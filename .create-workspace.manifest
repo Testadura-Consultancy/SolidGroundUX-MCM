@@ -1,0 +1,20 @@
+# create-workspace manifest
+# project: SolidGrond Management Modules
+# created: 2026-08-29 02:09:13
+DIR|/srv/storage/development/solidgrond-management-modules/target-root
+DIR|/srv/storage/development/solidgrond-management-modules/target-root/etc/update-motd.d
+DIR|/srv/storage/development/solidgrond-management-modules/target-root/usr/local/lib/solidgroundux/globals
+DIR|/srv/storage/development/solidgrond-management-modules/target-root/usr/local/lib/solidgroundux/templates
+DIR|/srv/storage/development/solidgrond-management-modules/target-root/usr/local/share/doc/SolidGrond Management Modules
+DIR|/srv/storage/development/solidgrond-management-modules/target-root/var/state
+DIR|/srv/storage/development/solidgrond-management-modules/target-root/usr/local/libexec
+DIR|/srv/storage/development/solidgrond-management-modules/target-root/usr/local/libexec/solidgroundux/solidgrond-management-modules
+FILE|/srv/storage/development/solidgrond-management-modules/target-root/usr/local/lib/solidgroundux/templates/exe-template.sh
+FILE|/srv/storage/development/solidgrond-management-modules/target-root/usr/local/lib/solidgroundux/templates/lib-template.sh
+FILE|/srv/storage/development/solidgrond-management-modules/target-root/usr/local/lib/solidgroundux/templates/mod-template.sh
+FILE|/srv/storage/development/solidgrond-management-modules/target-root/usr/local/lib/solidgroundux/templates/wrapper-template
+FILE|/srv/storage/development/solidgrond-management-modules/target-root/usr/local/libexec/solidgroundux/solidgrond-management-modules/mod-solidgrond-management-modules.sh
+FILE|/srv/storage/development/solidgrond-management-modules/SolidGrond Management Modules.code-workspace
+FILE|/srv/storage/development/solidgrond-management-modules/.gitignore
+FILE|/srv/storage/development/solidgrond-management-modules/target-root/usr/local/lib/solidgroundux/globals/solidgrond-management-modules-definitions.sh
+FILE|/srv/storage/development/solidgrond-management-modules/target-root/etc/update-motd.d/95-solidgrond-management-modules

@@ -1,0 +1,12 @@
+{
+  "folders": [
+    { "name": "SolidGrond Management Modules", "path": "." }
+  ],
+  "settings": {
+    "files.exclude": {
+      "**/.git": true,
+      "**/.DS_Store": true
+    },
+    "terminal.integrated.cwd": "${workspaceFolder}"
+  }
+}
