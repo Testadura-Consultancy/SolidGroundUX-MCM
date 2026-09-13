@@ -1,0 +1,1408 @@
+#!/usr/bin/env bash
+# =====================================================================================
+# SolidGroundUX - Manage Samba Shares
+# -------------------------------------------------------------------------------------
+# Metadata:
+#   Version     : 2.1
+#   Build       : 2624123
+#   Checksum    : 1905470e6ef2f9e38f36ad94fea0dda1506bae38252c7d848cfc4fe61c1f191e
+#   Source      : manage-samba-shares.sh
+#   Type        : script
+#   Group       : SolidGround Console
+#   Purpose     : Manage Samba shares
+#
+# Description:
+#   Provides complete interactive management of SolidGroundUX Samba shares, including
+#   share creation/removal, backing-directory structure, validation, and AD/NSS access
+#   control synchronized through POSIX ACLs and Samba valid-users/write-list settings.
+#
+# Attribution:
+#   Developers  : Mark Fieten
+#   Company     : Testadura Consultancy
+#   Client      : -
+#   Copyright   : © 2025 - 2026 Testadura Consultancy
+#   License     : Licensed under the Testadura Non-Commercial License (TD-NC) v1.1.
+# =====================================================================================
+set -uo pipefail
+
+# - Bootstrap ----------------------------------------------------------------------
+    # fn$ _framework_locator - Resolve and load the active SolidGroundUX framework
+        # . Purpose
+        #   Determine the filesystem root of the currently executing SolidGroundUX tree
+        #   from the script's physical path, then load the executable runtime library.
+        #
+        # . Behavior
+        #   - Resolves the physical path of the executing script.
+        #   - Treats usr, etc, and var as the canonical top-level SolidGroundUX tree roots.
+        #   - Uses the last occurrence of one of those path components to determine the
+        #     active filesystem root.
+        #   - Resolves production scripts beneath /usr, /etc, or /var to root (/).
+        #   - Resolves staged/development trees to the path prefix preceding the detected
+        #     usr, etc, or var component.
+        #   - Loads sgnd-exe-common.sh from the resolved framework root.
+        #
+        # . Globals (write)
+        #   SGND_FRAMEWORK_ROOT
+        #
+        # . Output
+        #   Writes fatal bootstrap errors to stderr using printf because framework UI
+        #   helpers are not available until sgnd-exe-common.sh has been loaded.
+        #
+        # . Returns
+        #   0 when the framework root was resolved and executable common library loaded.
+        #   126 when the script path cannot be resolved, no canonical root component can
+        #   be found, or the executable common library is unreadable.
+        #
+        # . Usage
+        #   _framework_locator || return $?
+    _framework_locator() {
+        local script_file=""
+        local path_without_root=""
+        local component=""
+        local framework_root=""
+        local exe_common=""
+        local index=0
+        local root_index=-1
+        local -a path_parts=()
+
+        script_file="$(readlink -f "${BASH_SOURCE[0]}")" || {
+            printf 'FATAL: Cannot resolve executable path: %s\n' "${BASH_SOURCE[0]}" >&2
+            return 126
+        }
+
+        path_without_root="${script_file#/}"
+        IFS='/' read -r -a path_parts <<< "$path_without_root"
+
+        for index in "${!path_parts[@]}"; do
+            component="${path_parts[$index]}"
+            case "$component" in
+                usr|etc|var)
+                    root_index=$index
+                    ;;
+            esac
+        done
+
+        if (( root_index < 0 )); then
+            printf 'FATAL: Cannot determine SolidGroundUX framework root from: %s\n' "$script_file" >&2
+            return 126
+        fi
+
+        if (( root_index == 0 )); then
+            framework_root="/"
+        else
+            framework_root=""
+            for (( index=0; index<root_index; index++ )); do
+                framework_root+="/${path_parts[$index]}"
+            done
+        fi
+
+        SGND_FRAMEWORK_ROOT="$framework_root"
+
+        if [[ "$SGND_FRAMEWORK_ROOT" == "/" ]]; then
+            exe_common="/usr/local/lib/solidgroundux/common/sgnd-exe-common.sh"
+        else
+            exe_common="${SGND_FRAMEWORK_ROOT%/}/usr/local/lib/solidgroundux/common/sgnd-exe-common.sh"
+        fi
+
+        [[ -r "$exe_common" ]] || {
+            printf 'FATAL: Cannot read executable common library: %s\n' "$exe_common" >&2
+            return 126
+        }
+
+        # shellcheck source=/dev/null
+        source "$exe_common"
+    }
+
+# - Script metadata ----------------------------------------------------------------
+    SGND_SCRIPT_FILE="$(readlink -f "${BASH_SOURCE[0]}")"
+    SGND_SCRIPT_DIR="$(cd -- "$(dirname -- "$SGND_SCRIPT_FILE")" && pwd)"
+    SGND_SCRIPT_BASE="$(basename -- "$SGND_SCRIPT_FILE")"
+    SGND_SCRIPT_NAME="${SGND_SCRIPT_BASE%.sh}"
+    SGND_SCRIPT_TITLE="Manage Samba Shares"
+    : "${SGND_SCRIPT_DESC:=Assign Active Directory groups and access rights to managed Samba shares.}"
+    : "${SGND_SCRIPT_VERSION:=2.0}"
+    : "${SGND_SCRIPT_BUILD:=2623211}"
+    : "${SGND_SCRIPT_DEVELOPERS:=Mark Fieten}"
+    : "${SGND_SCRIPT_COMPANY:=Testadura Consultancy}"
+    : "${SGND_SCRIPT_COPYRIGHT:=© 2025 - 2026 Testadura Consultancy}"
+    : "${SGND_SCRIPT_LICENSE:=Testadura Non-Commercial License (TD-NC) v1.1.}"
+
+# - Framework integration -----------------------------------------------------------
+    SGND_USING=()
+    SGND_ARGS_SPEC=()
+    SGND_SCRIPT_EXAMPLES=("  $SGND_SCRIPT_NAME")
+    SGND_SCRIPT_GLOBALS=()
+    SGND_STATE_VARIABLES=()
+    SGND_ON_EXIT_HANDLERS=()
+    SGND_STATE_SAVE=0
+
+# - Local declarations --------------------------------------------------------------
+    SGND_SAMBA_CONFIG="/etc/samba/smb.conf"
+    SGND_STORAGE_DEFAULT_MOUNTPOINT="/srv/storage"
+    SGND_STORAGE_CONFIG_FILE="${SGND_SYSCFG_DIR:-/etc/solidgroundux}/storage.cfg"
+    SGND_SAMBA_SHARE_ROOT="/srv/storage/shares"
+    MANAGED_SHARES=()
+    SELECTED_SHARES=()
+    DISCOVERED_GROUPS=()
+
+# - Helpers -------------------------------------------------------------------------
+    # fn: _refresh_storage_paths - Resolve the configured SolidGroundUX share root
+        # . Returns
+        #   0 after SGND_SAMBA_SHARE_ROOT is refreshed.
+        #
+        # . Usage
+        #   _refresh_storage_paths
+    _refresh_storage_paths() {
+        local mountpoint=""
+        local device=""
+        local uuid=""
+
+        if [[ -r "$SGND_STORAGE_CONFIG_FILE" ]]; then
+            mountpoint="$(awk -F= '
+                $1 == "SGND_STORAGE_MOUNTPOINT" {
+                    print substr($0, index($0, "=") + 1)
+                    exit
+                }
+            ' "$SGND_STORAGE_CONFIG_FILE" 2>/dev/null || true)"
+        fi
+
+        if [[ "$mountpoint" != /* || "$mountpoint" == "/" || "$mountpoint" == *[[:space:]]* ]]; then
+            mountpoint=""
+        fi
+
+        if [[ -z "$mountpoint" ]]; then
+            device="$(blkid -L SGND_STORAGE 2>/dev/null || true)"
+            if [[ -n "$device" ]]; then
+                uuid="$(blkid -s UUID -o value "$device" 2>/dev/null || true)"
+                if [[ -n "$uuid" ]]; then
+                    mountpoint="$(awk -v source="UUID=$uuid" '
+                        $0 !~ /^[[:space:]]*#/ && NF >= 2 && $1 == source { print $2; exit }
+                    ' /etc/fstab 2>/dev/null || true)"
+                fi
+            fi
+        fi
+
+        if [[ "$mountpoint" != /* || "$mountpoint" == "/" || "$mountpoint" == *[[:space:]]* ]]; then
+            mountpoint="$SGND_STORAGE_DEFAULT_MOUNTPOINT"
+        fi
+
+        SGND_SAMBA_SHARE_ROOT="$mountpoint/shares"
+    }
+
+    _refresh_storage_paths
+
+    # fn: _share_path - Resolve the configured path for a Samba share
+        # . Returns
+        #   Writes the configured path to stdout.
+        #
+        # . Usage
+        #   path="$(_share_path "Documents")"
+    _share_path() {
+        sudo testparm -s --section-name "$1" --parameter-name path 2>/dev/null || true
+    }
+
+    # fn: _list_managed_shares - Discover shares beneath the SolidGroundUX share root
+        # . Outputs (globals)
+        #   MANAGED_SHARES
+        #
+        # . Returns
+        #   0 when at least one managed share exists; 1 otherwise.
+        #
+        # . Usage
+        #   _list_managed_shares || return $?
+    _list_managed_shares() {
+        local share=""
+        local path=""
+
+        MANAGED_SHARES=()
+        command -v testparm >/dev/null 2>&1 || {
+            sayfail "Samba testparm is not available."
+            return 1
+        }
+
+        while IFS= read -r share; do
+            [[ -n "$share" ]] || continue
+            case "${share,,}" in
+                global|printers|print\$) continue ;;
+            esac
+
+            path="$(_share_path "$share")"
+            [[ "$path" == "$SGND_SAMBA_SHARE_ROOT/"* ]] || continue
+            MANAGED_SHARES+=("$share")
+        done < <(
+            sudo testparm -s 2>/dev/null | \
+                awk '/^\[[^]]+\]$/ { name=$0; gsub(/^\[|\]$/, "", name); print name }'
+        )
+
+        if (( ${#MANAGED_SHARES[@]} == 0 )); then
+            saywarning "No managed Samba shares found beneath $SGND_SAMBA_SHARE_ROOT."
+            return 1
+        fi
+
+        return 0
+    }
+
+    # fn: _select_shares - Select one or more managed shares
+        # . Outputs (globals)
+        #   SELECTED_SHARES
+        #
+        # . Returns
+        #   0 after selection; 1 when the user returns.
+        #
+        # . Usage
+        #   _select_shares || return $?
+    _select_shares() {
+        _list_managed_shares || return $?
+        SELECTED_SHARES=()
+        ask_selection \
+            --label "Select Samba share(s)" \
+            --var SELECTED_SHARES \
+            --multi \
+            --items "${MANAGED_SHARES[@]}"
+    }
+
+    # fn: _acl_groups_for_share - Return named group ACL entries for one share
+        # . Arguments
+        #   $1 SHARE
+        #
+        # . Output
+        #   Writes GROUP|PERMISSIONS records.
+        #
+        # . Usage
+        #   _acl_groups_for_share "Documents"
+    _acl_groups_for_share() {
+        local path=""
+        path="$(_share_path "$1")"
+        sudo test -d "$path" || return 1
+
+        sudo getfacl -cp -- "$path" 2>/dev/null | \
+            awk -F: '$1 == "group" && $2 != "" { print $2 "|" $3 }'
+    }
+
+    # fn: _validate_share_name - Validate a managed Samba share name
+        # . Usage
+        #   _validate_share_name "<arg1>"
+    _validate_share_name() {
+        [[ "${1:-}" =~ ^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$ ]]
+    }
+
+    # fn: _validate_relative_path - Validate a relative path beneath a share root
+        # . Usage
+        #   _validate_relative_path "<relative_path>"
+    _validate_relative_path() {
+        local relative_path="${1:-}"
+        local part=""
+        local -a parts=()
+
+        [[ -n "$relative_path" ]] || return 1
+        [[ "$relative_path" != /* ]] || return 1
+        [[ "$relative_path" != *$'\n'* ]] || return 1
+
+        IFS='/' read -r -a parts <<< "$relative_path"
+        for part in "${parts[@]}"; do
+            [[ -n "$part" && "$part" != "." && "$part" != ".." ]] || return 1
+        done
+        return 0
+    }
+
+    # fn: _share_exists - Test whether a Samba share exists
+        # . Usage
+        #   _share_exists "<share_name>"
+    _share_exists() {
+        local share_name="${1:-}"
+        [[ -r "$SGND_SAMBA_CONFIG" ]] || return 1
+        grep -Eqi "^[[:space:]]*\\[$share_name\\][[:space:]]*$" "$SGND_SAMBA_CONFIG"
+    }
+
+    # fn: _reload_samba - Validate and reload Samba configuration
+        # . Usage
+        #   _reload_samba
+    _reload_samba() {
+        sudo testparm -s >/dev/null 2>&1 || {
+            sayfail "The Samba configuration is invalid."
+            return 1
+        }
+        sudo systemctl reload smbd.service 2>/dev/null || sudo systemctl restart smbd.service
+    }
+
+    # fn: _create_share - Create a managed share and backing directory
+        # . Usage
+        #   _create_share
+    _create_share() {
+        local share_name=""
+        local comment=""
+        local browsable="Yes"
+        local read_only="No"
+        local share_path=""
+        local backup=""
+        local dlg_rc=0
+
+        while :; do
+            share_name=""
+            ask --label "Share name (Q=Back)" --var share_name --validate _validate_share_name --back || return 0
+
+            _share_exists "$share_name" && {
+                sayfail "A Samba share named '$share_name' already exists."
+                continue
+            }
+
+            share_path="$SGND_SAMBA_SHARE_ROOT/$share_name"
+            [[ ! -e "$share_path" ]] || {
+                sayfail "The backing directory already exists: $share_path"
+                continue
+            }
+
+            comment="$share_name share"
+            ask --label "Description (Q=Back)" --var comment --default "$comment" --back || return 0
+
+            ask_decision --label "Browsable" --choices "Yes|Y,No|N,Quit|Q" --default "Yes" --var browsable || return $?
+            [[ "${browsable^^}" == "QUIT" || "${browsable^^}" == "Q" ]] && return 0
+
+            ask_decision --label "Read only" --choices "Yes|Y,No|N,Quit|Q" --default "No" --var read_only || return $?
+            [[ "${read_only^^}" == "QUIT" || "${read_only^^}" == "Q" ]] && return 0
+
+            if (( ${FLAG_DRYRUN:-0} == 1 )); then
+                sayinfo "Dry run: Would create Samba share '$share_name' at $share_path."
+            else
+                backup="$SGND_SAMBA_CONFIG.pre-share.$(date +%Y%m%d%H%M%S)"
+                sudo cp -a "$SGND_SAMBA_CONFIG" "$backup" || return 1
+                sudo install -d -m 0770 "$share_path" || return 1
+
+                printf '%s\n' \
+                    '' \
+                    "# SolidGroundUX managed share: $share_name" \
+                    "[$share_name]" \
+                    "    path = $share_path" \
+                    "    comment = $comment" \
+                    "    browseable = ${browsable,,}" \
+                    "    read only = ${read_only,,}" \
+                    '    guest ok = no' \
+                    '    create mask = 0660' \
+                    '    directory mask = 0770' | \
+                    sudo tee -a "$SGND_SAMBA_CONFIG" >/dev/null || return 1
+
+                if ! _reload_samba; then
+                    sudo cp -a "$backup" "$SGND_SAMBA_CONFIG"
+                    sudo rm -rf -- "$share_path"
+                    return 1
+                fi
+
+                sayok "Samba share '$share_name' created."
+                sgnd_print_labeledvalue --label "Directory" --value "$share_path" --labelwidth 18
+            fi
+
+            dlg_rc=0
+            ask_dlg_autocontinue --seconds 5 --legend "Enter=return to manager; timeout=create another share" || dlg_rc=$?
+            case "$dlg_rc" in
+                1) continue ;;
+                *) return 0 ;;
+            esac
+        done
+    }
+
+    # fn: _remove_share - Remove a managed share and optionally its directory
+        # . Usage
+        #   _remove_share
+    _remove_share() {
+        local share_name=""
+        local share_path=""
+        local remove_data="No"
+        local temp_file=""
+        local backup=""
+        local dlg_rc=0
+
+        while :; do
+            _list_managed_shares || return 0
+            ask_selection --label "Select Samba share to remove" --var share_name --items "${MANAGED_SHARES[@]}" || return 0
+            share_path="$(_share_path "$share_name")"
+
+            ask_decision --label "Delete share data" --choices "Yes|Y,No|N,Quit|Q" --default "No" --var remove_data || return $?
+            [[ "${remove_data^^}" == "QUIT" || "${remove_data^^}" == "Q" ]] && return 0
+
+            if (( ${FLAG_DRYRUN:-0} == 1 )); then
+                sayinfo "Dry run: Would remove Samba share '$share_name'."
+            else
+                temp_file="$(mktemp)" || return 1
+                backup="$SGND_SAMBA_CONFIG.pre-remove.$(date +%Y%m%d%H%M%S)"
+                sudo cp -a "$SGND_SAMBA_CONFIG" "$backup" || { rm -f "$temp_file"; return 1; }
+
+                sudo awk -v section="$share_name" '
+                    BEGIN { skip = 0 }
+                    /^\[[^]]+\][[:space:]]*$/ {
+                        current = $0
+                        gsub(/^\[|\][[:space:]]*$/, "", current)
+                        skip = (tolower(current) == tolower(section))
+                    }
+                    !skip { print }
+                ' "$SGND_SAMBA_CONFIG" > "$temp_file" || { rm -f "$temp_file"; return 1; }
+
+                sudo install -o root -g root -m 0644 "$temp_file" "$SGND_SAMBA_CONFIG" || { rm -f "$temp_file"; return 1; }
+                rm -f "$temp_file"
+
+                if ! _reload_samba; then
+                    sudo cp -a "$backup" "$SGND_SAMBA_CONFIG"
+                    return 1
+                fi
+
+                if [[ "${remove_data^^}" == "YES" ]]; then
+                    sudo rm -rf -- "$share_path" || return 1
+                fi
+
+                sayok "Samba share '$share_name' removed."
+            fi
+
+            SELECTED_SHARES=()
+            dlg_rc=0
+            ask_dlg_autocontinue --seconds 5 --legend "Enter=return to manager; timeout=remove another share" || dlg_rc=$?
+            case "$dlg_rc" in
+                1) continue ;;
+                *) return 0 ;;
+            esac
+        done
+    }
+
+    # fn: _ensure_selected_shares - Ensure one or more managed shares are selected
+        # . Purpose
+        #   Reuse the current share selection and only prompt when nothing is selected.
+        #
+        # . Returns
+        #   0 when at least one share is selected; 1 when selection is cancelled.
+        #
+        # . Usage
+        #   _ensure_selected_shares || return 0
+    _ensure_selected_shares() {
+        (( ${#SELECTED_SHARES[@]} > 0 )) && return 0
+        _select_shares || return 1
+        (( ${#SELECTED_SHARES[@]} > 0 ))
+    }
+
+    # fn: _inherit_directory_access - Copy a parent directory's ownership and ACL model
+        # . Purpose
+        #   Make a newly created subdirectory follow the selected share's existing
+        #   Unix ownership, mode, and POSIX ACL/default-ACL model instead of inventing
+        #   per-user ownership from the directory name.
+        #
+        # . Arguments
+        #   $1 PARENT
+        #   $2 CHILD
+        #
+        # . Returns
+        #   0 when ownership/mode/ACL inheritance succeeds; non-zero otherwise.
+        # . Usage
+        #   _inherit_directory_access "<parent>" "<child>"
+    _inherit_directory_access() {
+        local parent="${1:?missing parent directory}"
+        local child="${2:?missing child directory}"
+
+        sudo chown --reference="$parent" -- "$child" || return 1
+        sudo chmod --reference="$parent" -- "$child" || return 1
+        sudo getfacl -cp -- "$parent" 2>/dev/null | sudo setfacl --set-file=- -- "$child" || return 1
+        return 0
+    }
+
+    # fn: _create_inherited_directory_tree - Create a relative directory tree with inherited access
+        # . Arguments
+        #   $1 SHARE_PATH
+        #   $2 RELATIVE_PATH
+        #
+        # . Returns
+        #   0 when the complete tree exists and newly created components inherited
+        #   their parent's ownership/mode/ACL model; non-zero on failure.
+        # . Usage
+        #   _create_inherited_directory_tree "<share_path>" "<relative_path>"
+    _create_inherited_directory_tree() {
+        local share_path="${1:?missing share path}"
+        local relative_path="${2:?missing relative path}"
+        local current="$share_path"
+        local child=""
+        local part=""
+        local -a parts=()
+
+        IFS='/' read -r -a parts <<< "$relative_path"
+        for part in "${parts[@]}"; do
+            child="$current/$part"
+            if ! sudo test -d "$child"; then
+                sudo mkdir -- "$child" || return 1
+                _inherit_directory_access "$current" "$child" || return 1
+            fi
+            current="$child"
+        done
+
+        sudo test -d "$current"
+    }
+
+    # fn: _list_share_subdirectories_raw - Return relative subdirectory paths for one share
+        # . Arguments
+        #   $1 SHARE
+        #
+        # . Output
+        #   Writes one relative directory path per line.
+        # . Usage
+        #   _list_share_subdirectories_raw "<share>"
+    _list_share_subdirectories_raw() {
+        local share="${1:?missing share}"
+        local share_path=""
+
+        share_path="$(_share_path "$share")"
+        sudo test -d "$share_path" || return 1
+        sudo find "$share_path" -mindepth 1 -type d -printf '%P\n' 2>/dev/null | LC_ALL=C sort
+    }
+
+    # fn: _create_subdirectory - Create subdirectories beneath the currently selected shares
+        # . Purpose
+        #   Create one relative path in every selected share. If no share is currently
+        #   selected, prompt for a share selection first. Newly created directory
+        #   components inherit the parent share's ownership, mode, and ACL model.
+        #
+        # . Returns
+        #   0 after returning to the manager; non-zero on creation failure.
+        # . Usage
+        #   _create_subdirectory
+    _create_subdirectory() {
+        local share=""
+        local share_path=""
+        local relative_path=""
+        local full_path=""
+        local dlg_rc=0
+        local created_count=0
+
+        _ensure_selected_shares || return 0
+
+        while :; do
+            relative_path=""
+            ask \
+                --label "Relative directory path (e.g. Files/Mark) (Q=Back)" \
+                --var relative_path \
+                --validate _validate_relative_path \
+                --back || return 0
+
+            created_count=0
+            for share in "${SELECTED_SHARES[@]}"; do
+                share_path="$(_share_path "$share")"
+                sudo test -d "$share_path" || {
+                    sayfail "Share backing directory does not exist: $share_path"
+                    return 1
+                }
+
+                full_path="$share_path/$relative_path"
+                sgnd_print_labeledvalue --label "Share" --value "$share" --labelwidth 18
+                sgnd_print_labeledvalue --label "Directory" --value "$full_path" --labelwidth 18
+
+                if sudo test -d "$full_path"; then
+                    saywarning "Directory already exists: $full_path"
+                    continue
+                fi
+
+                if (( ${FLAG_DRYRUN:-0} == 1 )); then
+                    sayinfo "Dry run: Would create $full_path using the share access model."
+                    created_count=$((created_count + 1))
+                    continue
+                fi
+
+                _create_inherited_directory_tree "$share_path" "$relative_path" || {
+                    sayfail "Could not create subdirectory tree: $full_path"
+                    return 1
+                }
+
+                sudo test -d "$full_path" || {
+                    sayfail "Directory creation could not be verified: $full_path"
+                    return 1
+                }
+
+                sayok "Created '$relative_path' in '$share'."
+                created_count=$((created_count + 1))
+            done
+
+            dlg_rc=0
+            ask_dlg_autocontinue \
+                --seconds 5 \
+                --again \
+                --legend "Enter=return to manager; A=another; timeout=create another subdirectory" \
+                || dlg_rc=$?
+            case "$dlg_rc" in
+                1|3) continue ;;
+                *) return 0 ;;
+            esac
+        done
+    }
+
+    # fn: _list_subdirectories - List subdirectories beneath the currently selected shares
+        # . Returns
+        #   0 after displaying the directory trees.
+        # . Usage
+        #   _list_subdirectories
+    _list_subdirectories() {
+        local share=""
+        local relative_path=""
+        local count=0
+
+        _ensure_selected_shares || return 0
+
+        for share in "${SELECTED_SHARES[@]}"; do
+            sgnd_print
+            sgnd_print_sectionheader --text "$share subdirectories"
+            count=0
+            while IFS= read -r relative_path; do
+                [[ -n "$relative_path" ]] || continue
+                sgnd_print --text "$relative_path" --pad 2
+                count=$((count + 1))
+            done < <(_list_share_subdirectories_raw "$share" || true)
+
+            (( count > 0 )) || sgnd_print --text "No subdirectories found." --pad 2
+        done
+
+        ask_dlg_autocontinue \
+            --seconds 15 \
+            --message "Press Enter to return to share management." \
+            --pause || true
+        return 0
+    }
+
+    # fn: _remove_subdirectory - Remove a selected subdirectory from a selected share
+        # . Purpose
+        #   Select a concrete relative directory beneath the current share selection and
+        #   remove it. The share root itself is never presented or accepted as a target.
+        #
+        # . Returns
+        #   0 after returning to the manager; non-zero on removal failure.
+        # . Usage
+        #   _remove_subdirectory
+    _remove_subdirectory() {
+        local share=""
+        local relative_path=""
+        local selected=""
+        local selected_share=""
+        local selected_relative=""
+        local share_path=""
+        local full_path=""
+        local decision="No"
+        local dlg_rc=0
+        local -a choices=()
+
+        _ensure_selected_shares || return 0
+
+        while :; do
+            choices=()
+            for share in "${SELECTED_SHARES[@]}"; do
+                while IFS= read -r relative_path; do
+                    [[ -n "$relative_path" ]] || continue
+                    choices+=("$share/$relative_path")
+                done < <(_list_share_subdirectories_raw "$share" || true)
+            done
+
+            if (( ${#choices[@]} == 0 )); then
+                saywarning "No subdirectories found beneath the selected share(s)."
+                return 0
+            fi
+
+            ask_selection \
+                --label "Select subdirectory to remove" \
+                --var selected \
+                --items "${choices[@]}" || return 0
+
+            selected_share="${selected%%/*}"
+            selected_relative="${selected#*/}"
+            _validate_relative_path "$selected_relative" || {
+                sayfail "Invalid relative directory path: $selected_relative"
+                return 1
+            }
+
+            share_path="$(_share_path "$selected_share")"
+            full_path="$share_path/$selected_relative"
+            [[ "$full_path" == "$share_path/"* && "$full_path" != "$share_path" ]] || {
+                sayfail "Refusing to remove the share root."
+                return 1
+            }
+            sudo test -d "$full_path" || {
+                saywarning "Directory no longer exists: $full_path"
+                continue
+            }
+
+            if sudo find "$full_path" -mindepth 1 -print -quit 2>/dev/null | grep -q .; then
+                decision="No"
+                ask_decision \
+                    --label "Directory is not empty. Remove it and all contents" \
+                    --choices "Yes|Y,No|N,Quit|Q" \
+                    --default "No" \
+                    --var decision || return $?
+                [[ "${decision^^}" == "QUIT" || "${decision^^}" == "Q" ]] && return 0
+                [[ "${decision^^}" == "YES" ]] || continue
+            fi
+
+            if (( ${FLAG_DRYRUN:-0} == 1 )); then
+                sayinfo "Dry run: Would remove $full_path."
+            else
+                sudo rm -rf -- "$full_path" || return 1
+                sudo test ! -e "$full_path" || {
+                    sayfail "Directory removal could not be verified: $full_path"
+                    return 1
+                }
+                sayok "Removed '$selected_relative' from '$selected_share'."
+            fi
+
+            dlg_rc=0
+            ask_dlg_autocontinue \
+                --seconds 5 \
+                --again \
+                --legend "Enter=return to manager; A=another; timeout=remove another subdirectory" \
+                || dlg_rc=$?
+            case "$dlg_rc" in
+                1|3) continue ;;
+                *) return 0 ;;
+            esac
+        done
+    }
+
+    # fn: _ensure_kerberos_ticket - Ensure an authenticated Kerberos ticket is available
+        # . Purpose
+        #   Require an existing Kerberos TGT before querying Active Directory through LDAP/GSSAPI.
+        #
+        # . Returns
+        #   0 when a valid ticket cache exists; 1 otherwise.
+        # . Usage
+        #   _ensure_kerberos_ticket
+    _ensure_kerberos_ticket() {
+        local realm=""
+        local principal=""
+        local username="Administrator"
+
+        if klist -s 2>/dev/null; then
+            return 0
+        fi
+
+        realm="$(realm list --name-only 2>/dev/null | head -n 1 || true)"
+        realm="${realm^^}"
+        [[ -n "$realm" ]] || {
+            saywarning "No joined Active Directory realm was found."
+            return 1
+        }
+
+        saywarning "No valid Kerberos ticket is available."
+        sgnd_print --text "AD Admin rights are needed to query Active Directory. Please enter the AD administrator account."
+
+        ask \
+            --label "AD user (Q=Back)" \
+            --var username \
+            --default "Administrator" \
+            --back || return 1
+
+        [[ "$username" == *"@"* ]] && username="${username%@*}"
+        principal="${username}@${realm}"
+
+        sayinfo "Authenticate as $principal."
+        if ! kinit "$principal"; then
+            sayfail "Kerberos authentication failed for $principal."
+            return 1
+        fi
+
+        if ! klist -s 2>/dev/null; then
+            sayfail "Kerberos authentication completed without a usable ticket."
+            return 1
+        fi
+
+        sayok "Kerberos authentication succeeded."
+        return 0
+    }
+
+    # fn: _discover_ad_groups - Discover domain groups visible through NSS
+        # . Purpose
+        #   Query Active Directory directly for group names and include groups already
+        #   present on selected share ACLs. NSS is used only to resolve the selected
+        #   group to the local fully-qualified identity required for ACL operations.
+        #
+        # Outputs (globals):
+        #   DISCOVERED_GROUPS
+        #
+        # . Returns
+        #   0 always.
+        #
+        # . Usage
+        #   _discover_ad_groups
+    _discover_ad_groups() {
+        local realm=""
+        local realm_lower=""
+        local dc=""
+        local base_dn=""
+        local group=""
+        local share=""
+        local acl_record=""
+        local -A seen=()
+
+        DISCOVERED_GROUPS=()
+
+        realm="$(realm list --name-only 2>/dev/null | head -n 1 || true)"
+        [[ -n "$realm" ]] || {
+            saywarning "No joined Active Directory realm was found."
+            return 1
+        }
+        realm="${realm^^}"
+        realm_lower="${realm,,}"
+
+        dc="$(
+            host -t SRV "_ldap._tcp.${realm_lower}" 2>/dev/null |
+                awk '{ print $NF }' |
+                sed 's/\.$//' |
+                head -n 1
+        )"
+        [[ -n "$dc" ]] || {
+            saywarning "No LDAP domain controller could be discovered for $realm."
+            return 1
+        }
+
+        base_dn="$(
+            awk -v realm="$realm_lower" 'BEGIN {
+                n=split(realm, parts, ".")
+                for (i=1; i<=n; i++) {
+                    if (i > 1) printf ","
+                    printf "DC=%s", parts[i]
+                }
+                printf "\n"
+            }'
+        )"
+
+        _ensure_kerberos_ticket || return 1
+
+        command -v ldapsearch >/dev/null 2>&1 || {
+            saywarning "ldapsearch is not installed."
+            return 1
+        }
+
+        # LDAP group discovery uses the existing Kerberos ticket. -N is required
+        # so SASL does not canonicalize the DC hostname away from its registered SPN.
+        while IFS= read -r group; do
+            [[ -n "$group" ]] || continue
+            [[ -n "${seen[$group]-}" ]] && continue
+            seen["$group"]=1
+            DISCOVERED_GROUPS+=("$group")
+        done < <(
+            ldapsearch -N -Y GSSAPI \
+                -H "ldap://$dc" \
+                -b "$base_dn" \
+                '(objectClass=group)' \
+                sAMAccountName 2>/dev/null |
+            awk -F': ' '/^sAMAccountName: / { print $2 }' |
+            LC_ALL=C sort -fu
+        )
+
+        # Preserve groups already assigned on selected share ACLs.
+        for share in "${SELECTED_SHARES[@]}"; do
+            while IFS= read -r acl_record; do
+                group="${acl_record%%|*}"
+                [[ -n "$group" ]] || continue
+
+                if [[ "${group,,}" == *"@${realm_lower}" ]]; then
+                    group="${group%@*}"
+                fi
+
+                [[ -n "${seen[$group]-}" ]] && continue
+                seen["$group"]=1
+                DISCOVERED_GROUPS+=("$group")
+            done < <(_acl_groups_for_share "$share" || true)
+        done
+
+        (( ${#DISCOVERED_GROUPS[@]} > 0 )) || {
+            saywarning "No Active Directory groups could be discovered."
+            return 1
+        }
+
+        mapfile -t DISCOVERED_GROUPS < <(
+            printf '%s\n' "${DISCOVERED_GROUPS[@]}" | LC_ALL=C sort -fu
+        )
+
+        return 0
+    }
+
+    # fn: _select_group - Select or enter an AD/NSS group
+        # . Arguments
+        #   $1 OUTPUT_VAR
+        #
+        # . Returns
+        #   0 with a resolvable group; 1 on cancellation.
+        #
+        # . Usage
+        #   _select_group group_name || return $?
+    _select_group() {
+        local output_var="$1"
+        local selected=""
+        local entered=""
+        local realm=""
+        local realm_lower=""
+        local qualified=""
+        local -a choices=()
+
+        realm="$(realm list --name-only 2>/dev/null | head -n 1 || true)"
+        [[ -n "$realm" ]] || {
+            saywarning "No joined Active Directory realm was found."
+            return 1
+        }
+        realm="${realm^^}"
+        realm_lower="${realm,,}"
+
+        _discover_ad_groups || return 1
+        choices=("${DISCOVERED_GROUPS[@]}" "Enter group manually")
+
+        ask_selection \
+            --label "Select Active Directory group" \
+            --var selected \
+            --items "${choices[@]}" || return 1
+
+        if [[ "$selected" == "Enter group manually" ]]; then
+            ask --label "AD group (Q=Back)" --var entered --back || return 1
+            selected="$entered"
+        fi
+
+        if [[ "$selected" == *"@"* ]]; then
+            qualified="$selected"
+        else
+            qualified="${selected}@${realm_lower}"
+        fi
+
+        if ! getent group "$qualified" >/dev/null 2>&1; then
+            sayfail "Group cannot be resolved through NSS: $qualified"
+            return 1
+        fi
+
+        printf -v "$output_var" '%s' "$qualified"
+        return 0
+    }
+
+    # fn: _samba_principal - Format an NSS group for a Samba user-list parameter
+        # . Output
+        #   Writes a quoted Samba group principal.
+        #
+        # . Usage
+        #   _samba_principal "domain admins@testadura.hq"
+    _samba_principal() {
+        local group="${1//\"/}"
+        printf '@"%s"' "$group"
+    }
+
+    # fn: _sync_share_samba_access - Synchronize Samba access lists from POSIX ACLs
+        # . Arguments
+        #   $1 SHARE
+        #
+        # . Returns
+        #   0 when smb.conf validates and reload succeeds; non-zero otherwise.
+        #
+        # . Usage
+        #   _sync_share_samba_access "Documents"
+    _sync_share_samba_access() {
+        local share="$1"
+        local group=""
+        local perms=""
+        local principal=""
+        local valid_users=""
+        local write_list=""
+        local temp_file=""
+        local backup=""
+        local have_groups=0
+
+        while IFS='|' read -r group perms; do
+            [[ -n "$group" ]] || continue
+            principal="$(_samba_principal "$group")"
+            [[ -n "$valid_users" ]] && valid_users+=" "
+            valid_users+="$principal"
+            have_groups=1
+
+            if [[ "$perms" == *w* ]]; then
+                [[ -n "$write_list" ]] && write_list+=" "
+                write_list+="$principal"
+            fi
+        done < <(_acl_groups_for_share "$share")
+
+        if (( ${FLAG_DRYRUN:-0} == 1 )); then
+            sayinfo "Dry run: Would synchronize Samba access for '$share'."
+            return 0
+        fi
+
+        temp_file="$(mktemp)" || return 1
+        backup="$SGND_SAMBA_CONFIG.pre-access.$(date +%Y%m%d%H%M%S)"
+        sudo cp -a "$SGND_SAMBA_CONFIG" "$backup" || { rm -f "$temp_file"; return 1; }
+
+        awk \
+            -v target="$share" \
+            -v valid="$valid_users" \
+            -v writers="$write_list" \
+            -v managed="$have_groups" '
+            BEGIN { in_target=0 }
+            /^\[[^]]+\][[:space:]]*$/ {
+                name=$0
+                gsub(/^\[|\][[:space:]]*$/, "", name)
+                in_target=(tolower(name) == tolower(target))
+                print
+                if (in_target && managed) {
+                    print "    read only = yes"
+                    print "    valid users = " valid
+                    if (writers != "") print "    write list = " writers
+                }
+                next
+            }
+            in_target && /^[[:space:]]*(valid users|write list)[[:space:]]*=/ { next }
+            in_target && managed && /^[[:space:]]*read only[[:space:]]*=/ { next }
+            { print }
+        ' "$SGND_SAMBA_CONFIG" > "$temp_file" || { rm -f "$temp_file"; return 1; }
+
+        sudo install -o root -g root -m 0644 "$temp_file" "$SGND_SAMBA_CONFIG" || {
+            rm -f "$temp_file"
+            return 1
+        }
+        rm -f "$temp_file"
+
+        if ! sudo testparm -s >/dev/null 2>&1; then
+            sudo cp -a "$backup" "$SGND_SAMBA_CONFIG"
+            sayfail "Samba configuration validation failed; previous configuration restored."
+            return 1
+        fi
+
+        sudo systemctl reload smbd.service 2>/dev/null || sudo systemctl restart smbd.service || {
+            sudo cp -a "$backup" "$SGND_SAMBA_CONFIG"
+            sayfail "Samba reload failed; previous configuration restored."
+            return 1
+        }
+
+        return 0
+    }
+
+    # fn: _apply_group_access - Apply read or write ACLs to selected shares
+        # . Arguments
+        #   $1 MODE - read or write
+        #
+        # . Returns
+        #   0 after all selected shares are updated; non-zero on failure.
+        #
+        # . Usage
+        #   _apply_group_access write
+    _apply_group_access() {
+        local mode="$1"
+        local group=""
+        local share=""
+        local path=""
+        local perms="r-x"
+
+        [[ "$mode" == "write" ]] && perms="rwx"
+        _select_group group || return $?
+
+        for share in "${SELECTED_SHARES[@]}"; do
+            path="$(_share_path "$share")"
+            sudo test -d "$path" || { sayfail "Share path not found: $path"; return 1; }
+
+            if (( ${FLAG_DRYRUN:-0} == 1 )); then
+                sayinfo "Dry run: Would grant $mode access to '$group' on '$share'."
+                continue
+            fi
+
+            sudo setfacl -m "g:$group:$perms" -m "m::rwx" -- "$path" || return 1
+            sudo setfacl -m "d:g:$group:$perms" -m "d:m::rwx" -- "$path" || return 1
+            _sync_share_samba_access "$share" || return $?
+            sayok "Granted $mode access to '$group' on '$share'."
+        done
+
+        return 0
+    }
+
+    # fn: _select_assigned_group - Select a group currently assigned to the selected shares
+        # . Arguments
+        #   $1 OUTPUT_VAR
+        #
+        # . Returns
+        #   0 with a selected group; 1 when none are assigned or the user returns.
+        # . Usage
+        #   _select_assigned_group "<output_var>"
+    _select_assigned_group() {
+        local output_var="${1:?missing output variable}"
+        local share=""
+        local record=""
+        local group=""
+        local selected=""
+        local -A seen=()
+        local -a groups=()
+
+        for share in "${SELECTED_SHARES[@]}"; do
+            while IFS= read -r record; do
+                group="${record%%|*}"
+                [[ -n "$group" ]] || continue
+                [[ -n "${seen[$group]-}" ]] && continue
+                seen["$group"]=1
+                groups+=("$group")
+            done < <(_acl_groups_for_share "$share" || true)
+        done
+
+        (( ${#groups[@]} > 0 )) || {
+            saywarning "No AD/NSS groups are assigned to the selected shares."
+            return 1
+        }
+
+        if (( ${#groups[@]} > 1 )); then
+            mapfile -t groups < <(printf '%s\n' "${groups[@]}" | LC_ALL=C sort -fu)
+        fi
+
+        ask_selection \
+            --label "Select assigned AD/NSS group" \
+            --var selected \
+            --items "${groups[@]}" || return 1
+
+        printf -v "$output_var" '%s' "$selected"
+        return 0
+    }
+
+    # fn: _remove_group_access - Remove one AD/NSS group's access from selected shares
+        # . Returns
+        #   0 after all selected shares are updated; non-zero on failure.
+        #
+        # . Usage
+        #   _remove_group_access
+    _remove_group_access() {
+        local group=""
+        local share=""
+        local path=""
+        local group_count=0
+        local group_present=0
+
+        _select_assigned_group group || return $?
+
+        for share in "${SELECTED_SHARES[@]}"; do
+            path="$(_share_path "$share")"
+            sudo test -d "$path" || { sayfail "Share path not found: $path"; return 1; }
+
+            group_count=0
+            group_present=0
+            while IFS='|' read -r acl_group _; do
+                [[ -n "$acl_group" ]] || continue
+                group_count=$((group_count + 1))
+                [[ "$acl_group" == "$group" ]] && group_present=1
+            done < <(_acl_groups_for_share "$share" || true)
+
+            (( group_present )) || {
+                saywarning "Group '$group' is not assigned to '$share'."
+                continue
+            }
+
+            if (( group_count <= 1 )); then
+                saywarning "Cannot remove the last managed group from '$share'; assign a replacement group first."
+                continue
+            fi
+
+            if (( ${FLAG_DRYRUN:-0} == 1 )); then
+                sayinfo "Dry run: Would remove '$group' from '$share'."
+                continue
+            fi
+
+            sudo setfacl -x "g:$group" -- "$path" 2>/dev/null || true
+            sudo setfacl -x "d:g:$group" -- "$path" 2>/dev/null || true
+            _sync_share_samba_access "$share" || return $?
+            sayok "Removed '$group' access from '$share'."
+        done
+
+        return 0
+    }
+
+    # fn: _show_access - Display current share paths and named group ACLs
+        # . Returns
+        #   0 after displaying access state.
+        #
+        # . Usage
+        #   _show_access
+    _show_access() {
+        local share=""
+        local path=""
+        local group=""
+        local perms=""
+        local role=""
+        local count=0
+
+        for share in "${SELECTED_SHARES[@]}"; do
+            path="$(_share_path "$share")"
+            sgnd_print
+            sgnd_print_sectionheader --text "$share"
+            sgnd_print_labeledvalue --label "Path" --value "$path" --labelwidth 20
+            count=0
+
+            while IFS='|' read -r group perms; do
+                [[ -n "$group" ]] || continue
+                role="Read only"
+                [[ "$perms" == *w* ]] && role="Read / write"
+                sgnd_print_labeledvalue --label "$group" --value "$role ($perms)" --labelwidth 30
+                count=$((count + 1))
+            done < <(_acl_groups_for_share "$share" || true)
+
+            (( count > 0 )) || sgnd_print --text "No named group ACLs assigned." --pad 2
+        done
+        return 0
+    }
+
+    # fn: _validate_selected - Validate selected share paths, ACLs, and Samba configuration
+        # . Returns
+        #   0 when selected shares validate; 1 otherwise.
+        #
+        # . Usage
+        #   _validate_selected
+    _validate_selected() {
+        local share=""
+        local path=""
+        local failures=0
+        local result=""
+
+        sgnd_print
+        sgnd_print_sectionheader --text "Validate selected Samba shares"
+
+        if sudo testparm -s >/dev/null 2>&1; then
+            result="Passed"
+        else
+            result="Failed"
+            failures=$((failures + 1))
+        fi
+        sgnd_print_labeledvalue --label "Samba configuration" --value "$result" --labelwidth 24
+
+        for share in "${SELECTED_SHARES[@]}"; do
+            path="$(_share_path "$share")"
+
+            sgnd_print
+            sgnd_print_sectionheader --text "$share"
+
+            if [[ "$path" == "$SGND_SAMBA_SHARE_ROOT/"* ]] && sudo test -d "$path"; then
+                result="Passed"
+            else
+                result="Failed"
+                failures=$((failures + 1))
+            fi
+            sgnd_print_labeledvalue --label "Managed path" --value "$result" --labelwidth 24
+            sgnd_print_labeledvalue --label "Path" --value "${path:-Unavailable}" --labelwidth 24
+
+            if [[ -n "$path" ]] && sudo getfacl -cp -- "$path" >/dev/null 2>&1; then
+                result="Passed"
+            else
+                result="Failed"
+                failures=$((failures + 1))
+            fi
+            sgnd_print_labeledvalue --label "ACL readable" --value "$result" --labelwidth 24
+
+            if [[ -n "$path" ]] && sudo test -d "$path"; then
+                result="Passed"
+            else
+                result="Failed"
+                failures=$((failures + 1))
+            fi
+            sgnd_print_labeledvalue --label "Backing directory" --value "$result" --labelwidth 24
+        done
+
+        local validation_rc=0
+
+        sgnd_print
+        if (( failures == 0 )); then
+            sgnd_print_labeledvalue --label "Result" --value "Passed" --labelwidth 24
+            validation_rc=0
+        else
+            sgnd_print_labeledvalue --label "Result" --value "Failed ($failures check(s))" --labelwidth 24
+            validation_rc=1
+        fi
+
+        # Keep the validation report visible before the manager redraws.
+        ask_dlg_autocontinue \
+            --seconds 15 \
+            --message "Press Enter to return to share management." \
+            --pause || true
+
+        return "$validation_rc"
+    }
+
+# - Main ---------------------------------------------------------------------------
+    # fn: main - Run interactive Samba share access management
+        # . Returns
+        #   0 after normal exit; non-zero when startup requirements fail.
+        #
+        # . Usage
+        #   main "$@"
+    main() {
+        local action=""
+        local selected_share=""
+        local -a actions=(
+            "Create share"
+            "Remove share"
+            "Create subdirectory"
+            "List subdirectories"
+            "Remove subdirectory"
+            "Select shares"
+            "Show access"
+            "Grant read-only access to AD group"
+            "Grant read/write access to AD group"
+            "Remove AD group access"
+            "Validate selected shares"
+        )
+
+        _framework_locator || return $?
+        sgnd_exe_start -- "$@" || return $?
+
+        command -v setfacl >/dev/null 2>&1 || { sayfail "setfacl is not installed."; return 1; }
+        command -v getfacl >/dev/null 2>&1 || { sayfail "getfacl is not installed."; return 1; }
+        [[ -r "$SGND_SAMBA_CONFIG" ]] || { sayfail "Samba configuration not found: $SGND_SAMBA_CONFIG"; return 1; }
+        [[ -d "$SGND_SAMBA_SHARE_ROOT" ]] || { sayfail "Share root not found: $SGND_SAMBA_SHARE_ROOT"; return 1; }
+
+        while :; do
+            sgnd_clear
+            action=""
+
+            if (( ${#SELECTED_SHARES[@]} > 0 )); then
+                sgnd_print
+                sgnd_print_sectionheader --text "Selected Samba shares"
+                for selected_share in "${SELECTED_SHARES[@]}"; do
+                    sgnd_print --text "$selected_share" --pad 2
+                done
+            else
+                sgnd_print
+                sgnd_print_sectionheader --text "Selected Samba shares"
+                sgnd_print --text "None selected" --pad 2
+            fi
+
+            ask_selection \
+                --label "Manage Samba shares" \
+                --var action \
+                --items "${actions[@]}" || return 0
+
+            case "$action" in
+                "Create share")
+                    _create_share || true
+                    ;;
+                "Remove share")
+                    _remove_share || true
+                    ;;
+                "Create subdirectory")
+                    _create_subdirectory || true
+                    ;;
+                "List subdirectories")
+                    _list_subdirectories || true
+                    ;;
+                "Remove subdirectory")
+                    _remove_subdirectory || true
+                    ;;
+                "Select shares")
+                    _select_shares || true
+                    ;;
+                "Show access")
+                    (( ${#SELECTED_SHARES[@]} > 0 )) || { saywarning "Select one or more shares first."; ask_dlg_autocontinue --seconds 5 || true; continue; }
+                    _show_access
+                    ask_dlg_autocontinue --seconds 15 --message "Press Enter to return to share management." --pause || true
+                    ;;
+                "Grant read-only access to AD group")
+                    (( ${#SELECTED_SHARES[@]} > 0 )) || { saywarning "Select one or more shares first."; ask_dlg_autocontinue --seconds 5 || true; continue; }
+                    _apply_group_access read || true
+                    ;;
+                "Grant read/write access to AD group")
+                    (( ${#SELECTED_SHARES[@]} > 0 )) || { saywarning "Select one or more shares first."; ask_dlg_autocontinue --seconds 5 || true; continue; }
+                    _apply_group_access write || true
+                    ;;
+                "Remove AD group access")
+                    (( ${#SELECTED_SHARES[@]} > 0 )) || { saywarning "Select one or more shares first."; ask_dlg_autocontinue --seconds 5 || true; continue; }
+                    _remove_group_access || true
+                    ;;
+                "Validate selected shares")
+                    (( ${#SELECTED_SHARES[@]} > 0 )) || { saywarning "Select one or more shares first."; ask_dlg_autocontinue --seconds 5 || true; continue; }
+                    _validate_selected || true
+                    ;;
+                *)
+                    saywarning "Unknown share-management action: $action"
+                    ;;
+            esac
+        done
+    }
+
+    main "$@"
