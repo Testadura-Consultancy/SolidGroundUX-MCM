@@ -8,7 +8,7 @@
 #   Group       : Module Registration
 #   Purpose     : Register SolidGroundUX framework test and validation actions
 #
-#   Build : 2625813
+#   Build : 2625822
 #   Checksum : d652f54935eeaf507ebaea5304389c925a0ac9192b1be5a0ef187253a52fe6a7
 # Description:
 #   Provides the Management Console presentation layer for framework testing.

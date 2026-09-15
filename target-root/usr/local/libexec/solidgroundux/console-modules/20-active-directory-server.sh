@@ -3,7 +3,7 @@
 # ----------------------------------------------------------------------------------
 # Metadata:
 #   Version     : 1.1
-#   Build       : 2625813
+#   Build       : 2625822
 #   Checksum    : afb2d509827f17f17c5820aab89822c9686a827da1181815d1ae5dacfff6a4a2
 #   Source      : 20-active-directory-server.sh
 #   Type        : module

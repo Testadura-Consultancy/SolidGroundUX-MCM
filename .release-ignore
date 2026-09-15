@@ -1,0 +1,14 @@
+# SolidGroundUX Management Console Modules release exclusions
+# Paths are relative to target-root. rsync exclude syntax is supported.
+
+# Local/editor/runtime metadata
+.*
+*.state
+*.cfg
+*.code-workspace
+
+# Runtime state that must not be distributed
+/var/log/solidgroundux.log*
+/var/lib/solidgroundux/archive/
+/var/lib/solidgroundux/releases/
+/var/lib/solidgroundux/projects/

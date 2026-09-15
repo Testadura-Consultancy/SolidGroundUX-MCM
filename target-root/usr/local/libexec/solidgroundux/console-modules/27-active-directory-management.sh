@@ -3,7 +3,7 @@
 # ----------------------------------------------------------------------------------
 # Metadata:
 #   Version     : 1.1
-#   Build       : 2625813
+#   Build       : 2625822
 #   Source      : 27-active-directory-management.sh
 #   Type        : module
 #   Group       : Module Registration

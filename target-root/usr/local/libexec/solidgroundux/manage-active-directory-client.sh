@@ -4,7 +4,7 @@
 # -------------------------------------------------------------------------------------
 # Metadata:
 #   Version     : 1.1
-#   Build       : 2625813
+#   Build       : 2625822
 #   Source      : manage-active-directory-client.sh
 #   Type        : script
 #   Group       : Console Actions

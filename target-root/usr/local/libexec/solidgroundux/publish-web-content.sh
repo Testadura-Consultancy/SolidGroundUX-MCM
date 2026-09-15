@@ -3,8 +3,8 @@
 # SolidGroundUX Management Console Modules - Publish Web Content
 # -------------------------------------------------------------------------------------
 # Metadata:
-#   Version     : 1.2
-#   Build       : 2625813
+#   Version     : 1.1
+#   Build       : 2625822
 #   Source      : publish-web-content.sh
 #   Type        : script
 #   Group       : Console Actions

@@ -4,7 +4,7 @@
 # -------------------------------------------------------------------------------------
 # Metadata:
 #   Version     : 1.1
-#   Build       : 2625813
+#   Build       : 2625822
 #   Source      : active-directory-management.sh
 #   Type        : library
 #   Group       : SolidGround Console
