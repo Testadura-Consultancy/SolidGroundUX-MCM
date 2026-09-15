@@ -3,9 +3,9 @@
 # SolidGroundUX Management Console Modules - Manage Samba Shares
 # -------------------------------------------------------------------------------------
 # Metadata:
-#   Version     : 2.1
-#   Build       : 2624123
-#   Checksum    : 1905470e6ef2f9e38f36ad94fea0dda1506bae38252c7d848cfc4fe61c1f191e
+#   Version     : 1.1
+#   Build       : 2625813
+#   Checksum    : 12b60f7c51c361c1e3ea52e4c92acbf4db409766d07950a96f17d317ddad4fd8
 #   Source      : manage-samba-shares.sh
 #   Type        : script
 #   Group       : Console Actions
@@ -64,22 +64,6 @@ set -uo pipefail
         local index=0
         local root_index=-1
         local -a path_parts=()
-
-        # A console module from a separate management-project tree passes the
-        # framework root used by the current console explicitly. Prefer it when valid.
-        if [[ -n "${SGND_FRAMEWORK_ROOT:-}" ]]; then
-            if [[ "$SGND_FRAMEWORK_ROOT" == "/" ]]; then
-                exe_common="/usr/local/lib/solidgroundux/common/sgnd-exe-common.sh"
-            else
-                exe_common="${SGND_FRAMEWORK_ROOT%/}/usr/local/lib/solidgroundux/common/sgnd-exe-common.sh"
-            fi
-
-            if [[ -r "$exe_common" ]]; then
-                # shellcheck source=/dev/null
-                source "$exe_common"
-                return 0
-            fi
-        fi
 
         script_file="$(readlink -f "${BASH_SOURCE[0]}")" || {
             printf 'FATAL: Cannot resolve executable path: %s\n' "${BASH_SOURCE[0]}" >&2

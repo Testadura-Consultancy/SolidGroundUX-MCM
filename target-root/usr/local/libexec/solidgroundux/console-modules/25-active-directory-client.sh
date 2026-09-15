@@ -2,13 +2,14 @@
 # SolidGroundUX Management Console Modules - Active Directory Client
 # ----------------------------------------------------------------------------------
 # Metadata:
-#   Version     : 2.1
-#   Build       : 2625721
+#   Version     : 1.1
+#   Build       : 2625813
 #   Source      : 25-active-directory-client.sh
 #   Type        : module
 #   Group       : Module Registration
 #   Purpose     : Register Active Directory client management actions
 #
+#   Checksum : 7b68465f1ade08cb4d9e67847b995ccc2b50d1b47ccec99b9766128772ec756a
 # Description:
 #   Registers Active Directory client management actions with the SolidGround Management
 #   Console. Persistent join, reconciliation, validation, and repair operations are
@@ -17,17 +18,53 @@
 set -uo pipefail
 
 # - Library guard ------------------------------------------------------------------
+    # fn$ _sgnd_lib_guard - Enforce source-only, single-load library initialization
+        # . Purpose
+        #   Ensure the file is sourced as a library and initialized only once.
+        #
+        # . Behavior
+        #   - Derives a unique guard variable name from the current filename.
+        #   - Aborts execution when the file is run directly instead of sourced.
+        #   - Sets the guard variable on first load.
+        #   - Returns immediately when the library was already loaded.
+        #
+        # Inputs
+        #   BASH_SOURCE[0]
+        #   $0
+        #
+        # Outputs (globals)
+        #   SGND_<MODULE>_LOADED
+        #
+        # . Returns
+        #   0 when already loaded or successfully initialized.
+        #   Exits with code 2 when executed instead of sourced.
+        #
+        # . Usage
+        #   _sgnd_lib_guard
     _sgnd_lib_guard() {
-        local lib_base="" guard=""
-        lib_base="$(basename "${BASH_SOURCE[0]}" .sh)"; lib_base="${lib_base//-/_}"; guard="SGND_${lib_base^^}_LOADED"
-        [[ "${BASH_SOURCE[0]}" != "$0" ]] || { printf 'This is a library; source it, do not execute it: %s\n' "${BASH_SOURCE[0]}" >&2; exit 2; }
+        local lib_base=""
+        local guard=""
+
+        lib_base="$(basename "${BASH_SOURCE[0]}" .sh)"
+        lib_base="${lib_base//-/_}"
+        guard="SGND_${lib_base^^}_LOADED"
+
+        [[ "${BASH_SOURCE[0]}" != "$0" ]] || {
+            printf 'This is a library; source it, do not execute it: %s\n' "${BASH_SOURCE[0]}" >&2
+            exit 2
+        }
+
         [[ -n "${!guard-}" ]] && return 0
         printf -v "$guard" '1'
     }
+
     _sgnd_lib_guard
     unset -f _sgnd_lib_guard
-    if declare -F sgnd_module_init_metadata >/dev/null 2>&1 && declare -F sgnd_header_buffer_load >/dev/null 2>&1; then sgnd_module_init_metadata "${BASH_SOURCE[0]}"; fi
 
+    if declare -F sgnd_module_init_metadata >/dev/null 2>&1 \
+        && declare -F sgnd_header_buffer_load >/dev/null 2>&1; then
+        sgnd_module_init_metadata "${BASH_SOURCE[0]}"
+    fi
 # - Module metadata ----------------------------------------------------------------
     SGND_AD_CLIENT_MODULE_ID="active-directory-client"
     SGND_AD_CLIENT_MODULE_NAME="Active Directory Client"

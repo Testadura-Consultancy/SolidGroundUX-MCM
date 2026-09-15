@@ -2,9 +2,9 @@
 # SolidGroundUX Management Console Modules - SolidGroundUX
 # ----------------------------------------------------------------------------------
 # Metadata:
-#   Version     : 2.1
-#   Build       : 2624123
-#   Checksum    : f0226399b8e8fec81db6596957b38d79b09960986a2e8398cc107e53cc5ccf2f
+#   Version     : 1.1
+#   Build       : 2625813
+#   Checksum    : 9fa9c97452a3dc84f9efc4fcb2d37d1ad42d7132eeb4855e0c0a70a040949577
 #   Source      : 40-solidgroundux.sh
 #   Type        : module
 #   Group       : Module Registration

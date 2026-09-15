@@ -2,13 +2,14 @@
 # SSolidGroundUX Management Console Modules - Storage
 # ----------------------------------------------------------------------------------
 # Metadata:
-#   Version     : 2.1
-#   Build       : 2625721
+#   Version     : 1.1
+#   Build       : 2625813
 #   Source      : 15-storage.sh
 #   Type        : module
 #   Group       : Module Registration
 #   Purpose     : Configure and inspect local storage volumes
 #
+#   Checksum : abe5823f45d8589933b871691076f78db8053a637a25bf909e7fcd6923f88432
 # Description:
 #   Registers local-storage management actions with the SolidGround Management Console.
 #   Persistent storage operations are implemented by manage-storage.sh.
@@ -24,6 +25,28 @@ set -uo pipefail
 
 # - Library guard ------------------------------------------------------------------
     # fn$ _sgnd_lib_guard - Enforce source-only, single-load library initialization
+        # . Purpose
+        #   Ensure the file is sourced as a library and initialized only once.
+        #
+        # . Behavior
+        #   - Derives a unique guard variable name from the current filename.
+        #   - Aborts execution when the file is run directly instead of sourced.
+        #   - Sets the guard variable on first load.
+        #   - Returns immediately when the library was already loaded.
+        #
+        # Inputs
+        #   BASH_SOURCE[0]
+        #   $0
+        #
+        # Outputs (globals)
+        #   SGND_<MODULE>_LOADED
+        #
+        # . Returns
+        #   0 when already loaded or successfully initialized.
+        #   Exits with code 2 when executed instead of sourced.
+        #
+        # . Usage
+        #   _sgnd_lib_guard
     _sgnd_lib_guard() {
         local lib_base=""
         local guard=""
@@ -48,7 +71,6 @@ set -uo pipefail
         && declare -F sgnd_header_buffer_load >/dev/null 2>&1; then
         sgnd_module_init_metadata "${BASH_SOURCE[0]}"
     fi
-
 # - Module metadata ----------------------------------------------------------------
     SGND_STORAGE_MODULE_ID="storage"
     SGND_STORAGE_MODULE_NAME="Storage"

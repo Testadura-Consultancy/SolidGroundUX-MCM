@@ -3,13 +3,15 @@
 # SolidGroundUX Management Console Modules - Framework Smoke Test and Validation
 # -------------------------------------------------------------------------------------
 # Metadata:
-#   Version     : 2.1
+#   Version     : 1.1
 #   Source      : framework-smoketest.sh
 #   Wrapper     : sgnd-framework-smoketest
 #   Type        : script
 #   Group       : Console Actions
 #   Purpose     : Validate the framework and exercise its interactive UI helpers
 #
+#   Build : 2625813
+#   Checksum : a4c62c151180f4d1944bd5b0dc6e12db2e0f84e16583cf52dd2d247d2b1236c5
 # Description:
 #   Authoritative test implementation for the SolidGroundUX Management Console
 #   Framework Test module. Supports individual validation suites, a complete Run All
@@ -34,6 +36,34 @@ set -uo pipefail
 
 # - Bootstrap -----------------------------------------------------------------------
     # fn$ _framework_locator - Resolve and load the active SolidGroundUX framework
+        # . Purpose
+        #   Determine the filesystem root of the currently executing SolidGroundUX tree
+        #   from the script's physical path, then load the executable runtime library.
+        #
+        # . Behavior
+        #   - Resolves the physical path of the executing script.
+        #   - Treats usr, etc, and var as the canonical top-level SolidGroundUX tree roots.
+        #   - Uses the last occurrence of one of those path components to determine the
+        #     active filesystem root.
+        #   - Resolves production scripts beneath /usr, /etc, or /var to root (/).
+        #   - Resolves staged/development trees to the path prefix preceding the detected
+        #     usr, etc, or var component.
+        #   - Loads sgnd-exe-common.sh from the resolved framework root.
+        #
+        # . Globals (write)
+        #   SGND_FRAMEWORK_ROOT
+        #
+        # . Output
+        #   Writes fatal bootstrap errors to stderr using printf because framework UI
+        #   helpers are not available until sgnd-exe-common.sh has been loaded.
+        #
+        # . Returns
+        #   0 when the framework root was resolved and executable common library loaded.
+        #   126 when the script path cannot be resolved, no canonical root component can
+        #   be found, or the executable common library is unreadable.
+        #
+        # . Usage
+        #   _framework_locator || return $?
     _framework_locator() {
         local script_file=""
         local path_without_root=""
@@ -55,7 +85,9 @@ set -uo pipefail
         for index in "${!path_parts[@]}"; do
             component="${path_parts[$index]}"
             case "$component" in
-                usr|etc|var) root_index=$index ;;
+                usr|etc|var)
+                    root_index=$index
+                    ;;
             esac
         done
 

@@ -2,12 +2,14 @@
 # SolidGroundUX Management Console Modules - SolidGround Framework Test
 # ----------------------------------------------------------------------------------
 # Metadata:
-#   Version     : 2.1
+#   Version     : 1.1
 #   Source      : 45-solidground-framework-test.sh
 #   Type        : module
 #   Group       : Module Registration
 #   Purpose     : Register SolidGroundUX framework test and validation actions
 #
+#   Build : 2625813
+#   Checksum : d652f54935eeaf507ebaea5304389c925a0ac9192b1be5a0ef187253a52fe6a7
 # Description:
 #   Provides the Management Console presentation layer for framework testing.
 #   Test implementation is owned by framework-smoketest.sh; this module only
@@ -24,6 +26,28 @@ set -uo pipefail
 
 # - Library guard ------------------------------------------------------------------
     # fn$ _sgnd_lib_guard - Enforce source-only, single-load library initialization
+        # . Purpose
+        #   Ensure the file is sourced as a library and initialized only once.
+        #
+        # . Behavior
+        #   - Derives a unique guard variable name from the current filename.
+        #   - Aborts execution when the file is run directly instead of sourced.
+        #   - Sets the guard variable on first load.
+        #   - Returns immediately when the library was already loaded.
+        #
+        # Inputs
+        #   BASH_SOURCE[0]
+        #   $0
+        #
+        # Outputs (globals)
+        #   SGND_<MODULE>_LOADED
+        #
+        # . Returns
+        #   0 when already loaded or successfully initialized.
+        #   Exits with code 2 when executed instead of sourced.
+        #
+        # . Usage
+        #   _sgnd_lib_guard
     _sgnd_lib_guard() {
         local lib_base=""
         local guard=""
@@ -48,7 +72,6 @@ set -uo pipefail
         && declare -F sgnd_header_buffer_load >/dev/null 2>&1; then
         sgnd_module_init_metadata "${BASH_SOURCE[0]}"
     fi
-
 # - Module metadata ----------------------------------------------------------------
     SGND_FRAMEWORK_TEST_MODULE_ID="framework-test"
     SGND_FRAMEWORK_TEST_MODULE_NAME="SolidGround Framework Test"

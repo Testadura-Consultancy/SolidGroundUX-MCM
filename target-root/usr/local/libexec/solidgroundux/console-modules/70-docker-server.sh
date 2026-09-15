@@ -2,13 +2,14 @@
 # SolidGroundUX Management Console Modules - Docker Server
 # ----------------------------------------------------------------------------------
 # Metadata:
-#   Version     : 2.1
-#   Build       : 2625802
+#   Version     : 1.1
+#   Build       : 2625813
 #   Source      : 70-docker-server.sh
 #   Type        : module
 #   Group       : Module Registration
 #   Purpose     : Install, configure, manage, validate, and inspect a Docker host and its containers
 #
+#   Checksum : 3f579f686090026e1afd06995f6ab16dabbbbccae974f6192ed5b5ff7d742df1
 # Description:
 #   Registers Docker host and container-management actions with the SolidGround
 #   Management Console. Persistent host operations are implemented by
@@ -18,8 +19,33 @@
 set -uo pipefail
 
 # - Library guard ------------------------------------------------------------------
+    # fn$ _sgnd_lib_guard - Enforce source-only, single-load library initialization
+        # . Purpose
+        #   Ensure the file is sourced as a library and initialized only once.
+        #
+        # . Behavior
+        #   - Derives a unique guard variable name from the current filename.
+        #   - Aborts execution when the file is run directly instead of sourced.
+        #   - Sets the guard variable on first load.
+        #   - Returns immediately when the library was already loaded.
+        #
+        # Inputs
+        #   BASH_SOURCE[0]
+        #   $0
+        #
+        # Outputs (globals)
+        #   SGND_<MODULE>_LOADED
+        #
+        # . Returns
+        #   0 when already loaded or successfully initialized.
+        #   Exits with code 2 when executed instead of sourced.
+        #
+        # . Usage
+        #   _sgnd_lib_guard
     _sgnd_lib_guard() {
-        local lib_base="" guard=""
+        local lib_base=""
+        local guard=""
+
         lib_base="$(basename "${BASH_SOURCE[0]}" .sh)"
         lib_base="${lib_base//-/_}"
         guard="SGND_${lib_base^^}_LOADED"
@@ -40,7 +66,6 @@ set -uo pipefail
         && declare -F sgnd_header_buffer_load >/dev/null 2>&1; then
         sgnd_module_init_metadata "${BASH_SOURCE[0]}"
     fi
-
 # - Module metadata ----------------------------------------------------------------
     SGND_DOCKER_MODULE_ID="docker-server"
     SGND_DOCKER_MODULE_NAME="Docker Server"

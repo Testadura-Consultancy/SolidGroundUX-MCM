@@ -3,13 +3,14 @@
 # SolidGroundUX Management Console Modules - Manage SolidGroundUX
 # -------------------------------------------------------------------------------------
 # Metadata:
-#   Version     : 2.1
-#   Build       : 2624123
+#   Version     : 1.1
+#   Build       : 2625813
 #   Source      : manage-solidgroundux.sh
 #   Type        : script
 #   Group       : Console Actions
 #   Purpose     : Apply persistent SolidGroundUX framework management actions
 #
+#   Checksum : 526007297199baec3d33006a06514275ea3a4d2e175072a5431d7dd0a48fef85
 # Description:
 #   Implements persistent framework configuration and logging actions dispatched by
 #   the SolidGroundUX Management Console. All mutating actions honor --dryrun and

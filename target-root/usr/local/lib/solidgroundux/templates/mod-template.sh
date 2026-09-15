@@ -2,9 +2,9 @@
 # SolidGroundUX - Console Module Template
 # ----------------------------------------------------------------------------------
 # Metadata:
-#   Version     : 2.1
-#   Build       : 2624021
-#   Checksum    : 66e10163d411e85f531044f0604380c4a4aa75f85426ed862572adb9c844a5aa
+#   Version     : 1.1
+#   Build       : 2625813
+#   Checksum    : d9225da61eb4ccc87ec2a1c10491859ce1e335acdc72213fbac6e927071178c1
 #   Source      : mod-template.sh
 #   Type        : module
 #   Group       : SDK

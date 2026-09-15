@@ -3,8 +3,8 @@
 # SolidGroundUX Management Console Modules - Manage Web Server
 # -------------------------------------------------------------------------------------
 # Metadata:
-#   Version     : 2.1
-#   Build       : 2625722
+#   Version     : 1.2
+#   Build       : 2625813
 #   Source      : manage-web-server.sh
 #   Type        : script
 #   Group       : Console Actions
@@ -14,67 +14,88 @@ set -uo pipefail
 
 # - Bootstrap ----------------------------------------------------------------------
     # fn$ _framework_locator - Resolve and load the active SolidGroundUX framework
+        # . Purpose
+        #   Determine the filesystem root of the currently executing SolidGroundUX tree
+        #   from the script's physical path, then load the executable runtime library.
+        #
+        # . Behavior
+        #   - Resolves the physical path of the executing script.
+        #   - Treats usr, etc, and var as the canonical top-level SolidGroundUX tree roots.
+        #   - Uses the last occurrence of one of those path components to determine the
+        #     active filesystem root.
+        #   - Resolves production scripts beneath /usr, /etc, or /var to root (/).
+        #   - Resolves staged/development trees to the path prefix preceding the detected
+        #     usr, etc, or var component.
+        #   - Loads sgnd-exe-common.sh from the resolved framework root.
+        #
+        # . Globals (write)
+        #   SGND_FRAMEWORK_ROOT
+        #
+        # . Output
+        #   Writes fatal bootstrap errors to stderr using printf because framework UI
+        #   helpers are not available until sgnd-exe-common.sh has been loaded.
+        #
+        # . Returns
+        #   0 when the framework root was resolved and executable common library loaded.
+        #   126 when the script path cannot be resolved, no canonical root component can
+        #   be found, or the executable common library is unreadable.
+        #
+        # . Usage
+        #   _framework_locator || return $?
     _framework_locator() {
         local script_file=""
         local path_without_root=""
         local component=""
-        local project_root=""
+        local framework_root=""
         local exe_common=""
         local index=0
         local root_index=-1
         local -a path_parts=()
 
-        # A Management Modules executable may live in a separate application tree.
-        # Prefer an explicitly supplied framework root when the console provides one.
-        if [[ -n "${SGND_FRAMEWORK_ROOT:-}" ]]; then
-            if [[ "$SGND_FRAMEWORK_ROOT" == "/" ]]; then
-                exe_common="/usr/local/lib/solidgroundux/common/sgnd-exe-common.sh"
-            else
-                exe_common="${SGND_FRAMEWORK_ROOT%/}/usr/local/lib/solidgroundux/common/sgnd-exe-common.sh"
-            fi
-            if [[ -r "$exe_common" ]]; then
-                # shellcheck source=/dev/null
-                source "$exe_common"
-                return 0
-            fi
-        fi
-
-        script_file="$(readlink -f "${BASH_SOURCE[0]}")" || return 126
-        path_without_root="${script_file#/}"
-        IFS='/' read -r -a path_parts <<< "$path_without_root"
-        for index in "${!path_parts[@]}"; do
-            component="${path_parts[$index]}"
-            case "$component" in usr|etc|var) root_index=$index ;; esac
-        done
-
-        if (( root_index >= 0 )); then
-            if (( root_index == 0 )); then
-                project_root="/"
-            else
-                project_root=""
-                for (( index=0; index<root_index; index++ )); do
-                    project_root+="/${path_parts[$index]}"
-                done
-            fi
-            if [[ "$project_root" == "/" ]]; then
-                exe_common="/usr/local/lib/solidgroundux/common/sgnd-exe-common.sh"
-            else
-                exe_common="${project_root%/}/usr/local/lib/solidgroundux/common/sgnd-exe-common.sh"
-            fi
-            if [[ -r "$exe_common" ]]; then
-                SGND_FRAMEWORK_ROOT="$project_root"
-                # shellcheck source=/dev/null
-                source "$exe_common"
-                return 0
-            fi
-        fi
-
-        exe_common="/usr/local/lib/solidgroundux/common/sgnd-exe-common.sh"
-        [[ -r "$exe_common" ]] || {
-            printf 'FATAL: Cannot read SolidGroundUX executable common library.\n' >&2
+        script_file="$(readlink -f "${BASH_SOURCE[0]}")" || {
+            printf 'FATAL: Cannot resolve executable path: %s\n' "${BASH_SOURCE[0]}" >&2
             return 126
         }
-        SGND_FRAMEWORK_ROOT="/"
+
+        path_without_root="${script_file#/}"
+        IFS='/' read -r -a path_parts <<< "$path_without_root"
+
+        for index in "${!path_parts[@]}"; do
+            component="${path_parts[$index]}"
+            case "$component" in
+                usr|etc|var)
+                    root_index=$index
+                    ;;
+            esac
+        done
+
+        if (( root_index < 0 )); then
+            printf 'FATAL: Cannot determine SolidGroundUX framework root from: %s\n' "$script_file" >&2
+            return 126
+        fi
+
+        if (( root_index == 0 )); then
+            framework_root="/"
+        else
+            framework_root=""
+            for (( index=0; index<root_index; index++ )); do
+                framework_root+="/${path_parts[$index]}"
+            done
+        fi
+
+        SGND_FRAMEWORK_ROOT="$framework_root"
+
+        if [[ "$SGND_FRAMEWORK_ROOT" == "/" ]]; then
+            exe_common="/usr/local/lib/solidgroundux/common/sgnd-exe-common.sh"
+        else
+            exe_common="${SGND_FRAMEWORK_ROOT%/}/usr/local/lib/solidgroundux/common/sgnd-exe-common.sh"
+        fi
+
+        [[ -r "$exe_common" ]] || {
+            printf 'FATAL: Cannot read executable common library: %s\n' "$exe_common" >&2
+            return 126
+        }
+
         # shellcheck source=/dev/null
         source "$exe_common"
     }
@@ -1014,3 +1035,4 @@ EOF
         _run_action "$action"
     }
     main "$@"
+#   Checksum : e580d88b630a6779760d98c902bd531ff255bb8f73406bfc8cff8a77c25892d9

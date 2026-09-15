@@ -2,13 +2,14 @@
 # SolidGroundUX Management Console Modules - Samba File Server
 # ----------------------------------------------------------------------------------
 # Metadata:
-#   Version     : 2.1
-#   Build       : 2624123
+#   Version     : 1.1
+#   Build       : 2625813
 #   Source      : 30-samba-file-server.sh
 #   Type        : module
 #   Group       : Module Registration
 #   Purpose     : Register and orchestrate Samba file-server management actions
 #
+#   Checksum : c91745569dffe470ed7ee7a3deab0cf3efb6a028ec48d8ff3b0ae8188afa4470
 # Description:
 #   Registers Samba file-server and share-management actions with the Management
 #   Console. Persistent server-management functionality is implemented by
@@ -19,6 +20,28 @@ set -uo pipefail
 
 # - Library guard ------------------------------------------------------------------
     # fn$ _sgnd_lib_guard - Enforce source-only, single-load library initialization
+        # . Purpose
+        #   Ensure the file is sourced as a library and initialized only once.
+        #
+        # . Behavior
+        #   - Derives a unique guard variable name from the current filename.
+        #   - Aborts execution when the file is run directly instead of sourced.
+        #   - Sets the guard variable on first load.
+        #   - Returns immediately when the library was already loaded.
+        #
+        # Inputs
+        #   BASH_SOURCE[0]
+        #   $0
+        #
+        # Outputs (globals)
+        #   SGND_<MODULE>_LOADED
+        #
+        # . Returns
+        #   0 when already loaded or successfully initialized.
+        #   Exits with code 2 when executed instead of sourced.
+        #
+        # . Usage
+        #   _sgnd_lib_guard
     _sgnd_lib_guard() {
         local lib_base=""
         local guard=""
@@ -43,7 +66,6 @@ set -uo pipefail
         && declare -F sgnd_header_buffer_load >/dev/null 2>&1; then
         sgnd_module_init_metadata "${BASH_SOURCE[0]}"
     fi
-
 # - Module metadata ----------------------------------------------------------------
     SGND_SAMBA_FILE_MODULE_ID="samba-file-server"
     SGND_SAMBA_FILE_MODULE_NAME="Samba File Server"

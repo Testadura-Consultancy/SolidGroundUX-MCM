@@ -3,13 +3,14 @@
 # SolidGroundUX Management Console Modules - Manage Samba File Server
 # -------------------------------------------------------------------------------------
 # Metadata:
-#   Version     : 2.1
-#   Build       : 2624123
+#   Version     : 1.1
+#   Build       : 2625813
 #   Source      : manage-samba-file-server.sh
 #   Type        : script
 #   Group       : Console Actions
 #   Purpose     : Prepare, validate, and inspect the Samba file-server service
 #
+#   Checksum : 36ac2a9313816a18472b690b269aa2cf6ea302258c6c9bd22659006510846ff1
 # Description:
 #   Implements persistent Samba file-server management actions exposed by the
 #   30-samba-file-server Management Console module. Share lifecycle and ACL management
@@ -19,31 +20,43 @@ set -uo pipefail
 
 # - Bootstrap ----------------------------------------------------------------------
     # fn$ _framework_locator - Resolve and load the active SolidGroundUX framework
+        # . Purpose
+        #   Determine the filesystem root of the currently executing SolidGroundUX tree
+        #   from the script's physical path, then load the executable runtime library.
+        #
+        # . Behavior
+        #   - Resolves the physical path of the executing script.
+        #   - Treats usr, etc, and var as the canonical top-level SolidGroundUX tree roots.
+        #   - Uses the last occurrence of one of those path components to determine the
+        #     active filesystem root.
+        #   - Resolves production scripts beneath /usr, /etc, or /var to root (/).
+        #   - Resolves staged/development trees to the path prefix preceding the detected
+        #     usr, etc, or var component.
+        #   - Loads sgnd-exe-common.sh from the resolved framework root.
+        #
+        # . Globals (write)
+        #   SGND_FRAMEWORK_ROOT
+        #
+        # . Output
+        #   Writes fatal bootstrap errors to stderr using printf because framework UI
+        #   helpers are not available until sgnd-exe-common.sh has been loaded.
+        #
+        # . Returns
+        #   0 when the framework root was resolved and executable common library loaded.
+        #   126 when the script path cannot be resolved, no canonical root component can
+        #   be found, or the executable common library is unreadable.
+        #
+        # . Usage
+        #   _framework_locator || return $?
     _framework_locator() {
         local script_file=""
         local path_without_root=""
         local component=""
-        local project_root=""
+        local framework_root=""
         local exe_common=""
         local index=0
         local root_index=-1
         local -a path_parts=()
-
-        # When launched by a console module from a separate project tree, the module
-        # explicitly passes the framework root used by the current console.
-        if [[ -n "${SGND_FRAMEWORK_ROOT:-}" ]]; then
-            if [[ "$SGND_FRAMEWORK_ROOT" == "/" ]]; then
-                exe_common="/usr/local/lib/solidgroundux/common/sgnd-exe-common.sh"
-            else
-                exe_common="${SGND_FRAMEWORK_ROOT%/}/usr/local/lib/solidgroundux/common/sgnd-exe-common.sh"
-            fi
-
-            if [[ -r "$exe_common" ]]; then
-                # shellcheck source=/dev/null
-                source "$exe_common"
-                return 0
-            fi
-        fi
 
         script_file="$(readlink -f "${BASH_SOURCE[0]}")" || {
             printf 'FATAL: Cannot resolve executable path: %s\n' "${BASH_SOURCE[0]}" >&2
@@ -56,43 +69,39 @@ set -uo pipefail
         for index in "${!path_parts[@]}"; do
             component="${path_parts[$index]}"
             case "$component" in
-                usr|etc|var) root_index=$index ;;
+                usr|etc|var)
+                    root_index=$index
+                    ;;
             esac
         done
 
-        if (( root_index >= 0 )); then
-            if (( root_index == 0 )); then
-                project_root="/"
-            else
-                project_root=""
-                for (( index=0; index<root_index; index++ )); do
-                    project_root+="/${path_parts[$index]}"
-                done
-            fi
-
-            if [[ "$project_root" == "/" ]]; then
-                exe_common="/usr/local/lib/solidgroundux/common/sgnd-exe-common.sh"
-            else
-                exe_common="${project_root%/}/usr/local/lib/solidgroundux/common/sgnd-exe-common.sh"
-            fi
-
-            if [[ -r "$exe_common" ]]; then
-                SGND_FRAMEWORK_ROOT="$project_root"
-                # shellcheck source=/dev/null
-                source "$exe_common"
-                return 0
-            fi
+        if (( root_index < 0 )); then
+            printf 'FATAL: Cannot determine SolidGroundUX framework root from: %s\n' "$script_file" >&2
+            return 126
         fi
 
-        # A separately checked-out management project intentionally does not contain
-        # framework libraries. Permit standalone execution against an installed framework.
-        exe_common="/usr/local/lib/solidgroundux/common/sgnd-exe-common.sh"
+        if (( root_index == 0 )); then
+            framework_root="/"
+        else
+            framework_root=""
+            for (( index=0; index<root_index; index++ )); do
+                framework_root+="/${path_parts[$index]}"
+            done
+        fi
+
+        SGND_FRAMEWORK_ROOT="$framework_root"
+
+        if [[ "$SGND_FRAMEWORK_ROOT" == "/" ]]; then
+            exe_common="/usr/local/lib/solidgroundux/common/sgnd-exe-common.sh"
+        else
+            exe_common="${SGND_FRAMEWORK_ROOT%/}/usr/local/lib/solidgroundux/common/sgnd-exe-common.sh"
+        fi
+
         [[ -r "$exe_common" ]] || {
-            printf 'FATAL: Cannot read SolidGroundUX executable common library.\n' >&2
+            printf 'FATAL: Cannot read executable common library: %s\n' "$exe_common" >&2
             return 126
         }
 
-        SGND_FRAMEWORK_ROOT="/"
         # shellcheck source=/dev/null
         source "$exe_common"
     }

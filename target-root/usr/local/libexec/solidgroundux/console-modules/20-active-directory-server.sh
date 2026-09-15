@@ -2,9 +2,9 @@
 # SolidGroundUX Management Console Modules - Active Directory Server
 # ----------------------------------------------------------------------------------
 # Metadata:
-#   Version     : 2.1
-#   Build       : 2624102
-#   Checksum    : 08eae622f9f542950ea2431dd34887a01a82ea2728dc8efbd03fb98aeaef6dfd
+#   Version     : 1.1
+#   Build       : 2625813
+#   Checksum    : afb2d509827f17f17c5820aab89822c9686a827da1181815d1ae5dacfff6a4a2
 #   Source      : 20-active-directory-server.sh
 #   Type        : module
 #   Group       : Module Registration
