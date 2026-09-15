@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
 # =====================================================================================
-# SolidGroundUX - Manage Samba File Server
+# SolidGroundUX Management Console Modules - Manage Samba File Server
 # -------------------------------------------------------------------------------------
 # Metadata:
 #   Version     : 2.1
 #   Build       : 2624123
 #   Source      : manage-samba-file-server.sh
 #   Type        : script
-#   Group       : SolidGround Console
+#   Group       : Console Actions
 #   Purpose     : Prepare, validate, and inspect the Samba file-server service
 #
 # Description:

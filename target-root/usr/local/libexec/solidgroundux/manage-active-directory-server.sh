@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
 # =====================================================================================
-# SolidGroundUX - Manage Active Directory Server
+# SolidGroundUX Management Console Modules - Manage Active Directory Server
 # -------------------------------------------------------------------------------------
 # Metadata:
 #   Version     : 2.1
 #   Build       : 2625721
 #   Source      : manage-active-directory-server.sh
 #   Type        : script
-#   Group       : SolidGround Console
+#   Group       : Console Actions
 #   Purpose     : Provision, validate, and inspect a Samba Active Directory domain controller
 #
 # Description:

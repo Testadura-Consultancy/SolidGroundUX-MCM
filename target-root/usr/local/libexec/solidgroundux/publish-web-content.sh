@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
 # =====================================================================================
-# SolidGroundUX - Publish Web Content
+# SolidGroundUX Management Console Modules - Publish Web Content
 # -------------------------------------------------------------------------------------
 # Metadata:
 #   Version     : 2.1
 #   Build       : 2625722
 #   Source      : publish-web-content.sh
 #   Type        : script
-#   Group       : SolidGround Console
+#   Group       : Console Actions
 #   Purpose     : Publish local, remote, Git, and SolidGroundUX documentation content
 # =====================================================================================
 set -uo pipefail

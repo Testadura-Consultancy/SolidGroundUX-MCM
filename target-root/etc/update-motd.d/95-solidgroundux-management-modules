@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-definitions=/usr/local/lib/solidgroundux/globals/solidgrond-management-console-modules-definitions.sh
+definitions=/usr/local/lib/solidgroundux/globals/solidground-management-console-modules-definitions.sh
 [[ -r "$definitions" ]] || exit 0
 # shellcheck source=/dev/null
 source "$definitions"

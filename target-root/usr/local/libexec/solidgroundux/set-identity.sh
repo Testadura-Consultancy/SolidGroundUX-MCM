@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # =====================================================================================
-# SolidGroundUX - Executable Script Template
+# SolidGroundUX Management Console Modules - Set Identity
 # ------------------------------------------------------------------------------------
 # Metadata:
 #   Version     : 2.1
@@ -8,11 +8,11 @@
 #   Checksum    : 24559d590ffe66ee3fd4e47564ff4dfc9b96d55bf24864fe1ba936e239aff644
 #   Source      : set-identity.sh
 #   Type        : script
-#   Group       : SolidGround Console
+#   Group       : Management Console Modules
 #   Purpose     : Sets the hostname and IPv4 network configuration for a VM
 #
 # Description:
-# 
+#  This script sets the hostname and IPv4 network configuration for a VM.
 #
 # Attribution:
 #   Developers  : Mark Fieten

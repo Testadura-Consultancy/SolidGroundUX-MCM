@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # =====================================================================================
-# SolidGroundUX - Manage Samba Shares
+# SolidGroundUX Management Console Modules - Manage Samba Shares
 # -------------------------------------------------------------------------------------
 # Metadata:
 #   Version     : 2.1
@@ -8,7 +8,7 @@
 #   Checksum    : 1905470e6ef2f9e38f36ad94fea0dda1506bae38252c7d848cfc4fe61c1f191e
 #   Source      : manage-samba-shares.sh
 #   Type        : script
-#   Group       : SolidGround Console
+#   Group       : Console Actions
 #   Purpose     : Manage Samba shares
 #
 # Description:

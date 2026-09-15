@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
 # ==================================================================================
-# SolidGroundUX - Manage SQL Server
+# SolidGroundUX Management Console Modules - Manage SQL Server
 # ----------------------------------------------------------------------------------
 # Metadata:
 #   Version     : 2.1
 #   Build       : 2625801
 #   Source      : manage-sqlserver.sh
 #   Type        : script
-#   Group       : SolidGround Console
+#   Group       : Console Actions
 #   Purpose     : Install, configure, manage, validate, and inspect Microsoft SQL Server
 # ==================================================================================
 set -uo pipefail

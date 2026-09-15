@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
 # ==================================================================================
-# SolidGroundUX - Manage Docker Server
+# SolidGroundUX Management Console Modules - Manage Docker Server
 # ----------------------------------------------------------------------------------
 # Metadata:
 #   Version     : 2.1
 #   Build       : 2625802
 #   Source      : manage-docker-server.sh
 #   Type        : script
-#   Group       : SolidGround Console
+#   Group       : Console Actions
 #   Purpose     : Install, configure, validate, and inspect a Docker host
 #
 # Description:

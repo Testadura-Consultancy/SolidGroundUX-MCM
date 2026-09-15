@@ -1,13 +1,12 @@
 # ==================================================================================
-# SolidGroundUX - Active Directory Client
+# SolidGroundUX Management Console Modules - Active Directory Client
 # ----------------------------------------------------------------------------------
 # Metadata:
 #   Version     : 2.1
 #   Build       : 2625721
 #   Source      : 25-active-directory-client.sh
 #   Type        : module
-#   Group       : SolidGround Console
-#   Subgroup    : Console Modules
+#   Group       : Module Registration
 #   Purpose     : Register Active Directory client management actions
 #
 # Description:

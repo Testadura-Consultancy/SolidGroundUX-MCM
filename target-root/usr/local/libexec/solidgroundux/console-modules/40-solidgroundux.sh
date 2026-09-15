@@ -1,5 +1,5 @@
 # ==================================================================================
-# SolidGroundUX - SolidGroundUX
+# SolidGroundUX Management Console Modules - SolidGroundUX
 # ----------------------------------------------------------------------------------
 # Metadata:
 #   Version     : 2.1
@@ -7,8 +7,7 @@
 #   Checksum    : f0226399b8e8fec81db6596957b38d79b09960986a2e8398cc107e53cc5ccf2f
 #   Source      : 40-solidgroundux.sh
 #   Type        : module
-#   Group       : SolidGround Console
-#   Subgroup    : Console Modules
+#   Group       : Module Registration
 #   Purpose     : Manage the SolidGroundUX framework and release lifecycle
 #
 # Description:

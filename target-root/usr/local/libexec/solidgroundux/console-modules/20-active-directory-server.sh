@@ -1,5 +1,5 @@
 # ==================================================================================
-# SolidGroundUX - Active Directory Server
+# SolidGroundUX Management Console Modules - Active Directory Server
 # ----------------------------------------------------------------------------------
 # Metadata:
 #   Version     : 2.1
@@ -7,8 +7,7 @@
 #   Checksum    : 08eae622f9f542950ea2431dd34887a01a82ea2728dc8efbd03fb98aeaef6dfd
 #   Source      : 20-active-directory-server.sh
 #   Type        : module
-#   Group       : SolidGround Console
-#   Subgroup    : Console Modules
+#   Group       : Module Registration
 #   Purpose     : Register Samba Active Directory server management actions
 #
 # Description:

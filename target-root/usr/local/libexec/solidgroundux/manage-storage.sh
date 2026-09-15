@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
 # =====================================================================================
-# SolidGroundUX - Manage Storage
+# SolidGroundUX Management Console Modules - Manage Storage
 # -------------------------------------------------------------------------------------
 # Metadata:
 #   Version     : 2.1
 #   Build       : 2625721
 #   Source      : manage-storage.sh
 #   Type        : script
-#   Group       : SolidGround Console
+#   Group       : Console Actions
 #   Purpose     : Configure, reconcile, validate, and inspect local storage volumes
 #
 # Description:

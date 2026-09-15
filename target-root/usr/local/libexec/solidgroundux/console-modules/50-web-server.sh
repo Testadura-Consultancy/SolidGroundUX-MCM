@@ -1,13 +1,12 @@
 # ==================================================================================
-# SolidGroundUX - Web Server
+# SolidGroundUX Management Console Modules - Web Server
 # ----------------------------------------------------------------------------------
 # Metadata:
 #   Version     : 2.1
 #   Build       : 2625722
 #   Source      : 50-web-server.sh
 #   Type        : module
-#   Group       : SolidGround Console
-#   Subgroup    : Console Modules
+#   Group       : Module Registration
 #   Purpose     : Install, configure, manage, validate, and inspect an Nginx web server
 #
 # Description:

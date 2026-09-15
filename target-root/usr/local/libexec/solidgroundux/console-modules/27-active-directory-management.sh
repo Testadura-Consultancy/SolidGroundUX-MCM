@@ -1,13 +1,12 @@
 # ==================================================================================
-# SolidGroundUX - Active Directory Management
+# SolidGroundUX Management Console Modules - Active Directory Management
 # ----------------------------------------------------------------------------------
 # Metadata:
 #   Version     : 2.1
 #   Build       : 2625721
 #   Source      : 27-active-directory-management.sh
 #   Type        : module
-#   Group       : SolidGround Console
-#   Subgroup    : Console Modules
+#   Group       : Module Registration
 #   Purpose     : Register Active Directory object-management actions
 #
 # Description:

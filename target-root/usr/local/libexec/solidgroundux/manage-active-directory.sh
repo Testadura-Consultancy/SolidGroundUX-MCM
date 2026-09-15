@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
 # =====================================================================================
-# SolidGroundUX - Manage Active Directory
+# SolidGroundUX Management Console Modules - Manage Active Directory
 # -------------------------------------------------------------------------------------
 # Metadata:
 #   Version     : 2.1
 #   Build       : 2625721
 #   Source      : manage-active-directory.sh
 #   Type        : script
-#   Group       : SolidGround Console
+#   Group       : Console Actions
 #   Purpose     : Manage Samba Active Directory users, groups, memberships, and computers
 #
 # Description:

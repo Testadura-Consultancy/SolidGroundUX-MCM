@@ -1,13 +1,12 @@
 # ==================================================================================
-# SolidGroundUX - Storage
+# SSolidGroundUX Management Console Modules - Storage
 # ----------------------------------------------------------------------------------
 # Metadata:
 #   Version     : 2.1
 #   Build       : 2625721
 #   Source      : 15-storage.sh
 #   Type        : module
-#   Group       : SolidGround Console
-#   Subgroup    : Console Modules
+#   Group       : Module Registration
 #   Purpose     : Configure and inspect local storage volumes
 #
 # Description:

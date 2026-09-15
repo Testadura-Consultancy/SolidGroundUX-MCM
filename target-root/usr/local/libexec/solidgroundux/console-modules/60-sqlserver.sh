@@ -1,13 +1,12 @@
 # ==================================================================================
-# SolidGroundUX - SQL Server
+# SolidGroundUX Management Console Modules - SQL Server
 # ----------------------------------------------------------------------------------
 # Metadata:
 #   Version     : 2.1
 #   Build       : 2625801
 #   Source      : 60-sqlserver.sh
 #   Type        : module
-#   Group       : SolidGround Console
-#   Subgroup    : Console Modules
+#   Group       : Module Registration
 #   Purpose     : Install, configure, manage, validate, and inspect Microsoft SQL Server
 #
 # Description:

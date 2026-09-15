@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
 # =====================================================================================
-# SolidGroundUX - Manage SolidGroundUX
+# SolidGroundUX Management Console Modules - Manage SolidGroundUX
 # -------------------------------------------------------------------------------------
 # Metadata:
 #   Version     : 2.1
 #   Build       : 2624123
 #   Source      : manage-solidgroundux.sh
 #   Type        : script
-#   Group       : SolidGround Console
+#   Group       : Console Actions
 #   Purpose     : Apply persistent SolidGroundUX framework management actions
 #
 # Description:

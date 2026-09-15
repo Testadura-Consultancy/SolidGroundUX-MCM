@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
 # ==================================================================================
-# SolidGroundUX - Manage Docker Containers
+# SolidGroundUX Management Console Modules - Manage Docker Containers
 # ----------------------------------------------------------------------------------
 # Metadata:
 #   Version     : 2.1
 #   Build       : 2625802
 #   Source      : manage-docker-containers.sh
 #   Type        : script
-#   Group       : SolidGround Console
+#   Group       : Console Actions
 #   Purpose     : Create and manage Docker containers and images
 #
 # Description:

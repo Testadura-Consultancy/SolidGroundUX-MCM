@@ -1,13 +1,12 @@
 # ==================================================================================
-# SolidGroundUX - Samba File Server
+# SolidGroundUX Management Console Modules - Samba File Server
 # ----------------------------------------------------------------------------------
 # Metadata:
 #   Version     : 2.1
 #   Build       : 2624123
 #   Source      : 30-samba-file-server.sh
 #   Type        : module
-#   Group       : SolidGround Console
-#   Subgroup    : Console Modules
+#   Group       : Module Registration
 #   Purpose     : Register and orchestrate Samba file-server management actions
 #
 # Description:

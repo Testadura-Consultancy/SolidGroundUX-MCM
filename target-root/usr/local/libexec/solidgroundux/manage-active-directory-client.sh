@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
 # =====================================================================================
-# SolidGroundUX - Manage Active Directory Client
+# SolidGroundUX Management Console Modules - Manage Active Directory Client
 # -------------------------------------------------------------------------------------
 # Metadata:
 #   Version     : 2.1
 #   Build       : 2625721
 #   Source      : manage-active-directory-client.sh
 #   Type        : script
-#   Group       : SolidGround Console
+#   Group       : Console Actions
 #   Purpose     : Join, reconcile, validate, and inspect an Active Directory client
 #
 # Description:

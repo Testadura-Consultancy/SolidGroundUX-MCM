@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
 # =====================================================================================
-# SolidGroundUX - Manage Web Server
+# SolidGroundUX Management Console Modules - Manage Web Server
 # -------------------------------------------------------------------------------------
 # Metadata:
 #   Version     : 2.1
 #   Build       : 2625722
 #   Source      : manage-web-server.sh
 #   Type        : script
-#   Group       : SolidGround Console
+#   Group       : Console Actions
 #   Purpose     : Configure, manage, validate, and inspect an Nginx web server
 # =====================================================================================
 set -uo pipefail

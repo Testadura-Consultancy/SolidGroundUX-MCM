@@ -1,5 +1,5 @@
 # ==================================================================================
-# SolidGroundUX - Development
+# SolidGroundUX Management Console Modules - Development
 # ----------------------------------------------------------------------------------
 # Metadata:
 #   Version     : 2.1
@@ -7,8 +7,7 @@
 #   Checksum    : cc73f75364cbeb76ac1284e26f4afb113d96c6f4d6a6fe63ff07bfaf97e81def
 #   Source      : 90-development.sh
 #   Type        : module
-#   Group       : SolidGround Console
-#   Subgroup    : Console Modules
+#   Group       : Module Registration
 #   Purpose     : Provide SolidGroundUX workspace, deployment, release, and documentation tools
 # ==================================================================================
 set -uo pipefail
