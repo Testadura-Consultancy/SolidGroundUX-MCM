@@ -1,0 +1,22 @@
+#!/usr/bin/env bash
+definitions=/usr/local/lib/solidgroundux/globals/solidground-management-console-modules-definitions.sh
+[[ -r "$definitions" ]] || exit 0
+# shellcheck source=/dev/null
+source "$definitions"
+
+CYAN=$'\e[38;2;0;220;255m'
+YELLOW=$'\e[38;2;255;220;0m'
+GREEN=$'\e[38;2;80;220;120m'
+ORANGE=$'\e[38;2;255;165;0m'
+RESET=$'\e[0m'
+
+printf '\n'
+
+printf '%s %s %s.%s %s\n' \
+    "$YELLOW" \
+    "$SGND_SOLIDGROUND_MANAGEMENT_CONSOLE_MODULES_PRODUCT" \
+    "$SGND_SOLIDGROUND_MANAGEMENT_CONSOLE_MODULES_VERSION" \
+    "$SGND_SOLIDGROUND_MANAGEMENT_CONSOLE_MODULES_BUILD" \
+    "$RESET"
+
+

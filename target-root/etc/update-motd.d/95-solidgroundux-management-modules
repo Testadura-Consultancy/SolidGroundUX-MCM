@@ -1,6 +1,0 @@
-#!/usr/bin/env bash
-definitions=/usr/local/lib/solidgroundux/globals/solidground-management-console-modules-definitions.sh
-[[ -r "$definitions" ]] || exit 0
-# shellcheck source=/dev/null
-source "$definitions"
-printf '%s %s.%s\n' "$SGND_SOLIDGROND_MANAGEMENT_CONSOLE_MODULES_PRODUCT" "$SGND_SOLIDGROND_MANAGEMENT_CONSOLE_MODULES_VERSION" "$SGND_SOLIDGROND_MANAGEMENT_CONSOLE_MODULES_BUILD"
