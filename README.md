@@ -9,6 +9,27 @@
 </tr>
 </table>
 
+<table>
+<tr>
+<td width="25%" align="center">
+  <a href="https://testadura-consultancy.github.io/SolidgroundUX/"><strong>Documentation</strong></a><br>
+  Framework reference and guides
+</td>
+<td width="25%" align="center">
+  <a href="INSTALL.md"><strong>Installation</strong></a><br>
+  Installation and release management
+</td>
+<td width="25%" align="center">
+  <a href="CHANGELOG.md"><strong>Changelog</strong></a><br>
+  Releases and development history
+</td>
+<td width="25%" align="center">
+  <a href="LICENSE"><strong>License</strong></a><br>
+  Terms of use and redistribution
+</td>
+</tr>
+</table>
+
 ------------------------------------------------------------------------
 
 ## About this project
