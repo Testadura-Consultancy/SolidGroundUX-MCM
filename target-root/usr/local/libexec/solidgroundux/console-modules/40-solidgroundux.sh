@@ -94,16 +94,22 @@ set -uo pipefail
         #   _release_manager
     _release_manager() {
         local manager="/var/lib/solidgroundux/release-manager.sh"
+        local -a manager_args=("$@")
 
         [[ -f "$manager" ]] || {
             saywarning "Release manager not found: $manager"
             return 1
         }
 
+        if (( ${FLAG_DRYRUN:-0} == 1 )); then
+            manager_args=(--dryrun "${manager_args[@]}")
+            sayinfo "DRYRUN: Opening release manager with dry-run enabled."
+        fi
+
         if [[ -x "$manager" ]]; then
-            sudo "$manager" "$@"
+            sudo "$manager" "${manager_args[@]}"
         else
-            sudo bash "$manager" "$@"
+            sudo bash "$manager" "${manager_args[@]}"
         fi
     }
 
@@ -155,15 +161,7 @@ set -uo pipefail
     }
 
 # - Framework configuration actions ----------------------------------------------
-    # fn: _framework_config_view_file
-        # . Purpose
-        #   Open a framework configuration file with the configured pager.
-        #
-        # . Returns
-        #   Exit status from the pager; 1 when the path is unavailable or missing.
-        #
-        # . Usage
-        #   _framework_config_view_file
+    # fn: _framework_config_view_file - Open a framework configuration file read-only
     _framework_config_view_file() {
         local title="$1"
         local file="$2"
@@ -184,270 +182,33 @@ set -uo pipefail
         "${pager_command[@]}" -- "$file"
     }
 
-    # fn: _framework_config_edit_file
-        # . Purpose
-        #   Open a framework configuration file in VISUAL/EDITOR, using sudo when write access requires it.
-        #
-        # . Returns
-        #   Exit status from the editor or required filesystem operation.
-        #
-        # . Usage
-        #   _framework_config_edit_file
-    _framework_config_edit_file() {
-        local title="$1"
-        local file="$2"
-        local editor="${VISUAL:-${EDITOR:-nano}}"
-        local directory=""
-        local -a editor_command=()
-
-        [[ -n "$file" ]] || {
-            saywarning "$title path is not available"
-            return 1
-        }
-
-        directory="$(dirname "$file")"
-        read -r -a editor_command <<< "$editor"
-
-        if [[ -d "$directory" && -w "$directory" ]] || [[ -f "$file" && -w "$file" ]]; then
-            mkdir -p -- "$directory" || return $?
-            "${editor_command[@]}" "$file"
-            return $?
-        fi
-
-        command -v sudo >/dev/null 2>&1 || {
-            saywarning "$title requires write access: $file"
-            return 1
-        }
-
-        sudo mkdir -p -- "$directory" || return $?
-        sudo "${editor_command[@]}" "$file"
-    }
-
-    # fn: _framework_config_view_system
-        # . Purpose
-        #   View the system-wide SolidGroundUX framework configuration file.
-        #
-        # . Returns
-        #   Returns _framework_config_view_file status.
-        #
-        # . Usage
-        #   _framework_config_view_system
+    # fn: _framework_config_view_system - View the system framework configuration
     _framework_config_view_system() {
-        _framework_config_view_file             "System framework configuration"             "${SGND_FRAMEWORK_SYSCFG_FILE:-}"
+        _framework_config_view_file \
+            "System framework configuration" \
+            "${SGND_FRAMEWORK_SYSCFG_FILE:-}"
     }
 
-    # fn: _framework_config_edit_system
-        # . Purpose
-        #   Edit the system-wide SolidGroundUX framework configuration file.
-        #
-        # . Returns
-        #   Returns _framework_config_edit_file status.
-        #
-        # . Usage
-        #   _framework_config_edit_system
-    _framework_config_edit_system() {
-        _framework_config_edit_file             "System framework configuration"             "${SGND_FRAMEWORK_SYSCFG_FILE:-}"
-    }
-
-    # fn: _framework_config_view_user
-        # . Purpose
-        #   View the current user SolidGroundUX framework configuration file.
-        #
-        # . Returns
-        #   Returns _framework_config_view_file status.
-        #
-        # . Usage
-        #   _framework_config_view_user
+    # fn: _framework_config_view_user - View the user framework configuration
     _framework_config_view_user() {
-        _framework_config_view_file             "User framework configuration"             "${SGND_FRAMEWORK_USRCFG_FILE:-}"
+        _framework_config_view_file \
+            "User framework configuration" \
+            "${SGND_FRAMEWORK_USRCFG_FILE:-}"
     }
 
-    # fn: _framework_config_edit_user
-        # . Purpose
-        #   Edit the current user SolidGroundUX framework configuration file.
-        #
-        # . Returns
-        #   Returns _framework_config_edit_file status.
-        #
-        # . Usage
-        #   _framework_config_edit_user
-    _framework_config_edit_user() {
-        _framework_config_edit_file             "User framework configuration"             "${SGND_FRAMEWORK_USRCFG_FILE:-}"
-    }
-
-    # fn: _framework_config_validator
-        # Returns:
-        #   Validator function name suitable for the requested configuration key.
-        #
-        # Usage:
-        #   _framework_config_validator "SGND_LOG_KEEP"
-        #
-    _framework_config_validator() {
-        local key="${1:-}"
-
-        case "$key" in
-            SGND_CONSOLE_LOG_LEVEL|SGND_FILE_LOG_LEVEL)
-                printf '%s\n' '_framework_config_validate_log_level'
-                ;;
-            SGND_LOG_MAX_BYTES|SGND_LOG_KEEP)
-                printf '%s\n' 'sgnd_validate_int'
-                ;;
-            SGND_LOG_COMPRESS|SAY_COLORIZE_DEFAULT|SAY_DATE_DEFAULT|SAY_SHOW_DEFAULT)
-                printf '%s\n' 'sgnd_validate_bool'
-                ;;
-            *)
-                printf '%s\n' 'sgnd_validate_text'
-                ;;
-        esac
-    }
-
-    # fn: _framework_config_validate_log_level
-        # Returns:
-        #   0 for a supported framework log level; 1 otherwise.
-        #
-        # Usage:
-        #   _framework_config_validate_log_level "normal"
-        #
-    _framework_config_validate_log_level() {
-        case "${1,,}" in
-            silent|quiet|normal|verbose|debug|trace) return 0 ;;
-            *) return 1 ;;
-        esac
-    }
-
-    # fn: _framework_config_write_value
-        # Purpose:
-        #   Replace or append one KEY=VALUE assignment in a cfg file.
-        #
-        # Arguments:
-        #   $1 - Target cfg file.
-        #   $2 - Configuration key.
-        #   $3 - New value.
-        #
-        # Returns:
-        #   0 on success; non-zero when the file cannot be updated.
-        #
-        # Usage:
-        #   _framework_config_write_value "$file" "$key" "$value"
-        #
-    _framework_config_write_value() {
-        local file="${1:?missing cfg file}"
-        local key="${2:?missing cfg key}"
-        local value="${3-}"
-        local temp_file=""
-
-        temp_file="$(mktemp)" || return $?
-
-        awk -v key="$key" -v value="$value" '
-            BEGIN { replaced = 0 }
-            $0 ~ "^[[:space:]]*" key "[[:space:]]*=" {
-                print key "=" value
-                replaced = 1
-                next
-            }
-            { print }
-            END {
-                if (!replaced) {
-                    print key "=" value
-                }
-            }
-        ' "$file" > "$temp_file" || {
-            rm -f -- "$temp_file"
-            return 1
-        }
-
-        if [[ -w "$file" ]]; then
-            cat -- "$temp_file" > "$file"
-        elif command -v sudo >/dev/null 2>&1; then
-            sudo cp -- "$temp_file" "$file"
-        else
-            rm -f -- "$temp_file"
-            saywarning "Configuration file is not writable: $file"
-            return 1
-        fi
-
-        local rc=$?
-        rm -f -- "$temp_file"
-        return "$rc"
-    }
-
-    # fn: framework_configure_file
-        # Purpose:
-        #   Interactively configure registered settings in a SolidGroundUX cfg file.
-        #
-        # Behavior:
-        #   - Defaults to sgnd_framework_globals.cfg.
-        #   - Uses the active value of each registered setting as the prompt default.
-        #   - Applies a validator appropriate to each setting.
-        #   - Writes accepted values back while retaining comments and ordering.
-        #
-        # Arguments:
-        #   $1 - Optional cfg path. Defaults to SGND_FRAMEWORK_SYSCFG_FILE.
-        #
-        # Returns:
-        #   0 when all selected values were written successfully.
-        #
-        # Usage:
-        #   framework_configure_file
-        #   framework_configure_file "$SGND_FRAMEWORK_USRCFG_FILE"
-        #
+    # fn: framework_configure_file - Configure validated framework settings externally
     framework_configure_file() {
-        local cfg_file="${1:-${SGND_FRAMEWORK_SYSCFG_FILE:-}}"
-        local spec=""
-        local audience=""
-        local key=""
-        local description=""
-        local extra=""
-        local current=""
-        local validator=""
-        local answer=""
+        _sgnd_run_module_script "manage-solidgroundux.sh" --action config-system-configure
+    }
 
-        [[ -n "$cfg_file" ]] || {
-            saywarning "Framework configuration path is not available"
-            return 1
-        }
+    # fn: _framework_config_edit_system - Edit the system configuration externally
+    _framework_config_edit_system() {
+        _sgnd_run_module_script "manage-solidgroundux.sh" --action config-system-edit
+    }
 
-        [[ -f "$cfg_file" ]] || {
-            saywarning "Framework configuration does not exist: $cfg_file"
-            return 1
-        }
-
-        declare -p SGND_FRAMEWORK_GLOBALS >/dev/null 2>&1 || {
-            saywarning "SGND_FRAMEWORK_GLOBALS is not defined"
-            return 1
-        }
-
-        sgnd_print
-        sgnd_print_sectionheader --text "Configure $(basename "$cfg_file")"
-        sgnd_print_labeledvalue --label "Configuration file" --value "$cfg_file"
-        sgnd_print
-
-        for spec in "${SGND_FRAMEWORK_GLOBALS[@]}"; do
-            IFS='|' read -r audience key description extra <<< "$spec"
-            [[ -n "$key" ]] || continue
-
-            if [[ "$cfg_file" == "${SGND_FRAMEWORK_SYSCFG_FILE:-}" ]]; then
-                [[ "$audience" == "system" || "$audience" == "both" ]] || continue
-            elif [[ "$cfg_file" == "${SGND_FRAMEWORK_USRCFG_FILE:-}" ]]; then
-                [[ "$audience" == "user" || "$audience" == "both" ]] || continue
-            fi
-
-            current="${!key-}"
-            validator="$(_framework_config_validator "$key")"
-            answer="$current"
-
-            ask \
-                --label "$key" \
-                --var answer \
-                --default "$current" \
-                --validate "$validator" \
-                --labelwidth 28 || return $?
-
-            _framework_config_write_value "$cfg_file" "$key" "$answer" || return $?
-            printf -v "$key" '%s' "$answer"
-        done
-
-        sayok "Framework configuration saved to $cfg_file"
+    # fn: _framework_config_edit_user - Edit the user configuration externally
+    _framework_config_edit_user() {
+        _sgnd_run_module_script "manage-solidgroundux.sh" --action config-user-edit
     }
 
 # - Framework logging actions ----------------------------------------------------
@@ -523,53 +284,9 @@ set -uo pipefail
         grep -E ' type=(ERROR|FAIL|FATAL) ' -- "$SGND_LOG_PATH"             | tail -n 100             | "${pager_command[@]}"
     }
 
-    # fn: _framework_log_rotate
-        # . Purpose
-        #   Rotate the active framework logfile according to configured retention and compression settings.
-        #
-        # . Returns
-        #   0 when rotation succeeds; non-zero on validation or filesystem failure.
-        #
-        # . Usage
-        #   _framework_log_rotate
+    # fn: _framework_log_rotate - Rotate the active logfile externally
     _framework_log_rotate() {
-        local logfile="${SGND_LOG_PATH:-}"
-        local keep="${SGND_LOG_KEEP:-5}"
-        local compress="${SGND_LOG_COMPRESS:-0}"
-        local i=0
-        local src=""
-        local dst=""
-
-        _framework_log_validate || return $?
-
-        [[ "$keep" =~ ^[0-9]+$ ]] && (( keep > 0 )) || {
-            saywarning "Invalid SGND_LOG_KEEP value: $keep"
-            return 1
-        }
-
-        [[ -w "$logfile" && -w "$(dirname "$logfile")" ]] || {
-            saywarning "Framework logfile is not writable: $logfile"
-            return 1
-        }
-
-        for (( i=keep; i>=1; i-- )); do
-            src="${logfile}.${i}"
-            dst="${logfile}.$((i + 1))"
-
-            [[ -f "$src" ]] && mv -f -- "$src" "$dst"
-            [[ -f "${src}.gz" ]] && mv -f -- "${src}.gz" "${dst}.gz"
-        done
-
-        mv -f -- "$logfile" "${logfile}.1" || return $?
-        : > "$logfile" || return $?
-
-        if (( compress )) && [[ -f "${logfile}.1" ]]; then
-            gzip -f -- "${logfile}.1" || return $?
-        fi
-
-        rm -f --             "${logfile}.$((keep + 1))"             "${logfile}.$((keep + 1)).gz"
-
-        sayok "Framework logfile rotated"
+        _sgnd_run_module_script "manage-solidgroundux.sh" --action log-rotate
     }
 
 # - Internal helpers -------------------------------------------------------------
@@ -668,15 +385,31 @@ set -uo pipefail
 
         local key=""
         local -a fields=()
+        local -a original_values=()
 
         for key in "${SGND_FRAMEWORK_STATE[@]}"; do
             fields+=("$key|$key|${!key-}|")
+            original_values+=("${!key-}")
         done
 
         sgnd_print
         sgnd_print_sectionheader --text "Edit transferable framework state"
 
         ask_prompt_form --autoalign --pad 2 -- "${fields[@]}" || return $?
+
+        if (( ${FLAG_DRYRUN:-0} == 1 )); then
+            sayinfo "DRYRUN: Would save transferable framework state to '$SGND_FRAMEWORK_STATEFILE':"
+            for key in "${SGND_FRAMEWORK_STATE[@]}"; do
+                sgnd_print_labeledvalue --label "$key" --value "${!key-}" --labelwidth 30
+            done
+
+            for key in "${!SGND_FRAMEWORK_STATE[@]}"; do
+                printf -v "${SGND_FRAMEWORK_STATE[$key]}" '%s' "${original_values[$key]}"
+            done
+
+            sayinfo "DRYRUN: Runtime state restored; no state file or UI changes were made."
+            return 0
+        fi
 
         sgnd_state_save_keys \
             --file "$SGND_FRAMEWORK_STATEFILE" \
@@ -698,6 +431,17 @@ set -uo pipefail
         #   framework_state_save
     framework_state_save() {
         _framework_state_validate || return 1
+
+        local key=""
+
+        if (( ${FLAG_DRYRUN:-0} == 1 )); then
+            sayinfo "DRYRUN: Would save current transferable framework state to '$SGND_FRAMEWORK_STATEFILE':"
+            for key in "${SGND_FRAMEWORK_STATE[@]}"; do
+                sgnd_print_labeledvalue --label "$key" --value "${!key-}" --labelwidth 30
+            done
+            sayinfo "DRYRUN: No state file changes were made."
+            return 0
+        fi
 
         sgnd_state_save_keys \
             --file "$SGND_FRAMEWORK_STATEFILE" \

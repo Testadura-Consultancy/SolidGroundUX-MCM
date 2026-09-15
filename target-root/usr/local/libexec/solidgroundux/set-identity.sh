@@ -154,7 +154,7 @@ set -uo pipefail
         # Optional: script-specific arguments
         # --- Example: Arguments
         # Each entry:
-        #   "name|short|type|var|help|choices"
+        #   "name|short|type|var|help|default|choices"
         #
         #   name    = long option name WITHOUT leading --
         #   short   - short option name WITHOUT leading -
@@ -169,7 +169,7 @@ set -uo pipefail
         #   - After parsing you can use: FLAG_VERBOSE, VAL_CONFIG, ENUM_MODE, ...
     SGND_ARGS_SPEC=(
         "Ipv4|i|value|TARGET_IPV4|Target static IPv4 address with CIDR|"
-        "dhcp||enum|USE_DHCP|Use DHCP for IPv4 configuration|yes,no"
+        "dhcp||enum|USE_DHCP|Use DHCP for IPv4 configuration||yes,no"
         "DNS|d|value|TARGET_DNS|Target DNS server IP address|"
         "DNS-search||value|TARGET_DNS_SEARCH|Target DNS search domain|"
         "dns-only||flag|FLAG_DNS_ONLY|Update only the configured DNS server and search domain|"
@@ -427,7 +427,7 @@ set -uo pipefail
         #   _set_hostname
     _set_hostname() {
         if (( ${FLAG_DRYRUN:-0} == 1 )); then
-            sayinfo "Dry-run mode: would set hostname to $TARGET_HOSTNAME"
+            sayinfo "DRYRUN: Would set hostname to '$TARGET_HOSTNAME'."
             return 0
         fi
 
@@ -794,16 +794,20 @@ set -uo pipefail
         fi
 
         if (( changed == 0 )); then
-            sayinfo "No network configuration changes detected."
+            if (( ${FLAG_DRYRUN:-0} == 1 )); then
+                sayinfo "DRYRUN: No network configuration changes would be required."
+            else
+                sayinfo "No network configuration changes detected."
+            fi
             rm -f -- "$candidate_file"
             rm -rf -- "$backup_dir"
             return 0
         fi
 
         if (( ${FLAG_DRYRUN:-0} == 1 )); then
-            sayinfo "Dry-run mode: would update $NETPLAN_FILE"
-            sayinfo "Dry-run mode: would run netplan generate"
-            sayinfo "Dry-run mode: would run netplan apply"
+            sayinfo "DRYRUN: Would update netplan configuration '$NETPLAN_FILE'."
+            sayinfo "DRYRUN: Would run 'netplan generate'."
+            sayinfo "DRYRUN: Would run 'netplan apply'."
             rm -f -- "$candidate_file"
             rm -rf -- "$backup_dir"
             return 0
@@ -871,6 +875,18 @@ set -uo pipefail
         return 0
     }
 
+    # fn: _dryrun_complete - Report completion of a dry-run preview
+        # . Purpose
+        #   Confirm explicitly that the preview completed without persistent changes.
+        #
+        # . Returns
+        #   Always returns 0.
+    _dryrun_complete() {
+        (( ${FLAG_DRYRUN:-0} == 1 )) || return 0
+        sayok "DRYRUN complete. The changes shown above would have been applied; no changes were written."
+        return 0
+    }
+
 # - Main ----------------------------------------------------------------------------
     # fn: main - Run the executable main sequence
         # . Purpose
@@ -910,6 +926,7 @@ set -uo pipefail
             }
 
             _network_config || exit $?
+            _dryrun_complete
             exit 0
         fi
 
@@ -923,6 +940,7 @@ set -uo pipefail
 
         _set_hostname || exit $?
         _network_config || exit $?
+        _dryrun_complete
     }
 
     # Entrypoint: sgnd_bootstrap will split framework args from script args.

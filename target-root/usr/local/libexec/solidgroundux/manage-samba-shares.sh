@@ -65,6 +65,22 @@ set -uo pipefail
         local root_index=-1
         local -a path_parts=()
 
+        # A console module from a separate management-project tree passes the
+        # framework root used by the current console explicitly. Prefer it when valid.
+        if [[ -n "${SGND_FRAMEWORK_ROOT:-}" ]]; then
+            if [[ "$SGND_FRAMEWORK_ROOT" == "/" ]]; then
+                exe_common="/usr/local/lib/solidgroundux/common/sgnd-exe-common.sh"
+            else
+                exe_common="${SGND_FRAMEWORK_ROOT%/}/usr/local/lib/solidgroundux/common/sgnd-exe-common.sh"
+            fi
+
+            if [[ -r "$exe_common" ]]; then
+                # shellcheck source=/dev/null
+                source "$exe_common"
+                return 0
+            fi
+        fi
+
         script_file="$(readlink -f "${BASH_SOURCE[0]}")" || {
             printf 'FATAL: Cannot resolve executable path: %s\n' "${BASH_SOURCE[0]}" >&2
             return 126
@@ -146,6 +162,10 @@ set -uo pipefail
     DISCOVERED_GROUPS=()
 
 # - Helpers -------------------------------------------------------------------------
+    _dryrun_complete() {
+        sayok "DRYRUN complete. The changes shown above would have been applied; no changes were written."
+    }
+
     # fn: _refresh_storage_paths - Resolve the configured SolidGroundUX share root
         # . Returns
         #   0 after SGND_SAMBA_SHARE_ROOT is refreshed.
@@ -190,6 +210,134 @@ set -uo pipefail
     }
 
     _refresh_storage_paths
+
+
+    # fn: _smb_ask_selection - Render a Samba selection menu and return the selected value(s)
+        # . Purpose
+        #   Keep selection mechanics local while the manager owns the surrounding UI layout.
+        #   The menu uses the standard section header and leaves a blank line between the
+        #   final option and the Selection prompt.
+        #
+        # . Arguments
+        #   --label TEXT
+        #   --var NAME
+        #   --multi
+        #   --items ITEM...
+        #
+        # . Returns
+        #   0 on selection; 1 when Q is entered; 2 on invalid invocation.
+    _smb_ask_selection() {
+        local label="Select an option"
+        local var_name="selection"
+        local multi=0
+        local input=""
+        local token=""
+        local start=0
+        local end=0
+        local index=0
+        local i=0
+        local invalid=0
+        local -a items=()
+        local -a tokens=()
+        local -a selected_values=()
+        local -A selected_indexes=()
+
+        while [[ $# -gt 0 ]]; do
+            case "$1" in
+                --label) label="$2"; shift 2 ;;
+                --var)   var_name="$2"; shift 2 ;;
+                --multi) multi=1; shift ;;
+                --items)
+                    shift
+                    items=("$@")
+                    break
+                    ;;
+                --)
+                    shift
+                    break
+                    ;;
+                *)
+                    items+=("$1")
+                    shift
+                    ;;
+            esac
+        done
+
+        [[ "$var_name" =~ ^[A-Za-z_][A-Za-z0-9_]*$ ]] || return 2
+        (( ${#items[@]} > 0 )) || return 2
+
+        sgnd_print
+        sgnd_print_sectionheader --text "$label"
+        for (( i=0; i<${#items[@]}; i++ )); do
+            sgnd_print --text "$((i + 1)). ${items[i]}" --pad 2
+        done
+        sgnd_print --text "Q. Back" --pad 2
+        sgnd_print
+
+        while :; do
+            input=""
+            if (( multi )); then
+                ask --label "Selection (comma/range)" --var input
+            else
+                ask --label "Selection" --var input
+            fi
+
+            input="${input#"${input%%[![:space:]]*}"}"
+            input="${input%"${input##*[![:space:]]}"}"
+
+            [[ "${input^^}" == "Q" ]] && return 1
+
+            if (( ! multi )); then
+                if [[ "$input" =~ ^[1-9][0-9]*$ ]] && (( input <= ${#items[@]} )); then
+                    printf -v "$var_name" '%s' "${items[input - 1]}"
+                    return 0
+                fi
+                saywarning "Invalid selection: $input"
+                continue
+            fi
+
+            selected_values=()
+            selected_indexes=()
+            invalid=0
+            IFS=',' read -r -a tokens <<< "$input"
+
+            for token in "${tokens[@]}"; do
+                token="${token#"${token%%[![:space:]]*}"}"
+                token="${token%"${token##*[![:space:]]}"}"
+
+                if [[ "$token" =~ ^([1-9][0-9]*)-([1-9][0-9]*)$ ]]; then
+                    start="${BASH_REMATCH[1]}"
+                    end="${BASH_REMATCH[2]}"
+                    if (( start > end || end > ${#items[@]} )); then
+                        invalid=1
+                        break
+                    fi
+                    for (( index=start; index<=end; index++ )); do
+                        selected_indexes["$index"]=1
+                    done
+                elif [[ "$token" =~ ^[1-9][0-9]*$ ]] && (( token <= ${#items[@]} )); then
+                    selected_indexes["$token"]=1
+                else
+                    invalid=1
+                    break
+                fi
+            done
+
+            if (( invalid || ${#selected_indexes[@]} == 0 )); then
+                saywarning "Invalid selection: $input"
+                continue
+            fi
+
+            for (( index=1; index<=${#items[@]}; index++ )); do
+                [[ -n "${selected_indexes[$index]-}" ]] || continue
+                selected_values+=("${items[index - 1]}")
+            done
+
+            local -n output_ref="$var_name"
+            output_ref=("${selected_values[@]}")
+            return 0
+        done
+    }
 
     # fn: _share_path - Resolve the configured path for a Samba share
         # . Returns
@@ -254,7 +402,7 @@ set -uo pipefail
     _select_shares() {
         _list_managed_shares || return $?
         SELECTED_SHARES=()
-        ask_selection \
+        _smb_ask_selection \
             --label "Select Samba share(s)" \
             --var SELECTED_SHARES \
             --multi \
@@ -362,7 +510,11 @@ set -uo pipefail
             [[ "${read_only^^}" == "QUIT" || "${read_only^^}" == "Q" ]] && return 0
 
             if (( ${FLAG_DRYRUN:-0} == 1 )); then
-                sayinfo "Dry run: Would create Samba share '$share_name' at $share_path."
+                sayinfo "DRYRUN: Would create backing directory '$share_path' with mode 0770."
+                sayinfo "DRYRUN: Would add Samba share '$share_name' to '$SGND_SAMBA_CONFIG'."
+                sayinfo "DRYRUN: Share settings would be browseable=${browsable,,}, read only=${read_only,,}, guest ok=no."
+                sayinfo "DRYRUN: Would validate the updated Samba configuration and reload smbd.service."
+                _dryrun_complete
             else
                 backup="$SGND_SAMBA_CONFIG.pre-share.$(date +%Y%m%d%H%M%S)"
                 sudo cp -a "$SGND_SAMBA_CONFIG" "$backup" || return 1
@@ -413,14 +565,21 @@ set -uo pipefail
 
         while :; do
             _list_managed_shares || return 0
-            ask_selection --label "Select Samba share to remove" --var share_name --items "${MANAGED_SHARES[@]}" || return 0
+            _smb_ask_selection --label "Select Samba share to remove" --var share_name --items "${MANAGED_SHARES[@]}" || return 0
             share_path="$(_share_path "$share_name")"
 
             ask_decision --label "Delete share data" --choices "Yes|Y,No|N,Quit|Q" --default "No" --var remove_data || return $?
             [[ "${remove_data^^}" == "QUIT" || "${remove_data^^}" == "Q" ]] && return 0
 
             if (( ${FLAG_DRYRUN:-0} == 1 )); then
-                sayinfo "Dry run: Would remove Samba share '$share_name'."
+                sayinfo "DRYRUN: Would remove Samba share '$share_name' from '$SGND_SAMBA_CONFIG'."
+                if [[ "${remove_data^^}" == "YES" ]]; then
+                    sayinfo "DRYRUN: Would recursively remove backing directory '$share_path'."
+                else
+                    sayinfo "DRYRUN: Would leave backing directory '$share_path' and its data intact."
+                fi
+                sayinfo "DRYRUN: Would validate the updated Samba configuration and reload smbd.service."
+                _dryrun_complete
             else
                 temp_file="$(mktemp)" || return 1
                 backup="$SGND_SAMBA_CONFIG.pre-remove.$(date +%Y%m%d%H%M%S)"
@@ -594,7 +753,7 @@ set -uo pipefail
                 fi
 
                 if (( ${FLAG_DRYRUN:-0} == 1 )); then
-                    sayinfo "Dry run: Would create $full_path using the share access model."
+                    sayinfo "DRYRUN: Would create '$full_path' and inherit the parent ownership, mode, and ACL model."
                     created_count=$((created_count + 1))
                     continue
                 fi
@@ -612,6 +771,10 @@ set -uo pipefail
                 sayok "Created '$relative_path' in '$share'."
                 created_count=$((created_count + 1))
             done
+
+            if (( ${FLAG_DRYRUN:-0} == 1 && created_count > 0 )); then
+                _dryrun_complete
+            fi
 
             dlg_rc=0
             ask_dlg_autocontinue \
@@ -695,7 +858,7 @@ set -uo pipefail
                 return 0
             fi
 
-            ask_selection \
+            _smb_ask_selection \
                 --label "Select subdirectory to remove" \
                 --var selected \
                 --items "${choices[@]}" || return 0
@@ -730,7 +893,8 @@ set -uo pipefail
             fi
 
             if (( ${FLAG_DRYRUN:-0} == 1 )); then
-                sayinfo "Dry run: Would remove $full_path."
+                sayinfo "DRYRUN: Would recursively remove subdirectory '$full_path'."
+                _dryrun_complete
             else
                 sudo rm -rf -- "$full_path" || return 1
                 sudo test ! -e "$full_path" || {
@@ -778,6 +942,13 @@ set -uo pipefail
         }
 
         saywarning "No valid Kerberos ticket is available."
+
+        if (( ${FLAG_DRYRUN:-0} == 1 )); then
+            sayinfo "DRYRUN: Would require a Kerberos ticket to query Active Directory groups."
+            sayinfo "DRYRUN: No new Kerberos ticket will be created in dry-run mode."
+            return 1
+        fi
+
         sgnd_print --text "AD Admin rights are needed to query Active Directory. Please enter the AD administrator account."
 
         ask \
@@ -941,7 +1112,7 @@ set -uo pipefail
         _discover_ad_groups || return 1
         choices=("${DISCOVERED_GROUPS[@]}" "Enter group manually")
 
-        ask_selection \
+        _smb_ask_selection \
             --label "Select Active Directory group" \
             --var selected \
             --items "${choices[@]}" || return 1
@@ -1011,7 +1182,14 @@ set -uo pipefail
         done < <(_acl_groups_for_share "$share")
 
         if (( ${FLAG_DRYRUN:-0} == 1 )); then
-            sayinfo "Dry run: Would synchronize Samba access for '$share'."
+            sayinfo "DRYRUN: Would synchronize Samba access lists for share '$share' in '$SGND_SAMBA_CONFIG'."
+            if (( have_groups )); then
+                sayinfo "DRYRUN: Would set valid users to: $valid_users"
+                [[ -n "$write_list" ]] && sayinfo "DRYRUN: Would set write list to: $write_list"
+            else
+                sayinfo "DRYRUN: No managed group ACLs are present; no Samba group list would be written."
+            fi
+            sayinfo "DRYRUN: Would validate the resulting Samba configuration and reload smbd.service."
             return 0
         fi
 
@@ -1087,7 +1265,7 @@ set -uo pipefail
             sudo test -d "$path" || { sayfail "Share path not found: $path"; return 1; }
 
             if (( ${FLAG_DRYRUN:-0} == 1 )); then
-                sayinfo "Dry run: Would grant $mode access to '$group' on '$share'."
+                sayinfo "DRYRUN: Would grant $mode ACL access to '$group' on '$share' and synchronize the Samba access lists."
                 continue
             fi
 
@@ -1096,6 +1274,10 @@ set -uo pipefail
             _sync_share_samba_access "$share" || return $?
             sayok "Granted $mode access to '$group' on '$share'."
         done
+
+        if (( ${FLAG_DRYRUN:-0} == 1 )); then
+            _dryrun_complete
+        fi
 
         return 0
     }
@@ -1136,7 +1318,7 @@ set -uo pipefail
             mapfile -t groups < <(printf '%s\n' "${groups[@]}" | LC_ALL=C sort -fu)
         fi
 
-        ask_selection \
+        _smb_ask_selection \
             --label "Select assigned AD/NSS group" \
             --var selected \
             --items "${groups[@]}" || return 1
@@ -1183,7 +1365,7 @@ set -uo pipefail
             fi
 
             if (( ${FLAG_DRYRUN:-0} == 1 )); then
-                sayinfo "Dry run: Would remove '$group' from '$share'."
+                sayinfo "DRYRUN: Would remove ACL access for '$group' from '$share' and synchronize the Samba access lists."
                 continue
             fi
 
@@ -1192,6 +1374,10 @@ set -uo pipefail
             _sync_share_samba_access "$share" || return $?
             sayok "Removed '$group' access from '$share'."
         done
+
+        if (( ${FLAG_DRYRUN:-0} == 1 )); then
+            _dryrun_complete
+        fi
 
         return 0
     }
@@ -1330,7 +1516,7 @@ set -uo pipefail
         )
 
         _framework_locator || return $?
-        sgnd_exe_start -- "$@" || return $?
+        sgnd_exe_start "$@" || return $?
 
         command -v setfacl >/dev/null 2>&1 || { sayfail "setfacl is not installed."; return 1; }
         command -v getfacl >/dev/null 2>&1 || { sayfail "getfacl is not installed."; return 1; }
@@ -1353,7 +1539,7 @@ set -uo pipefail
                 sgnd_print --text "None selected" --pad 2
             fi
 
-            ask_selection \
+            _smb_ask_selection \
                 --label "Manage Samba shares" \
                 --var action \
                 --items "${actions[@]}" || return 0

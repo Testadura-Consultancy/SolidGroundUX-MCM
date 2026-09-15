@@ -1,36 +1,27 @@
 #!/usr/bin/env bash
-# ==================================================================================
-# SolidGroundUX - Framework smoke tester
-# ----------------------------------------------------------------------------------
+# =====================================================================================
+# SolidGroundUX - Framework Smoke Test and Validation
+# -------------------------------------------------------------------------------------
 # Metadata:
 #   Version     : 2.1
-#   Build       : 2624123
-#   Checksum    : 6a65dc89e09f7d8fbcdc1136cd0d00d6ae39c0b276f682a0780a98728c019c2b
 #   Source      : framework-smoketest.sh
+#   Wrapper     : sgnd-framework-smoketest
 #   Type        : script
-#   Group       : SDK
-#   Purpose     : Exercise and validate core SolidGroundUX framework functionality
+#   Group       : SolidGround Console
+#   Purpose     : Validate the framework and exercise its interactive UI helpers
 #
 # Description:
-#   Standalone executable test harness for verifying foundational framework behavior.
-#
-#   The script:
-#     - Locates and loads the SolidGroundUX bootstrap configuration
-#     - Loads the framework bootstrapper and common runtime services
-#     - Exercises argument parsing, state, config, UI, and messaging behavior
-#     - Provides manual test routines for ask-* interaction helpers
-#     - Serves as a smoke test for framework integration during development
+#   Authoritative test implementation for the SolidGroundUX Management Console
+#   Framework Test module. Supports individual validation suites, a complete Run All
+#   pass, and the original interactive UI smoke-test menu.
 #
 # Design principles:
-#   - Executable scripts explicitly bootstrap and opt into framework features
-#   - Libraries are sourced only and never auto-run
-#   - Test flow should stay simple, visible, and easy to extend
-#   - Framework integration issues should fail early and clearly
-#
-# Non-goals:
-#   - Full automated regression testing
-#   - Fine-grained unit isolation for every library function
-#   - Replacement for dedicated shell test frameworks
+#   - Validation suites are non-destructive.
+#   - Console registration is tested after explicitly loading all discovered modules,
+#     avoiding false failures caused by the Management Console's lazy-loading model.
+#   - Existing module validators remain owned by their respective modules and are
+#     invoked rather than duplicated here.
+#   - Test sections use one consistent finish and summary pattern.
 #
 # Attribution:
 #   Developers  : Mark Fieten
@@ -38,38 +29,11 @@
 #   Client      : -
 #   Copyright   : © 2025 - 2026 Testadura Consultancy
 #   License     : Licensed under the Testadura Non-Commercial License (TD-NC) v1.1.
-# ==================================================================================
+# =====================================================================================
 set -uo pipefail
-# - Bootstrap ----------------------------------------------------------------------
+
+# - Bootstrap -----------------------------------------------------------------------
     # fn$ _framework_locator - Resolve and load the active SolidGroundUX framework
-        # . Purpose
-        #   Determine the filesystem root of the currently executing SolidGroundUX tree
-        #   from the script's physical path, then load the executable runtime library.
-        #
-        # . Behavior
-        #   - Resolves the physical path of the executing script.
-        #   - Treats usr, etc, and var as the canonical top-level SolidGroundUX tree roots.
-        #   - Uses the last occurrence of one of those path components to determine the
-        #     active filesystem root.
-        #   - Resolves production scripts beneath /usr, /etc, or /var to root (/).
-        #   - Resolves staged/development trees to the path prefix preceding the detected
-        #     usr, etc, or var component.
-        #   - Loads sgnd-exe-common.sh from the resolved framework root.
-        #
-        # . Globals (write)
-        #   SGND_FRAMEWORK_ROOT
-        #
-        # . Output
-        #   Writes fatal bootstrap errors to stderr using printf because framework UI
-        #   helpers are not available until sgnd-exe-common.sh has been loaded.
-        #
-        # . Returns
-        #   0 when the framework root was resolved and executable common library loaded.
-        #   126 when the script path cannot be resolved, no canonical root component can
-        #   be found, or the executable common library is unreadable.
-        #
-        # . Usage
-        #   _framework_locator || return $?
     _framework_locator() {
         local script_file=""
         local path_without_root=""
@@ -91,9 +55,7 @@ set -uo pipefail
         for index in "${!path_parts[@]}"; do
             component="${path_parts[$index]}"
             case "$component" in
-                usr|etc|var)
-                    root_index=$index
-                    ;;
+                usr|etc|var) root_index=$index ;;
             esac
         done
 
@@ -128,77 +90,50 @@ set -uo pipefail
         source "$exe_common"
     }
 
-# - Script metadata (identity) ---------------------------------------------------
+# - Script identity -----------------------------------------------------------------
     SGND_SCRIPT_FILE="$(readlink -f "${BASH_SOURCE[0]}")"
     SGND_SCRIPT_DIR="$(cd -- "$(dirname -- "$SGND_SCRIPT_FILE")" && pwd)"
     SGND_SCRIPT_BASE="$(basename -- "$SGND_SCRIPT_FILE")"
     SGND_SCRIPT_NAME="${SGND_SCRIPT_BASE%.sh}"
-    SGND_SCRIPT_DESC="Canonical executable template for Testadura scripts"
-    SGND_CONSOLE_LOG_LEVEL="${SGND_CONSOLE_LOG_LEVEL:-silent}"
-    : "${SGND_SCRIPT_DESC:=Canonical executable template for Testadura scripts}"
-    : "${SGND_SCRIPT_VERSION:=1.0}"
-    : "${SGND_SCRIPT_BUILD:=20250110}"
-    : "${SGND_SCRIPT_DEVELOPERS:=Mark Fieten}"
-    : "${SGND_SCRIPT_COMPANY:=Testadura Consultancy}"
-    : "${SGND_SCRIPT_COPYRIGHT:=© 2025 - 2026 Testadura Consultancy}"
-    : "${SGND_SCRIPT_LICENSE:=Testadura Non-Commercial License (TD-NC) v1.1.}"
+    SGND_SCRIPT_DESC="SolidGroundUX framework smoke test and validation suite"
+    SGND_SCRIPT_VERSION="2.1"
 
-# - Script metadata (framework integration) --------------------------------------
-    # Libraries to source from SGND_COMMON_LIB
+# - Framework integration ----------------------------------------------------------
     SGND_USING=(
         sgnd-datatable.sh
         console-helpers.sh
         sgnd-menu.sh
     )
 
-    # SGND_ARGS_SPEC
-        # --- Example: Arguments ----------------------------------------------
-        # Each entry:
-        #   "name|short|type|var|help|choices"
-        #
-        #   name    = long option name WITHOUT leading --
-        #   short   - short option name WITHOUT leading -
-        #   type    = flag | value | enum
-        # var: = shell variable that will be set
-        #   help    = help string for auto-generated --help output
-        #   choices = for enum: comma-separated values (e.g. fast,slow,auto)
-        #             for flag/value: leave empty
-        #
-        # Notes:
-        #   - -h / --help is built in, you don't need to define it here.
-        #   - After parsing you can use: FLAG_VERBOSE, VAL_CONFIG, ENUM_MODE, ...
     SGND_ARGS_SPEC=(
-        "load|l|flag|FLAG_LOAD|Random argument for testing|"
-        "unload|u|flag|FLAG_UNLOAD|Random argument for testing|"
-        "exit|x|flag|FLAG_EXIT|Random argument for testing|"
+        "suite|s|enum|ENUM_SUITE|Test suite to run||smoke,installation,console,modules,all"
         "view-log||flag|FLAG_VIEW_LOG|Display the active SolidGroundUX logfile and exit|"
     )
 
     SGND_SCRIPT_EXAMPLES=(
-        "$SGND_SCRIPT_NAME --load --verbose  #Some example usage"
-    ) 
-    
-    SGND_SCRIPT_GLOBALS=(
-        "system|SGND_SYS_STRING|System CFG string|"
-        "system|SGND_SYS_INT|System CFG int|"
-        "system|SGND_SYS_DATE|System CFG date|"
-
-        "user|SGND_USR_STRING|User CFG string|"
-        "user|SGND_USR_INT|User CFG int|"
-        "user|SGND_USR_DATE|User  CFG date|"
-
-        "both|SGND_COMMON_STRING|Common CFG string|"
-        "both|SGND_COMMON_INT|Common CFG int|"
-        "both|SGND_COMMON_DATE|Common  CFG date|"
+        "Interactive smoke tests:"
+        "  $SGND_SCRIPT_NAME --suite smoke"
+        ""
+        "Run all framework tests:"
+        "  $SGND_SCRIPT_NAME --suite all"
+        ""
+        "Validate console registration only:"
+        "  $SGND_SCRIPT_NAME --suite console"
     )
 
-    : "${INP_NAME=}"
-    : "${INP_STREET=}"
-    : "${INP_ZIPCODE=}"
-    : "${INP_CITY=}"
-    : "${INP_COUNTRY=}"
-    : "${INP_AGE=}"
-     
+    SGND_SCRIPT_GLOBALS=()
+    SGND_ON_EXIT_HANDLERS=()
+    SGND_STATE_SAVE=0
+    : "${ENUM_SUITE:=smoke}"
+
+# - Smoke-test input declarations --------------------------------------------------
+    : "${INP_NAME:=}"
+    : "${INP_STREET:=}"
+    : "${INP_ZIPCODE:=}"
+    : "${INP_CITY:=}"
+    : "${INP_COUNTRY:=}"
+    : "${INP_AGE:=}"
+
     SGND_STATE_VARIABLES=(
         "INP_NAME|Name|Petrus Puk|"
         "INP_STREET|Address|Nowhere straat|"
@@ -208,29 +143,6 @@ set -uo pipefail
         "INP_AGE|Leeftijd|102|sgnd_is_number"
     )
 
-    SGND_ON_EXIT_HANDLERS=(
-    )
-
-    SGND_STATE_SAVE=1
-
-# - Local script Declarations ----------------------------------------------------
-    : "${SGND_SYS_STRING:=system-default}"
-    : "${SGND_SYS_INT:=0}"
-    : "${SGND_SYS_DATE:=1970-01-01}"
-
-    : "${SGND_USR_STRING:=user-default}"
-    : "${SGND_USR_INT:=0}"
-    : "${SGND_USR_DATE:=1970-01-01}"
-
-    : "${SGND_COMMON_STRING:=common-default}"
-    : "${SGND_COMMON_INT:=0}"
-    : "${SGND_COMMON_DATE:=1970-01-01}"
-
-    : "${STATE_VAR1:=State VAR1}"
-    : "${STATE_VAR2:=4}"
-    : "${STATE_VAR3:=2025-01-01}"
-    
-# - Local script functions -------------------------------------------------------
     # fn: input_test - Run simple shell input tests
         # . Purpose
         #   Run simple shell input tests.
@@ -569,29 +481,13 @@ set -uo pipefail
         # . Purpose
         #   Verify file logging and file-level filtering independently from console output.
         #
-        # . Behavior
-        #   - Resolves and displays the active logfile path.
-        #   - Cycles through every supported SGND_FILE_LOG_LEVEL value.
-        #   - Writes representative messages for each level so filtering can be inspected.
-        #   - Finishes with SGND_FILE_LOG_LEVEL set to silent.
-        #   - Saves the final silent setting in the framework state file when available.
-        #
-        # Outputs (globals):
-        #   SGND_FILE_LOG_LEVEL
-        #
-        # Side effects:
-        #   Appends test records to the active SolidGroundUX logfile.
-        #   Updates SGND_FRAMEWORK_STATEFILE when framework state is available.
-        #
-        # . Returns
-        #   0 when the test sequence completes.
-        #   1 when no logfile can be resolved or the final state cannot be saved.
-        #
-        # . Usage
-        #   file_loglevel_test
+        # . DRYRUN
+        #   File logging is intentionally skipped because exercising it would append test
+        #   records to the active logfile. The test reports exactly what would be tested.
     file_loglevel_test() {
         local logfile=""
         local level=""
+        local original_file_loglevel="${SGND_FILE_LOG_LEVEL:-silent}"
 
         logfile="$(_sgnd_logfile)" || {
             saywarning "Unable to resolve the active logfile"
@@ -606,6 +502,12 @@ set -uo pipefail
         sgnd_print
         sgnd_print_sectionheader --text "Testing file log levels"
         sgnd_print_labeledvalue --label "Logfile" --value "$logfile"
+
+        if (( ${FLAG_DRYRUN:-0} == 1 )); then
+            sayinfo "DRYRUN: Would test file log filtering for: silent, quiet, normal, verbose, debug, trace."
+            sayinfo "DRYRUN: Test records would be written to '$logfile'; no records will be written."
+            return 0
+        fi
 
         for level in silent quiet normal verbose debug trace; do
             SGND_FILE_LOG_LEVEL="$level"
@@ -637,16 +539,8 @@ set -uo pipefail
             esac
         done
 
-        SGND_FILE_LOG_LEVEL="silent"
-
-        if [[ -n "${SGND_FRAMEWORK_STATEFILE:-}" ]]; then
-            sgnd_state_set \
-                --file "$SGND_FRAMEWORK_STATEFILE" \
-                SGND_FILE_LOG_LEVEL \
-                "$SGND_FILE_LOG_LEVEL" || return 1
-        fi
-
-        printf 'Finished with SGND_FILE_LOG_LEVEL=%s\n' "$SGND_FILE_LOG_LEVEL"
+        SGND_FILE_LOG_LEVEL="$original_file_loglevel"
+        printf 'Restored SGND_FILE_LOG_LEVEL=%s\n' "$SGND_FILE_LOG_LEVEL"
         return 0
     }
 
@@ -703,7 +597,7 @@ set -uo pipefail
         if [[ -r "$motd_file" ]]; then
             bash "$motd_file"
         else
-            sayerror "MOTD file not readable: $motd_file"
+            sayfail "MOTD file not readable: $motd_file"
         fi
     }
 
@@ -735,7 +629,7 @@ set -uo pipefail
 
         sgnd_print
         sgnd_print_sectionheader --text "Testing sayprogress() helpers"
-        sgdn_print
+        sgnd_print
         saystart "Progress test 1/3: single level"
 
         outer_total=150
@@ -949,162 +843,391 @@ set -uo pipefail
 
         return 0
     }
-# - Main -------------------------------------------------------------------------
-    # main MUST BE LAST function in script
-        # Main entry point for the executable script.
-        #
-        # Execution flow:
-        #   1) Invoke sgnd_bootstrap to initialize the framework environment, parse
-        #      framework-level arguments, and optionally load UI, state, and config.
-        #   2) Abort immediately if bootstrap reports an error condition.
-        #   3) Enact framework builtin arguments (help, showargs, state reset, etc.).
-        #      Info-only builtins terminate execution; mutating builtins may continue.
-        #   4) Continue with script-specific logic.
-        #
-        # Bootstrap options:
-        #   The script author explicitly selects which framework features to enable.
-        #   None are required; include only what this script needs.
-        #
-        #   --state        Enable persistent state loading/saving.
-        #   --needroot     Require execution as root.
-        #   --cannotroot   Require execution as non-root.
-        #   --console      Enable logging to console output.
-        #   --             End of bootstrap options; remaining args are script arguments.
-        # Notes:
-        #   - Builtin argument handling is centralized in sgnd_builtinarg_handler.
-        #   - Scripts may override builtin handling, but doing so transfers
-        #     responsibility for correct behavior to the script author.
-    # fn: _smoketest_show_license - Display the active SolidGroundUX license
-        # Returns:
-        #   Returns the underlying license renderer status.
-        #
-        # Usage:
-        #   _smoketest_show_license
+
+# - Validation engine --------------------------------------------------------------
+    SGND_TEST_PASS=0
+    SGND_TEST_FAIL=0
+    SGND_TEST_SKIP=0
+
+    _framework_test_root_path() {
+        local relative="${1:?missing path}"
+        local root="${SGND_FRAMEWORK_ROOT:-/}"
+        relative="${relative#/}"
+        if [[ "$root" == "/" ]]; then
+            printf '/%s\n' "$relative"
+        else
+            printf '%s/%s\n' "${root%/}" "$relative"
+        fi
+    }
+
+    _framework_test_result() {
+        local label="${1:?missing label}"
+        local status="${2:?missing status}"
+        local detail="${3:-}"
+        local value="$status"
+
+        [[ -z "$detail" ]] || value="$status - $detail"
+        sgnd_print_labeledvalue --label "$label" --value "$value" --labelwidth 32
+
+        case "$status" in
+            PASS) SGND_TEST_PASS=$((SGND_TEST_PASS + 1)); return 0 ;;
+            SKIP) SGND_TEST_SKIP=$((SGND_TEST_SKIP + 1)); return 0 ;;
+            FAIL) SGND_TEST_FAIL=$((SGND_TEST_FAIL + 1)); return 1 ;;
+        esac
+        return 1
+    }
+
+    _framework_test_suite_summary() {
+        local title="${1:?missing title}"
+        local pass_before="${2:-0}"
+        local fail_before="${3:-0}"
+        local skip_before="${4:-0}"
+        local passed=$((SGND_TEST_PASS - pass_before))
+        local failed=$((SGND_TEST_FAIL - fail_before))
+        local skipped=$((SGND_TEST_SKIP - skip_before))
+
+        sgnd_print
+        sgnd_print_sectionheader --text "$title summary"
+        sgnd_print_labeledvalue --label "Passed" --value "$passed" --labelwidth 18
+        sgnd_print_labeledvalue --label "Failed" --value "$failed" --labelwidth 18
+        sgnd_print_labeledvalue --label "Skipped" --value "$skipped" --labelwidth 18
+        sgnd_print
+
+        if (( failed == 0 )); then
+            sayok "$title passed."
+            return 0
+        fi
+
+        sayfail "$title reported $failed failure(s)."
+        return 1
+    }
+
+    _framework_test_validate_installation() {
+        local pass_before=$SGND_TEST_PASS
+        local fail_before=$SGND_TEST_FAIL
+        local skip_before=$SGND_TEST_SKIP
+        local path=""
+        local relative=""
+        local command_name=""
+        local module_dir=""
+        local module_count=0
+        local -a required_files=(
+            "/usr/local/lib/solidgroundux/common/sgnd-bootstrap.sh"
+            "/usr/local/lib/solidgroundux/common/sgnd-core.sh"
+            "/usr/local/lib/solidgroundux/common/sgnd-menu.sh"
+            "/usr/local/lib/solidgroundux/common/ui.sh"
+            "/usr/local/libexec/solidgroundux/management-console.sh"
+            "/usr/local/libexec/solidgroundux/framework-smoketest.sh"
+        )
+        local -a required_commands=(
+            "sgnd-console"
+            "sgnd-framework-smoketest"
+        )
+
+        sgnd_print
+        sgnd_print_sectionheader --text "Framework installation"
+
+        for relative in "${required_files[@]}"; do
+            path="$(_framework_test_root_path "$relative")"
+            if [[ -r "$path" ]]; then
+                _framework_test_result "$(basename "$relative")" "PASS" || true
+            else
+                _framework_test_result "$(basename "$relative")" "FAIL" "$path" || true
+            fi
+        done
+
+        module_dir="$(_framework_test_root_path /usr/local/libexec/solidgroundux/console-modules)"
+        if [[ -d "$module_dir" ]]; then
+            module_count="$(find "$module_dir" -maxdepth 1 -type f -name '*.sh' -printf '.' 2>/dev/null | wc -c)"
+            _framework_test_result "Console modules" "PASS" "$module_count module(s)" || true
+        else
+            _framework_test_result "Console modules" "FAIL" "$module_dir" || true
+        fi
+
+        for command_name in "${required_commands[@]}"; do
+            path="$(_framework_test_root_path "/usr/local/bin/$command_name")"
+            if [[ -x "$path" ]]; then
+                _framework_test_result "$command_name" "PASS" "$path" || true
+            else
+                _framework_test_result "$command_name" "FAIL" "public command not executable: $path" || true
+            fi
+        done
+
+        _framework_test_suite_summary "Framework installation" "$pass_before" "$fail_before" "$skip_before"
+    }
+
+    _framework_test_load_console_modules() {
+        local module_dir=""
+        local module_file=""
+        local loaded=0
+
+        module_dir="$(_framework_test_root_path /usr/local/libexec/solidgroundux/console-modules)"
+        [[ -d "$module_dir" ]] || {
+            _framework_test_result "Console module directory" "FAIL" "$module_dir" || true
+            return 1
+        }
+
+        sgnd_menu_create "Framework registration test" "Temporary registration model used by framework-smoketest"
+
+        while IFS= read -r -d '' module_file; do
+            if source "$module_file"; then
+                loaded=$((loaded + 1))
+            else
+                _framework_test_result "$(basename "$module_file")" "FAIL" "module source failed" || true
+            fi
+        done < <(find "$module_dir" -maxdepth 1 -type f -name '*.sh' -print0 | LC_ALL=C sort -z)
+
+        (( loaded > 0 )) || {
+            _framework_test_result "Console modules loaded" "FAIL" "no modules loaded" || true
+            return 1
+        }
+
+        _framework_test_result "Console modules loaded" "PASS" "$loaded" || true
+        return 0
+    }
+
+    _framework_test_validate_console() {
+        local pass_before=$SGND_TEST_PASS
+        local fail_before=$SGND_TEST_FAIL
+        local skip_before=$SGND_TEST_SKIP
+        local row=""
+        local key=""
+        local group=""
+        local label=""
+        local handler=""
+        local desc=""
+        local source=""
+        local builtin=""
+        local waitsecs=""
+        local visible=""
+        local indent=""
+        local status=""
+        local ord=""
+        local group_count=0
+        local item_count=0
+        local -A group_keys=()
+        local -A item_keys=()
+
+        sgnd_print
+        sgnd_print_sectionheader --text "Console registration"
+
+        _framework_test_load_console_modules || {
+            _framework_test_suite_summary "Console registration" "$pass_before" "$fail_before" "$skip_before"
+            return 1
+        }
+
+        group_count="${#SGND_GROUP_ROWS[@]}"
+        item_count="${#SGND_ITEM_ROWS[@]}"
+
+        for row in "${SGND_GROUP_ROWS[@]}"; do
+            IFS='|' read -r key label desc source builtin visible ord <<< "$row"
+            if [[ -z "$key" ]]; then
+                _framework_test_result "Console group" "FAIL" "empty group key" || true
+                continue
+            fi
+            if [[ -n "${group_keys[$key]+x}" ]]; then
+                _framework_test_result "Console group $key" "FAIL" "duplicate key" || true
+            else
+                group_keys["$key"]=1
+            fi
+        done
+
+        for row in "${SGND_ITEM_ROWS[@]}"; do
+            IFS='|' read -r key group label handler desc source builtin waitsecs visible indent status <<< "$row"
+
+            if [[ -z "$key" ]]; then
+                _framework_test_result "Console item" "FAIL" "empty item key" || true
+                continue
+            fi
+
+            if [[ -n "${item_keys[$key]+x}" ]]; then
+                _framework_test_result "Console item $key" "FAIL" "duplicate key" || true
+            else
+                item_keys["$key"]=1
+            fi
+
+            if [[ -z "${group_keys[$group]+x}" ]]; then
+                _framework_test_result "Console item $key" "FAIL" "missing group: $group" || true
+            fi
+
+            # All modules were explicitly sourced above. A missing handler at this point
+            # is therefore a real registration error, not a lazy-loading false positive.
+            if [[ -n "$handler" ]] && ! declare -F "$handler" >/dev/null 2>&1; then
+                _framework_test_result "Console item $key" "FAIL" "missing handler: $handler" || true
+            fi
+        done
+
+        _framework_test_result "Registered groups" "PASS" "$group_count" || true
+        _framework_test_result "Registered items" "PASS" "$item_count" || true
+
+        _framework_test_suite_summary "Console registration" "$pass_before" "$fail_before" "$skip_before"
+    }
+
+    _framework_test_is_storage_configured() {
+        [[ -s /etc/solidgroundux/storage.cfg ]] || grep -Eq '(^|[[:space:]])SGND_STORAGE([[:space:]]|$)' /etc/fstab 2>/dev/null
+    }
+
+    _framework_test_is_ad_server() {
+        grep -Eiq '^[[:space:]]*server[[:space:]]+role[[:space:]]*=[[:space:]]*active[[:space:]]+directory[[:space:]]+domain[[:space:]]+controller' /etc/samba/smb.conf 2>/dev/null
+    }
+
+    _framework_test_is_ad_client() {
+        command -v realm >/dev/null 2>&1 && [[ -n "$(realm list 2>/dev/null)" ]]
+    }
+
+    _framework_test_is_samba_file_server() {
+        command -v smbd >/dev/null 2>&1 && ! _framework_test_is_ad_server
+    }
+
+    _framework_test_run_validator() {
+        local label="${1:?missing label}"
+        local handler="${2:?missing handler}"
+        local applicable="${3:-1}"
+        local skip_reason="${4:-not configured on this host}"
+
+        if (( ! applicable )); then
+            _framework_test_result "$label" "SKIP" "$skip_reason" || true
+            return 0
+        fi
+
+        if ! declare -F "$handler" >/dev/null 2>&1; then
+            _framework_test_result "$label" "FAIL" "validator not available: $handler" || true
+            return 1
+        fi
+
+        sgnd_print
+        sgnd_print_sectionheader --text "$label"
+        if "$handler"; then
+            _framework_test_result "$label" "PASS" || true
+            return 0
+        fi
+
+        _framework_test_result "$label" "FAIL" "validator returned failure" || true
+        return 1
+    }
+
+    _framework_test_validate_modules() {
+        local pass_before=$SGND_TEST_PASS
+        local fail_before=$SGND_TEST_FAIL
+        local skip_before=$SGND_TEST_SKIP
+        local applicable=0
+
+        sgnd_print
+        sgnd_print_sectionheader --text "Module validations"
+
+        # Load all modules when this suite is run directly. When Run All follows the
+        # console-registration suite the functions are already available and guards
+        # prevent duplicate registration/loading.
+        if ! declare -F _computer_validate >/dev/null 2>&1; then
+            _framework_test_load_console_modules || {
+                _framework_test_suite_summary "Module validations" "$pass_before" "$fail_before" "$skip_before"
+                return 1
+            }
+        fi
+
+        _framework_test_run_validator "Computer setup" "_computer_validate" 1 || true
+
+        applicable=0
+        _framework_test_is_storage_configured && applicable=1
+        _framework_test_run_validator "Storage" "storage_validate_provisioning" "$applicable" "storage is not configured" || true
+
+        applicable=0
+        _framework_test_is_ad_server && applicable=1
+        _framework_test_run_validator "Active Directory server" "_adsvr_validate" "$applicable" "host is not an AD domain controller" || true
+
+        applicable=0
+        _framework_test_is_ad_client && applicable=1
+        _framework_test_run_validator "Active Directory client" "_adc_validate" "$applicable" "host is not joined through realmd" || true
+
+        applicable=0
+        _framework_test_is_samba_file_server && applicable=1
+        _framework_test_run_validator "Samba file server" "_smb_validate" "$applicable" "standalone Samba file service is not installed" || true
+
+        applicable=0
+        command -v nginx >/dev/null 2>&1 && applicable=1
+        _framework_test_run_validator "Web server" "_web_server_validate" "$applicable" "nginx is not installed" || true
+
+        applicable=0
+        [[ -x /opt/mssql/bin/sqlservr ]] && applicable=1
+        _framework_test_run_validator "SQL Server" "_sqlserver_validate" "$applicable" "SQL Server is not installed" || true
+
+        _framework_test_suite_summary "Module validations" "$pass_before" "$fail_before" "$skip_before"
+    }
+
+
+
+# - Smoke test menu -----------------------------------------------------------------
     _smoketest_show_license() {
         saydebug "$SGND_DOCS_DIR/$SGND_LICENSE_FILE"
         sgnd_print_license
     }
 
-    # fn: _smoketest_run_all_tests - Run the complete smoke-test sequence
-        # . Purpose
-        #   Execute the principal framework smoke tests in their normal menu order.
-        #
-        # . Behavior
-        #   - Runs ask, input, say, console log-level, file log-level, MOTD, and
-        #     progress tests sequentially.
-        #   - Leaves display-only license, color-chart, theme, and logfile actions
-        #     available as individual menu choices.
-        #
-        # . Returns
-        #   Returns 0 after the sequence completes.
-        #
-        # . Usage
-        #   _smoketest_run_all_tests
-    _smoketest_run_all_tests() {
-        ask_test
-        input_test
-        say_test
-        loglevel_test
-        file_loglevel_test
-        motd_test
-        sayprogress_test
-        return 0
+    _smoketest_finish_test() {
+        sgnd_print
+        sgnd_print_sectionheader --border "$DL_H" --maxwidth "${SGND_MENU_RENDER_WIDTH:-$(sgnd_terminal_width)}"
+        sgnd_print
     }
 
-    # fn: _smoketest_request_exit - Mark the interactive smoke-test menu for exit
-        # . Purpose
-        #   Request termination of the current smoke-test menu loop.
-        #
-        # Outputs (globals):
-        #   SGND_SMOKETEST_EXIT
-        #
-        # . Returns
-        #   0 always.
-        #
-        # . Usage
-        #   _smoketest_request_exit
+    _smoketest_run_all_tests() {
+        local failures=0
+
+        sgnd_print
+        sgnd_print_sectionheader --text "Interactive smoke tests"
+
+        ask_test || failures=$((failures + 1))
+        ask_selection_test || failures=$((failures + 1))
+        input_test || failures=$((failures + 1))
+        say_test || failures=$((failures + 1))
+        loglevel_test || failures=$((failures + 1))
+        file_loglevel_test || failures=$((failures + 1))
+        motd_test || failures=$((failures + 1))
+        sayprogress_test || failures=$((failures + 1))
+
+        sgnd_print
+        sgnd_print_sectionheader --text "Interactive smoke test summary"
+        if (( failures == 0 )); then
+            sayok "Interactive smoke tests completed."
+            return 0
+        fi
+
+        sayfail "$failures interactive smoke test(s) reported failure."
+        return 1
+    }
+
     _smoketest_request_exit() {
         SGND_SMOKETEST_EXIT=1
         return 0
     }
 
-    # fn: _smoketest_register_menu - Register the smoke-test menu through the public menu API
-        # . Purpose
-        #   Build the framework smoke-test menu using the reusable sgnd-menu API.
-        #
-        # . Behavior
-        #   - Disables management-console togglebar chrome for this standalone menu.
-        #   - Creates the menu model once for the current process.
-        #   - Registers the numbered test actions in their historical order.
-        #   - Registers the additional smoke-test actions as numbered items.
-        #   - Keeps Q as the literal-key quit action.
-        #
-        # . Returns
-        #   0 when all menu groups and items are registered successfully.
-        #   Non-zero when menu creation or registration fails.
-        #
-        # . Usage
-        #   _smoketest_register_menu
     _smoketest_register_menu() {
-        SGND_MENU_SHOW_TOGGLEBAR=0
+        SGND_MENU_TOGGLEBAR_ENABLED=0
+        sgnd_menu_create "Framework Smoke Tests" "Exercise SolidGroundUX UI and runtime helpers"
 
-        sgnd_menu_create \
-            "SolidGroundUX - Framework Unit Test Menu" \
-            "Exercise and validate core SolidGroundUX framework functionality" || return $?
+        sgnd_menu_register_group "smoke-tests" "Smoke tests" "Interactive framework helper tests" 0 1 100 || return $?
+        sgnd_menu_register_item "ask"       "smoke-tests" "Ask tests"                 "ask_test"               "Exercise ask and dialog helpers" 0 15 1 || return $?
+        sgnd_menu_register_item "selection" "smoke-tests" "Selection test"            "ask_selection_test"     "Exercise single and multiple ask_selection behavior" 0 15 1 || return $?
+        sgnd_menu_register_item "input"     "smoke-tests" "Input test"                "input_test"             "Exercise input helpers" 0 15 1 || return $?
+        sgnd_menu_register_item "say"       "smoke-tests" "Say test"                  "say_test"               "Exercise message output helpers" 0 15 1 || return $?
+        sgnd_menu_register_item "loglevel"  "smoke-tests" "Log level visibility test" "loglevel_test"          "Verify console log-level filtering" 0 15 1 || return $?
+        sgnd_menu_register_item "motd"      "smoke-tests" "Call MOTD"                 "motd_test"              "Render the SolidGroundUX MOTD" 0 15 1 || return $?
+        sgnd_menu_register_item "progress"  "smoke-tests" "Progress dialogue test"    "sayprogress_test"       "Exercise stacked progress lines" 0 15 1 || return $?
+        sgnd_menu_register_item "license"   "smoke-tests" "Show license"              "_smoketest_show_license" "Display the active SolidGroundUX license" 0 15 1 || return $?
+        sgnd_menu_register_item "colors"    "smoke-tests" "Show color chart"          "show_colorchart"        "Display the current terminal color chart" 0 15 1 || return $?
+        sgnd_menu_register_item "theme"     "smoke-tests" "Show theme"                "show_theme"             "Browse installed SolidGroundUX themes" 0 15 1 || return $?
 
-        sgnd_menu_register_group \
-            "smoke-tests" \
-            "Framework Tests" \
-            "Run individual framework smoke tests" \
-            0 1 100 || return $?
-
-        sgnd_menu_register_item "ask"      "smoke-tests" "Ask tests"                 "ask_test"               "Exercise ask and dialog helpers" 0 15 1 || return $?
-        sgnd_menu_register_item "selection" "smoke-tests" "Selection test"             "ask_selection_test"     "Exercise single and multiple ask_selection behavior" 0 15 1 || return $?
-        sgnd_menu_register_item "input"    "smoke-tests" "Input test"                "input_test"             "Exercise input helpers" 0 15 1 || return $?
-        sgnd_menu_register_item "say"      "smoke-tests" "Say test"                  "say_test"               "Exercise message output helpers" 0 15 1 || return $?
-        sgnd_menu_register_item "loglevel" "smoke-tests" "Log level visibility test" "loglevel_test"          "Verify console log-level filtering" 0 15 1 || return $?
-        sgnd_menu_register_item "motd"     "smoke-tests" "Call MOTD"                  "motd_test"              "Render the SolidGroundUX MOTD" 0 15 1 || return $?
-        sgnd_menu_register_item "progress" "smoke-tests" "Progress dialogue test"     "sayprogress_test"       "Exercise one, two, and three stacked progress lines" 0 15 1 || return $?
-        sgnd_menu_register_item "license"  "smoke-tests" "Show license"               "_smoketest_show_license" "Display the active SolidGroundUX license" 0 15 1 || return $?
-        sgnd_menu_register_item "colors"   "smoke-tests" "Show color chart"           "show_colorchart"        "Display the current terminal color chart" 0 15 1 || return $?
-        sgnd_menu_register_item "theme"    "smoke-tests" "Show theme"                 "show_theme"             "Display the active SolidGroundUX theme" 0 15 1 || return $?
-
-        sgnd_menu_register_group \
-            "smoke-actions" \
-            "Smoke Test Actions" \
-            "Logging and aggregate smoke-test actions" \
-            1 1 900 || return $?
-
+        sgnd_menu_register_group "smoke-actions" "Actions" "Smoke-test actions" 0 1 900 || return $?
         sgnd_menu_register_item "filelog" "smoke-actions" "File log level test" "file_loglevel_test"       "Verify file log-level filtering" 0 15 1 || return $?
         sgnd_menu_register_item "viewlog" "smoke-actions" "View logfile"        "view_log"                 "Display the active SolidGroundUX logfile" 0 15 1 || return $?
-        sgnd_menu_register_item "runall"  "smoke-actions" "Run all tests"       "_smoketest_run_all_tests" "Run the principal framework smoke-test sequence" 0 15 1 || return $?
-        sgnd_menu_register_item "Q"       "smoke-actions" "Quit"                "_smoketest_request_exit"  "Exit the framework smoke tester" 1 0 1 || return $?
-
+        sgnd_menu_register_item "A"       "smoke-actions" "Run all smoke tests" "_smoketest_run_all_tests" "Run the complete interactive smoke-test sequence" 0 30 1 || return $?
+        sgnd_menu_register_item "Q"       "smoke-actions" "Quit"                "_smoketest_request_exit"  "Return to the Management Console" 1 0 1 || return $?
         return 0
     }
 
-    # fn: _smoketest_read_choice - Read one smoke-test choice with auto-exit timeout
-        # . Purpose
-        #   Preserve the smoke test's 30-second inactivity timeout while allowing
-        #   complete menu selections such as 11, 12, and 13 to be entered.
-        #
-        # . Arguments
-        #   $1  OUTPUT_VAR - Variable receiving the selected menu choice.
-        #
-        # . Returns
-        #   0 when a selection was read.
-        #   1 when the 30-second timeout expires.
-        #
-        # . Usage
-        #   _smoketest_read_choice choice
     _smoketest_read_choice() {
         local output_var="${1:?missing output variable}"
         local choice=""
 
-        printf '%bSelect option (auto-exit in 30s): %b' \
-            "${SGND_UI_TEXT:-}" \
-            "${RESET:-}" >/dev/tty
-
+        printf '%bSelect option (auto-exit in 30s): %b' "${SGND_UI_TEXT:-}" "${RESET:-}" >/dev/tty
         if IFS= read -r -t 30 choice </dev/tty; then
             printf -v "$output_var" '%s' "$choice"
             return 0
@@ -1115,67 +1238,100 @@ set -uo pipefail
         return 1
     }
 
-    # fn: main - Run the SolidGroundUX framework smoke test
-        # . Purpose
-        #   Initialize the framework and run the interactive smoke-test menu.
-        #
-        # . Behavior
-        #   - Starts through the canonical executable framework path.
-        #   - Supports direct logfile viewing through --view-log.
-        #   - Builds and renders the test menu through the public sgnd-menu API.
-        #   - Suppresses management-console status/legend chrome and renders one final
-        #     double separator before the selection prompt.
-        #   - Preserves the historical 30-second inactivity auto-exit behavior.
-        #
-        # . Arguments
-        #   $@  Framework and script-specific command-line arguments.
-        #
-        # . Returns
-        #   Exits with the framework startup status or selected test status.
-        #
-        # . Usage
-        #   main "$@"
-    main() {
+    _framework_test_run_smoke_menu() {
         local choice=""
 
-        # -- Startup
-            _framework_locator || exit $?
-            sgnd_exe_start -- "$@"
+        _smoketest_register_menu || return $?
+        SGND_SMOKETEST_EXIT=0
 
-            if (( ${FLAG_VIEW_LOG:-0} )); then
-                view_log
-                return $?
+        while true; do
+            sgnd_menu_show_menu
+            sgnd_print
+            sgnd_print_sectionheader --border "$DL_H" --maxwidth "${SGND_MENU_RENDER_WIDTH:-$(sgnd_terminal_width)}"
+            sgnd_print
+
+            choice=""
+            if ! _smoketest_read_choice choice; then
+                sgnd_print "No selection made. Returning..."
+                break
             fi
 
-        # -- Main script logic
-            _smoketest_register_menu || return $?
+            SGND_LAST_WAITSECS=0
+            sgnd_menu_dispatch "$choice" || true
+            (( SGND_SMOKETEST_EXIT )) && break
 
-            SGND_SMOKETEST_EXIT=0
+            if (( ${SGND_LAST_WAITSECS:-0} > 0 )); then
+                ask_dlg_autocontinue \
+                    --seconds "$SGND_LAST_WAITSECS" \
+                    --message "Press Enter to continue, or wait to return to the smoke-test menu."
+            fi
+        done
 
-            while true; do
-                sgnd_menu_show_menu
-                sgnd_print_sectionheader --border "$DL_H" --maxwidth "${SGND_MENU_RENDER_WIDTH:-$(sgnd_terminal_width)}"
-
-                choice=""
-                if ! _smoketest_read_choice choice; then
-                    sgnd_print "No selection made. Exiting..."
-                    break
-                fi
-
-                # The timed reader is smoke-test-specific input policy; selection execution
-                # is delegated to the public menu dispatcher.
-                SGND_LAST_WAITSECS=0
-                sgnd_menu_dispatch "$choice" || true
-
-                (( SGND_SMOKETEST_EXIT )) && break
-
-                if (( ${SGND_LAST_WAITSECS:-0} > 0 )); then
-                    ask_dlg_autocontinue \
-                        --seconds "$SGND_LAST_WAITSECS" \
-                        --message "Press Enter to continue, or wait to return to the smoke-test menu."
-                fi
-            done
+        return 0
     }
 
-    # Entrypoint: sgnd_bootstrap will split framework args from script args.
+# - Aggregate runner ---------------------------------------------------------------
+    _framework_test_run_all() {
+        local area_failures=0
+        local smoke_rc=0
+
+        _framework_test_validate_installation || area_failures=$((area_failures + 1))
+        _framework_test_validate_console || area_failures=$((area_failures + 1))
+        _framework_test_validate_modules || area_failures=$((area_failures + 1))
+
+        _smoketest_run_all_tests || {
+            smoke_rc=$?
+            area_failures=$((area_failures + 1))
+        }
+
+        sgnd_print
+        sgnd_print_sectionheader --text "Framework test summary"
+        sgnd_print_labeledvalue --label "Validation passed" --value "$SGND_TEST_PASS" --labelwidth 22
+        sgnd_print_labeledvalue --label "Validation failed" --value "$SGND_TEST_FAIL" --labelwidth 22
+        sgnd_print_labeledvalue --label "Validation skipped" --value "$SGND_TEST_SKIP" --labelwidth 22
+        sgnd_print_labeledvalue --label "Smoke tests" --value "$([[ $smoke_rc -eq 0 ]] && printf PASS || printf FAIL)" --labelwidth 22
+        sgnd_print
+
+        if (( area_failures == 0 )); then
+            sayok "All SolidGroundUX framework tests passed."
+            return 0
+        fi
+
+        sayfail "$area_failures framework test area(s) reported failures."
+        return 1
+    }
+
+# - Main ---------------------------------------------------------------------------
+    main() {
+        _framework_locator || return $?
+        sgnd_exe_start -- "$@"
+
+        if (( ${FLAG_VIEW_LOG:-0} )); then
+            view_log
+            return $?
+        fi
+
+        case "${ENUM_SUITE:-smoke}" in
+            smoke)
+                _framework_test_run_smoke_menu
+                ;;
+            installation)
+                _framework_test_validate_installation
+                ;;
+            console)
+                _framework_test_validate_console
+                ;;
+            modules)
+                _framework_test_validate_modules
+                ;;
+            all)
+                _framework_test_run_all
+                ;;
+            *)
+                sayfail "Unknown framework test suite: ${ENUM_SUITE:-}"
+                return 2
+                ;;
+        esac
+    }
+
     main "$@"

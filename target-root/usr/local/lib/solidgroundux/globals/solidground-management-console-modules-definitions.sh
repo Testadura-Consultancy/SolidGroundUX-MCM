@@ -1,16 +1,16 @@
 #!/usr/bin/env bash
 # =====================================================================================
-# SolidGrond Management Modules - Project Definitions
+# SolidGroundUX Management Console Modules - Project Definitions
 # -------------------------------------------------------------------------------------
 # Metadata:
-#   Version     : 1.0
+#   Version     : 1.1
 #   Build       : 2624102
 #   Checksum    : -
-#   Source      : solidgrond-management-modules-definitions.sh
+#   Source      : solidgroundux-management-modules-definitions.sh
 #   Type        : library
 #   Group       : Globals
 #   Purpose     : Project-wide identity and release globals
 # =====================================================================================
-SGND_SOLIDGROND_MANAGEMENT_MODULES_PRODUCT=SolidGrond\ Management\ Modules
-SGND_SOLIDGROND_MANAGEMENT_MODULES_VERSION=1.0
-SGND_SOLIDGROND_MANAGEMENT_MODULES_BUILD=2624102
+SGND_SOLIDGROND_MANAGEMENT_CONSOLE_MODULES_PRODUCT="SolidGroundUX Management Console Modules"
+SGND_SOLIDGROND_MANAGEMENT_CONSOLEMODULES_VERSION=1.1
+SGND_SOLIDGROND_MANAGEMENT_CONSOLE_MODULES_BUILD=2624102

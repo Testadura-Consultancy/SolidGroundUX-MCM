@@ -1,0 +1,1 @@
+/srv/storage/development/SolidGroundUX/target-root/usr/local/bin/sgnd-console "$@" --appcfg /srv/storage/development/solidgrond-management-modules/target-root/usr/local/libexec/solidgroundux/console-modules/ 
