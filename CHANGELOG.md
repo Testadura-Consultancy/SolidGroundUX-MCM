@@ -10,6 +10,8 @@ practical framework development.
 ### Changed
 
 - Moved all existing console management modules and their dependencies to a separate repository, to be released as a separate product.
+- Defined Management Console Modules as an independently versioned and distributable product, while allowing tested compatible module releases to be bundled with full SolidGroundUX framework releases.
+- Kept `90-development.sh` as a thin integration module over the existing public `sgnd-*` development commands, with no additional management executable required.
 - Refactored console modules toward a presentation-and-orchestration role, moving persistent management operations into dedicated management executables.
 - Refactored `40-solidgroundux.sh` to separate Management Console presentation and orchestration from persistent framework-management operations.
 - Preserved runtime-sensitive framework state operations within the console module, with local DRYRUN protection.
