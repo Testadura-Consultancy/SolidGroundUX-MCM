@@ -4,7 +4,7 @@
 # ----------------------------------------------------------------------------------
 # Metadata:
 #   Version     : 1.2
-#   Build       : 2626021
+#   Build       : 2626022
 #   Source      : manage-sqlserver.sh
 #   Type        : script
 #   Group       : Console Actions
