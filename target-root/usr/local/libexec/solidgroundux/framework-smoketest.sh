@@ -3,14 +3,14 @@
 # SolidGroundUX Management Console Modules - Framework Smoke Test and Validation
 # -------------------------------------------------------------------------------------
 # Metadata:
-#   Version     : 1.1
+#   Version     : 1.2
 #   Source      : framework-smoketest.sh
 #   Wrapper     : sgnd-framework-smoketest
 #   Type        : script
 #   Group       : Console Actions
 #   Purpose     : Validate the framework and exercise its interactive UI helpers
 #
-#   Build : 2625822
+#   Build : 2626021
 #   Checksum : a4c62c151180f4d1944bd5b0dc6e12db2e0f84e16583cf52dd2d247d2b1236c5
 # Description:
 #   Authoritative test implementation for the SolidGroundUX Management Console

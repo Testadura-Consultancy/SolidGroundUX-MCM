@@ -7,6 +7,8 @@ practical framework development.
 
 ## Unreleased
 
+## Release 1.2.2626021
+
 ### Changed
 
 - Moved all existing console management modules and their dependencies to a separate repository, to be released as a separate product.

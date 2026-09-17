@@ -3,17 +3,17 @@
 # SolidGroundUX Management Console Modules - Project Definitions
 # -------------------------------------------------------------------------------------
 # Metadata:
-#   Version     : 1.1
-#   Build       : 2625822
-#   Checksum    : 5e53dcc52634f4753fdb67dfc0c09f7f2d2906b6c5686edfb988794f4e6830d9
+#   Version     : 1.2
+#   Build       : 2626021
+#   Checksum    : 56dacd83ea053787e61598ef160ac252c937579bf3a063f47e17e8cbd852faa8
 #   Source      : solidgroundux-management-modules-definitions.sh
 #   Type        : library
 #   Group       : Globals
 #   Purpose     : Project-wide identity and release globals
 # =====================================================================================
 SGND_SOLIDGROUND_MANAGEMENT_CONSOLE_MODULES_PRODUCT="SolidGroundUX Management Console Modules"
-SGND_SOLIDGROUND_MANAGEMENT_CONSOLE_MODULES_VERSION=1.1
-SGND_SOLIDGROUND_MANAGEMENT_CONSOLE_MODULES_BUILD=2625822
+SGND_SOLIDGROUND_MANAGEMENT_CONSOLE_MODULES_VERSION=1.2
+SGND_SOLIDGROUND_MANAGEMENT_CONSOLE_MODULES_BUILD=2626021
 
 SGND_SOLIDGROUND_MANAGEMENT_CONSOLE_MODULES_COMPANY="Testadura Consultancy"
 SGND_SOLIDGROUND_MANAGEMENT_CONSOLE_MODULES_COPYRIGHT="© 2025 - 2026 Testadura Consultancy"

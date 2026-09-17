@@ -3,8 +3,8 @@
 # SolidGroundUX Management Console Modules - Manage Active Directory
 # -------------------------------------------------------------------------------------
 # Metadata:
-#   Version     : 1.1
-#   Build       : 2625822
+#   Version     : 1.2
+#   Build       : 2626021
 #   Source      : manage-active-directory.sh
 #   Type        : script
 #   Group       : Console Actions

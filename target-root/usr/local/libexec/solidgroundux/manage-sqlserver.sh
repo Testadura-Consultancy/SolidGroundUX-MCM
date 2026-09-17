@@ -3,8 +3,8 @@
 # SolidGroundUX Management Console Modules - Manage SQL Server
 # ----------------------------------------------------------------------------------
 # Metadata:
-#   Version     : 1.1
-#   Build       : 2625822
+#   Version     : 1.2
+#   Build       : 2626021
 #   Source      : manage-sqlserver.sh
 #   Type        : script
 #   Group       : Console Actions

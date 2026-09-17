@@ -2,8 +2,8 @@
 # SolidGroundUX Management Console Modules - Docker Server
 # ----------------------------------------------------------------------------------
 # Metadata:
-#   Version     : 1.1
-#   Build       : 2625822
+#   Version     : 1.2
+#   Build       : 2626021
 #   Source      : 70-docker-server.sh
 #   Type        : module
 #   Group       : Module Registration

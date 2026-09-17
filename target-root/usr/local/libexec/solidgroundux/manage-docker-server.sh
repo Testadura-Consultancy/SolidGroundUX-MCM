@@ -3,8 +3,8 @@
 # SolidGroundUX Management Console Modules - Manage Docker Server
 # ----------------------------------------------------------------------------------
 # Metadata:
-#   Version     : 1.1
-#   Build       : 2625822
+#   Version     : 1.2
+#   Build       : 2626021
 #   Source      : manage-docker-server.sh
 #   Type        : script
 #   Group       : Console Actions
