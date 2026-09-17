@@ -7,7 +7,7 @@
 #   Build       : 2625822
 #   Source      : active-directory-management.sh
 #   Type        : library
-#   Group       : SolidGround Console
+#   Group       : Common Core
 #   Purpose     : Provide shared Active Directory discovery and validation primitives
 #
 #   Checksum : caf45218225a2f5b087c1bbee2b2a92419c83227a2922550b14a498546876f61

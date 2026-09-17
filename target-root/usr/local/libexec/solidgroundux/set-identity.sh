@@ -8,7 +8,7 @@
 #   Checksum    : 7e937fdbf09f33cf4d6a16dd21e9780acbb0a3a5710f1e65c1e42ba42b278798
 #   Source      : set-identity.sh
 #   Type        : script
-#   Group       : Management Console Modules
+#   Group       : Console Actions
 #   Purpose     : Sets the hostname and IPv4 network configuration for a VM
 #
 # Description:
