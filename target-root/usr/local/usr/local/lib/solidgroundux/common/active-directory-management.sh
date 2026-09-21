@@ -3,14 +3,14 @@
 # SolidGroundUX - Active Directory Management Library
 # -------------------------------------------------------------------------------------
 # Metadata:
-#   Version     : 1.2
-#   Build       : 2626021
+#   Version     : 2.1
+#   Build       : 2626414
 #   Source      : active-directory-management.sh
 #   Type        : library
 #   Group       : Common Core
 #   Purpose     : Provide shared Active Directory discovery and validation primitives
 #
-#   Checksum : 3693c5dc14d1da38615c2f6340b4f303ebd3f6807dab44503428d6c51ce85ef7
+#   Checksum : 10f9f0976c2d2d81adf58301d9ca074240e0beab099cf92d587af9ae5fdb0f4d
 # Description:
 #   Shared Active Directory primitives used by the server, client, and directory
 #   management executables. Role-specific provisioning and mutation remain outside

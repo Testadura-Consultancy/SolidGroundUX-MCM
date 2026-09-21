@@ -3,14 +3,14 @@
 # SolidGroundUX Management Console Modules - Manage Storage
 # -------------------------------------------------------------------------------------
 # Metadata:
-#   Version     : 1.2
-#   Build       : 2626021
+#   Version     : 2.1
+#   Build       : 2626414
 #   Source      : manage-storage.sh
 #   Type        : script
 #   Group       : Console Actions
 #   Purpose     : Configure, reconcile, validate, and inspect local storage volumes
 #
-#   Checksum : ef5e6906d4189c70c9d32380ccc5b4db168f7426a7e781a3f58e39cf5ccb85dc
+#   Checksum : 000a9ef256d05a90a3ed3f6385a749b07dd8e5213bff1e64da039ed36aab0c58
 # Description:
 #   Implements persistent local-storage management actions exposed by the
 #   15-storage Management Console module.

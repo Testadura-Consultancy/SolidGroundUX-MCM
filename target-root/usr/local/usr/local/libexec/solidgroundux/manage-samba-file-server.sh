@@ -3,14 +3,14 @@
 # SolidGroundUX Management Console Modules - Manage Samba File Server
 # -------------------------------------------------------------------------------------
 # Metadata:
-#   Version     : 1.2
-#   Build       : 2626021
+#   Version     : 2.1
+#   Build       : 2626414
 #   Source      : manage-samba-file-server.sh
 #   Type        : script
 #   Group       : Console Actions
 #   Purpose     : Prepare, validate, and inspect the Samba file-server service
 #
-#   Checksum : 36ac2a9313816a18472b690b269aa2cf6ea302258c6c9bd22659006510846ff1
+#   Checksum : 473c47a04a20259fd23f0abef824bbf4876574b9bdc7896e9457a2a43ccf31e9
 # Description:
 #   Implements persistent Samba file-server management actions exposed by the
 #   30-samba-file-server Management Console module. Share lifecycle and ACL management

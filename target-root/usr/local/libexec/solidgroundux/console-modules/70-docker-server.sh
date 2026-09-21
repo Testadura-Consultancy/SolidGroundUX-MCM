@@ -2,14 +2,14 @@
 # SolidGroundUX Management Console Modules - Docker Server
 # ----------------------------------------------------------------------------------
 # Metadata:
-#   Version     : 1.2
-#   Build       : 2626021
+#   Version     : 2.1
+#   Build       : 2626414
 #   Source      : 70-docker-server.sh
 #   Type        : module
 #   Group       : Module Registration
 #   Purpose     : Install, configure, manage, validate, and inspect a Docker host and its containers
 #
-#   Checksum : 3f579f686090026e1afd06995f6ab16dabbbbccae974f6192ed5b5ff7d742df1
+#   Checksum : 7e2d052922dac188a7dadbf37bf693ed5d6e77465e5b7f49d3b4cd35110ed147
 # Description:
 #   Registers Docker host and container-management actions with the SolidGround
 #   Management Console. Persistent host operations are implemented by

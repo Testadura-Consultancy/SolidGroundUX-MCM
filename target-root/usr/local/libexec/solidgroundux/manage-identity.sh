@@ -3,9 +3,9 @@
 # SolidGroundUX Management Console Modules - Manage Identity
 # ------------------------------------------------------------------------------------
 # Metadata:
-#   Version     : 1.2
-#   Build       : 2626021
-#   Checksum    : 3795fb64080b93c9306e219019d61c9b1342f27ed979bf215e50f761913f6101
+#   Version     : 2.1
+#   Build       : 2626414
+#   Checksum    : 277816e74cf64f3f8e20db0149238aa7f28120c323af37d7c4f7b69dc1a1e004
 #   Source      : manage-identity.sh
 #   Type        : script
 #   Group       : Console Actions

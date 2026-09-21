@@ -2,9 +2,9 @@
 # SolidGroundUX Management Console Modules - Active Directory Management
 # ----------------------------------------------------------------------------------
 # Metadata:
-#   Version     : 1.2
-#   Build       : 2626021
-#   Checksum    : 721c8be13519759146b656ad464e356f349572afd089cc7027fd6fe042c84a10
+#   Version     : 2.1
+#   Build       : 2626414
+#   Checksum    : c9e4a086971f9b14bae52eb6b354cd48bfad915602a72776d33c839bd4e642f9
 #   Source      : 27-active-directory-management.sh
 #   Type        : module
 #   Group       : Module Registration

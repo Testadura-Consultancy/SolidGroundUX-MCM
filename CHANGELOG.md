@@ -7,6 +7,30 @@ practical framework development.
 
 ## Unreleased
 
+### Added
+
+- Added the canonical per-module validation contract: `validate_module_<module-id-with-hyphens-replaced-by-underscores>`, `SGND_MODULE_VALIDATION_MESSAGE`, and standard Passed/Failed/Warning/Skipped return states.
+- Added Framework Test orchestration that combines framework-owned smoke/installation tests with Management Console-owned registration and module validation.
+
+### Changed
+
+- Took ownership of the SolidGround Management Console host (`management-console.sh`) and public `sgnd-console` command, moved from the SolidGroundUX Framework so the console application and its management modules are versioned and released together. The reusable menu/runtime APIs remain Framework-owned.
+- Framework smoke-test ownership moved to the SolidGroundUX Framework. Management Console Modules now invokes the public `sgnd-smoketest` command instead of shipping its own smoke-test executable and wrapper.
+- Module applicability is determined by each module's canonical validator; the Framework Test runner no longer hardcodes role-specific validation knowledge.
+- The Management Console module template is owned by this product as a convenience template, while generic executable, library, documentation and wrapper templates remain Framework-owned.
+- Standardized module/action presentation around SolidGroundUX section-header, spacing, current-state and return-flow conventions across the corrected management modules.
+- Continued the module/executable split so console modules remain presentation/orchestration layers and persistent operations are delegated to management executables.
+
+### Removed
+
+- Removed the former Management Console-owned `framework-smoketest.sh` and `sgnd-framework-smoketest` wrapper; these are superseded by Framework-owned `sgnd-smoketest`.
+
+### Fixed
+
+- Fixed framework/module test integration after the product split, including console registration validation, module validator dispatch, smoke-test menu behavior, and public-command execution.
+- Fixed cross-module helper ownership exposed by lazy loading by moving shared helpers to their appropriate framework or subject-specific libraries.
+- Fixed Active Directory, Storage, Samba, Web Server, SQL Server and Docker module validation/presentation issues found during the 2.1 correction pass.
+
 ## Release 1.2.2626021
 
 ### Changed
@@ -18,7 +42,7 @@ practical framework development.
 - Refactored `40-solidgroundux.sh` to separate Management Console presentation and orchestration from persistent framework-management operations.
 - Preserved runtime-sensitive framework state operations within the console module, with local DRYRUN protection.
 - Propagated console DRYRUN mode to delegated management executables and release-management actions.
-- Refactored SolidGroundUX framework testing into a thin console module backed by the standalone `sgnd-framework-smoketest` executable.
+- Refactored SolidGroundUX framework testing into a thin console orchestration module, preparing framework-owned smoke testing and Management Console-owned registration/module validation to be separated cleanly.
 - Refactored `30-samba-file-server.sh` to separate Samba File Server presentation and orchestration from persistent Samba management operations.
 - Refactored `15-storage.sh` to separate Storage console presentation and orchestration from persistent storage-management operations.
 - Standardized DRYRUN reporting for management actions, using `DRYRUN: Would ...` during previews and an explicit retrospective completion message.
@@ -35,7 +59,7 @@ practical framework development.
 
 - Added `manage-solidgroundux.sh` for persistent framework configuration management and logfile rotation.
 - Added consistent DRYRUN handling to SolidGroundUX management actions, including detailed previews of intended persistent changes.
-- Added standalone framework smoke-test execution with smoke, installation, console, module, and combined test suites.
+- Added the Framework Test console page and the initial validation/smoke-test orchestration used during the product split.
 - Added `manage-samba-file-server.sh` for Samba File Server installation, preparation, service management, validation, and status operations.
 - Added dedicated Samba share-management support for creating, removing, structuring, validating, and assigning access to managed shares.
 - Added `manage-storage.sh` for persistent storage provisioning, mounting, expansion, access management, validation, and status operations.

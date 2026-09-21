@@ -3,14 +3,14 @@
 # SolidGroundUX Management Console Modules - Manage Docker Containers
 # ----------------------------------------------------------------------------------
 # Metadata:
-#   Version     : 1.2
-#   Build       : 2626021
+#   Version     : 2.1
+#   Build       : 2626414
 #   Source      : manage-docker-containers.sh
 #   Type        : script
 #   Group       : Console Actions
 #   Purpose     : Create and manage Docker containers and images
 #
-#   Checksum : 53bf2fa5b69f7ad05cbe42c96c20d098078675a2038ed1f1428a0191abbdbe1e
+#   Checksum : ad40d436938609f068babde8a6bacf66651da4c13b4252beda916176bf658064
 # Description:
 #   Provides a deliberately small first-version Docker container manager. It covers
 #   the common lifecycle and creation options without attempting to replace Docker

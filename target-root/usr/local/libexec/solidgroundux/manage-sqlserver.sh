@@ -3,8 +3,8 @@
 # SolidGroundUX Management Console Modules - Manage SQL Server
 # ----------------------------------------------------------------------------------
 # Metadata:
-#   Version     : 1.2
-#   Build       : 2626100
+#   Version     : 2.1
+#   Build       : 2626415
 #   Source      : manage-sqlserver.sh
 #   Type        : script
 #   Group       : Console Actions
@@ -789,4 +789,4 @@ set -uo pipefail
         _run_action "$action"
     }
     main "$@"
-#   Checksum : b72340bec0ec34cf109902375e29e04922a66691f8a112814b39594f866a66d7
+#   Checksum : a8cfef057c619641e0d7ecbff89725534fdca45c42ef3c17f7d77799ecb30592

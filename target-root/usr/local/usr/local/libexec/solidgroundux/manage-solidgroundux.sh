@@ -3,8 +3,8 @@
 # SolidGroundUX Management Console Modules - Manage SolidGroundUX
 # -------------------------------------------------------------------------------------
 # Metadata:
-#   Version     : 1.2
-#   Build       : 2626021
+#   Version     : 2.1
+#   Build       : 2626414
 #   Source      : manage-solidgroundux.sh
 #   Type        : script
 #   Group       : Console Actions

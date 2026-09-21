@@ -2,9 +2,9 @@
 # SolidGroundUX Management Console Modules - Computer Setup
 # ----------------------------------------------------------------------------------
 # Metadata:
-#   Version     : 1.2
-#   Build       : 2626021
-#   Checksum    : fa29201a01208bb0ebe2027e643252c20d36590cb0f586515d44891a08931063
+#   Version     : 2.1
+#   Build       : 2626414
+#   Checksum    : eb97e7e7d9fabbb4498d0b5446a9fe51aa2ea04e506a996224348698c8cb739a
 #   Source      : 10-computer-setup.sh
 #   Type        : module
 #   Group       : Module Registration

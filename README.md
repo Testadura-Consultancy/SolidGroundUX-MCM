@@ -91,6 +91,42 @@ For example, the Development module may expose framework utilities such
 as workspace creation, deployment or release preparation without taking
 ownership of those utilities.
 
+## Framework integration
+
+Management Console Modules depends on the SolidGroundUX Framework runtime and public APIs. Framework testing is split deliberately by ownership:
+
+- The Framework provides the public `sgnd-smoketest` command for framework installation validation and interactive framework smoke tests.
+- The Management Console Modules **Framework Test** page calls `sgnd-smoketest` for framework-owned suites.
+- Console registration validation remains owned by Management Console Modules because module discovery, registration and handler validation are console-application concerns.
+- Module validation remains owned by Management Console Modules and uses the canonical validator contract below.
+
+The former Management Console-owned `framework-smoketest.sh` implementation and `sgnd-framework-smoketest` public command are no longer part of this product.
+
+### Module validation contract
+
+Every console module exposes a validator named:
+
+```text
+validate_module_<module-id-with-hyphens-replaced-by-underscores>
+```
+
+The validator may print detailed diagnostics and sets:
+
+```text
+SGND_MODULE_VALIDATION_MESSAGE=<concise summary>
+```
+
+It returns one of the standard validation states:
+
+```text
+0  Passed
+1  Failed
+2  Warning
+3  Skipped / not applicable
+```
+
+Applicability is decided by the module itself. A missing canonical validator is a module-contract error rather than a skipped validation.
+
 ## DRYRUN contract
 
 All persistent actions exposed through the Management Console must
@@ -159,7 +195,6 @@ target-root/
                 │   ├── 60-sqlserver.sh
                 │   ├── 70-docker-server.sh
                 │   └── 90-development.sh
-                ├── framework-smoketest.sh
                 ├── manage-active-directory-client.sh
                 ├── manage-active-directory-server.sh
                 ├── manage-active-directory.sh
@@ -180,23 +215,13 @@ executable tooling outside the `console-modules` directory. They remain
 part of this project when their primary purpose is to implement
 functionality owned by a Management Console module.
 
-## Canonical starter templates
+## Convenience templates
 
-A workspace created by `sgnd-create-workspace` contains copies of the
-SolidGroundUX canonical starter templates.
+Canonical convenience templates are owned by the product that defines them and are installed below `usr/local/share/solidgroundux/convenience-templates`.
 
-These copies are included deliberately so that development can begin
-directly from the canonical executable, library, module and wrapper
-patterns without locating or copying templates from another
-installation.
+The SolidGroundUX Framework supplies the generic executable, library, documentation and wrapper templates. Management Console Modules supplies the console-module template because the module contract belongs to this product.
 
-The copies in this repository are **reference/starter copies only**.
-They are not project-owned variants of the SolidGroundUX canon and
-should not be modified here. Changes to canonical templates belong in
-the SolidGroundUX framework project.
-
-Future workspace creation may mark these copied files explicitly as
-workspace copies to make this distinction clear.
+`create-workspace` discovers the installed convenience templates and lets the developer select which ones to copy into a new workspace. The copied templates become workspace-local starter/reference copies and may then be used to instantiate project starter scripts.
 
 ## Development principle
 

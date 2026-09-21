@@ -3,8 +3,8 @@
 # SolidGroundUX Management Console Modules - Set Identity
 # ------------------------------------------------------------------------------------
 # Metadata:
-#   Version     : 1.2
-#   Build       : 2626021
+#   Version     : 2.1
+#   Build       : 2626414
 #   Checksum    : 3795fb64080b93c9306e219019d61c9b1342f27ed979bf215e50f761913f6101
 #   Source      : set-identity.sh
 #   Type        : script

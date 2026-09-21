@@ -3,9 +3,9 @@
 # SolidGroundUX Management Console Modules - Manage Framework Logging
 # ------------------------------------------------------------------------------------
 # Metadata:
-#   Version     : 1.2
-#   Build       : 2626021
-#   Checksum    : ac001ae7201bac35d11a39fdcbf88f19d8bb55aa848037856d9e5d2bf1a88242
+#   Version     : 2.1
+#   Build       : 2626414
+#   Checksum    : 6127339c86ebcc3eba880aac0d79cadf4747e3b9c5fdf4d8a6cc982c7742d8c1
 #   Source      : manage-framework-logging.sh
 #   Type        : script
 #   Group       : Console Actions

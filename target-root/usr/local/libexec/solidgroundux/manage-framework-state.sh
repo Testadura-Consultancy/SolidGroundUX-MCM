@@ -3,9 +3,9 @@
 # SolidGroundUX Management Console Modules - Manage Framework State
 # ------------------------------------------------------------------------------------
 # Metadata:
-#   Version     : 1.2
-#   Build       : 2626021
-#   Checksum    : ac001ae7201bac35d11a39fdcbf88f19d8bb55aa848037856d9e5d2bf1a88242
+#   Version     : 2.1
+#   Build       : 2626414
+#   Checksum    : 9c3e8da345c94551623c0566d25cdfa7106577bd0e558d0f0d71e02c510add29
 #   Source      : manage-framework-state.sh
 #   Type        : script
 #   Group       : Console Actions

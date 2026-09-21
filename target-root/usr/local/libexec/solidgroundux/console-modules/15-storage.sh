@@ -2,14 +2,14 @@
 # SSolidGroundUX Management Console Modules - Storage
 # ----------------------------------------------------------------------------------
 # Metadata:
-#   Version     : 1.2
-#   Build       : 2626021
+#   Version     : 2.1
+#   Build       : 2626414
 #   Source      : 15-storage.sh
 #   Type        : module
 #   Group       : Module Registration
 #   Purpose     : Configure and inspect local storage volumes
 #
-#   Checksum : abe5823f45d8589933b871691076f78db8053a637a25bf909e7fcd6923f88432
+#   Checksum : 783433416eeaefa53fb7d48e1f33f1a3b043ef00bfcbd12f21fd5e87588b54a1
 # Description:
 #   Registers local-storage management actions with the SolidGround Management Console.
 #   Persistent storage operations are implemented by manage-storage.sh.

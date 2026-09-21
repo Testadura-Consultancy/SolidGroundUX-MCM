@@ -3,8 +3,8 @@
 # SolidGroundUX Management Console Modules - Manage Web Server
 # -------------------------------------------------------------------------------------
 # Metadata:
-#   Version     : 1.2
-#   Build       : 2626100
+#   Version     : 2.1
+#   Build       : 2626415
 #   Source      : manage-web-server.sh
 #   Type        : script
 #   Group       : Console Actions
@@ -1115,4 +1115,4 @@ EOF
         _run_action "$action"
     }
     main "$@"
-#   Checksum : e580d88b630a6779760d98c902bd531ff255bb8f73406bfc8cff8a77c25892d9
+#   Checksum : 10ca817001553842f28974716654934d237bd169e2cb6708de8202619ae337ff

@@ -2,14 +2,14 @@
 # SolidGroundUX Management Console Modules - SolidGround Framework Test
 # ----------------------------------------------------------------------------------
 # Metadata:
-#   Version     : 1.2
+#   Version     : 2.1
 #   Source      : 45-solidground-framework-test.sh
 #   Type        : module
 #   Group       : Module Registration
 #   Purpose     : Register SolidGroundUX framework test and validation actions
 #
-#   Build : 2626021
-#   Checksum : d652f54935eeaf507ebaea5304389c925a0ac9192b1be5a0ef187253a52fe6a7
+#   Build : 2626414
+#   Checksum : 667e6a88afded54c395e1a3521ced921e6578051ccfb0b9a8b6bdcac496992f0
 # Description:
 #   Provides the Management Console presentation layer for framework testing.
 #   Framework smoke tests are owned by the SolidGroundUX framework. This module acts as

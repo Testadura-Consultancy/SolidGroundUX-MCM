@@ -2,9 +2,9 @@
 # SolidGroundUX Management Console Modules - Development
 # ----------------------------------------------------------------------------------
 # Metadata:
-#   Version     : 1.2
-#   Build       : 2626021
-#   Checksum    : d4897cecd8a4dd05216c2cf44d3690be62735b5456938c28c820aedc45bc18d8
+#   Version     : 2.1
+#   Build       : 2626414
+#   Checksum    : 53df6fec53b46fad58f42dd76133078175cef3137f7280abb53790b079a75ae7
 #   Source      : 90-development.sh
 #   Type        : module
 #   Group       : Module Registration

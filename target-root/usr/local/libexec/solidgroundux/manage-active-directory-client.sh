@@ -3,14 +3,14 @@
 # SolidGroundUX Management Console Modules - Manage Active Directory Client
 # -------------------------------------------------------------------------------------
 # Metadata:
-#   Version     : 1.2
-#   Build       : 2626021
+#   Version     : 2.1
+#   Build       : 2626414
 #   Source      : manage-active-directory-client.sh
 #   Type        : script
 #   Group       : Console Actions
 #   Purpose     : Join, reconcile, validate, and inspect an Active Directory client
 #
-#   Checksum : 3fd183d40515ca1b5cd42b5c0d866e581e03e3a3ddd676f38ca520056d139f1e
+#   Checksum : 19386f5d0c524a318e7d54b2dd281ee6d598c5761c582c217496ad38152db3fe
 # Description:
 #   Implements persistent Active Directory client management actions exposed by the
 #   25-active-directory-client Management Console module.

@@ -3,14 +3,14 @@
 # SolidGroundUX Management Console Modules - Manage Docker Server
 # ----------------------------------------------------------------------------------
 # Metadata:
-#   Version     : 1.2
-#   Build       : 2626021
+#   Version     : 2.1
+#   Build       : 2626414
 #   Source      : manage-docker-server.sh
 #   Type        : script
 #   Group       : Console Actions
 #   Purpose     : Install, configure, validate, and inspect a Docker host
 #
-#   Checksum : 07bd139f27354b029fcf3890ff3b981f0aa4656164124e04c4413fef4303ae91
+#   Checksum : 8e17aa140bcb91b19f76c9e6c3f9fede79e483fdc922349f8e5cb084c94b7ad8
 # Description:
 #   Provides first-version Docker host management for SolidGroundUX. The script
 #   deliberately avoids migrating an existing Docker data root automatically.

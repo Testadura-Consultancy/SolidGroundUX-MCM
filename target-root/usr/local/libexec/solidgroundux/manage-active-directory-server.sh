@@ -3,14 +3,14 @@
 # SolidGroundUX Management Console Modules - Manage Active Directory Server
 # -------------------------------------------------------------------------------------
 # Metadata:
-#   Version     : 1.2
-#   Build       : 2626021
+#   Version     : 2.1
+#   Build       : 2626414
 #   Source      : manage-active-directory-server.sh
 #   Type        : script
 #   Group       : Console Actions
 #   Purpose     : Provision, validate, and inspect a Samba Active Directory domain controller
 #
-#   Checksum : a79143cce76b638a31e0b2ab40c73700a6e171a85726d3fc1b1fd7a113ec7b9e
+#   Checksum : 415286935aac022095953ef6577aaacd43740a3e4b255ede72440841c5e61431
 # Description:
 #   Implements persistent Active Directory server management actions exposed by the
 #   20-active-directory-server Management Console module.

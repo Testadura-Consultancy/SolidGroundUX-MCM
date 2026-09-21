@@ -2,14 +2,14 @@
 # SolidGroundUX Management Console Modules - Active Directory Client
 # ----------------------------------------------------------------------------------
 # Metadata:
-#   Version     : 1.2
-#   Build       : 2626021
+#   Version     : 2.1
+#   Build       : 2626414
 #   Source      : 25-active-directory-client.sh
 #   Type        : module
 #   Group       : Module Registration
 #   Purpose     : Register Active Directory client management actions
 #
-#   Checksum : 7b68465f1ade08cb4d9e67847b995ccc2b50d1b47ccec99b9766128772ec756a
+#   Checksum : 06223de014350b10a86c04ca5f68ecaa0034ffb7fc9822f59ae07e47086e02e2
 # Description:
 #   Registers Active Directory client management actions with the SolidGround Management
 #   Console. Persistent join, reconciliation, validation, and repair operations are

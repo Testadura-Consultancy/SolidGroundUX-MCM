@@ -3,8 +3,8 @@
 # SolidGroundUX Management Console Modules - Publish Web Content
 # -------------------------------------------------------------------------------------
 # Metadata:
-#   Version     : 1.2
-#   Build       : 2626100
+#   Version     : 2.1
+#   Build       : 2626415
 #   Source      : publish-web-content.sh
 #   Type        : script
 #   Group       : Console Actions
@@ -688,4 +688,4 @@ set -uo pipefail
         _run_action "$action"
     }
     main "$@"
-#   Checksum : 336e477f1085ea8e3405c9cfc10917044c852775843c09d53b21dfd29499d07d
+#   Checksum : a0f9b415b80a0f29117381c79e93d6d6027cde7798715d50d6dd67b6ebdde323

@@ -3,9 +3,9 @@
 # SolidGroundUX Management Console Modules - Manage Samba Shares
 # ------------------------------------------------------------------------------------
 # Metadata:
-#   Version     : 1.2
-#   Build       : 2626021
-#   Checksum    : ac001ae7201bac35d11a39fdcbf88f19d8bb55aa848037856d9e5d2bf1a88242
+#   Version     : 2.1
+#   Build       : 2626414
+#   Checksum    : 0db3e1e9a28ab4e93a816e5597ffe22fec4d4e35fa721580dac12c5fe3c24dd6
 #   Source      : manage-samba-shares.sh
 #   Type        : script
 #   Group       : Console Actions

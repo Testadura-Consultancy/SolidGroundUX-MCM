@@ -3,8 +3,8 @@
 # SolidGroundUX Management Console Modules - Project Definitions
 # -------------------------------------------------------------------------------------
 # Metadata:
-#   Version     : 1.2
-#   Build       : 2626100
+#   Version     : 2.1
+#   Build       : 2626414
 #   Checksum    : 8cbcdf7b75c1371d99eefc6d47b5ef0c574959beda8473e0545dc76983c84a22
 #   Source      : solidgroundux-management-modules-definitions.sh
 #   Type        : library

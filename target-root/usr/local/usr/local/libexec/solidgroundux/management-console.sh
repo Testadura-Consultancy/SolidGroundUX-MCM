@@ -4,8 +4,8 @@
 # -------------------------------------------------------------------------------------
 # Metadata:
 #   Version     : 2.1
-#   Build       : 2626022
-#   Checksum    : 046962e3951bc7f12f6d0c67f5db27de17fb27e5c78eefeeb74dd2c3c14960f7
+#   Build       : 2626414
+#   Checksum    : c35420a64db513d4cfbaf76c2bd19be62ad3729c3338ca7227b00810391661b4
 #   Source      : management-console.sh
 #   Wrapper     : sgnd-console
 #   Type        : script
