@@ -66,6 +66,8 @@ set -uo pipefail
     SGND_DEVELOPMENT_MODULE_VERSION="1.0.0"
     SGND_DEVELOPMENT_MODULE_DESC="Workspace, deployment, release, wrapper, and documentation tools"
 
+    SGND_MODULE_ID="${SGND_DEVELOPMENT_MODULE_ID}"
+
     SGND_MODULE_NAME="$SGND_DEVELOPMENT_MODULE_NAME"
     SGND_MODULE_VERSION="$SGND_DEVELOPMENT_MODULE_VERSION"
     SGND_MODULE_DESC="$SGND_DEVELOPMENT_MODULE_DESC"
@@ -137,6 +139,20 @@ set -uo pipefail
     }
 
 
+
+# - Module validation contract ------------------------------------------------------
+    # Return codes:
+    #   0 = Passed
+    #   1 = Failed
+    #   2 = Warning
+    #   3 = Skipped / not applicable
+    #
+    # Every validator sets SGND_MODULE_VALIDATION_MESSAGE to a concise result summary.
+    # Detailed diagnostic output may be written by the validator or delegated action.
+    validate_module_development() {
+        SGND_MODULE_VALIDATION_MESSAGE="Development module is loaded and registered."
+        return 0
+    }
 
 # - Console registration ----------------------------------------------------------
     # Provides SolidGroundUX development and release tooling from the management

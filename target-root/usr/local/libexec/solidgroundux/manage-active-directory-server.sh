@@ -162,7 +162,7 @@ set -uo pipefail
     : "${SGND_SCRIPT_BUILD:=2625721}"
 
 # - Framework integration -----------------------------------------------------------
-    SGND_USING=( console-helpers.sh )
+    SGND_USING=()
     SGND_ARGS_SPEC=(
         "action|a|enum|ACTION|Management action||provision-all,install,preflight,identity,provision,settings,kerberos,resolver,start,dns,validate,status"
     )

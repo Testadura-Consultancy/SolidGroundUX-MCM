@@ -162,7 +162,7 @@ set -uo pipefail
     : "${SGND_SCRIPT_BUILD:=2625721}"
 
 # - Framework integration -----------------------------------------------------------
-    SGND_USING=( console-helpers.sh )
+    SGND_USING=()
     SGND_ARGS_SPEC=(
         "action|a|enum|ACTION|Management action||join-all,install,preflight,dns,identity,discover,join,sssd,register,reconcile,validate,status,leave"
     )
@@ -209,6 +209,8 @@ set -uo pipefail
             return 1
         }
 
+        sgnd_print
+        sgnd_print_sectionheader ""
         ask --label "AD realm" --var SGND_ADC_REALM --default "$SGND_ADC_REALM" --validate _adc_validate_realm || return $?
         SGND_ADC_REALM="${SGND_ADC_REALM,,}"
         ask --label "AD DNS server" --var SGND_ADC_DNS_SERVER --default "$SGND_ADC_DNS_SERVER" --validate sgnd_validate_ipv4 || return $?
@@ -216,6 +218,7 @@ set -uo pipefail
         SGND_ADC_FQDN="${SGND_ADC_HOSTNAME_SHORT}.${SGND_ADC_REALM}"
 
         sgnd_print
+        sgnd_print_sectionheader ""
         sgnd_print_labeledvalue --label "Machine FQDN" --value "$SGND_ADC_FQDN"
         sgnd_print_labeledvalue --label "Machine IPv4" --value "$SGND_ADC_IP"
         sgnd_print_labeledvalue --label "AD realm" --value "$SGND_ADC_REALM"
@@ -280,9 +283,17 @@ set -uo pipefail
         #   _adc_step_dns
     _adc_step_dns() {
         _adc_require_context || return 1
-        declare -F sgnd_console_set_dns_server >/dev/null 2>&1 || { sayfail "Console DNS helper is unavailable."; return 1; }
+        local identity_script=""
         (( ${FLAG_DRYRUN:-0} == 1 )) && { sayinfo "DRYRUN: Would set DNS to $SGND_ADC_DNS_SERVER."; return 0; }
-        sgnd_console_set_dns_server "$SGND_ADC_DNS_SERVER" || return 1
+
+        if [[ "$SGND_FRAMEWORK_ROOT" == "/" ]]; then
+            identity_script="/usr/local/libexec/solidgroundux/set-identity.sh"
+        else
+            identity_script="${SGND_FRAMEWORK_ROOT%/}/usr/local/libexec/solidgroundux/set-identity.sh"
+        fi
+
+        [[ -x "$identity_script" ]] || { sayfail "Cannot execute canonical identity tool: $identity_script"; return 1; }
+        "$identity_script" --dns-only --DNS "$SGND_ADC_DNS_SERVER" --Auto || return $?
         sudo resolvectl flush-caches 2>/dev/null || true
         host -t SOA "$SGND_ADC_REALM" "$SGND_ADC_DNS_SERVER" >/dev/null 2>&1 || { sayfail "$SGND_ADC_DNS_SERVER is not authoritative for $SGND_ADC_REALM."; return 1; }
         sayok "Client DNS points to the Active Directory DNS server."
@@ -399,6 +410,8 @@ set -uo pipefail
         local decision="No"
         _adc_step_install_packages || return $?
         _adc_step_preflight || return $?
+        sgnd_print
+        sgnd_print_sectionheader ""
         ask_decision --label "Join $SGND_ADC_FQDN to $SGND_ADC_REALM?" --choices "Yes|Y,No|N" --default "No" --var decision
         [[ "${decision^^}" == "YES" ]] || { sayinfo "Domain join cancelled."; return 0; }
         _adc_step_dns || return $?
@@ -592,5 +605,9 @@ set -uo pipefail
         action="${ACTION:-}"
         [[ -n "$action" ]] || { sayfail "No management action supplied. Use --action <action>."; return 2; }
         _adc_run_action "$action"
+        local rc=$?
+        sgnd_print
+        sgnd_print_sectionheader ""
+        return "$rc"
     }
     main "$@"

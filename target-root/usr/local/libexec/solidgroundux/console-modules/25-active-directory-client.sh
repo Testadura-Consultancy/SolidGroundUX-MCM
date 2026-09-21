@@ -70,6 +70,7 @@ set -uo pipefail
     SGND_AD_CLIENT_MODULE_NAME="Active Directory Client"
     SGND_AD_CLIENT_MODULE_VERSION="1.1.0"
     SGND_AD_CLIENT_MODULE_DESC="Join, reconcile, validate, and inspect Active Directory client membership"
+    SGND_MODULE_ID="${SGND_AD_CLIENT_MODULE_ID}"
     SGND_MODULE_NAME="$SGND_AD_CLIENT_MODULE_NAME"
     SGND_MODULE_VERSION="$SGND_AD_CLIENT_MODULE_VERSION"
     SGND_MODULE_DESC="$SGND_AD_CLIENT_MODULE_DESC"
@@ -89,6 +90,28 @@ set -uo pipefail
     _adc_validate()               { _adc_run_action validate; }
     _adc_status()                 { _adc_run_action status; }
     _adc_leave()                  { _adc_run_action leave; }
+
+# - Module validation contract ------------------------------------------------------
+    # Return codes:
+    #   0 = Passed
+    #   1 = Failed
+    #   2 = Warning
+    #   3 = Skipped / not applicable
+    #
+    # Every validator sets SGND_MODULE_VALIDATION_MESSAGE to a concise result summary.
+    # Detailed diagnostic output may be written by the validator or delegated action.
+    validate_module_active_directory_client() {
+        if ! command -v realm >/dev/null 2>&1 || [[ -z "$(realm list 2>/dev/null)" ]]; then
+            SGND_MODULE_VALIDATION_MESSAGE="Host is not joined to an Active Directory realm through realmd."
+            return 3
+        fi
+        if _adc_validate; then
+            SGND_MODULE_VALIDATION_MESSAGE="Active Directory client validation passed."
+            return 0
+        fi
+        SGND_MODULE_VALIDATION_MESSAGE="Active Directory client validation reported one or more failures."
+        return 1
+    }
 
 # - Console registration ---------------------------------------------------------
     # Provides Active Directory client preparation and domain membership management.

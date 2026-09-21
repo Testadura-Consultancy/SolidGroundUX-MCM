@@ -225,10 +225,62 @@ print()
     _docker_select_service_action() {
         local output_var="${1:?missing output variable}"
         local selected=""
+        local service_state="inactive"
+        local boot_state="Disabled"
+
+        service_state="$(systemctl is-active "$SGND_DOCKER_SERVICE" 2>/dev/null || true)"
+        [[ -n "$service_state" ]] || service_state="inactive"
+        systemctl is-enabled --quiet "$SGND_DOCKER_SERVICE" 2>/dev/null && boot_state="Enabled"
+
         sgnd_print
-        sgnd_print_sectionheader "Docker service"
-        ask_selection --label "Action" --var selected --items "Start" "Stop" "Restart" "Enable at boot" "Disable at boot" || return 1
+        sgnd_print_labeledvalue --label "Service" --value "$service_state" --labelwidth 20
+        sgnd_print_labeledvalue --label "At boot" --value "$boot_state" --labelwidth 20
+        _docker_ask_selection --label "Action" --var selected --items "Start" "Stop" "Restart" "Enable at boot" "Disable at boot" || return 1
         printf -v "$output_var" '%s' "$selected"
+    }
+
+    # Render a local numbered selector using the Docker action layout.
+    # The framework ask_selection API is intentionally left unchanged.
+    _docker_ask_selection() {
+        local label="Select an option"
+        local var_name="selection"
+        local input=""
+        local i=0
+        local -a items=()
+
+        while [[ $# -gt 0 ]]; do
+            case "$1" in
+                --label) label="$2"; shift 2 ;;
+                --var) var_name="$2"; shift 2 ;;
+                --items) shift; items=("$@"); break ;;
+                *) return 2 ;;
+            esac
+        done
+
+        [[ "$var_name" =~ ^[a-zA-Z_][a-zA-Z0-9_]*$ ]] || return 2
+        (( ${#items[@]} > 0 )) || return 2
+
+        sgnd_print
+        sgnd_print_sectionheader --text "$label"
+        for (( i=0; i<${#items[@]}; i++ )); do
+            sgnd_print --text "$((i + 1)). ${items[i]}" --pad 2
+        done
+        sgnd_print --text "Q. Back" --pad 2
+        sgnd_print
+        sgnd_print_sectionheader ""
+
+        while :; do
+            input=""
+            ask --label "Selection" --var input
+            input="${input#"${input%%[![:space:]]*}"}"
+            input="${input%"${input##*[![:space:]]}"}"
+            [[ "${input^^}" == "Q" ]] && return 1
+            if [[ "$input" =~ ^[1-9][0-9]*$ ]] && (( input <= ${#items[@]} )); then
+                printf -v "$var_name" '%s' "${items[input - 1]}"
+                return 0
+            fi
+            saywarning "Select 1-${#items[@]} or Q."
+        done
     }
 
 # - Host operations ----------------------------------------------------------------
@@ -438,6 +490,8 @@ print()
         if (( rc == 0 )); then
             case "$action" in status|validate) ;; *) _dryrun_complete ;; esac
         fi
+        sgnd_print
+        sgnd_print_sectionheader ""
         return "$rc"
     }
 

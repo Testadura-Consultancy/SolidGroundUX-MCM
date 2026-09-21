@@ -70,6 +70,7 @@ set -uo pipefail
     SGND_AD_SERVER_MODULE_NAME="Active Directory Server"
     SGND_AD_SERVER_MODULE_VERSION="1.1.0"
     SGND_AD_SERVER_MODULE_DESC="Install, provision, validate, and inspect a Samba Active Directory domain controller"
+    SGND_MODULE_ID="${SGND_AD_SERVER_MODULE_ID}"
     SGND_MODULE_NAME="$SGND_AD_SERVER_MODULE_NAME"
     SGND_MODULE_VERSION="$SGND_AD_SERVER_MODULE_VERSION"
     SGND_MODULE_DESC="$SGND_AD_SERVER_MODULE_DESC"
@@ -92,6 +93,28 @@ set -uo pipefail
     _adsvr_step_register_dns()     { _adsvr_run_action dns; }
     _adsvr_validate()              { _adsvr_run_action validate; }
     _adsvr_status()                { _adsvr_run_action status; }
+
+# - Module validation contract ------------------------------------------------------
+    # Return codes:
+    #   0 = Passed
+    #   1 = Failed
+    #   2 = Warning
+    #   3 = Skipped / not applicable
+    #
+    # Every validator sets SGND_MODULE_VALIDATION_MESSAGE to a concise result summary.
+    # Detailed diagnostic output may be written by the validator or delegated action.
+    validate_module_active_directory_server() {
+        if ! grep -Eiq '^[[:space:]]*server[[:space:]]+role[[:space:]]*=[[:space:]]*active[[:space:]]+directory[[:space:]]+domain[[:space:]]+controller' /etc/samba/smb.conf 2>/dev/null; then
+            SGND_MODULE_VALIDATION_MESSAGE="Host is not configured as an Active Directory domain controller."
+            return 3
+        fi
+        if _adsvr_validate; then
+            SGND_MODULE_VALIDATION_MESSAGE="Active Directory server validation passed."
+            return 0
+        fi
+        SGND_MODULE_VALIDATION_MESSAGE="Active Directory server validation reported one or more failures."
+        return 1
+    }
 
 # - Console registration ---------------------------------------------------------
     # Registers Samba Active Directory domain-controller management actions.

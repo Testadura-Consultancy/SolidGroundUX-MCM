@@ -72,6 +72,8 @@ set -uo pipefail
     
     SGND_COMPUTER_SUDOERS_FILE="/etc/sudoers.d/solidgroundux-receiver"
 
+    SGND_MODULE_ID="${SGND_COMPUTER_SETUP_MODULE_ID}"
+
     SGND_MODULE_NAME="$SGND_COMPUTER_SETUP_MODULE_NAME"
     SGND_MODULE_VERSION="$SGND_COMPUTER_SETUP_MODULE_VERSION"
     SGND_MODULE_DESC="$SGND_COMPUTER_SETUP_MODULE_DESC"
@@ -428,6 +430,24 @@ set -uo pipefail
         #   0 on success; non-zero on failure.
     _prepare_template() {
         _sgnd_run_public_command "sgnd-prepare-template"
+    }
+
+# - Module validation contract ------------------------------------------------------
+    # Return codes:
+    #   0 = Passed
+    #   1 = Failed
+    #   2 = Warning
+    #   3 = Skipped / not applicable
+    #
+    # Every validator sets SGND_MODULE_VALIDATION_MESSAGE to a concise result summary.
+    # Detailed diagnostic output may be written by the validator or delegated action.
+    validate_module_computer_setup() {
+        if _computer_validate; then
+            SGND_MODULE_VALIDATION_MESSAGE="Computer setup validation passed."
+            return 0
+        fi
+        SGND_MODULE_VALIDATION_MESSAGE="Computer setup validation reported one or more failures."
+        return 1
     }
 
 # - Console registration ---------------------------------------------------------

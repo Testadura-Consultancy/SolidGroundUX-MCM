@@ -1,20 +1,34 @@
 #!/usr/bin/env bash
 # =====================================================================================
 # SolidGroundUX Management Console Modules - Manage Samba Shares
-# -------------------------------------------------------------------------------------
+# ------------------------------------------------------------------------------------
 # Metadata:
 #   Version     : 1.2
 #   Build       : 2626021
-#   Checksum    : 12b60f7c51c361c1e3ea52e4c92acbf4db409766d07950a96f17d317ddad4fd8
+#   Checksum    : ac001ae7201bac35d11a39fdcbf88f19d8bb55aa848037856d9e5d2bf1a88242
 #   Source      : manage-samba-shares.sh
 #   Type        : script
 #   Group       : Console Actions
 #   Purpose     : Manage Samba shares
 #
 # Description:
-#   Provides complete interactive management of SolidGroundUX Samba shares, including
-#   share creation/removal, backing-directory structure, validation, and AD/NSS access
-#   control synchronized through POSIX ACLs and Samba valid-users/write-list settings.
+#   Provides interactive management of SolidGroundUX Samba shares, including share
+#   lifecycle, directory structure, validation, and AD/NSS access control synchronized
+#   through POSIX ACLs and Samba valid-users/write-list settings.
+#
+# Design principles:
+#   - Executables are explicit: resolve, bootstrap, then run
+#   - Libraries never auto-execute (composition over inheritance)
+#   - Framework integration is opt-in and declarative
+#   - UI and input must be TTY-safe
+#
+# Role in framework:
+#   - Entry point pattern for all SolidGroundUX-based scripts
+#   - Defines how scripts integrate with sgnd-bootstrap and common libraries
+#
+# Non-goals:
+#   - Business logic implementation (provided by the script author)
+#   - Library behavior (handled in /common modules)
 #
 # Attribution:
 #   Developers  : Mark Fieten
@@ -24,8 +38,7 @@
 #   License     : Licensed under the Testadura Non-Commercial License (TD-NC) v1.1.
 # =====================================================================================
 set -uo pipefail
-
-# - Bootstrap ----------------------------------------------------------------------
+# - Bootstrap -----------------------------------------------------------------------
     # fn$ _framework_locator - Resolve and load the active SolidGroundUX framework
         # . Purpose
         #   Determine the filesystem root of the currently executing SolidGroundUX tree
@@ -113,27 +126,176 @@ set -uo pipefail
         source "$exe_common"
     }
 
-# - Script metadata ----------------------------------------------------------------
+# - Script identity ------------------------------------------------------------------
+    # var: SGND_SCRIPT_FILE - Absolute path to the currently executing script
     SGND_SCRIPT_FILE="$(readlink -f "${BASH_SOURCE[0]}")"
+
+    # var: SGND_SCRIPT_DIR - Directory containing the currently executing script
     SGND_SCRIPT_DIR="$(cd -- "$(dirname -- "$SGND_SCRIPT_FILE")" && pwd)"
+
+    # var: SGND_SCRIPT_BASE - Filename of the currently executing script
     SGND_SCRIPT_BASE="$(basename -- "$SGND_SCRIPT_FILE")"
+
+    # var: SGND_SCRIPT_NAME - Script basename without the .sh extension
     SGND_SCRIPT_NAME="${SGND_SCRIPT_BASE%.sh}"
+    # var$ SGND_SCRIPT_FILE
+        # Absolute path to the currently executing script.
+    SGND_SCRIPT_FILE="$(readlink -f "${BASH_SOURCE[0]}")"
+
+    # var$ SGND_SCRIPT_DIR
+        # Directory containing the currently executing script.
+    SGND_SCRIPT_DIR="$(cd -- "$(dirname -- "$SGND_SCRIPT_FILE")" && pwd)"
+
+    # var$ SGND_SCRIPT_BASE
+        # Filename of the currently executing script, including extension.
+    SGND_SCRIPT_BASE="$(basename -- "$SGND_SCRIPT_FILE")"
+
+    # var$ SGND_SCRIPT_NAME
+        # Script basename without the .sh extension; used for help and display text.
+    SGND_SCRIPT_NAME="${SGND_SCRIPT_BASE%.sh}"
+
+# - Script metadata ----------------------------------------------------------------
     SGND_SCRIPT_TITLE="Manage Samba Shares"
-    : "${SGND_SCRIPT_DESC:=Assign Active Directory groups and access rights to managed Samba shares.}"
-    : "${SGND_SCRIPT_VERSION:=2.0}"
-    : "${SGND_SCRIPT_BUILD:=2623211}"
+    : "${SGND_SCRIPT_DESC:=Create, remove, structure, validate, and manage access to Samba shares.}"
+    : "${SGND_SCRIPT_VERSION:=2.1}"
+    : "${SGND_SCRIPT_BUILD:=2626021}"
     : "${SGND_SCRIPT_DEVELOPERS:=Mark Fieten}"
     : "${SGND_SCRIPT_COMPANY:=Testadura Consultancy}"
     : "${SGND_SCRIPT_COPYRIGHT:=© 2025 - 2026 Testadura Consultancy}"
     : "${SGND_SCRIPT_LICENSE:=Testadura Non-Commercial License (TD-NC) v1.1.}"
 
-# - Framework integration -----------------------------------------------------------
-    SGND_USING=()
-    SGND_ARGS_SPEC=()
-    SGND_SCRIPT_EXAMPLES=("  $SGND_SCRIPT_NAME")
-    SGND_SCRIPT_GLOBALS=()
-    SGND_STATE_VARIABLES=()
-    SGND_ON_EXIT_HANDLERS=()
+# - Framework integration ----------------------------------------------------------
+    # var: SGND_USING - Optional framework libraries to source after core bootstrap
+        # Libraries to source from SGND_COMMON_LIB.
+        # These are loaded automatically by sgnd_bootstrap AFTER core libraries.
+        #
+        # Example:
+        #   SGND_USING=( net.sh fs.sh )
+        #
+        # Leave empty if no extra libs are needed.
+    SGND_USING=(
+        sgnd-datatable.sh
+        sgnd-menu.sh
+    )
+
+    # var: SGND_ARGS_SPEC - Script-specific command-line argument specification
+        # Optional: script-specific arguments
+        # --- Example: Arguments
+        # Each entry:
+        #   "name|short|type|var|help|choices"
+        #
+        #   name    = long option name WITHOUT leading --
+        #   short   - short option name WITHOUT leading -
+        #   type    = flag | value | enum
+        #   var     = shell variable that will be set
+        #   help    = help string for auto-generated --help output
+        #   choices = for enum: comma-separated values (e.g. fast,slow,auto)
+        #             for flag/value: leave empty
+        #
+        # Notes:
+        #   - -h / --help is built in, you don't need to define it here.
+        #   - After parsing you can use: FLAG_VERBOSE, VAL_CONFIG, ENUM_MODE, ...
+    SGND_ARGS_SPEC=(
+    )
+
+    # var: SGND_SCRIPT_EXAMPLES - Optional help examples for this script
+        # Optional: examples for --help output.
+        # Each entry is a string that will be printed verbatim.
+        #
+        # Example:
+        #   SGND_SCRIPT_EXAMPLES=(
+        #       "Example usage:"
+        #       "  script.sh --verbose --mode fast"
+        #       "  script.sh -v -m slow"
+        #   )
+        #
+        # Leave empty if no examples are needed.
+    SGND_SCRIPT_EXAMPLES=(
+        "Run in dry-run mode:"
+        "  $SGND_SCRIPT_NAME --dryrun"
+        ""
+        "Show verbose logging"
+        "  $SGND_SCRIPT_NAME --verbose"
+    ) 
+
+    # var: SGND_SCRIPT_GLOBALS - Script globals participating in configuration loading# var: SGND_SCRIPT_GLOBALS - Script globals participating in configuration loading
+        # Explicit declaration of global variables intentionally used by this script.
+        #
+        # . Purpose
+        #   - Declares which globals are part of the script’s public/config contract.
+        #   - Enables optional configuration loading when non-empty.
+        #
+        # . Behavior
+        #   - If this array is non-empty, sgnd_bootstrap enables config integration.
+        #   - Variables listed here may be populated from configuration files.
+        #   - Unlisted globals will NOT be auto-populated.
+        #
+        # Use this to:
+        #   - Document intentional globals
+        #   - Prevent accidental namespace leakage
+        #   - Make configuration behavior explicit and predictable
+        #
+        # Only list:
+        #   - Variables that must be globally accessible
+        #   - Variables that may be defined in config files
+        #
+        # Leave empty if:
+        #   - The script does not use configuration-driven globals
+    SGND_SCRIPT_GLOBALS=(
+    )
+
+    # var: SGND_STATE_VARIABLES - Script variables participating in persistent state
+        # List of variables participating in persistent state.
+        #
+        # . Purpose
+        #   - Declares which variables should be saved/restored when state is enabled.
+        #
+        # . Behavior
+        #   - Only used when sgnd_bootstrap is invoked with --state.
+        #   - Variables listed here are serialized on exit (if SGND_STATE_SAVE=1).
+        #   - On startup, previously saved values are restored before main logic runs.
+        #
+        # Contract:
+        #   - Variables must be simple scalars (no arrays/associatives unless explicitly supported).
+        #   - Script remains fully functional when state is disabled.
+        #
+        # Leave empty if:
+        #   - The script does not use persistent state.
+    SGND_STATE_VARIABLES=(
+    )
+
+    # var: SGND_ON_EXIT_HANDLERS - Script-specific exit handler list
+        # List of functions to be invoked on script termination.
+        #
+        # . Purpose
+        #   - Allows scripts to register cleanup or finalization hooks.
+        #
+        # . Behavior
+        #   - Functions listed here are executed during framework exit handling.
+        #   - Execution order follows array order.
+        #   - Handlers run regardless of normal exit or controlled termination.
+        #
+        # Contract:
+        #   - Functions must exist before exit occurs.
+        #   - Handlers must not call exit directly.
+        #   - Handlers should be idempotent (safe if executed once).
+        #
+        # Typical uses:
+        #   - Cleanup temporary files
+        #   - Persist additional state
+        #   - Release locks
+        #
+        # Leave empty if:
+        #   - No custom exit behavior is required.
+    SGND_ON_EXIT_HANDLERS=(
+    )
+    
+    # var$ SGND_STATE_SAVE
+        # State persistence toggle used by sgnd_bootstrap when state support is enabled.
+        #
+        # Scripts that want persistent state must:
+        #   1) set SGND_STATE_SAVE=1
+        #   2) call sgnd_bootstrap --state or --autostate
     SGND_STATE_SAVE=0
 
 # - Local declarations --------------------------------------------------------------
@@ -257,6 +419,7 @@ set -uo pipefail
         done
         sgnd_print --text "Q. Back" --pad 2
         sgnd_print
+        sgnd_print_sectionheader ""
 
         while :; do
             input=""
@@ -404,11 +567,28 @@ set -uo pipefail
         #   _acl_groups_for_share "Documents"
     _acl_groups_for_share() {
         local path=""
+        local gid=""
+        local perms=""
+        local group=""
+
         path="$(_share_path "$1")"
         sudo test -d "$path" || return 1
 
-        sudo getfacl -cp -- "$path" 2>/dev/null | \
-            awk -F: '$1 == "group" && $2 != "" { print $2 "|" $3 }'
+        # Read numeric ACL qualifiers first. getfacl's normal output escapes spaces
+        # in names (for example Domain\040Users), which is display-safe but is not
+        # a usable NSS group name for later setfacl removal/synchronization.
+        while IFS='|' read -r gid perms; do
+            [[ -n "$gid" ]] || continue
+            group="$(getent group "$gid" 2>/dev/null | cut -d: -f1)"
+            [[ -n "$group" ]] || {
+                saywarning "ACL group id '$gid' cannot be resolved through NSS."
+                continue
+            }
+            printf '%s|%s\n' "$group" "$perms"
+        done < <(
+            sudo getfacl -cpn -- "$path" 2>/dev/null | \
+                awk -F: '$1 == "group" && $2 != "" { print $2 "|" $3 }'
+        )
     }
 
     # fn: _validate_share_name - Validate a managed Samba share name
@@ -1343,11 +1523,6 @@ set -uo pipefail
                 continue
             }
 
-            if (( group_count <= 1 )); then
-                saywarning "Cannot remove the last managed group from '$share'; assign a replacement group first."
-                continue
-            fi
-
             if (( ${FLAG_DRYRUN:-0} == 1 )); then
                 sayinfo "DRYRUN: Would remove ACL access for '$group' from '$share' and synchronize the Samba access lists."
                 continue
@@ -1475,31 +1650,85 @@ set -uo pipefail
         return "$validation_rc"
     }
 
-# - Main ---------------------------------------------------------------------------
-    # fn: main - Run interactive Samba share access management
-        # . Returns
-        #   0 after normal exit; non-zero when startup requirements fail.
-        #
-        # . Usage
-        #   main "$@"
-    main() {
-        local action=""
-        local selected_share=""
-        local -a actions=(
-            "Create share"
-            "Remove share"
-            "Create subdirectory"
-            "List subdirectories"
-            "Remove subdirectory"
-            "Select shares"
-            "Show access"
-            "Grant read-only access to AD group"
-            "Grant read/write access to AD group"
-            "Remove AD group access"
-            "Validate selected shares"
-        )
+# - Standard share-management menu -------------------------------------------------
+    _smb_menu_require_selection() {
+        (( ${#SELECTED_SHARES[@]} > 0 )) || {
+            saywarning "Select one or more shares first."
+            return 1
+        }
+    }
 
-        _framework_locator || return $?
+    _smb_menu_create_share()        { _create_share; }
+    _smb_menu_remove_share()        { _remove_share; }
+    _smb_menu_create_subdirectory() { _create_subdirectory; }
+    _smb_menu_list_subdirectories() { _list_subdirectories; }
+    _smb_menu_remove_subdirectory() { _remove_subdirectory; }
+    _smb_menu_select_shares()       { _select_shares; }
+    _smb_menu_show_access() {
+        _smb_menu_require_selection || return $?
+        _show_access
+        local rc=$?
+        sgnd_print
+        sgnd_print_sectionheader ""
+        ask_dlg_autocontinue --seconds 15 --message "Press Enter to return to share management." --pause || true
+        return "$rc"
+    }
+    _smb_menu_grant_read() {
+        _smb_menu_require_selection || return $?
+        _apply_group_access read
+    }
+    _smb_menu_grant_write() {
+        _smb_menu_require_selection || return $?
+        _apply_group_access write
+    }
+    _smb_menu_remove_access() {
+        _smb_menu_require_selection || return $?
+        _remove_group_access
+    }
+    _smb_menu_validate() {
+        _smb_menu_require_selection || return $?
+        _validate_selected
+    }
+
+    _smb_menu_build() {
+        local selection_state=2
+        local selected_text="None selected"
+
+        (( ${#SELECTED_SHARES[@]} > 0 )) && {
+            selection_state=1
+            selected_text="$(IFS=', '; printf '%s' "${SELECTED_SHARES[*]}")"
+        }
+
+        sgnd_menu_create "Manage Samba Shares" "Selected Samba shares: $selected_text"
+        SGND_MENU_SHOW_TOGGLEBAR=0
+        SGND_CURRENT_MODULE_SOURCE="manage-samba-shares"
+        SGND_MENU_ACTIVE_SOURCE="$SGND_CURRENT_MODULE_SOURCE"
+
+        sgnd_menu_register_group "share-create-remove" "Create/remove shares" "" 0 1 10
+        sgnd_menu_register_item "create"     "share-create-remove" "Create share"                        "_smb_menu_create_share"        "" 0 0 1 0
+        sgnd_menu_register_item "remove"     "share-create-remove" "Remove share"                        "_smb_menu_remove_share"        "" 0 0 1 0
+
+        sgnd_menu_register_group "share-management" "Share management" "" 0 1 20
+        sgnd_menu_register_item "select"     "share-management" "Select shares"                        "_smb_menu_select_shares"       "" 0 0 1 0
+        sgnd_menu_register_item "mkdir"      "share-management" "Create subdirectory"                  "_smb_menu_create_subdirectory" "" 0 0 "$selection_state" 0
+        sgnd_menu_register_item "listdirs"   "share-management" "List subdirectories"                  "_smb_menu_list_subdirectories" "" 0 0 "$selection_state" 0
+        sgnd_menu_register_item "rmdir"      "share-management" "Remove subdirectory"                  "_smb_menu_remove_subdirectory" "" 0 0 "$selection_state" 0
+        sgnd_menu_register_item "access"     "share-management" "Show access"                          "_smb_menu_show_access"         "" 0 0 "$selection_state" 0
+        sgnd_menu_register_item "grant-read" "share-management" "Grant read-only access to AD group"   "_smb_menu_grant_read"          "" 0 0 "$selection_state" 0
+        sgnd_menu_register_item "grant-rw"   "share-management" "Grant read/write access to AD group"  "_smb_menu_grant_write"         "" 0 0 "$selection_state" 0
+        sgnd_menu_register_item "remove-acl" "share-management" "Remove AD group access"               "_smb_menu_remove_access"       "" 0 0 "$selection_state" 0
+
+        sgnd_menu_register_group "share-validation" "Validation" "" 0 1 30
+        sgnd_menu_register_item "validate"   "share-validation" "Validate selected shares"             "_smb_menu_validate"            "" 0 0 "$selection_state" 0
+    }
+
+# - Main ----------------------------------------------------------------------------
+    # fn: main - Run interactive Samba share management
+    main() {
+        local choice=""
+        local dispatch_rc=0
+
+        _framework_locator || exit $?
         sgnd_exe_start "$@" || return $?
 
         command -v setfacl >/dev/null 2>&1 || { sayfail "setfacl is not installed."; return 1; }
@@ -1508,70 +1737,29 @@ set -uo pipefail
         [[ -d "$SGND_SAMBA_SHARE_ROOT" ]] || { sayfail "Share root not found: $SGND_SAMBA_SHARE_ROOT"; return 1; }
 
         while :; do
-            sgnd_clear
-            action=""
+            _smb_menu_build || return $?
+            sgnd_menu_show_menu
 
-            if (( ${#SELECTED_SHARES[@]} > 0 )); then
-                sgnd_print
-                sgnd_print_sectionheader --text "Selected Samba shares"
-                for selected_share in "${SELECTED_SHARES[@]}"; do
-                    sgnd_print --text "$selected_share" --pad 2
-                done
-            else
-                sgnd_print
-                sgnd_print_sectionheader --text "Selected Samba shares"
-                sgnd_print --text "None selected" --pad 2
-            fi
+            choice=""
+            sgnd_print
+            sgnd_print_sectionheader ""
+            printf 'Selection : ' >/dev/tty
+            sgnd_menu_read_choice choice || return $?
 
-            _smb_ask_selection \
-                --label "Manage Samba shares" \
-                --var action \
-                --items "${actions[@]}" || return 0
-
-            case "$action" in
-                "Create share")
-                    _create_share || true
-                    ;;
-                "Remove share")
-                    _remove_share || true
-                    ;;
-                "Create subdirectory")
-                    _create_subdirectory || true
-                    ;;
-                "List subdirectories")
-                    _list_subdirectories || true
-                    ;;
-                "Remove subdirectory")
-                    _remove_subdirectory || true
-                    ;;
-                "Select shares")
-                    _select_shares || true
-                    ;;
-                "Show access")
-                    (( ${#SELECTED_SHARES[@]} > 0 )) || { saywarning "Select one or more shares first."; ask_dlg_autocontinue --seconds 5 || true; continue; }
-                    _show_access
-                    ask_dlg_autocontinue --seconds 15 --message "Press Enter to return to share management." --pause || true
-                    ;;
-                "Grant read-only access to AD group")
-                    (( ${#SELECTED_SHARES[@]} > 0 )) || { saywarning "Select one or more shares first."; ask_dlg_autocontinue --seconds 5 || true; continue; }
-                    _apply_group_access read || true
-                    ;;
-                "Grant read/write access to AD group")
-                    (( ${#SELECTED_SHARES[@]} > 0 )) || { saywarning "Select one or more shares first."; ask_dlg_autocontinue --seconds 5 || true; continue; }
-                    _apply_group_access write || true
-                    ;;
-                "Remove AD group access")
-                    (( ${#SELECTED_SHARES[@]} > 0 )) || { saywarning "Select one or more shares first."; ask_dlg_autocontinue --seconds 5 || true; continue; }
-                    _remove_group_access || true
-                    ;;
-                "Validate selected shares")
-                    (( ${#SELECTED_SHARES[@]} > 0 )) || { saywarning "Select one or more shares first."; ask_dlg_autocontinue --seconds 5 || true; continue; }
-                    _validate_selected || true
-                    ;;
-                *)
-                    saywarning "Unknown share-management action: $action"
-                    ;;
+            case "$choice" in
+                EXIT|ESC) return 0 ;;
+                RESET|REDRAW) continue ;;
             esac
+
+            dispatch_rc=0
+            sgnd_menu_dispatch "$choice" || dispatch_rc=$?
+
+            sgnd_print
+            sgnd_print_sectionheader ""
+
+            if (( dispatch_rc != 0 )); then
+                sleep 1
+            fi
         done
     }
 

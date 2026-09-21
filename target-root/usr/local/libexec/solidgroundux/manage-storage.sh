@@ -118,7 +118,7 @@ set -uo pipefail
 # - Framework integration -----------------------------------------------------------
     SGND_USING=()
     SGND_ARGS_SPEC=(
-        "action|a|enum|ACTION|Management action||configure,mount,unmount,expand,reconcile,reconcile-persistence,validate,status,access-status,set-owner,set-group,set-permissions,restore-defaults"
+        "action|a|enum|ACTION|Management action||configure,mount,unmount,expand,reconcile,reconcile-persistence,validate,status,access-status,set-access,restore-defaults"
     )
     SGND_SCRIPT_EXAMPLES=(
         "  $SGND_SCRIPT_NAME --action status"
@@ -188,164 +188,118 @@ set -uo pipefail
         [[ "$mountpoint" != *[[:space:]]* ]] || return 1
     }
 
-    # fn: _storage_get_mountpoint
-        # . Purpose
-        #   Resolve the configured SolidGroundUX storage mount point.
-        #
-        # . Behavior
-        #   - Uses the persisted storage configuration when available.
-        #   - Falls back to an existing SGND_STORAGE filesystem entry in /etc/fstab.
-        #   - Falls back to /srv/storage when storage has not yet been configured.
-        #
-        # Outputs (stdout):
-        #   Effective storage mount point.
-        #
-        # . Usage
-        #   mountpoint="$(_storage_get_mountpoint)"
-    _storage_get_mountpoint() {
+    # fn: _storage_list_mountpoints - List all SolidGroundUX-managed storage mount points
+    _storage_list_mountpoints() {
+        local source=""
+        local target=""
+        local filesystem=""
+        local options=""
+
+        while IFS='|' read -r source target filesystem options; do
+            [[ -n "$target" ]] || continue
+            _storage_validate_mountpoint "$target" || continue
+            printf '%s\n' "$target"
+        done < <(_storage_list_managed_fstab_entries)
+    }
+
+    # fn: _storage_mountpoint_is_managed - Validate a managed storage mount point
+    _storage_mountpoint_is_managed() {
+        local candidate="${1:-}"
         local mountpoint=""
-        local device=""
-        local uuid=""
-
-        if [[ -r "$SGND_STORAGE_CONFIG_FILE" ]]; then
-            mountpoint="$(awk -F= '
-                $1 == "SGND_STORAGE_MOUNTPOINT" {
-                    print substr($0, index($0, "=") + 1)
-                    exit
-                }
-            ' "$SGND_STORAGE_CONFIG_FILE" 2>/dev/null || true)"
-
-            if _storage_validate_mountpoint "$mountpoint"; then
-                printf '%s\n' "$mountpoint"
-                return 0
-            fi
-        fi
-
-        device="$(blkid -L SGND_STORAGE 2>/dev/null || true)"
-        if [[ -n "$device" ]]; then
-            uuid="$(blkid -s UUID -o value "$device" 2>/dev/null || true)"
-            if [[ -n "$uuid" ]]; then
-                mountpoint="$(awk -v source="UUID=$uuid" '
-                    $0 !~ /^[[:space:]]*#/ && NF >= 2 && $1 == source { print $2; exit }
-                ' /etc/fstab 2>/dev/null || true)"
-
-                if _storage_validate_mountpoint "$mountpoint"; then
-                    printf '%s\n' "$mountpoint"
-                    return 0
-                fi
-            fi
-        fi
-
-        printf '%s\n' "$SGND_STORAGE_DEFAULT_MOUNTPOINT"
+        while IFS= read -r mountpoint; do
+            [[ "$candidate" == "$mountpoint" ]] && return 0
+        done < <(_storage_list_mountpoints)
+        return 1
     }
 
-    # fn: _storage_get_share_root
-        # . Purpose
-        #   Return the managed Samba share root beneath the configured storage mount point.
-        #
-        # Outputs (stdout):
-        #   Effective share-root path.
-        #
-        # . Usage
-        #   share_root="$(_storage_get_share_root)"
-    _storage_get_share_root() {
-        printf '%s/shares\n' "$(_storage_get_mountpoint)"
+    # fn: _storage_select_mountpoint - Select one managed storage volume
+    _storage_select_mountpoint() {
+        local output_var="${1:?missing output variable}"
+        local label="${2:-Storage mount point}"
+        local selected=""
+        local choices=""
+        local index=1
+        local -a mountpoints=()
+
+        mapfile -t mountpoints < <(_storage_list_mountpoints)
+        (( ${#mountpoints[@]} > 0 )) || {
+            sayfail "No SolidGroundUX-managed storage volumes are configured."
+            return 1
+        }
+
+        if (( ${#mountpoints[@]} == 1 )); then
+            selected="${mountpoints[0]}"
+        else
+            ask_selection \
+                --label "$label" \
+                --var selected \
+                --items "${mountpoints[@]}" || return $?
+        fi
+
+        printf -v "$output_var" '%s' "$selected"
     }
 
-    # fn: _storage_save_mountpoint
-        # . Purpose
-        #   Persist the configured SolidGroundUX storage mount point.
-        #
-        # Inputs:
-        #   $1 - Validated absolute mount point.
-        #
-        # . Returns
-        #   0 when configuration is written, otherwise non-zero.
-        #
-        # . Usage
-        #   _storage_save_mountpoint "/srv/storage"
-    _storage_save_mountpoint() {
-        local mountpoint="${1:-}"
+    # fn: _storage_save_configuration - Persist the complete managed mount-point set
+    _storage_save_configuration() {
         local config_dir=""
+        local mountpoint=""
+        local joined=""
 
-        _storage_validate_mountpoint "$mountpoint" || return 1
         config_dir="$(dirname "$SGND_STORAGE_CONFIG_FILE")"
+        while IFS= read -r mountpoint; do
+            [[ -n "$mountpoint" ]] || continue
+            [[ -z "$joined" ]] || joined+=":"
+            joined+="$mountpoint"
+        done < <(_storage_list_mountpoints)
 
         sudo install -d -m 0755 "$config_dir" || return 1
         printf '%s\n' \
             '# SolidGroundUX managed storage configuration' \
-            "SGND_STORAGE_MOUNTPOINT=$mountpoint" | \
+            "SGND_STORAGE_MOUNTPOINTS=$joined" | \
             sudo tee "$SGND_STORAGE_CONFIG_FILE" >/dev/null || return 1
         sudo chmod 0644 "$SGND_STORAGE_CONFIG_FILE" || return 1
     }
 
-
-    # fn: _storage_get_configured_mountpoint - Read only the persisted storage mount point
-    _storage_get_configured_mountpoint() {
-        local mountpoint=""
-
+    # fn: _storage_get_configured_mountpoints - Read persisted managed mount points
+    _storage_get_configured_mountpoints() {
+        local value=""
         [[ -r "$SGND_STORAGE_CONFIG_FILE" ]] || return 1
-        mountpoint="$(awk -F= '
-            $1 == "SGND_STORAGE_MOUNTPOINT" {
-                print substr($0, index($0, "=") + 1)
-                exit
-            }
-        ' "$SGND_STORAGE_CONFIG_FILE" 2>/dev/null || true)"
-
-        _storage_validate_mountpoint "$mountpoint" || return 1
-        printf '%s\n' "$mountpoint"
+        value="$(awk -F= '$1 == "SGND_STORAGE_MOUNTPOINTS" { print substr($0,index($0,"=")+1); exit }' "$SGND_STORAGE_CONFIG_FILE" 2>/dev/null || true)"
+        [[ -n "$value" ]] || return 1
+        tr ':' '\n' <<< "$value" | awk 'NF && !seen[$0]++'
     }
 
-    # fn: _storage_detect_labeled_volume - Resolve the existing SGND_STORAGE filesystem
-    # Outputs globals:
-    #   STORAGE_DETECTED_DEVICE, STORAGE_DETECTED_UUID, STORAGE_DETECTED_FILESYSTEM,
-    #   STORAGE_DETECTED_MOUNTPOINT, STORAGE_DETECTED_FSTAB_SOURCE
-    _storage_detect_labeled_volume() {
+    # fn: _storage_list_labeled_volumes - List every filesystem labelled SGND_STORAGE
+    # Output: DEVICE|UUID|FSTYPE|MOUNTPOINT|FSTAB_SOURCE
+    _storage_list_labeled_volumes() {
         local device=""
         local uuid=""
         local filesystem=""
         local mountpoint=""
         local fstab_source=""
 
-        STORAGE_DETECTED_DEVICE=""
-        STORAGE_DETECTED_UUID=""
-        STORAGE_DETECTED_FILESYSTEM=""
-        STORAGE_DETECTED_MOUNTPOINT=""
-        STORAGE_DETECTED_FSTAB_SOURCE=""
-
-        device="$(blkid -L SGND_STORAGE 2>/dev/null || true)"
-        [[ -n "$device" ]] || return 1
-        device="$(readlink -f -- "$device" 2>/dev/null || printf '%s' "$device")"
-        [[ -b "$device" ]] || return 1
-
-        uuid="$(blkid -s UUID -o value "$device" 2>/dev/null || true)"
-        filesystem="$(blkid -s TYPE -o value "$device" 2>/dev/null || true)"
-
-        mountpoint="$(findmnt -rn -S "$device" -o TARGET 2>/dev/null | head -n 1 || true)"
-
-        if [[ -n "$uuid" ]]; then
-            fstab_source="UUID=$uuid"
-            if [[ -z "$mountpoint" ]]; then
-                mountpoint="$(awk -v source="$fstab_source" '
-                    $0 !~ /^[[:space:]]*#/ && NF >= 2 && $1 == source { print $2; exit }
-                ' /etc/fstab 2>/dev/null || true)"
+        while IFS= read -r device; do
+            [[ -n "$device" ]] || continue
+            device="$(readlink -f -- "$device" 2>/dev/null || printf '%s' "$device")"
+            [[ -b "$device" ]] || continue
+            uuid="$(blkid -s UUID -o value "$device" 2>/dev/null || true)"
+            filesystem="$(blkid -s TYPE -o value "$device" 2>/dev/null || true)"
+            mountpoint="$(findmnt -rn -S "$device" -o TARGET 2>/dev/null | head -n 1 || true)"
+            fstab_source=""
+            if [[ -n "$uuid" ]]; then
+                fstab_source="UUID=$uuid"
+                [[ -n "$mountpoint" ]] || mountpoint="$(awk -v source="$fstab_source" '$0 !~ /^[[:space:]]*#/ && NF>=2 && $1==source {print $2; exit}' /etc/fstab 2>/dev/null || true)"
             fi
-        fi
+            _storage_validate_mountpoint "$mountpoint" || continue
+            printf '%s|%s|%s|%s|%s\n' "$device" "$uuid" "$filesystem" "$mountpoint" "$fstab_source"
+        done < <(blkid -t LABEL=SGND_STORAGE -o device 2>/dev/null | sort -u)
+    }
 
-        if [[ -z "$mountpoint" ]]; then
-            mountpoint="$(awk -v dev="$device" '
-                $0 !~ /^[[:space:]]*#/ && NF >= 2 && $1 == dev { print $2; exit }
-            ' /etc/fstab 2>/dev/null || true)"
-        fi
-
-        _storage_validate_mountpoint "$mountpoint" || return 1
-
-        STORAGE_DETECTED_DEVICE="$device"
-        STORAGE_DETECTED_UUID="$uuid"
-        STORAGE_DETECTED_FILESYSTEM="$filesystem"
-        STORAGE_DETECTED_MOUNTPOINT="$mountpoint"
-        STORAGE_DETECTED_FSTAB_SOURCE="$fstab_source"
-        return 0
+    # Backward-compatible helper: return first managed mount point, or the default.
+    _storage_get_mountpoint() {
+        local mountpoint=""
+        mountpoint="$(_storage_list_mountpoints | head -n 1)"
+        printf '%s\n' "${mountpoint:-$SGND_STORAGE_DEFAULT_MOUNTPOINT}"
     }
 
     _storage_dryrun_complete() {
@@ -386,34 +340,20 @@ set -uo pipefail
         ' /etc/fstab 2>/dev/null
     }
 
-    # fn: _storage_list_stale_managed_fstab_entries - List stale SolidGroundUX-managed entries
-        # . Purpose
-        #   Identify SolidGroundUX-managed fstab entries that do not describe the
-        #   currently detected SGND_STORAGE volume.
-        #
-        # . Prerequisite
-        #   _storage_detect_labeled_volume must have completed successfully.
-        #
-        # . Output
-        #   One stale managed entry per line as SOURCE|TARGET|FSTYPE|OPTIONS.
+    # fn: _storage_list_stale_managed_fstab_entries - List invalid/stale managed entries
     _storage_list_stale_managed_fstab_entries() {
-        local expected_source=""
-        local source=""
-        local target=""
-        local filesystem=""
-        local options=""
-
-        [[ -n "${STORAGE_DETECTED_MOUNTPOINT:-}" ]] || return 1
-
-        if [[ -n "${STORAGE_DETECTED_UUID:-}" ]]; then
-            expected_source="UUID=${STORAGE_DETECTED_UUID}"
-        else
-            expected_source="${STORAGE_DETECTED_DEVICE:-}"
-        fi
-
+        local source="" target="" filesystem="" options="" device="" label=""
         while IFS='|' read -r source target filesystem options; do
             [[ -n "$source" && -n "$target" ]] || continue
-            if [[ "$source" != "$expected_source" || "$target" != "$STORAGE_DETECTED_MOUNTPOINT" ]]; then
+            case "$source" in
+                UUID=*) device="$(blkid -U "${source#UUID=}" 2>/dev/null || true)" ;;
+                LABEL=*) device="$(blkid -L "${source#LABEL=}" 2>/dev/null || true)" ;;
+                *) device="$source" ;;
+            esac
+            device="$(readlink -f -- "$device" 2>/dev/null || true)"
+            label=""
+            [[ -b "$device" ]] && label="$(blkid -s LABEL -o value "$device" 2>/dev/null || true)"
+            if [[ ! -b "$device" || "$label" != "SGND_STORAGE" ]] || ! _storage_validate_mountpoint "$target"; then
                 printf '%s|%s|%s|%s\n' "$source" "$target" "$filesystem" "$options"
             fi
         done < <(_storage_list_managed_fstab_entries)
@@ -527,39 +467,98 @@ set -uo pipefail
         [[ "${1:-}" =~ ^[0-7]{3,4}$ ]]
     }
 
-    # fn: _storage_select_access_target
-        # . Purpose
-        #   Ask which managed storage directory should be changed.
-        #
-        # Outputs (globals):
-        #   Variable named by $1 receives either the storage root or shares root path.
-        #
-        # Inputs:
-        #   $1 - Output variable name.
-        #
-        # . Returns
-        #   0 when a target was selected, otherwise non-zero.
-        #
-        # . Usage
-        #   _storage_select_access_target target
-    _storage_select_access_target() {
-        local output_var="$1"
-        local selection="STORAGE"
-        local target=""
+    # fn: _storage_select_access_targets - Select one, several, or all managed storage roots
+    _storage_select_access_targets() {
+        local output_var="${1:?missing output variable}"
+        local choice=""
+        local token=""
+        local count=0
+        local i=0
+        local index=0
+        local invalid=0
+        local -a mountpoints=()
+        local -a selected_targets=()
+        local -a tokens=()
+        local -A seen=()
 
-        ask_decision \
-            --label "Storage access target" \
-            --choices "STORAGE|S,SHARES|H" \
-            --default "STORAGE" \
-            --var selection || return $?
+        mapfile -t mountpoints < <(_storage_list_mountpoints)
+        count=${#mountpoints[@]}
+        (( count > 0 )) || {
+            sayfail "No SolidGroundUX-managed storage volumes are configured."
+            return 1
+        }
 
-        case "$selection" in
-            STORAGE) target="$(_storage_get_mountpoint)" ;;
-            SHARES)  target="$(_storage_get_share_root)" ;;
-            *)       return 1 ;;
-        esac
+        sgnd_print
+        sgnd_print_sectionheader "Select storage target"
+        for (( i=0; i<count; i++ )); do
+            sgnd_print --text "$((i + 1)). ${mountpoints[i]}" --pad 2
+        done
+        if (( count > 1 )); then
+            sgnd_print --text "A. All storage volumes" --pad 2
+        fi
+        sgnd_print --text "Q. Back" --pad 2
+        sgnd_print
+        sgnd_print_sectionheader "Selection"
 
-        printf -v "$output_var" '%s' "$target"
+        while :; do
+            choice=""
+            ask --label "Selection" --var choice || return $?
+            choice="${choice#"${choice%%[![:space:]]*}"}"
+            choice="${choice%"${choice##*[![:space:]]}"}"
+
+            if [[ "${choice^^}" == "Q" ]]; then
+                return 1
+            fi
+            if (( count > 1 )) && [[ "${choice^^}" == "A" ]]; then
+                selected_targets=("${mountpoints[@]}")
+                break
+            fi
+
+            IFS=',' read -r -a tokens <<< "$choice"
+            selected_targets=()
+            seen=()
+            invalid=0
+
+            for token in "${tokens[@]}"; do
+                token="${token#"${token%%[![:space:]]*}"}"
+                token="${token%"${token##*[![:space:]]}"}"
+                if [[ ! "$token" =~ ^[1-9][0-9]*$ ]] || (( token > count )); then
+                    invalid=1
+                    break
+                fi
+                index=$((token - 1))
+                if [[ -z "${seen[$index]+x}" ]]; then
+                    selected_targets+=("${mountpoints[index]}")
+                    seen[$index]=1
+                fi
+            done
+
+            if (( invalid == 0 && ${#selected_targets[@]} > 0 )); then
+                break
+            fi
+            saywarning "Invalid selection: $choice"
+        done
+
+        local -n output_ref="$output_var"
+        output_ref=("${selected_targets[@]}")
+    }
+
+    # fn: _storage_action_again - Offer to repeat the completed storage action
+    _storage_action_again() {
+        local rc=0
+
+        sgnd_print
+        sgnd_print_sectionheader "Do another"
+
+        ask_dlg_autocontinue \
+            --seconds 5 \
+            --message "Repeat this storage action?" \
+            --again \
+            --pause \
+            --legend "Enter=return to menu; A=do another; P/Space=pause"
+        rc=$?
+
+        (( rc == 3 ))
     }
 
 # - Public module actions --------------------------------------------------------
@@ -573,15 +572,13 @@ set -uo pipefail
         #   - Requires explicit confirmation before destructive changes.
         #   - Creates one GPT partition and formats it as ext4 or XFS.
         #   - Adds the filesystem UUID to /etc/fstab and mounts it.
-        #   - Creates a shares directory for file-service consumers.
-        #   - Honors console dry-run mode.
+        #   -         #   - Honors console dry-run mode.
         #
         # Inputs (globals):
         #   FLAG_DRYRUN
         #
         # Outputs (files):
         #   /etc/fstab
-        #   <mount point>/shares
         #
         # . Returns
         #   0 when storage is configured or the action is cancelled.
@@ -593,7 +590,7 @@ set -uo pipefail
         local devices=()
         local device=""
         local filesystem="EXT4"
-        local mountpoint="$(_storage_get_mountpoint)"
+        local mountpoint="$SGND_STORAGE_DEFAULT_MOUNTPOINT"
         local decision="No"
         local partition=""
         local uuid=""
@@ -654,7 +651,7 @@ set -uo pipefail
 
         if (( ${FLAG_DRYRUN:-0} == 1 )); then
             sayinfo "DRYRUN: Would partition $device, format it as ${filesystem,,}, and mount it at $mountpoint."
-            sayinfo "DRYRUN: Would create $mountpoint/shares and persist SGND_STORAGE_MOUNTPOINT=$mountpoint."
+            sayinfo "DRYRUN: Would persist $mountpoint as an additional managed storage volume."
             _storage_dryrun_complete
             return 0
         fi
@@ -721,13 +718,23 @@ set -uo pipefail
             return 1
         fi
 
-        sudo install -d -m 0770 "$mountpoint/shares" || return 1
-        _storage_save_mountpoint "$mountpoint" || {
-            sayfail "Storage was mounted, but its mount point could not be persisted."
+        _storage_save_configuration || {
+            sayfail "Storage was mounted, but the managed storage configuration could not be persisted."
             return 1
         }
 
         sayok "Storage configured successfully at $mountpoint."
+
+        mapfile -t devices < <(_storage_list_unused_disks)
+        if (( ${#devices[@]} > 0 )); then
+            decision="No"
+            ask_decision \
+                --label "Configure another storage device?" \
+                --choices "Yes|Y,No|N" \
+                --default "No" \
+                --var decision || return $?
+            [[ "${decision^^}" == "YES" ]] && storage_configure
+        fi
     }
 
     # fn$ storage_mount
@@ -749,7 +756,9 @@ set -uo pipefail
         # . Usage
         #   storage_mount
     storage_mount() {
-        local mountpoint="$(_storage_get_mountpoint)"
+        local mountpoint=""
+
+        _storage_select_mountpoint mountpoint "Storage mount point" || return $?
 
         if mountpoint -q "$mountpoint"; then
             sayinfo "Storage is already mounted at $mountpoint."
@@ -793,7 +802,9 @@ set -uo pipefail
         # . Usage
         #   storage_unmount
     storage_unmount() {
-        local mountpoint="$(_storage_get_mountpoint)"
+        local mountpoint=""
+
+        _storage_select_mountpoint mountpoint "Storage mount point" || return $?
 
         if ! mountpoint -q "$mountpoint"; then
             sayinfo "Storage is already unmounted at $mountpoint."
@@ -835,13 +846,15 @@ set -uo pipefail
         # . Usage
         #   storage_expand
     storage_expand() {
-        local mountpoint="$(_storage_get_mountpoint)"
+        local mountpoint=""
         local source=""
         local source_spec=""
         local filesystem=""
         local parent_name=""
         local parent_device=""
         local partition_number=""
+
+        _storage_select_mountpoint mountpoint "Storage mount point" || return $?
 
         if mountpoint -q "$mountpoint"; then
             source="$(findmnt -n -o SOURCE --mountpoint "$mountpoint" 2>/dev/null || true)"
@@ -921,735 +934,255 @@ set -uo pipefail
     }
 
     # fn$ storage_access_status
-        # . Purpose
-        #   Display ownership and Unix permissions for the managed storage directories.
-        #
-        # . Behavior
-        #   - Reports owner, group, and octal mode for the configured storage root.
-        #   - Reports owner, group, and octal mode for the configured shares root.
-        #   - Reports missing directories without changing the filesystem.
-        #
-        # . Returns
-        #   0 after displaying the available ownership information.
-        #
-        # . Usage
-        #   storage_access_status
     storage_access_status() {
-        local path=""
-        local owner="-"
-        local group="-"
-        local mode="-"
-
+        local path="" owner="-" group="-" mode="-"
         sgnd_print
         sgnd_print_sectionheader "Storage access"
-
-        for path in "$(_storage_get_mountpoint)" "$(_storage_get_share_root)"; do
-            owner="-"
-            group="-"
-            mode="-"
-
+        while IFS= read -r path; do
+            [[ -n "$path" ]] || continue
+            owner="-"; group="-"; mode="-"
             if [[ -e "$path" ]]; then
                 owner="$(stat -c '%U' "$path" 2>/dev/null || printf '-')"
                 group="$(stat -c '%G' "$path" 2>/dev/null || printf '-')"
                 mode="$(stat -c '%a' "$path" 2>/dev/null || printf '-')"
             fi
-
             sgnd_print_labeledvalue --label "Path" --value "$path" --labelwidth 18
             sgnd_print_labeledvalue --label "Owner" --value "$owner" --labelwidth 18
             sgnd_print_labeledvalue --label "Group" --value "$group" --labelwidth 18
-            sgnd_print_labeledvalue --label "Permissions" --value "$mode" --labelwidth 18
+            sgnd_print_labeledvalue --label "Root permissions" --value "$mode" --labelwidth 18
             sgnd_print
-        done
-
-        return 0
+        done < <(_storage_list_mountpoints)
+        sgnd_print
+        sgnd_print_sectionheader ""
     }
 
-    # fn$ storage_set_owner
-        # . Purpose
-        #   Set the Unix owner of a managed storage directory.
-        #
-        # . Behavior
-        #   - Lets the administrator select the storage root or shares root.
-        #   - Validates the requested account through getent.
-        #   - Changes only the selected directory, not its descendants.
-        #   - Honors console dry-run mode.
-        #
-        # Inputs (globals):
-        #   FLAG_DRYRUN
-        #
-        # . Returns
-        #   0 when ownership is updated, otherwise non-zero.
-        #
-        # . Usage
-        #   storage_set_owner
-    storage_set_owner() {
-        local target=""
-        local current_owner="root"
-        local owner=""
+    storage_set_access() {
+        local target="" current_owner="root" current_group="root" current_mode="755"
+        local owner="" group="" mode=""
+        local -a targets=()
 
-        _storage_select_access_target target || return $?
-        [[ -d "$target" ]] || { sayfail "Storage directory does not exist: $target"; return 1; }
-
-        current_owner="$(stat -c '%U' "$target" 2>/dev/null || printf 'root')"
+        _storage_select_access_targets targets || return $?
+        current_owner="$(stat -c '%U' "${targets[0]}" 2>/dev/null || printf 'root')"
+        current_group="$(stat -c '%G' "${targets[0]}" 2>/dev/null || printf 'root')"
+        current_mode="$(stat -c '%a' "${targets[0]}" 2>/dev/null || printf '755')"
         owner="$current_owner"
-
-        ask \
-            --label "Storage owner" \
-            --var owner \
-            --default "$owner" \
-            --validate _storage_validate_account || return $?
-
-        if (( ${FLAG_DRYRUN:-0} == 1 )); then
-            sayinfo "DRYRUN: Would set owner of $target to $owner."
-            _storage_dryrun_complete
-            return 0
-        fi
-
-        sudo chown "$owner" "$target" || return 1
-        sayok "Storage owner updated for $target."
-    }
-
-    # fn$ storage_set_group
-        # . Purpose
-        #   Set the Unix group of a managed storage directory.
-        #
-        # . Behavior
-        #   - Lets the administrator select the storage root or shares root.
-        #   - Validates the requested group through getent.
-        #   - Changes only the selected directory, not its descendants.
-        #   - Honors console dry-run mode.
-        #
-        # Inputs (globals):
-        #   FLAG_DRYRUN
-        #
-        # . Returns
-        #   0 when the group is updated, otherwise non-zero.
-        #
-        # . Usage
-        #   storage_set_group
-    storage_set_group() {
-        local target=""
-        local current_group="root"
-        local group=""
-
-        _storage_select_access_target target || return $?
-        [[ -d "$target" ]] || { sayfail "Storage directory does not exist: $target"; return 1; }
-
-        current_group="$(stat -c '%G' "$target" 2>/dev/null || printf 'root')"
         group="$current_group"
-
-        ask \
-            --label "Storage group" \
-            --var group \
-            --default "$group" \
-            --validate _storage_validate_group || return $?
-
-        if (( ${FLAG_DRYRUN:-0} == 1 )); then
-            sayinfo "DRYRUN: Would set group of $target to $group."
-            _storage_dryrun_complete
-            return 0
-        fi
-
-        sudo chgrp "$group" "$target" || return 1
-        sayok "Storage group updated for $target."
-    }
-
-    # fn$ storage_set_permissions
-        # . Purpose
-        #   Set Unix permissions on a managed storage directory.
-        #
-        # . Behavior
-        #   - Lets the administrator select the storage root or shares root.
-        #   - Uses the current mode as the editable default.
-        #   - Accepts a three- or four-digit octal mode.
-        #   - Changes only the selected directory, not its descendants.
-        #   - Honors console dry-run mode.
-        #
-        # Inputs (globals):
-        #   FLAG_DRYRUN
-        #
-        # . Returns
-        #   0 when permissions are updated, otherwise non-zero.
-        #
-        # . Usage
-        #   storage_set_permissions
-    storage_set_permissions() {
-        local target=""
-        local mode=""
-
-        _storage_select_access_target target || return $?
-        [[ -d "$target" ]] || { sayfail "Storage directory does not exist: $target"; return 1; }
-
-        mode="$(stat -c '%a' "$target" 2>/dev/null || true)"
-        ask \
-            --label "Storage permissions" \
-            --var mode \
-            --default "$mode" \
-            --validate _storage_validate_mode || return $?
-
-        if (( ${FLAG_DRYRUN:-0} == 1 )); then
-            sayinfo "DRYRUN: Would set permissions on $target to $mode."
-            _storage_dryrun_complete
-            return 0
-        fi
-
-        sudo chmod "$mode" "$target" || return 1
-        sayok "Storage permissions updated for $target."
-    }
-
-    # fn$ storage_restore_access_defaults
-        # . Purpose
-        #   Restore canonical ownership and permissions for the managed storage roots.
-        #
-        # . Behavior
-        #   - Restores the configured storage root to root:root with mode 0755.
-        #   - Restores the configured shares root to root:root with mode 0770.
-        #   - Requires confirmation before changing either directory.
-        #   - Does not alter share directories beneath the configured shares root.
-        #   - Honors console dry-run mode.
-        #
-        # Inputs (globals):
-        #   FLAG_DRYRUN
-        #
-        # . Returns
-        #   0 when defaults are restored or the action is cancelled.
-        #   Non-zero when a required directory or filesystem operation fails.
-        #
-        # . Usage
-        #   storage_restore_access_defaults
-    storage_restore_access_defaults() {
-        local decision="No"
-        local mountpoint="$(_storage_get_mountpoint)"
-        local share_root="$(_storage_get_share_root)"
-
-        [[ -d "$mountpoint" ]] || {
-            sayfail "Storage root does not exist: $mountpoint"
-            return 1
-        }
-        [[ -d "$share_root" ]] || {
-            sayfail "Shares root does not exist: $share_root"
-            return 1
-        }
+        mode="$current_mode"
 
         sgnd_print
+        sgnd_print_sectionheader "Storage access"
+        ask --label "Owner" --var owner --default "$owner" --validate _storage_validate_account || return $?
+        ask --label "Group" --var group --default "$group" --validate _storage_validate_group || return $?
+        ask --label "Root permissions" --var mode --default "$mode" --validate _storage_validate_mode || return $?
+
+        for target in "${targets[@]}"; do
+            [[ -d "$target" ]] || { sayfail "Storage directory does not exist: $target"; return 1; }
+            if (( ${FLAG_DRYRUN:-0} == 1 )); then
+                sayinfo "DRYRUN: Would set access on $target to $owner:$group $mode."
+            else
+                sudo chown "$owner:$group" "$target" || return 1
+                sudo chmod "$mode" "$target" || return 1
+                sayok "Storage access updated for $target to $owner:$group $mode."
+            fi
+        done
+        (( ${FLAG_DRYRUN:-0} == 1 )) && _storage_dryrun_complete
+        sgnd_print
+        sgnd_print_sectionheader ""
+    }
+
+    storage_restore_access_defaults() {
+        local target="" decision="No"
+        local -a targets=()
+        _storage_select_access_targets targets || return $?
+        sgnd_print
         sgnd_print_sectionheader "Restore storage access defaults"
-        sgnd_print_labeledvalue --label "Storage root" --value "root:root 0755" --labelwidth 20
-        sgnd_print_labeledvalue --label "Shares root" --value "root:root 0770" --labelwidth 20
-
-        ask_decision \
-            --label "Restore these defaults?" \
-            --choices "Yes|Y,No|N" \
-            --default "No" \
-            --var decision || return $?
-
-        [[ "${decision^^}" == "YES" ]] || {
-            sayinfo "Storage access reset cancelled."
-            return 0
-        }
-
-        if (( ${FLAG_DRYRUN:-0} == 1 )); then
-            sayinfo "DRYRUN: Would restore canonical storage ownership and permissions."
-            _storage_dryrun_complete
-            return 0
-        fi
-
-        sudo chown root:root "$mountpoint" || return 1
-        sudo chmod 0755 "$mountpoint" || return 1
-        sudo chown root:root "$share_root" || return 1
-        sudo chmod 0770 "$share_root" || return 1
-
-        sayok "Canonical storage ownership and permissions restored."
+        for target in "${targets[@]}"; do
+            sgnd_print_labeledvalue --label "Storage root" --value "$target" --labelwidth 20
+        done
+        sgnd_print_labeledvalue --label "Defaults" --value "root:root 0755" --labelwidth 20
+        ask_decision --label "Restore these defaults?" --choices "Yes|Y,No|N" --default "No" --var decision || return $?
+        [[ "${decision^^}" == "YES" ]] || { sayinfo "Storage access reset cancelled."; return 0; }
+        for target in "${targets[@]}"; do
+            [[ -d "$target" ]] || { sayfail "Storage root does not exist: $target"; return 1; }
+            if (( ${FLAG_DRYRUN:-0} == 1 )); then
+                sayinfo "DRYRUN: Would restore canonical storage ownership and permissions for $target."
+            else
+                sudo chown root:root "$target" || return 1
+                sudo chmod 0755 "$target" || return 1
+                sayok "Canonical storage ownership and permissions restored for $target."
+            fi
+        done
+        (( ${FLAG_DRYRUN:-0} == 1 )) && _storage_dryrun_complete
     }
 
     # fn$ storage_reconcile
-        # . Purpose
-        #   Reconcile SolidGroundUX storage configuration with an existing SGND_STORAGE volume.
-        #
-        # . Behavior
-        #   - Detects the existing filesystem labeled SGND_STORAGE.
-        #   - Resolves its current or persistent mount point.
-        #   - Compares that mount point with /etc/solidgroundux/storage.cfg.
-        #   - Rewrites only the SolidGroundUX storage configuration when they differ.
-        #   - Never partitions, formats, mounts, unmounts, or changes /etc/fstab.
-        #   - Honors console dry-run mode.
     storage_reconcile() {
-        local configured_mountpoint=""
-        local decision="Yes"
-
-        _storage_detect_labeled_volume || {
-            sayfail "No usable SGND_STORAGE filesystem could be detected."
-            return 1
-        }
-
-        configured_mountpoint="$(_storage_get_configured_mountpoint 2>/dev/null || true)"
+        local device="" uuid="" filesystem="" mountpoint="" fstab_source=""
+        local detected_count=0
+        local current="" detected=""
 
         sgnd_print
         sgnd_print_sectionheader "Reconcile storage configuration"
-        sgnd_print_labeledvalue --label "Device" --value "$STORAGE_DETECTED_DEVICE" --labelwidth 24
-        sgnd_print_labeledvalue --label "UUID" --value "${STORAGE_DETECTED_UUID:--}" --labelwidth 24
-        sgnd_print_labeledvalue --label "Filesystem" --value "${STORAGE_DETECTED_FILESYSTEM:--}" --labelwidth 24
-        sgnd_print_labeledvalue --label "Detected mount point" --value "$STORAGE_DETECTED_MOUNTPOINT" --labelwidth 24
-        sgnd_print_labeledvalue --label "Configured mount point" --value "${configured_mountpoint:-Not configured}" --labelwidth 24
-        sgnd_print
+        while IFS='|' read -r device uuid filesystem mountpoint fstab_source; do
+            [[ -n "$mountpoint" ]] || continue
+            detected_count=$((detected_count + 1))
+            sgnd_print_labeledvalue --label "Device" --value "$device" --labelwidth 24
+            sgnd_print_labeledvalue --label "UUID" --value "${uuid:--}" --labelwidth 24
+            sgnd_print_labeledvalue --label "Filesystem" --value "${filesystem:--}" --labelwidth 24
+            sgnd_print_labeledvalue --label "Mount point" --value "$mountpoint" --labelwidth 24
+            sgnd_print
+        done < <(_storage_list_labeled_volumes)
 
-        if [[ "$configured_mountpoint" == "$STORAGE_DETECTED_MOUNTPOINT" ]]; then
-            sayok "Storage configuration already matches the detected SGND_STORAGE volume."
+        (( detected_count > 0 )) || { sayfail "No usable SGND_STORAGE filesystems could be detected."; return 1; }
+
+        current="$(_storage_get_configured_mountpoints 2>/dev/null | sort -u || true)"
+        detected="$(_storage_list_mountpoints | sort -u)"
+        if [[ "$current" == "$detected" ]]; then
+            sayok "Storage configuration already matches all managed SGND_STORAGE volumes."
             return 0
         fi
-
         if (( ${FLAG_DRYRUN:-0} == 1 )); then
-            sayinfo "DRYRUN: Would update $SGND_STORAGE_CONFIG_FILE to use '$STORAGE_DETECTED_MOUNTPOINT'."
-            _storage_dryrun_complete
-            return 0
+            sayinfo "DRYRUN: Would update $SGND_STORAGE_CONFIG_FILE with all managed storage mount points."
+            _storage_dryrun_complete; return 0
         fi
-
-        ask_decision \
-            --label "Update SolidGroundUX storage configuration?" \
-            --choices "Yes|Y,No|N" \
-            --default "Yes" \
-            --var decision || return $?
-
-        [[ "${decision^^}" == "YES" ]] || {
-            sayinfo "Storage reconciliation cancelled."
-            return 0
-        }
-
-        _storage_save_mountpoint "$STORAGE_DETECTED_MOUNTPOINT" || {
-            sayfail "Could not update SolidGroundUX storage configuration."
-            return 1
-        }
-
-        sayok "Storage configuration reconciled to $STORAGE_DETECTED_MOUNTPOINT."
-        return 0
+        _storage_save_configuration || { sayfail "Could not update SolidGroundUX storage configuration."; return 1; }
+        sayok "Storage configuration reconciled for $detected_count SGND_STORAGE volume(s)."
     }
 
-
     # fn$ storage_reconcile_persistence
-        # . Purpose
-        #   Remove stale SolidGroundUX-managed storage entries from /etc/fstab.
-        #
-        # . Behavior
-        #   - Detects the active filesystem labeled SGND_STORAGE.
-        #   - Considers only fstab entries explicitly preceded by the canonical
-        #     '# SolidGroundUX managed storage' marker.
-        #   - Keeps the managed entry that matches the detected SGND_STORAGE UUID and mount point.
-        #   - Removes stale managed storage blocks only; unrelated fstab entries are untouched.
-        #   - Creates a timestamped backup before changing /etc/fstab.
-        #   - Honors console dry-run mode.
     storage_reconcile_persistence() {
-        local expected_source=""
-        local decision="Yes"
-        local backup_file=""
-        local temp_file=""
-        local source=""
-        local target=""
-        local filesystem=""
-        local options=""
+        local decision="Yes" backup_file="" temp_file="" source="" target="" filesystem="" options=""
         local stale_count=0
-
-        _storage_detect_labeled_volume || {
-            sayfail "No usable SGND_STORAGE filesystem could be detected."
-            return 1
-        }
-
-        if [[ -n "${STORAGE_DETECTED_UUID:-}" ]]; then
-            expected_source="UUID=${STORAGE_DETECTED_UUID}"
-        else
-            expected_source="$STORAGE_DETECTED_DEVICE"
-        fi
-
         sgnd_print
         sgnd_print_sectionheader "Reconcile storage persistence"
-        sgnd_print_labeledvalue --label "Expected source" --value "$expected_source" --labelwidth 24
-        sgnd_print_labeledvalue --label "Expected mount point" --value "$STORAGE_DETECTED_MOUNTPOINT" --labelwidth 24
-        sgnd_print
+        while IFS='|' read -r source target filesystem options; do
+            [[ -n "$source" && -n "$target" ]] || continue
+            sgnd_print_labeledvalue --label "Managed storage" --value "$target" --labelwidth 24
+            sgnd_print_labeledvalue --label "Source" --value "$source" --labelwidth 24
+            sgnd_print_labeledvalue --label "Filesystem" --value "$filesystem" --labelwidth 24
+            sgnd_print
+        done < <(_storage_list_managed_fstab_entries)
 
         while IFS='|' read -r source target filesystem options; do
             [[ -n "$source" && -n "$target" ]] || continue
             stale_count=$((stale_count + 1))
             saywarning "Stale managed fstab entry: $source -> $target ($filesystem, $options)"
         done < <(_storage_list_stale_managed_fstab_entries)
-
         if (( stale_count == 0 )); then
-            sayok "No stale SolidGroundUX-managed storage entries were found in /etc/fstab."
+            sayok "All SolidGroundUX-managed storage entries are valid; no stale entries were found."
             return 0
         fi
-
         if (( ${FLAG_DRYRUN:-0} == 1 )); then
-            sayinfo "DRYRUN: Would remove $stale_count stale SolidGroundUX-managed storage entr$([[ $stale_count -eq 1 ]] && printf 'y' || printf 'ies') from /etc/fstab."
-            sayinfo "DRYRUN: Would keep the managed entry for '$expected_source' at '$STORAGE_DETECTED_MOUNTPOINT'."
-            _storage_dryrun_complete
-            return 0
+            sayinfo "DRYRUN: Would remove $stale_count stale SolidGroundUX-managed storage entry/entries from /etc/fstab."
+            _storage_dryrun_complete; return 0
         fi
-
-        ask_decision \
-            --label "Remove stale SolidGroundUX-managed fstab entries?" \
-            --choices "Yes|Y,No|N" \
-            --default "Yes" \
-            --var decision || return $?
-
-        [[ "${decision^^}" == "YES" ]] || {
-            sayinfo "Storage persistence reconciliation cancelled."
-            return 0
-        }
-
+        ask_decision --label "Remove stale SolidGroundUX-managed fstab entries?" --choices "Yes|Y,No|N" --default "Yes" --var decision || return $?
+        [[ "${decision^^}" == "YES" ]] || { sayinfo "Storage persistence reconciliation cancelled."; return 0; }
         backup_file="/etc/fstab.pre-storage-reconcile.$(date +%Y%m%d%H%M%S)"
         temp_file="$(mktemp)" || return 1
-
-        sudo cp -a /etc/fstab "$backup_file" || {
-            rm -f -- "$temp_file"
-            return 1
-        }
-
-        awk -v expected_source="$expected_source" -v expected_target="$STORAGE_DETECTED_MOUNTPOINT" '
-            function flush_marker() {
-                if (marker != "") {
-                    print marker
-                    marker = ""
-                }
-            }
-            $0 == "# SolidGroundUX managed storage" {
-                flush_marker()
-                marker = $0
-                managed = 1
-                next
-            }
-            managed {
-                if ($0 ~ /^[[:space:]]*$/) {
-                    # Keep waiting for the managed entry; do not emit the marker yet.
-                    next
-                }
-                if ($0 ~ /^[[:space:]]*#/) {
-                    flush_marker()
-                    managed = 0
-                    print
-                    next
-                }
-                if (NF >= 2) {
-                    if ($1 == expected_source && $2 == expected_target) {
-                        flush_marker()
-                        print
-                    }
-                    marker = ""
-                    managed = 0
-                    next
-                }
-                flush_marker()
+        local stale_file=""
+        stale_file="$(mktemp)" || { rm -f -- "$temp_file"; return 1; }
+        sudo cp -a /etc/fstab "$backup_file" || { rm -f -- "$temp_file" "$stale_file"; return 1; }
+        _storage_list_stale_managed_fstab_entries | awk -F'|' '{print $1 "|" $2}' > "$stale_file"
+        awk -v stale_file="$stale_file" '''
+            BEGIN {
+                while ((getline k < stale_file) > 0) stale[k] = 1
+                close(stale_file)
                 managed = 0
+                marker = ""
             }
-            {
-                print
+            $0 == "# SolidGroundUX managed storage" { marker = $0; managed = 1; next }
+            managed {
+                if ($0 ~ /^[[:space:]]*$/) next
+                if (NF >= 2) {
+                    key = $1 "|" $2
+                    if (!(key in stale)) { print marker; print }
+                    marker = ""; managed = 0; next
+                }
+                print marker; marker = ""; managed = 0
             }
-            END {
-                flush_marker()
-            }
-        ' /etc/fstab > "$temp_file" || {
-            rm -f -- "$temp_file"
-            return 1
-        }
-
-        sudo install -m 0644 "$temp_file" /etc/fstab || {
-            rm -f -- "$temp_file"
-            return 1
-        }
+            { print }
+        ''' /etc/fstab > "$temp_file" || { rm -f -- "$stale_file" "$temp_file"; return 1; }
+        rm -f -- "$stale_file"
+        sudo install -m 0644 "$temp_file" /etc/fstab || { rm -f -- "$temp_file"; return 1; }
         rm -f -- "$temp_file"
-
-        if ! findmnt --verify --tab-file /etc/fstab >/dev/null 2>&1; then
-            sayfail "Reconciled /etc/fstab did not validate; restoring backup."
-            sudo cp -a "$backup_file" /etc/fstab
-            return 1
-        fi
-
-        sayok "Removed $stale_count stale SolidGroundUX-managed storage entr$([[ $stale_count -eq 1 ]] && printf 'y' || printf 'ies') from /etc/fstab."
+        findmnt --verify --tab-file /etc/fstab >/dev/null 2>&1 || { sayfail "Reconciled /etc/fstab did not validate; restoring backup."; sudo cp -a "$backup_file" /etc/fstab; return 1; }
+        _storage_save_configuration || true
+        sayok "Removed $stale_count stale SolidGroundUX-managed storage entry/entries from /etc/fstab."
         sayinfo "Backup retained at $backup_file."
-        return 0
     }
 
     # fn$ storage_status
-        # . Purpose
-        #   Display local block devices and the configured SolidGroundUX storage state.
-        #
-        # . Behavior
-        #   - Displays a concise block-device overview.
-        #   - Reports filesystem, source, capacity, availability, and persistence for
-        #     the configured storage mount point.
-        #
-        # Outputs (console):
-        #   Local disk and storage-mount status.
-        #
-        # . Returns
-        #   0 after displaying available status information.
-        #
-        # . Usage
-        #   storage_status
     storage_status() {
-        local mountpoint="$(_storage_get_mountpoint)"
-        local share_root="$mountpoint/shares"
-        local source="Not configured"
-        local filesystem="-"
-        local filesystem_label="-"
-        local filesystem_uuid="-"
-        local size="-"
-        local available="-"
-        local mounted="No"
-        local persistent="No"
-        local root_exists="No"
-        local mounted_readwrite="No"
-        local share_root_exists="No"
-        local mount_matches="No"
-        local fstab_valid="Not checked"
-        local detected_mountpoint="Not detected"
-        local config_reconciled="No"
-
-        if _storage_detect_labeled_volume; then
-            detected_mountpoint="$STORAGE_DETECTED_MOUNTPOINT"
-            [[ "$mountpoint" == "$detected_mountpoint" ]] && config_reconciled="Yes"
-        fi
-
-        [[ -d "$mountpoint" ]] && root_exists="Yes"
-        [[ -d "$share_root" ]] && share_root_exists="Yes"
-
-        if mountpoint -q "$mountpoint"; then
-            mounted="Yes"
-            source="$(findmnt -n -o SOURCE --mountpoint "$mountpoint" 2>/dev/null || true)"
-            filesystem="$(findmnt -n -o FSTYPE --mountpoint "$mountpoint" 2>/dev/null || true)"
-            size="$(df -h --output=size "$mountpoint" 2>/dev/null | awk 'NR == 2 { print $1 }')"
-            available="$(df -h --output=avail "$mountpoint" 2>/dev/null | awk 'NR == 2 { print $1 }')"
-
-            if [[ -n "$source" ]]; then
-                filesystem_label="$(blkid -s LABEL -o value "$source" 2>/dev/null || true)"
-                filesystem_uuid="$(blkid -s UUID -o value "$source" 2>/dev/null || true)"
-                [[ -n "$filesystem_label" ]] || filesystem_label="-"
-                [[ -n "$filesystem_uuid" ]] || filesystem_uuid="-"
-            fi
-
-            if findmnt -n -o OPTIONS --mountpoint "$mountpoint" 2>/dev/null | tr "," "\n" | grep -qx "rw"; then
-                mounted_readwrite="Yes"
-            fi
-
-            if [[ "$(findmnt -n -o TARGET --source "$source" 2>/dev/null || true)" == "$mountpoint" ]]; then
-                mount_matches="Yes"
-            fi
-        fi
-
-        if awk -v target="$mountpoint" '
-            $0 !~ /^[[:space:]]*#/ && NF >= 2 && $2 == target { found = 1 }
-            END { exit(found ? 0 : 1) }
-        ' /etc/fstab; then
-            persistent="Yes"
-        fi
-
-        if findmnt --verify --tab-file /etc/fstab >/dev/null 2>&1; then
-            fstab_valid="Yes"
-        else
-            fstab_valid="No"
-        fi
-
+        local source="" mountpoint="" filesystem="" options="" device="" label="" uuid="" size="-" available="-" mounted="No" rw="No"
         sgnd_print
         sgnd_print_sectionheader "Storage devices"
         lsblk -o NAME,SIZE,FSTYPE,LABEL,UUID,MOUNTPOINTS,MODEL
-
         sgnd_print
-        sgnd_print_sectionheader "SolidGroundUX storage"
-        sgnd_print_labeledvalue --label "Configured mount point" --value "$mountpoint" --labelwidth 24
-        sgnd_print_labeledvalue --label "Detected SGND_STORAGE" --value "$detected_mountpoint" --labelwidth 24
-        sgnd_print_labeledvalue --label "Config reconciled" --value "$config_reconciled" --labelwidth 24
-        sgnd_print_labeledvalue --label "Source" --value "$source" --labelwidth 24
-        sgnd_print_labeledvalue --label "Filesystem" --value "$filesystem" --labelwidth 24
-        sgnd_print_labeledvalue --label "Label" --value "$filesystem_label" --labelwidth 24
-        sgnd_print_labeledvalue --label "UUID" --value "$filesystem_uuid" --labelwidth 24
-        sgnd_print_labeledvalue --label "Mounted" --value "$mounted" --labelwidth 24
-        sgnd_print_labeledvalue --label "Persistent" --value "$persistent" --labelwidth 24
-        sgnd_print_labeledvalue --label "fstab valid" --value "$fstab_valid" --labelwidth 24
-        sgnd_print_labeledvalue --label "Mount source matches" --value "$mount_matches" --labelwidth 24
-        sgnd_print_labeledvalue --label "Storage root exists" --value "$root_exists" --labelwidth 24
-        sgnd_print_labeledvalue --label "Mounted read/write" --value "$mounted_readwrite" --labelwidth 24
-        sgnd_print_labeledvalue --label "Shares root exists" --value "$share_root_exists" --labelwidth 24
-        sgnd_print_labeledvalue --label "Capacity" --value "$size" --labelwidth 24
-        sgnd_print_labeledvalue --label "Available" --value "$available" --labelwidth 24
+        sgnd_print_sectionheader "SolidGroundUX managed storage"
+        while IFS='|' read -r source mountpoint filesystem options; do
+            [[ -n "$source" && -n "$mountpoint" ]] || continue
+            case "$source" in UUID=*) device="$(blkid -U "${source#UUID=}" 2>/dev/null || true)" ;; *) device="$source" ;; esac
+            device="$(readlink -f -- "$device" 2>/dev/null || true)"
+            label="$(blkid -s LABEL -o value "$device" 2>/dev/null || true)"
+            uuid="$(blkid -s UUID -o value "$device" 2>/dev/null || true)"
+            mounted="No"; rw="No"; size="-"; available="-"
+            if mountpoint -q "$mountpoint"; then
+                mounted="Yes"
+                findmnt -n -o OPTIONS --mountpoint "$mountpoint" 2>/dev/null | tr ',' '\n' | grep -qx rw && rw="Yes"
+                size="$(df -h --output=size "$mountpoint" 2>/dev/null | awk 'NR==2{print $1}')"
+                available="$(df -h --output=avail "$mountpoint" 2>/dev/null | awk 'NR==2{print $1}')"
+            fi
+            sgnd_print_labeledvalue --label "Mount point" --value "$mountpoint" --labelwidth 20
+            sgnd_print_labeledvalue --label "Source" --value "$device" --labelwidth 20
+            sgnd_print_labeledvalue --label "Filesystem" --value "$filesystem" --labelwidth 20
+            sgnd_print_labeledvalue --label "Label" --value "${label:--}" --labelwidth 20
+            sgnd_print_labeledvalue --label "UUID" --value "${uuid:--}" --labelwidth 20
+            sgnd_print_labeledvalue --label "Mounted" --value "$mounted" --labelwidth 20
+            sgnd_print_labeledvalue --label "Read/write" --value "$rw" --labelwidth 20
+            sgnd_print_labeledvalue --label "Capacity" --value "$size" --labelwidth 20
+            sgnd_print_labeledvalue --label "Available" --value "$available" --labelwidth 20
+            sgnd_print
+        done < <(_storage_list_managed_fstab_entries)
     }
-
 
     # fn$ storage_validate_provisioning
-        # . Purpose
-        #   Actively validate the SolidGroundUX storage provisioning state.
-        #
-        # . Behavior
-        #   - Verifies that /etc/fstab is syntactically valid.
-        #   - Verifies that the configured storage mount point has a persistent entry.
-        #   - Verifies that the storage filesystem is mounted read/write.
-        #   - Resolves the active source and compares it with the configured fstab source.
-        #   - Verifies the expected filesystem label and storage directory structure.
-        #   - Displays each check as Passed or Failed and returns failure when any
-        #     required provisioning check fails.
-        #
-        # Outputs (console):
-        #   Validation results for fstab, mount state, source, filesystem, and directories.
-        #
-        # . Returns
-        #   0 when all storage provisioning checks pass.
-        #   1 when one or more checks fail.
-        #
-        # . Usage
-        #   storage_validate_provisioning
     storage_validate_provisioning() {
-        local mountpoint="$(_storage_get_mountpoint)"
-        local share_root="$mountpoint/shares"
-        local fstab_source=""
-        local resolved_fstab_source=""
-        local active_source=""
-        local filesystem=""
-        local filesystem_label=""
-        local configured_mountpoint=""
-        local detected_mountpoint=""
-        local result=""
-        local stale_managed_count=0
-        local stale_entry=""
-        local failures=0
-
+        local source="" mountpoint="" filesystem="" options="" device="" label="" result="" failures=0 count=0 stale_count=0
         sgnd_print
         sgnd_print_sectionheader "Validate storage provisioning"
-
-        if findmnt --verify --tab-file /etc/fstab >/dev/null 2>&1; then
-            result="Passed"
-        else
-            result="Failed"
-            failures=$((failures + 1))
-        fi
+        if findmnt --verify --tab-file /etc/fstab >/dev/null 2>&1; then result="Passed"; else result="Failed"; failures=$((failures+1)); fi
         sgnd_print_labeledvalue --label "fstab syntax" --value "$result" --labelwidth 24
-
-        configured_mountpoint="$(_storage_get_configured_mountpoint 2>/dev/null || true)"
-        if _storage_detect_labeled_volume; then
-            detected_mountpoint="$STORAGE_DETECTED_MOUNTPOINT"
-        fi
-
-        if [[ -n "$configured_mountpoint" && -n "$detected_mountpoint" && "$configured_mountpoint" == "$detected_mountpoint" ]]; then
-            result="Passed"
-        else
-            result="Failed"
-            failures=$((failures + 1))
-        fi
-        sgnd_print_labeledvalue --label "Config reconciliation" --value "$result" --labelwidth 24
-        if [[ "$result" == "Failed" && -n "$detected_mountpoint" ]]; then
-            saywarning "Configured mount point '${configured_mountpoint:-Not configured}' differs from detected SGND_STORAGE mount point '$detected_mountpoint'."
-        fi
-
-        if [[ -n "$detected_mountpoint" ]]; then
-            while IFS= read -r stale_entry; do
-                [[ -n "$stale_entry" ]] || continue
-                stale_managed_count=$((stale_managed_count + 1))
-            done < <(_storage_list_stale_managed_fstab_entries)
-        fi
-
-        if (( stale_managed_count == 0 )); then
-            result="Passed"
-        else
-            result="Failed"
-            failures=$((failures + 1))
-        fi
-        sgnd_print_labeledvalue --label "Managed fstab entries" --value "$result" --labelwidth 24
-        if (( stale_managed_count > 0 )); then
-            saywarning "$stale_managed_count stale SolidGroundUX-managed fstab entr$([[ $stale_managed_count -eq 1 ]] && printf 'y' || printf 'ies') detected; run Reconcile storage persistence."
-        fi
-
-        fstab_source="$(awk -v target="$mountpoint" '
-            $0 !~ /^[[:space:]]*#/ && NF >= 3 && $2 == target { print $1; exit }
-        ' /etc/fstab)"
-
-        if [[ -n "$fstab_source" ]]; then
-            result="Passed"
-        else
-            result="Failed"
-            failures=$((failures + 1))
-        fi
-        sgnd_print_labeledvalue --label "Persistent entry" --value "$result" --labelwidth 24
-
-        if mountpoint -q "$mountpoint"; then
-            result="Passed"
-            active_source="$(findmnt -n -o SOURCE --mountpoint "$mountpoint" 2>/dev/null || true)"
-            filesystem="$(findmnt -n -o FSTYPE --mountpoint "$mountpoint" 2>/dev/null || true)"
-        else
-            result="Failed"
-            failures=$((failures + 1))
-        fi
-        sgnd_print_labeledvalue --label "Mounted" --value "$result" --labelwidth 24
-
-        if mountpoint -q "$mountpoint" && \
-           findmnt -n -o OPTIONS --mountpoint "$mountpoint" 2>/dev/null | tr ',' '\n' | grep -qx 'rw'; then
-            result="Passed"
-        else
-            result="Failed"
-            failures=$((failures + 1))
-        fi
-        sgnd_print_labeledvalue --label "Mounted read/write" --value "$result" --labelwidth 24
-
-        case "$fstab_source" in
-            UUID=*)
-                resolved_fstab_source="$(blkid -U "${fstab_source#UUID=}" 2>/dev/null || true)"
-                ;;
-            LABEL=*)
-                resolved_fstab_source="$(blkid -L "${fstab_source#LABEL=}" 2>/dev/null || true)"
-                ;;
-            *)
-                resolved_fstab_source="$fstab_source"
-                ;;
-        esac
-
-        active_source="$(readlink -f "$active_source" 2>/dev/null || true)"
-        resolved_fstab_source="$(readlink -f "$resolved_fstab_source" 2>/dev/null || true)"
-
-        if [[ -n "$active_source" && -n "$resolved_fstab_source" && "$active_source" == "$resolved_fstab_source" ]]; then
-            result="Passed"
-        else
-            result="Failed"
-            failures=$((failures + 1))
-        fi
-        sgnd_print_labeledvalue --label "Mount source matches" --value "$result" --labelwidth 24
-
-        case "${filesystem,,}" in
-            ext4|xfs) result="Passed" ;;
-            *)
-                result="Failed"
-                failures=$((failures + 1))
-                ;;
-        esac
-        sgnd_print_labeledvalue --label "Supported filesystem" --value "$result" --labelwidth 24
-
-        filesystem_label="$(blkid -s LABEL -o value "$active_source" 2>/dev/null || true)"
-        if [[ "$filesystem_label" == "SGND_STORAGE" ]]; then
-            result="Passed"
-        else
-            result="Failed"
-            failures=$((failures + 1))
-        fi
-        sgnd_print_labeledvalue --label "Filesystem label" --value "$result" --labelwidth 24
-
-        if [[ -d "$mountpoint" ]]; then
-            result="Passed"
-        else
-            result="Failed"
-            failures=$((failures + 1))
-        fi
-        sgnd_print_labeledvalue --label "Storage root" --value "$result" --labelwidth 24
-
-        if [[ -d "$share_root" ]]; then
-            result="Passed"
-        else
-            result="Failed"
-            failures=$((failures + 1))
-        fi
-        sgnd_print_labeledvalue --label "Shares root" --value "$result" --labelwidth 24
-
+        while IFS='|' read -r source mountpoint filesystem options; do
+            [[ -n "$source" && -n "$mountpoint" ]] || continue
+            count=$((count+1))
+            case "$source" in UUID=*) device="$(blkid -U "${source#UUID=}" 2>/dev/null || true)" ;; *) device="$source" ;; esac
+            device="$(readlink -f -- "$device" 2>/dev/null || true)"
+            label="$(blkid -s LABEL -o value "$device" 2>/dev/null || true)"
+            sgnd_print
+            sgnd_print_labeledvalue --label "Storage volume" --value "$mountpoint" --labelwidth 24
+            [[ -b "$device" ]] && result="Passed" || { result="Failed"; failures=$((failures+1)); }
+            sgnd_print_labeledvalue --label "Source resolves" --value "$result" --labelwidth 24
+            [[ "$label" == "SGND_STORAGE" ]] && result="Passed" || { result="Failed"; failures=$((failures+1)); }
+            sgnd_print_labeledvalue --label "Filesystem label" --value "$result" --labelwidth 24
+            mountpoint -q "$mountpoint" && result="Passed" || { result="Failed"; failures=$((failures+1)); }
+            sgnd_print_labeledvalue --label "Mounted" --value "$result" --labelwidth 24
+            if mountpoint -q "$mountpoint" && findmnt -n -o OPTIONS --mountpoint "$mountpoint" 2>/dev/null | tr ',' '\n' | grep -qx rw; then result="Passed"; else result="Failed"; failures=$((failures+1)); fi
+            sgnd_print_labeledvalue --label "Mounted read/write" --value "$result" --labelwidth 24
+            case "${filesystem,,}" in ext4|xfs) result="Passed" ;; *) result="Failed"; failures=$((failures+1)) ;; esac
+            sgnd_print_labeledvalue --label "Supported filesystem" --value "$result" --labelwidth 24
+            [[ -d "$mountpoint" ]] && result="Passed" || { result="Failed"; failures=$((failures+1)); }
+            sgnd_print_labeledvalue --label "Storage root" --value "$result" --labelwidth 24
+        done < <(_storage_list_managed_fstab_entries)
+        while IFS= read -r result; do [[ -n "$result" ]] && stale_count=$((stale_count+1)); done < <(_storage_list_stale_managed_fstab_entries)
+        (( stale_count == 0 )) && result="Passed" || { result="Failed"; failures=$((failures+stale_count)); }
         sgnd_print
-        if (( failures == 0 )); then
-            sayok "Storage provisioning validation passed."
-            return 0
-        fi
-
-        sayfail "$failures storage provisioning check(s) failed."
-        return 1
+        sgnd_print_labeledvalue --label "Managed fstab entries" --value "$result" --labelwidth 24
+        (( count > 0 )) || { sayfail "No SolidGroundUX-managed storage volumes are configured."; return 1; }
+        sgnd_print
+        if (( failures == 0 )); then sayok "Storage provisioning validation passed for $count volume(s)."; return 0; fi
+        sayfail "$failures storage provisioning check(s) failed across $count volume(s)."; return 1
     }
-
 
 # - Action dispatch -----------------------------------------------------------------
     _run_action() {
@@ -1664,10 +1197,8 @@ set -uo pipefail
             reconcile-persistence) storage_reconcile_persistence ;;
             validate)        storage_validate_provisioning ;;
             status)          storage_status ;;
-            access-status)   storage_access_status ;;
-            set-owner)       storage_set_owner ;;
-            set-group)       storage_set_group ;;
-            set-permissions) storage_set_permissions ;;
+            access-status)    storage_access_status ;;
+            set-access)       storage_set_access ;;
             restore-defaults) storage_restore_access_defaults ;;
             *)
                 sayfail "Unknown storage management action: $action"
@@ -1684,7 +1215,32 @@ set -uo pipefail
         sgnd_exe_start "$@" || return $?
 
         action="${ACTION:-status}"
-        _run_action "$action"
+
+        while :; do
+            _run_action "$action" || return $?
+
+            case "$action" in
+                status|validate)
+                    sgnd_print
+                    ask_dlg_autocontinue \
+                        --seconds 5 \
+                        --pause \
+                        --legend "Enter=return to menu; P/Space=pause" || true
+                    break
+                    ;;
+                access-status)
+                    break
+                    ;;
+                *)
+                    if _storage_action_again; then
+                        continue
+                    fi
+                    break
+                    ;;
+            esac
+        done
+
+        return 0
     }
 
     main "$@"

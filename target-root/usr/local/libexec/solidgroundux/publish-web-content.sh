@@ -155,6 +155,50 @@ set -uo pipefail
     : "${SGND_WEB_DOC_REF:=master}"
     : "${SGND_WEB_DOC_REPO_PATH:=target-root/usr/local/share/testadura/solidgroundux/doc}"
 
+    # Render a local numbered selector using the Web Server action layout.
+    # The framework ask_selection API is intentionally left unchanged.
+    _web_ask_selection() {
+        local label="Select an option"
+        local var_name="selection"
+        local input=""
+        local i=0
+        local -a items=()
+
+        while [[ $# -gt 0 ]]; do
+            case "$1" in
+                --label) label="$2"; shift 2 ;;
+                --var) var_name="$2"; shift 2 ;;
+                --items) shift; items=("$@"); break ;;
+                *) return 2 ;;
+            esac
+        done
+
+        [[ "$var_name" =~ ^[a-zA-Z_][a-zA-Z0-9_]*$ ]] || return 2
+        (( ${#items[@]} > 0 )) || return 2
+
+        sgnd_print
+        sgnd_print_sectionheader --text "$label"
+        for (( i=0; i<${#items[@]}; i++ )); do
+            sgnd_print --text "$((i + 1)). ${items[i]}" --pad 2
+        done
+        sgnd_print --text "Q. Back" --pad 2
+        sgnd_print
+        sgnd_print_sectionheader ""
+
+        while :; do
+            input=""
+            ask --label "Selection" --var input
+            input="${input#"${input%%[![:space:]]*}"}"
+            input="${input%"${input##*[![:space:]]}"}"
+            [[ "${input^^}" == "Q" ]] && return 1
+            if [[ "$input" =~ ^[1-9][0-9]*$ ]] && (( input <= ${#items[@]} )); then
+                printf -v "$var_name" '%s' "${items[input - 1]}"
+                return 0
+            fi
+            saywarning "Invalid selection: $input"
+        done
+    }
+
     _web_server_load_state() {
         if [[ -r "$SGND_WEB_SERVER_STATE_FILE" ]] && command -v sgnd_state_load_keys >/dev/null 2>&1; then
             sgnd_state_load_keys --file "$SGND_WEB_SERVER_STATE_FILE" --array SGND_WEB_SERVER_STATE_VARIABLES >/dev/null 2>&1 || true
@@ -391,17 +435,21 @@ set -uo pipefail
             fi
         fi
 
-        sgnd_print
-        sgnd_print_sectionheader "Publish web content"
-        ask_selection --label "Publish to site" --var site --items "${sites[@]}" || return 0
+        _web_ask_selection --label "Publish to site" --var site --items "${sites[@]}" || return 0
         [[ -f "/etc/nginx/sites-available/$site" ]] || { sayfail "Site configuration no longer exists: $site"; return 1; }
         document_root="$(_web_server_site_document_root "$site" 2>/dev/null || true)"
         [[ -n "$document_root" ]] || { sayfail "Could not determine document root for $site."; return 1; }
 
         case "$source_type" in
-            "Local directory") ask_selection --label "Source location" --var source_type --items "Local directory" "Remote machine" "Git repository" || return 0 ;;
-            "Git repository") ask_selection --label "Source location" --var source_type --items "Git repository" "Local directory" "Remote machine" || return 0 ;;
-            *) ask_selection --label "Source location" --var source_type --items "Remote machine" "Local directory" "Git repository" || return 0 ;;
+            "Local directory")
+                _web_ask_selection --label "Source location" --var source_type --items "Local directory" "Remote machine" "Git repository" || return 0
+                ;;
+            "Git repository")
+                _web_ask_selection --label "Source location" --var source_type --items "Git repository" "Local directory" "Remote machine" || return 0
+                ;;
+            *)
+                _web_ask_selection --label "Source location" --var source_type --items "Remote machine" "Local directory" "Git repository" || return 0
+                ;;
         esac
 
         case "$source_type" in
@@ -446,6 +494,8 @@ set -uo pipefail
         esac
 
         _web_server_ensure_directory "$document_root" "www-data:www-data" || { [[ -n "$temp_dir" ]] && rm -rf -- "$temp_dir"; return 1; }
+        sgnd_print
+        sgnd_print_sectionheader ""
         ask_decision --label "Synchronize source into $document_root" --choices "YES|Y,NO|N" --default "YES" --var decision
         [[ "$decision" == "YES" ]] || { [[ -n "$temp_dir" ]] && rm -rf -- "$temp_dir"; return 0; }
 
@@ -508,25 +558,35 @@ set -uo pipefail
         [[ -n "$document_root" ]] || { sayfail "Could not determine document root for documentation site $site."; return 1; }
         installed_docs="$(_web_server_installed_docs_root)"
 
+        sgnd_print
+        sgnd_print_sectionheader ""
         case "$source_type" in
             "Installed documentation")
-                ask_selection --label "Documentation source" --var source_type --items "Installed documentation" "Local directory" "Remote machine" "GitHub repository" || return 0
+                _web_ask_selection --label "Documentation source" --var source_type --items "Installed documentation" "Local directory" "Remote machine" "GitHub repository" || return 0
                 ;;
             "Local directory")
-                ask_selection --label "Documentation source" --var source_type --items "Local directory" "Installed documentation" "Remote machine" "GitHub repository" || return 0
+                _web_ask_selection --label "Documentation source" --var source_type --items "Local directory" "Installed documentation" "Remote machine" "GitHub repository" || return 0
                 ;;
             "Remote machine")
-                ask_selection --label "Documentation source" --var source_type --items "Remote machine" "Installed documentation" "Local directory" "GitHub repository" || return 0
+                _web_ask_selection --label "Documentation source" --var source_type --items "Remote machine" "Installed documentation" "Local directory" "GitHub repository" || return 0
                 ;;
             *)
-                ask_selection --label "Documentation source" --var source_type --items "GitHub repository" "Installed documentation" "Local directory" "Remote machine" || return 0
+                _web_ask_selection --label "Documentation source" --var source_type --items "GitHub repository" "Installed documentation" "Local directory" "Remote machine" || return 0
                 ;;
         esac
 
         case "$source_type" in
             "Installed documentation")
-                [[ -d "$installed_docs" ]] || { sayfail "Installed documentation directory does not exist: $installed_docs"; return 1; }
-                source_dir="$installed_docs"
+                [[ -n "$source_dir" ]] || source_dir="share/doc"
+                sgnd_print
+                sgnd_print_sectionheader ""
+                ask --label "Source directory" --var source_dir --default "$source_dir" --back || return 0
+                if [[ "$source_dir" != /* ]]; then
+                    source_dir="$(readlink -m -- "$source_dir")"
+                fi
+                [[ -d "$source_dir" ]] || { sayfail "Installed documentation directory does not exist: $source_dir"; return 1; }
+                SGND_WEB_DOC_SOURCE_DIR="$source_dir"
+                _web_server_save_state || return 1
                 source_spec="$source_dir/"
                 ;;
             "Local directory")
@@ -571,6 +631,8 @@ set -uo pipefail
         esac
 
         _web_server_ensure_directory "$document_root" "www-data:www-data" || { [[ -n "$temp_dir" ]] && rm -rf -- "$temp_dir"; return 1; }
+        sgnd_print
+        sgnd_print_sectionheader ""
         ask_decision --label "Publish documentation to $site" --choices "YES|Y,NO|N" --default "YES" --var decision
         if [[ "$decision" != "YES" ]]; then
             [[ -n "$temp_dir" ]] && rm -rf -- "$temp_dir"
@@ -611,6 +673,8 @@ set -uo pipefail
             *) sayfail "Unknown web publishing action: $action"; return 2 ;;
         esac
         (( rc == 0 )) && _dryrun_complete
+        sgnd_print
+        sgnd_print_sectionheader ""
         return "$rc"
     }
 

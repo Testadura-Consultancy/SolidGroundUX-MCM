@@ -76,6 +76,8 @@ set -uo pipefail
     SGND_SOLIDGROUNDUX_MODULE_VERSION="1.0.0"
     SGND_SOLIDGROUNDUX_MODULE_DESC="Manage the SolidGroundUX framework and installation"
 
+    SGND_MODULE_ID="${SGND_SOLIDGROUNDUX_MODULE_ID}"
+
     SGND_MODULE_NAME="${SGND_SOLIDGROUNDUX_MODULE_NAME}"
     SGND_MODULE_VERSION="${SGND_SOLIDGROUNDUX_MODULE_VERSION}"
     SGND_MODULE_DESC="${SGND_SOLIDGROUNDUX_MODULE_DESC}"
@@ -211,266 +213,51 @@ set -uo pipefail
     }
 
 # - Framework logging actions ----------------------------------------------------
-    # fn: _framework_log_validate
-        # . Purpose
-        #   Verify that the configured framework logfile path exists and is usable for log actions.
-        #
-        # . Returns
-        #   0 when the logfile exists; 1 otherwise.
-        #
-        # . Usage
-        #   _framework_log_validate
-    _framework_log_validate() {
-        [[ -n "${SGND_LOG_PATH:-}" ]] || {
-            saywarning "SGND_LOG_PATH is not set"
-            return 1
-        }
-
-        [[ -f "$SGND_LOG_PATH" ]] || {
-            saywarning "Framework logfile does not exist: $SGND_LOG_PATH"
-            return 1
-        }
-    }
-
-    # fn: _framework_log_view
-        # . Purpose
-        #   Open the active framework logfile at its most recent entries.
-        #
-        # . Returns
-        #   Exit status from the configured pager; 1 when the logfile is unavailable.
-        #
-        # . Usage
-        #   _framework_log_view
     _framework_log_view() {
-        local pager="${PAGER:-less}"
-        local -a pager_command=()
-
-        _framework_log_validate || return $?
-        read -r -a pager_command <<< "$pager"
-        "${pager_command[@]}" +G -- "$SGND_LOG_PATH"
+        _sgnd_run_module_script "manage-framework-logging.sh" --action view
     }
 
-    # fn: _framework_log_follow
-        # . Purpose
-        #   Follow new entries appended to the active framework logfile.
-        #
-        # . Returns
-        #   Exit status from tail -F; 1 when the logfile is unavailable.
-        #
-        # . Usage
-        #   _framework_log_follow
     _framework_log_follow() {
-        _framework_log_validate || return $?
-        tail -F -- "$SGND_LOG_PATH"
+        _sgnd_run_module_script "manage-framework-logging.sh" --action follow
     }
 
-    # fn: _framework_log_show_errors
-        # . Purpose
-        #   Show the most recent ERROR, FAIL, and FATAL entries from the active framework logfile.
-        #
-        # . Returns
-        #   Exit status from the filter/pager pipeline; 1 when the logfile is unavailable.
-        #
-        # . Usage
-        #   _framework_log_show_errors
     _framework_log_show_errors() {
-        local pager="${PAGER:-less}"
-        local -a pager_command=()
-
-        _framework_log_validate || return $?
-        read -r -a pager_command <<< "$pager"
-
-        grep -E ' type=(ERROR|FAIL|FATAL) ' -- "$SGND_LOG_PATH"             | tail -n 100             | "${pager_command[@]}"
+        _sgnd_run_module_script "manage-framework-logging.sh" --action errors
     }
 
-    # fn: _framework_log_rotate - Rotate the active logfile externally
     _framework_log_rotate() {
-        _sgnd_run_module_script "manage-solidgroundux.sh" --action log-rotate
+        _sgnd_run_module_script "manage-framework-logging.sh" --action rotate
     }
 
-# - Internal helpers -------------------------------------------------------------
-    # fn: _framework_state_validate
-        # . Purpose
-        #   Verify that the transferable framework-state contract is available.
-        #
-        # . Returns
-        #   0 when SGND_FRAMEWORK_STATEFILE and SGND_FRAMEWORK_STATE are available.
-        #   1 otherwise.
-        #
-        # . Usage
-        #   _framework_state_validate
-    _framework_state_validate() {
-        [[ -n "${SGND_FRAMEWORK_STATEFILE:-}" ]] || {
-            saywarning "SGND_FRAMEWORK_STATEFILE is not set"
-            return 1
-        }
-
-        declare -p SGND_FRAMEWORK_STATE >/dev/null 2>&1 || {
-            saywarning "SGND_FRAMEWORK_STATE is not defined"
-            return 1
-        }
-
-        return 0
-    }
-
-    # fn: _framework_state_apply_ui
-        # . Purpose
-        #   Reload the active palette and style after framework state changes.
-        #
-        # . Returns
-        #   0 when UI state is reloaded or no loader is available.
-        #   Non-zero when the UI loader fails.
-        #
-        # . Usage
-        #   _framework_state_apply_ui
-    _framework_state_apply_ui() {
-        if declare -F sgnd_load_ui_style >/dev/null 2>&1; then
-            sgnd_load_ui_style
-        fi
-    }
-
-# - Public module actions --------------------------------------------------------
-    # fn: framework_state_show
-        # . Purpose
-        #   Display all transferable framework-state variables and their values.
-        #
-        # . Returns
-        #   0 on success.
-        #   1 when framework state is unavailable.
-        #
-        # . Usage
-        #   framework_state_show
+# - Framework state actions ------------------------------------------------------
     framework_state_show() {
-        _framework_state_validate || return 1
-
-        local key=""
-        local value=""
-
-        sgnd_print
-        sgnd_print_sectionheader --text "Transferable framework state"
-        sgnd_print_labeledvalue --label "State file" --value "$SGND_FRAMEWORK_STATEFILE"
-        sgnd_print
-
-        for key in "${SGND_FRAMEWORK_STATE[@]}"; do
-            value="${!key-}"
-            sgnd_print_labeledvalue --label "$key" --value "$value" --labelwidth 30
-        done
+        _sgnd_run_module_script "manage-framework-state.sh" --action show
     }
 
-    # fn: framework_state_edit
-        # . Purpose
-        #   Edit and save all transferable framework-state variables.
-        #
-        # . Behavior
-        #   - Builds an input form from SGND_FRAMEWORK_STATE.
-        #   - Uses the current runtime values as defaults.
-        #   - Saves the edited values to SGND_FRAMEWORK_STATEFILE.
-        #   - Reloads the active UI style after a successful save.
-        #
-        # Outputs (globals):
-        #   Variables listed in SGND_FRAMEWORK_STATE.
-        #
-        # Side effects:
-        #   Updates SGND_FRAMEWORK_STATEFILE.
-        #
-        # . Returns
-        #   0 on success.
-        #   Non-zero when editing, saving, or UI reloading fails.
-        #
-        # . Usage
-        #   framework_state_edit
     framework_state_edit() {
-        _framework_state_validate || return 1
-
-        local key=""
-        local -a fields=()
-        local -a original_values=()
-
-        for key in "${SGND_FRAMEWORK_STATE[@]}"; do
-            fields+=("$key|$key|${!key-}|")
-            original_values+=("${!key-}")
-        done
-
-        sgnd_print
-        sgnd_print_sectionheader --text "Edit transferable framework state"
-
-        ask_prompt_form --autoalign --pad 2 -- "${fields[@]}" || return $?
-
-        if (( ${FLAG_DRYRUN:-0} == 1 )); then
-            sayinfo "DRYRUN: Would save transferable framework state to '$SGND_FRAMEWORK_STATEFILE':"
-            for key in "${SGND_FRAMEWORK_STATE[@]}"; do
-                sgnd_print_labeledvalue --label "$key" --value "${!key-}" --labelwidth 30
-            done
-
-            for key in "${!SGND_FRAMEWORK_STATE[@]}"; do
-                printf -v "${SGND_FRAMEWORK_STATE[$key]}" '%s' "${original_values[$key]}"
-            done
-
-            sayinfo "DRYRUN: Runtime state restored; no state file or UI changes were made."
-            return 0
-        fi
-
-        sgnd_state_save_keys \
-            --file "$SGND_FRAMEWORK_STATEFILE" \
-            --array SGND_FRAMEWORK_STATE || return $?
-
-        _framework_state_apply_ui || return $?
-        sayok "Framework state saved"
+        _sgnd_run_module_script "manage-framework-state.sh" --action edit
     }
 
-    # fn: framework_state_save
-        # . Purpose
-        #   Save current transferable framework-state values.
-        #
-        # . Returns
-        #   0 on success.
-        #   Non-zero when state is unavailable or cannot be saved.
-        #
-        # . Usage
-        #   framework_state_save
     framework_state_save() {
-        _framework_state_validate || return 1
-
-        local key=""
-
-        if (( ${FLAG_DRYRUN:-0} == 1 )); then
-            sayinfo "DRYRUN: Would save current transferable framework state to '$SGND_FRAMEWORK_STATEFILE':"
-            for key in "${SGND_FRAMEWORK_STATE[@]}"; do
-                sgnd_print_labeledvalue --label "$key" --value "${!key-}" --labelwidth 30
-            done
-            sayinfo "DRYRUN: No state file changes were made."
-            return 0
-        fi
-
-        sgnd_state_save_keys \
-            --file "$SGND_FRAMEWORK_STATEFILE" \
-            --array SGND_FRAMEWORK_STATE || return $?
-
-        sayok "Framework state saved to $SGND_FRAMEWORK_STATEFILE"
+        _sgnd_run_module_script "manage-framework-state.sh" --action save
     }
 
-    # fn: framework_state_reload
-        # . Purpose
-        #   Reload transferable framework state from disk into the console instance.
-        #
-        # Outputs (globals):
-        #   Variables listed in SGND_FRAMEWORK_STATE.
-        #
-        # . Returns
-        #   0 on success.
-        #   Non-zero when state is unavailable or cannot be loaded.
-        #
-        # . Usage
-        #   framework_state_reload
     framework_state_reload() {
-        _framework_state_validate || return 1
+        _sgnd_run_module_script "manage-framework-state.sh" --action reload
+    }
 
-        sgnd_state_load_keys \
-            --file "$SGND_FRAMEWORK_STATEFILE" \
-            --array SGND_FRAMEWORK_STATE || return $?
-
-        _framework_state_apply_ui || return $?
-        sayok "Framework state reloaded"
+# - Module validation contract ------------------------------------------------------
+    # Return codes:
+    #   0 = Passed
+    #   1 = Failed
+    #   2 = Warning
+    #   3 = Skipped / not applicable
+    #
+    # Every validator sets SGND_MODULE_VALIDATION_MESSAGE to a concise result summary.
+    # Detailed diagnostic output may be written by the validator or delegated action.
+    validate_module_solidgroundux() {
+        SGND_MODULE_VALIDATION_MESSAGE="SolidGroundUX management module is loaded and registered."
+        return 0
     }
 
 # - Console registration ---------------------------------------------------------

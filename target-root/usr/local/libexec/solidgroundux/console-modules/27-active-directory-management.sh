@@ -71,6 +71,7 @@ set -uo pipefail
     SGND_AD_MANAGEMENT_MODULE_NAME="Active Directory Management"
     SGND_AD_MANAGEMENT_MODULE_VERSION="1.1.0"
     SGND_AD_MANAGEMENT_MODULE_DESC="Manage Active Directory users, groups, memberships, and computers"
+    SGND_MODULE_ID="${SGND_AD_MANAGEMENT_MODULE_ID}"
     SGND_MODULE_NAME="$SGND_AD_MANAGEMENT_MODULE_NAME"
     SGND_MODULE_VERSION="$SGND_AD_MANAGEMENT_MODULE_VERSION"
     SGND_MODULE_DESC="$SGND_AD_MANAGEMENT_MODULE_DESC"
@@ -97,6 +98,28 @@ set -uo pipefail
     _admg_list_computers() { _admg_run_action computer-list; }
     _admg_show_computer() { _admg_run_action computer-show; }
     _admg_delete_computer() { _admg_run_action computer-delete; }
+
+# - Module validation contract ------------------------------------------------------
+    # Return codes:
+    #   0 = Passed
+    #   1 = Failed
+    #   2 = Warning
+    #   3 = Skipped / not applicable
+    #
+    # Every validator sets SGND_MODULE_VALIDATION_MESSAGE to a concise result summary.
+    # Detailed diagnostic output may be written by the validator or delegated action.
+    validate_module_active_directory_management() {
+        if ! command -v samba-tool >/dev/null 2>&1; then
+            SGND_MODULE_VALIDATION_MESSAGE="Active Directory management tools are not installed on this host."
+            return 3
+        fi
+        if _admg_validate; then
+            SGND_MODULE_VALIDATION_MESSAGE="Active Directory management validation passed."
+            return 0
+        fi
+        SGND_MODULE_VALIDATION_MESSAGE="Active Directory management validation reported one or more failures."
+        return 1
+    }
 
 # - Console registration -----------------------------------------------------------
     # Provides day-to-day Active Directory object management after a domain has been

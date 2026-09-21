@@ -95,6 +95,28 @@ set -uo pipefail
     sqlserver_validate()          { _sqlserver_run_manage validate; }
     sqlserver_status()            { _sqlserver_run_manage status; }
 
+# - Module validation contract ------------------------------------------------------
+    # Return codes:
+    #   0 = Passed
+    #   1 = Failed
+    #   2 = Warning
+    #   3 = Skipped / not applicable
+    #
+    # Every validator sets SGND_MODULE_VALIDATION_MESSAGE to a concise result summary.
+    # Detailed diagnostic output may be written by the validator or delegated action.
+    validate_module_sql_server() {
+        if [[ ! -x /opt/mssql/bin/sqlservr ]]; then
+            SGND_MODULE_VALIDATION_MESSAGE="SQL Server is not installed on this host."
+            return 3
+        fi
+        if sqlserver_validate; then
+            SGND_MODULE_VALIDATION_MESSAGE="SQL Server validation passed."
+            return 0
+        fi
+        SGND_MODULE_VALIDATION_MESSAGE="SQL Server validation reported one or more failures."
+        return 1
+    }
+
 # - Console registration ------------------------------------------------------------
     sgnd_menu_register_group \
         "$SGND_SQLSERVER_MODULE_ID" \

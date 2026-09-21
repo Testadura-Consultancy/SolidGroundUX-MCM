@@ -155,6 +155,50 @@ set -uo pipefail
     : "${SGND_WEB_DOC_REF:=master}"
     : "${SGND_WEB_DOC_REPO_PATH:=target-root/usr/local/share/testadura/solidgroundux/doc}"
 
+    # Render a local numbered selector using the Web Server action layout.
+    # The framework ask_selection API is intentionally left unchanged.
+    _web_ask_selection() {
+        local label="Select an option"
+        local var_name="selection"
+        local input=""
+        local i=0
+        local -a items=()
+
+        while [[ $# -gt 0 ]]; do
+            case "$1" in
+                --label) label="$2"; shift 2 ;;
+                --var) var_name="$2"; shift 2 ;;
+                --items) shift; items=("$@"); break ;;
+                *) return 2 ;;
+            esac
+        done
+
+        [[ "$var_name" =~ ^[a-zA-Z_][a-zA-Z0-9_]*$ ]] || return 2
+        (( ${#items[@]} > 0 )) || return 2
+
+        sgnd_print
+        sgnd_print_sectionheader --text "$label"
+        for (( i=0; i<${#items[@]}; i++ )); do
+            sgnd_print --text "$((i + 1)). ${items[i]}" --pad 2
+        done
+        sgnd_print --text "Q. Back" --pad 2
+        sgnd_print
+        sgnd_print_sectionheader ""
+
+        while :; do
+            input=""
+            ask --label "Selection" --var input
+            input="${input#"${input%%[![:space:]]*}"}"
+            input="${input%"${input##*[![:space:]]}"}"
+            [[ "${input^^}" == "Q" ]] && return 1
+            if [[ "$input" =~ ^[1-9][0-9]*$ ]] && (( input <= ${#items[@]} )); then
+                printf -v "$var_name" '%s' "${items[input - 1]}"
+                return 0
+            fi
+            saywarning "Invalid selection: $input"
+        done
+    }
+
     _web_server_load_state() {
         if [[ -r "$SGND_WEB_SERVER_STATE_FILE" ]] && command -v sgnd_state_load_keys >/dev/null 2>&1; then
             sgnd_state_load_keys --file "$SGND_WEB_SERVER_STATE_FILE" --array SGND_WEB_SERVER_STATE_VARIABLES >/dev/null 2>&1 || true
@@ -530,7 +574,7 @@ set -uo pipefail
         fi
         options+=("Enter path manually")
 
-        ask_selection --label "Select web content root" --var selected --items "${options[@]}" || return 0
+        _web_ask_selection --label "Select web content root" --var selected --items "${options[@]}" || return 0
         if [[ "$selected" == "Enter path manually" ]]; then
             ask --label "Web content root" --var manual --default "$current_root" || return 0
             selected="$manual"
@@ -555,7 +599,22 @@ set -uo pipefail
         #   _web_server_manage_service
     _web_server_manage_service() {
         local action=""
-        ask_selection --label "Web service action" --var action --items "Start" "Stop" "Restart" "Enable at boot" "Disable at boot" || return 0
+        local service_state="Unavailable"
+        local boot_state="Unavailable"
+
+        if command -v systemctl >/dev/null 2>&1; then
+            service_state="$(systemctl is-active nginx.service 2>/dev/null || true)"
+            [[ -n "$service_state" ]] || service_state="inactive"
+            if systemctl is-enabled --quiet nginx.service 2>/dev/null; then
+                boot_state="Enabled"
+            else
+                boot_state="Disabled"
+            fi
+        fi
+
+        sgnd_print_labeledvalue --label "Service" --value "$service_state" --labelwidth 20
+        sgnd_print_labeledvalue --label "At boot" --value "$boot_state" --labelwidth 20
+        _web_ask_selection --label "Web service action" --var action --items "Start" "Stop" "Restart" "Enable at boot" "Disable at boot" || return 0
 
         if (( ${FLAG_DRYRUN:-0} == 1 )); then
             sayinfo "DRYRUN: Would perform web service action: $action."
@@ -577,7 +636,21 @@ set -uo pipefail
         # . Usage
         #   _web_server_configure_firewall
     _web_server_configure_firewall() {
+        local firewall_state="Inactive"
+        local nginx_profile_state="Not allowed"
+        local decision="YES"
+
         command -v ufw >/dev/null 2>&1 || { saywarning "UFW is not installed."; return 0; }
+        sudo ufw status 2>/dev/null | grep -q '^Status: active' && firewall_state="Active"
+        sudo ufw status 2>/dev/null | grep -Eq '^Nginx Full[[:space:]]+ALLOW' && nginx_profile_state="Allowed"
+
+        sgnd_print_labeledvalue --label "Firewall" --value "$firewall_state" --labelwidth 20
+        sgnd_print_labeledvalue --label "HTTP / HTTPS" --value "$nginx_profile_state" --labelwidth 20
+        sgnd_print
+        sgnd_print_sectionheader ""
+        ask_decision --label "Allow HTTP and HTTPS through UFW" --choices "YES|Y,NO|N" --default "YES" --var decision || return 0
+        [[ "$decision" == "YES" ]] || return 0
+
         if (( ${FLAG_DRYRUN:-0} == 1 )); then
             sayinfo "DRYRUN: Would allow the Nginx Full firewall profile."
             return 0
@@ -650,7 +723,7 @@ EOF
         local -a sites=()
         mapfile -t sites < <(_web_server_available_sites 2>/dev/null || true)
         (( ${#sites[@]} > 0 )) || { saywarning "No Nginx sites are available."; return 0; }
-        ask_selection --label "Enable Nginx site" --var site --items "${sites[@]}" || return 0
+        _web_ask_selection --label "Enable Nginx site" --var site --items "${sites[@]}" || return 0
         [[ -e "/etc/nginx/sites-enabled/$site" ]] && { sayok "Site is already enabled: $site"; return 0; }
         if (( ${FLAG_DRYRUN:-0} == 1 )); then sayinfo "DRYRUN: Would enable $site."; return 0; fi
         sudo ln -s "/etc/nginx/sites-available/$site" "/etc/nginx/sites-enabled/$site" || return 1
@@ -668,7 +741,7 @@ EOF
         local -a sites=()
         mapfile -t sites < <(_web_server_enabled_sites 2>/dev/null || true)
         (( ${#sites[@]} > 0 )) || { saywarning "No enabled Nginx sites found."; return 0; }
-        ask_selection --label "Disable Nginx site" --var site --items "${sites[@]}" || return 0
+        _web_ask_selection --label "Disable Nginx site" --var site --items "${sites[@]}" || return 0
         if (( ${FLAG_DRYRUN:-0} == 1 )); then sayinfo "DRYRUN: Would disable $site."; return 0; fi
         sudo rm -f "/etc/nginx/sites-enabled/$site" || return 1
         _web_server_reload || return 1
@@ -689,7 +762,7 @@ EOF
 
         mapfile -t sites < <(_web_server_available_sites 2>/dev/null || true)
         (( ${#sites[@]} > 0 )) || { saywarning "No Nginx sites are available."; return 0; }
-        ask_selection --label "Remove Nginx site configuration" --var site --items "${sites[@]}" || return 0
+        _web_ask_selection --label "Remove Nginx site configuration" --var site --items "${sites[@]}" || return 0
         document_root="$(_web_server_site_document_root "$site" 2>/dev/null || true)"
 
         ask_decision --label "Remove site configuration '$site'" --choices "YES|Y,NO|N" --default "NO" --var decision
@@ -738,7 +811,7 @@ EOF
 
         mapfile -t sites < <(_web_server_available_sites 2>/dev/null || true)
         (( ${#sites[@]} > 0 )) || { saywarning "No Nginx sites are available."; return 0; }
-        ask_selection --label "Remove content from site" --var site --items "${sites[@]}" || return 0
+        _web_ask_selection --label "Remove content from site" --var site --items "${sites[@]}" || return 0
 
         document_root="$(_web_server_site_document_root "$site" 2>/dev/null || true)"
         [[ -n "$document_root" ]] || { sayfail "Could not determine document root for $site."; return 1; }
@@ -791,7 +864,7 @@ EOF
         #   _web_server_manage_sites
     _web_server_manage_sites() {
         local action=""
-        ask_selection --label "Site management" --var action --items "Create site" "Enable site" "Disable site" "Remove site" "Remove site content" "List sites" || return 0
+        _web_ask_selection --label "Site management" --var action --items "Create site" "Enable site" "Disable site" "Remove site" "Remove site content" "List sites" || return 0
         case "$action" in
             "Create site") _web_server_create_site ;;
             "Enable site") _web_server_enable_site ;;
@@ -914,6 +987,11 @@ EOF
         sgnd_print_labeledvalue --label "Status" --value "$state" --labelwidth 24
         sgnd_print_labeledvalue --label "Enabled" --value "$enabled" --labelwidth 24
         sgnd_print_labeledvalue --label "Web address" --value "$address" --labelwidth 24
+        if [[ "$address" != "Not configured" && -n "$address" ]]; then
+            sgnd_print_labeledvalue --label "HTTP address" --value "http://$address/" --labelwidth 24
+        else
+            sgnd_print_labeledvalue --label "HTTP address" --value "Not configured" --labelwidth 24
+        fi
         sgnd_print_labeledvalue --label "Document root" --value "$document_root" --labelwidth 24
         sgnd_print_labeledvalue --label "Installed docs" --value "$installed_docs" --labelwidth 24
         sgnd_print_labeledvalue --label "Source type" --value "${SGND_WEB_DOC_SOURCE_TYPE:-Installed documentation}" --labelwidth 24
@@ -1022,6 +1100,8 @@ EOF
         if (( rc == 0 )); then
             case "$action" in status|validate|documentation-status) ;; *) _dryrun_complete ;; esac
         fi
+        sgnd_print
+        sgnd_print_sectionheader ""
         return "$rc"
     }
 

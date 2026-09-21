@@ -106,6 +106,28 @@ set -uo pipefail
     docker_image_list()          { _docker_run_containers images; }
     docker_image_pull()          { _docker_run_containers pull; }
 
+# - Module validation contract ------------------------------------------------------
+    # Return codes:
+    #   0 = Passed
+    #   1 = Failed
+    #   2 = Warning
+    #   3 = Skipped / not applicable
+    #
+    # Every validator sets SGND_MODULE_VALIDATION_MESSAGE to a concise result summary.
+    # Detailed diagnostic output may be written by the validator or delegated action.
+    validate_module_docker_server() {
+        if ! command -v docker >/dev/null 2>&1; then
+            SGND_MODULE_VALIDATION_MESSAGE="Docker is not installed on this host."
+            return 3
+        fi
+        if docker_validate; then
+            SGND_MODULE_VALIDATION_MESSAGE="Docker validation passed."
+            return 0
+        fi
+        SGND_MODULE_VALIDATION_MESSAGE="Docker validation reported one or more failures."
+        return 1
+    }
+
 # - Console registration ------------------------------------------------------------
     sgnd_menu_register_group \
         "$SGND_DOCKER_MODULE_ID" \

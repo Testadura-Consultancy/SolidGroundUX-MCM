@@ -177,7 +177,7 @@ set -uo pipefail
         (( ${#containers[@]} > 0 )) || { saywarning "No matching Docker containers were found."; return 1; }
         sgnd_print
         sgnd_print_sectionheader "$label"
-        ask_selection --label "Container" --var selected --items "${containers[@]}" || return 1
+        _docker_ask_selection --label "Container" --var selected --items "${containers[@]}" || return 1
         printf -v "$output_var" '%s' "$selected"
     }
 
@@ -186,7 +186,7 @@ set -uo pipefail
         local selected=""
         sgnd_print
         sgnd_print_sectionheader "Container restart policy"
-        ask_selection --label "Policy" --var selected --items "no" "unless-stopped" "always" "on-failure" || return 1
+        _docker_ask_selection --label "Policy" --var selected --items "no" "unless-stopped" "always" "on-failure" || return 1
         printf -v "$output_var" '%s' "$selected"
     }
 
@@ -204,6 +204,50 @@ set -uo pipefail
             item="$(_docker_trim "$item")"
             [[ -n "$item" ]] || continue
             target+=("$option" "$item")
+        done
+    }
+
+    # Render a local numbered selector using the Docker action layout.
+    # The framework ask_selection API is intentionally left unchanged.
+    _docker_ask_selection() {
+        local label="Select an option"
+        local var_name="selection"
+        local input=""
+        local i=0
+        local -a items=()
+
+        while [[ $# -gt 0 ]]; do
+            case "$1" in
+                --label) label="$2"; shift 2 ;;
+                --var) var_name="$2"; shift 2 ;;
+                --items) shift; items=("$@"); break ;;
+                *) return 2 ;;
+            esac
+        done
+
+        [[ "$var_name" =~ ^[a-zA-Z_][a-zA-Z0-9_]*$ ]] || return 2
+        (( ${#items[@]} > 0 )) || return 2
+
+        sgnd_print
+        sgnd_print_sectionheader --text "$label"
+        for (( i=0; i<${#items[@]}; i++ )); do
+            sgnd_print --text "$((i + 1)). ${items[i]}" --pad 2
+        done
+        sgnd_print --text "Q. Back" --pad 2
+        sgnd_print
+        sgnd_print_sectionheader ""
+
+        while :; do
+            input=""
+            ask --label "Selection" --var input
+            input="${input#"${input%%[![:space:]]*}"}"
+            input="${input%"${input##*[![:space:]]}"}"
+            [[ "${input^^}" == "Q" ]] && return 1
+            if [[ "$input" =~ ^[1-9][0-9]*$ ]] && (( input <= ${#items[@]} )); then
+                printf -v "$var_name" '%s' "${items[input - 1]}"
+                return 0
+            fi
+            saywarning "Select 1-${#items[@]} or Q."
         done
     }
 
@@ -367,6 +411,8 @@ set -uo pipefail
         if (( rc == 0 )); then
             case "$action" in list|inspect|logs|images) ;; *) _dryrun_complete ;; esac
         fi
+        sgnd_print
+        sgnd_print_sectionheader ""
         return "$rc"
     }
 

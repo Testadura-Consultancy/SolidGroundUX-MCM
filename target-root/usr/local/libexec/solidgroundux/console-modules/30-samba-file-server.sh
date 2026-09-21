@@ -72,6 +72,8 @@ set -uo pipefail
     SGND_SAMBA_FILE_MODULE_VERSION="1.0.0"
     SGND_SAMBA_FILE_MODULE_DESC="Install, prepare, validate, and manage Samba file services"
 
+    SGND_MODULE_ID="${SGND_SAMBA_FILE_MODULE_ID}"
+
     SGND_MODULE_NAME="$SGND_SAMBA_FILE_MODULE_NAME"
     SGND_MODULE_VERSION="$SGND_SAMBA_FILE_MODULE_VERSION"
     SGND_MODULE_DESC="$SGND_SAMBA_FILE_MODULE_DESC"
@@ -149,6 +151,32 @@ set -uo pipefail
 # - Share management dispatch ------------------------------------------------------
     _smb_manage_shares() {
         _smb_run_project_script "manage-samba-shares.sh"
+    }
+
+# - Module validation contract ------------------------------------------------------
+    # Return codes:
+    #   0 = Passed
+    #   1 = Failed
+    #   2 = Warning
+    #   3 = Skipped / not applicable
+    #
+    # Every validator sets SGND_MODULE_VALIDATION_MESSAGE to a concise result summary.
+    # Detailed diagnostic output may be written by the validator or delegated action.
+    validate_module_samba_file_server() {
+        if ! command -v smbd >/dev/null 2>&1; then
+            SGND_MODULE_VALIDATION_MESSAGE="Samba file-server service is not installed on this host."
+            return 3
+        fi
+        if grep -Eiq '^[[:space:]]*server[[:space:]]+role[[:space:]]*=[[:space:]]*active[[:space:]]+directory[[:space:]]+domain[[:space:]]+controller' /etc/samba/smb.conf 2>/dev/null; then
+            SGND_MODULE_VALIDATION_MESSAGE="Host is an Active Directory domain controller, not a standalone Samba file server."
+            return 3
+        fi
+        if _smb_validate; then
+            SGND_MODULE_VALIDATION_MESSAGE="Samba file-server validation passed."
+            return 0
+        fi
+        SGND_MODULE_VALIDATION_MESSAGE="Samba file-server validation reported one or more failures."
+        return 1
     }
 
 # - Console registration -----------------------------------------------------------

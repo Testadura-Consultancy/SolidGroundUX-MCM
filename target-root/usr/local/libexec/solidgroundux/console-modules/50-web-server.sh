@@ -92,6 +92,28 @@ set -uo pipefail
     web_validate()                { _web_run_manage validate; }
     web_status()                  { _web_run_manage status; }
 
+# - Module validation contract ------------------------------------------------------
+    # Return codes:
+    #   0 = Passed
+    #   1 = Failed
+    #   2 = Warning
+    #   3 = Skipped / not applicable
+    #
+    # Every validator sets SGND_MODULE_VALIDATION_MESSAGE to a concise result summary.
+    # Detailed diagnostic output may be written by the validator or delegated action.
+    validate_module_web_server() {
+        if ! command -v nginx >/dev/null 2>&1; then
+            SGND_MODULE_VALIDATION_MESSAGE="nginx is not installed on this host."
+            return 3
+        fi
+        if web_validate; then
+            SGND_MODULE_VALIDATION_MESSAGE="Web-server validation passed."
+            return 0
+        fi
+        SGND_MODULE_VALIDATION_MESSAGE="Web-server validation reported one or more failures."
+        return 1
+    }
+
 # - Console registration ------------------------------------------------------------
     sgnd_menu_register_group "$SGND_WEB_SERVER_MODULE_ID" "General" "General Nginx host and site management" 0 1 500
     sgnd_menu_register_group "web-documentation" "SolidGroundUX Documentation" "Configure and publish the documentation delivered with SolidGroundUX" 0 1 510

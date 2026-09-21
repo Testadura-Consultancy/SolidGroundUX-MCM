@@ -150,6 +150,7 @@ set -uo pipefail
         done
         sgnd_print "  Q. Back"
         sgnd_print
+        sgnd_print_sectionheader ""
         ask --label "Selection" --var selected --back || return 1
         [[ "$selected" =~ ^[0-9]+$ ]] || return 1
         (( selected >= 1 && selected <= $# )) || return 1
@@ -320,9 +321,7 @@ set -uo pipefail
         fi
         options+=("Enter path manually")
 
-        sgnd_print
-        sgnd_print_sectionheader "$label"
-        _sqlserver_ask_selection "Selection" selected "${options[@]}" || return 1
+        _sqlserver_ask_selection "$label" selected "${options[@]}" || return 1
         if [[ "$selected" == "Enter path manually" ]]; then
             ask --label "$label" --var manual --default "$default_path" --back || return 1
             selected="$manual"
@@ -492,6 +491,12 @@ set -uo pipefail
         log_dir="$(_sqlserver_conf_get filelocation.defaultlogdir 2>/dev/null || printf '%s/mssql/log' "$storage_root")"
         backup_dir="$(_sqlserver_conf_get filelocation.defaultbackupdir 2>/dev/null || printf '%s/mssql/backup' "$storage_root")"
 
+        sgnd_print
+        sgnd_print_sectionheader "Current storage configuration"
+        sgnd_print_labeledvalue --label "Data directory" --value "$data_dir" --labelwidth 22
+        sgnd_print_labeledvalue --label "Log directory" --value "$log_dir" --labelwidth 22
+        sgnd_print_labeledvalue --label "Backup directory" --value "$backup_dir" --labelwidth 22
+
         _sqlserver_select_directory "Select SQL data directory" "$data_dir" data_dir || return 0
         _sqlserver_select_directory "Select SQL log directory" "$log_dir" log_dir || return 0
         _sqlserver_select_directory "Select SQL backup directory" "$backup_dir" backup_dir || return 0
@@ -541,8 +546,21 @@ set -uo pipefail
         #   _sqlserver_configure_network
     _sqlserver_configure_network() {
         local port=""
-        port="$(_sqlserver_tcp_port)"
+        local current_port=""
+        current_port="$(_sqlserver_tcp_port)"
+        port="$current_port"
+
+        sgnd_print
+        sgnd_print_sectionheader "Current network configuration"
+        sgnd_print_labeledvalue --label "TCP port" --value "$current_port" --labelwidth 22
+        sgnd_print
+        sgnd_print_sectionheader ""
+
         ask --label "TCP port" --var port --default "$port" --validate _sqlserver_validate_port --back || return 0
+        if [[ "$port" == "$current_port" ]]; then
+            saywarning "SQL Server TCP port is already configured: $port"
+            return 0
+        fi
         _sqlserver_apply_conf network.tcpport "$port" || return 1
         _sqlserver_restart_if_active || return 1
         sayok "SQL Server TCP port configured: $port"
@@ -557,6 +575,13 @@ set -uo pipefail
         local memory_mb=""
         memory_mb="$(_sqlserver_conf_get memory.memorylimitmb 2>/dev/null || true)"
         [[ "$memory_mb" =~ ^[0-9]+$ ]] || memory_mb="2048"
+
+        sgnd_print
+        sgnd_print_sectionheader "Current memory configuration"
+        sgnd_print_labeledvalue --label "Memory limit (MB)" --value "$memory_mb" --labelwidth 22
+        sgnd_print
+        sgnd_print_sectionheader ""
+
         ask --label "Memory limit (MB)" --var memory_mb --default "$memory_mb" --back || return 0
         [[ "$memory_mb" =~ ^[1-9][0-9]*$ ]] || { sayfail "Memory limit must be a positive integer."; return 1; }
         _sqlserver_apply_conf memory.memorylimitmb "$memory_mb" || return 1
@@ -571,6 +596,18 @@ set -uo pipefail
         #   _sqlserver_manage_service
     _sqlserver_manage_service() {
         local action=""
+        local service_state="inactive"
+        local enabled_state="Disabled"
+
+        service_state="$(systemctl is-active "$SGND_SQLSERVER_SERVICE" 2>/dev/null || true)"
+        [[ -n "$service_state" ]] || service_state="inactive"
+        systemctl is-enabled --quiet "$SGND_SQLSERVER_SERVICE" 2>/dev/null && enabled_state="Enabled"
+
+        sgnd_print
+        sgnd_print_sectionheader "Current service configuration"
+        sgnd_print_labeledvalue --label "Service" --value "$service_state" --labelwidth 22
+        sgnd_print_labeledvalue --label "At boot" --value "$enabled_state" --labelwidth 22
+
         _sqlserver_ask_selection "SQL Server service action" action "Start" "Stop" "Restart" "Enable at boot" "Disable at boot" || return 0
         if (( ${FLAG_DRYRUN:-0} == 1 )); then sayinfo "DRYRUN: Would perform SQL Server service action: $action."; return 0; fi
         case "$action" in
@@ -589,8 +626,21 @@ set -uo pipefail
         #   _sqlserver_configure_firewall
     _sqlserver_configure_firewall() {
         local port=""
+        local firewall_state="Inactive"
+        local rule_state="Not allowed"
         command -v ufw >/dev/null 2>&1 || { saywarning "UFW is not installed."; return 0; }
         port="$(_sqlserver_tcp_port)"
+
+        sudo ufw status 2>/dev/null | grep -q '^Status: active' && firewall_state="Active"
+        sudo ufw status 2>/dev/null | grep -Eq "^${port}/tcp[[:space:]]+ALLOW([[:space:]]|$)|^${port}[[:space:]]+ALLOW([[:space:]]|$)" && rule_state="Allowed"
+
+        sgnd_print
+        sgnd_print_sectionheader "Current firewall configuration"
+        sgnd_print_labeledvalue --label "Firewall" --value "$firewall_state" --labelwidth 22
+        sgnd_print_labeledvalue --label "TCP ${port}" --value "$rule_state" --labelwidth 22
+        sgnd_print
+        sgnd_print_sectionheader ""
+
         if (( ${FLAG_DRYRUN:-0} == 1 )); then sayinfo "DRYRUN: Would allow ${port}/tcp through UFW."; return 0; fi
         sudo ufw allow "${port}/tcp" || return 1
         sayok "SQL Server TCP port $port allowed through UFW."
@@ -724,6 +774,9 @@ set -uo pipefail
         if (( rc == 0 )); then
             case "$action" in status|validate) ;; *) _dryrun_complete ;; esac
         fi
+
+        sgnd_print
+        sgnd_print_sectionheader ""
         return "$rc"
     }
 

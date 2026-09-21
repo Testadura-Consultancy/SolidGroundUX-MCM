@@ -277,6 +277,7 @@ set -uo pipefail
         done
         sgnd_print --text "Q. Back" --pad 2
         sgnd_print
+        sgnd_print_sectionheader ""
 
         while :; do
             input=""
@@ -595,7 +596,12 @@ set -uo pipefail
             esac
         fi
 
-        _run_action "$action"
+        local action_rc=0
+        _run_action "$action" || action_rc=$?
+
+        sgnd_print
+        sgnd_print_sectionheader ""
+        return "$action_rc"
     }
 
     main "$@"

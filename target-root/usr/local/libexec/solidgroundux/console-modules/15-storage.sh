@@ -77,6 +77,8 @@ set -uo pipefail
     SGND_STORAGE_MODULE_VERSION="1.2.0"
     SGND_STORAGE_MODULE_DESC="Configure, reconcile, and inspect local storage volumes"
 
+    SGND_MODULE_ID="${SGND_STORAGE_MODULE_ID}"
+
     SGND_MODULE_NAME="$SGND_STORAGE_MODULE_NAME"
     SGND_MODULE_VERSION="$SGND_STORAGE_MODULE_VERSION"
     SGND_MODULE_DESC="$SGND_STORAGE_MODULE_DESC"
@@ -96,25 +98,45 @@ set -uo pipefail
     storage_validate_provisioning()     { _storage_run_action validate; }
     storage_status()                    { _storage_run_action status; }
     storage_access_status()             { _storage_run_action access-status; }
-    storage_set_owner()                 { _storage_run_action set-owner; }
-    storage_set_group()                 { _storage_run_action set-group; }
-    storage_set_permissions()           { _storage_run_action set-permissions; }
+    storage_set_access()                 { _storage_run_action set-access; }
     storage_restore_access_defaults()   { _storage_run_action restore-defaults; }
+
+# - Module validation contract ------------------------------------------------------
+    # Return codes:
+    #   0 = Passed
+    #   1 = Failed
+    #   2 = Warning
+    #   3 = Skipped / not applicable
+    #
+    # Every validator sets SGND_MODULE_VALIDATION_MESSAGE to a concise result summary.
+    # Detailed diagnostic output may be written by the validator or delegated action.
+    validate_module_storage() {
+        if [[ ! -s /etc/solidgroundux/storage.cfg ]] && ! grep -Eq '(^|[[:space:]])SGND_STORAGE([[:space:]]|$)' /etc/fstab 2>/dev/null; then
+            SGND_MODULE_VALIDATION_MESSAGE="Storage is not configured on this host."
+            return 3
+        fi
+        if storage_validate_provisioning; then
+            SGND_MODULE_VALIDATION_MESSAGE="Storage provisioning validation passed."
+            return 0
+        fi
+        SGND_MODULE_VALIDATION_MESSAGE="Storage provisioning validation reported one or more failures."
+        return 1
+    }
 
 # - Console registration ------------------------------------------------------------
     # . Storage
     # ! Configure storage
-    #   > Provision an unused disk as persistent local storage.
+    #   > Provision one or more unused disks as persistent local storage.
     # ! Mount storage
-    #   > Mount the configured local storage filesystem.
+    #   > Mount a configured local storage filesystem.
     # ! Unmount storage
-    #   > Unmount storage while keeping its persistent configuration.
+    #   > Unmount a configured storage filesystem while keeping its persistent configuration.
     # ! Expand storage
     #   > Expand the partition and filesystem after enlarging its disk.
     # ! Reconcile storage configuration
-    #   > Update SolidGroundUX storage configuration from the existing SGND_STORAGE volume.
+    #   > Update SolidGroundUX storage configuration from all managed SGND_STORAGE volumes.
     # ! Reconcile storage persistence
-    #   > Remove stale SolidGroundUX-managed storage entries from /etc/fstab.
+    #   > Remove only stale SolidGroundUX-managed storage entries from /etc/fstab.
     # ! Validate storage provisioning
     #   > Run active checks including configuration reconciliation.
     # ! Show storage status
@@ -138,13 +160,11 @@ set -uo pipefail
     sgnd_menu_register_group \
         "storage-access" \
         "Storage Access" \
-        "Manage ownership and Unix permissions for the storage and shares roots" \
+        "Manage ownership and Unix permissions for managed storage roots" \
         0 1 245
 
-    sgnd_menu_register_item "storage-access-status" "storage-access" "Show storage ownership" "storage_access_status" "Show ownership and permissions for the storage and shares roots" 0 15 1 0
-    sgnd_menu_register_item "storage-access-owner" "storage-access" "Set storage owner" "storage_set_owner" "Set the owner of the storage root or shares root" 0 15 1 1
-    sgnd_menu_register_item "storage-access-group" "storage-access" "Set storage group" "storage_set_group" "Set the group of the storage root or shares root" 0 15 1 1
-    sgnd_menu_register_item "storage-access-mode" "storage-access" "Set storage permissions" "storage_set_permissions" "Set Unix permissions on the storage root or shares root" 0 20 1 1
-    sgnd_menu_register_item "storage-access-reset" "storage-access" "Restore default permissions" "storage_restore_access_defaults" "Restore canonical ownership and permissions for managed storage roots" 0 25 1 1
+    sgnd_menu_register_item "storage-access-status" "storage-access" "Show storage access" "storage_access_status" "Show ownership and permissions for managed storage roots" 0 15 1 0
+    sgnd_menu_register_item "storage-access-set" "storage-access" "Set storage access" "storage_set_access" "Set owner, group, and Unix permissions for one or more managed storage roots" 0 0 1 0
+    sgnd_menu_register_item "storage-access-reset" "storage-access" "Restore default access" "storage_restore_access_defaults" "Restore canonical ownership and permissions for managed storage roots" 0 25 1 0
 
     sayinfo "Storage module registered with the console."
