@@ -1,0 +1,15 @@
+Management Console Modules now expects the SolidGroundUX Framework to provide:
+
+  sgnd-smoketest
+
+The former Management Console files:
+  usr/local/libexec/solidgroundux/framework-smoketest.sh
+  usr/local/bin/sgnd-framework-smoketest
+
+have been removed from this product. Move/rename the framework-owned smoke-test suite
+to the Framework product and expose it as the public command sgnd-smoketest.
+
+Module validation contract:
+  validate_module_<module-id-with-hyphens-replaced-by-underscores>
+  SGND_MODULE_VALIDATION_MESSAGE=<concise summary>
+  return 0 Passed, 1 Failed, 2 Warning, 3 Skipped/not applicable
