@@ -68,14 +68,8 @@ set -uo pipefail
 # - Module metadata ----------------------------------------------------------------
     SGND_SQLSERVER_MODULE_ID="sql-server"
     SGND_SQLSERVER_MODULE_NAME="SQL Server"
-    SGND_SQLSERVER_MODULE_VERSION="1.2.0"
-    SGND_SQLSERVER_MODULE_DESC="Install, configure, manage, validate, and inspect Microsoft SQL Server"
-
     SGND_MODULE_ID="$SGND_SQLSERVER_MODULE_ID"
     SGND_MODULE_NAME="$SGND_SQLSERVER_MODULE_NAME"
-    SGND_MODULE_VERSION="$SGND_SQLSERVER_MODULE_VERSION"
-    SGND_MODULE_DESC="$SGND_SQLSERVER_MODULE_DESC"
-
 # - Management dispatch -------------------------------------------------------------
     _sqlserver_run_manage() {
         local action="${1:?missing action}"
@@ -121,7 +115,7 @@ set -uo pipefail
     sgnd_menu_register_group \
         "$SGND_SQLSERVER_MODULE_ID" \
         "$SGND_SQLSERVER_MODULE_NAME" \
-        "$SGND_SQLSERVER_MODULE_DESC" \
+        "$(sgnd_header_get_field_value "${BASH_SOURCE[0]}" "Metadata" "Purpose")" \
         0 1 600
 
     sgnd_menu_register_item "sql-prepare" "$SGND_SQLSERVER_MODULE_ID" "Prepare SQL Server" "sqlserver_prepare" "Configure repositories, install and configure SQL Server, and install tools" 0 15 1 0

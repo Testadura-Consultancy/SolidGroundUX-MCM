@@ -68,13 +68,8 @@ set -uo pipefail
 # - Module metadata ----------------------------------------------------------------
     SGND_AD_CLIENT_MODULE_ID="active-directory-client"
     SGND_AD_CLIENT_MODULE_NAME="Active Directory Client"
-    SGND_AD_CLIENT_MODULE_VERSION="1.1.0"
-    SGND_AD_CLIENT_MODULE_DESC="Join, reconcile, validate, and inspect Active Directory client membership"
     SGND_MODULE_ID="${SGND_AD_CLIENT_MODULE_ID}"
     SGND_MODULE_NAME="$SGND_AD_CLIENT_MODULE_NAME"
-    SGND_MODULE_VERSION="$SGND_AD_CLIENT_MODULE_VERSION"
-    SGND_MODULE_DESC="$SGND_AD_CLIENT_MODULE_DESC"
-
 # - Management dispatch -------------------------------------------------------------
     _adc_run_action() { local action="${1:?missing action}"; _sgnd_run_module_script "manage-active-directory-client.sh" --action "$action"; }
     _adc_join_domain()            { _adc_run_action join-all; }
@@ -170,7 +165,7 @@ set -uo pipefail
     # ! Leave domain
     #   > Leave the currently joined Active Directory realm.
     #   > Handler: _adc_leave
-    sgnd_menu_register_group "$SGND_AD_CLIENT_MODULE_ID" "$SGND_AD_CLIENT_MODULE_NAME" "$SGND_AD_CLIENT_MODULE_DESC" 0 1 250
+    sgnd_menu_register_group "$SGND_AD_CLIENT_MODULE_ID" "$SGND_AD_CLIENT_MODULE_NAME" "$(sgnd_header_get_field_value "${BASH_SOURCE[0]}" "Metadata" "Purpose")" 0 1 250
     sgnd_menu_register_item "adc-join" "$SGND_AD_CLIENT_MODULE_ID" "Join domain" "_adc_join_domain" "Run the complete Active Directory client join sequence" 0 15 1 0
     sgnd_menu_register_item "adc-install" "$SGND_AD_CLIENT_MODULE_ID" "Install AD client prerequisites" "_adc_step_install_packages" "Install realmd, SSSD, Kerberos, and AD client utilities" 0 15 1 1
     sgnd_menu_register_item "adc-preflight" "$SGND_AD_CLIENT_MODULE_ID" "Validate join inputs" "_adc_step_preflight" "Collect realm, DNS, account, and machine identity settings" 0 15 1 1

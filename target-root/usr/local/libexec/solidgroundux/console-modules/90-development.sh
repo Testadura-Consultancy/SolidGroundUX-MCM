@@ -63,15 +63,9 @@ set -uo pipefail
 # - Module metadata ----------------------------------------------------------------
     SGND_DEVELOPMENT_MODULE_ID="development"
     SGND_DEVELOPMENT_MODULE_NAME="Development"
-    SGND_DEVELOPMENT_MODULE_VERSION="1.0.0"
-    SGND_DEVELOPMENT_MODULE_DESC="Workspace, deployment, release, wrapper, and documentation tools"
-
     SGND_MODULE_ID="${SGND_DEVELOPMENT_MODULE_ID}"
 
     SGND_MODULE_NAME="$SGND_DEVELOPMENT_MODULE_NAME"
-    SGND_MODULE_VERSION="$SGND_DEVELOPMENT_MODULE_VERSION"
-    SGND_MODULE_DESC="$SGND_DEVELOPMENT_MODULE_DESC"
-
 # - Development actions -----------------------------------------------------------
     # fn: _dev_create_workspace
         # . Purpose
@@ -187,7 +181,7 @@ set -uo pipefail
     sgnd_menu_register_group \
         "$SGND_DEVELOPMENT_MODULE_ID" \
         "$SGND_DEVELOPMENT_MODULE_NAME" \
-        "$SGND_DEVELOPMENT_MODULE_DESC" \
+        "$(sgnd_header_get_field_value "${BASH_SOURCE[0]}" "Metadata" "Purpose")" \
         0 1 900
 
     sgnd_menu_register_item "dev-createws" "$SGND_DEVELOPMENT_MODULE_ID" "Create workspace" "_dev_create_workspace" "Create a template workspace with target-root structure" 0 15 1 0

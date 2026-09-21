@@ -75,15 +75,9 @@ set -uo pipefail
 # - Module metadata ----------------------------------------------------------------
     SGND_FRAMEWORK_TEST_MODULE_ID="framework-test"
     SGND_FRAMEWORK_TEST_MODULE_NAME="SolidGround Framework Test"
-    SGND_FRAMEWORK_TEST_MODULE_VERSION="2.0.0"
-    SGND_FRAMEWORK_TEST_MODULE_DESC="Test and validate SolidGroundUX framework and installed modules"
-
     SGND_MODULE_ID="${SGND_FRAMEWORK_TEST_MODULE_ID}"
 
     SGND_MODULE_NAME="${SGND_FRAMEWORK_TEST_MODULE_NAME}"
-    SGND_MODULE_VERSION="${SGND_FRAMEWORK_TEST_MODULE_VERSION}"
-    SGND_MODULE_DESC="${SGND_FRAMEWORK_TEST_MODULE_DESC}"
-
 # - Test agent ---------------------------------------------------------------------
     _framework_test_run_framework_suite() {
         local suite="${1:?missing test suite}"
@@ -411,7 +405,7 @@ set -uo pipefail
     sgnd_menu_register_group \
         "$SGND_FRAMEWORK_TEST_MODULE_ID" \
         "$SGND_FRAMEWORK_TEST_MODULE_NAME" \
-        "$SGND_FRAMEWORK_TEST_MODULE_DESC" \
+        "$(sgnd_header_get_field_value "${BASH_SOURCE[0]}" "Metadata" "Purpose")" \
         0 \
         1 \
         450

@@ -73,15 +73,9 @@ set -uo pipefail
 # - Module metadata -------------------------------------------------------------
     SGND_SOLIDGROUNDUX_MODULE_ID="solidgroundux"
     SGND_SOLIDGROUNDUX_MODULE_NAME="SolidGroundUX"
-    SGND_SOLIDGROUNDUX_MODULE_VERSION="1.0.0"
-    SGND_SOLIDGROUNDUX_MODULE_DESC="Manage the SolidGroundUX framework and installation"
-
     SGND_MODULE_ID="${SGND_SOLIDGROUNDUX_MODULE_ID}"
 
     SGND_MODULE_NAME="${SGND_SOLIDGROUNDUX_MODULE_NAME}"
-    SGND_MODULE_VERSION="${SGND_SOLIDGROUNDUX_MODULE_VERSION}"
-    SGND_MODULE_DESC="${SGND_SOLIDGROUNDUX_MODULE_DESC}"
-
 # - SolidGroundUX installation actions -------------------------------------------
     # fn: _release_manager - Open the standalone SolidGroundUX release manager
         # . Purpose

@@ -69,14 +69,8 @@ set -uo pipefail
 # - Module metadata ----------------------------------------------------------------
     SGND_DOCKER_MODULE_ID="docker-server"
     SGND_DOCKER_MODULE_NAME="Docker Server"
-    SGND_DOCKER_MODULE_VERSION="0.1.0"
-    SGND_DOCKER_MODULE_DESC="Install, configure, manage, validate, and inspect Docker and its containers"
-
     SGND_MODULE_ID="$SGND_DOCKER_MODULE_ID"
     SGND_MODULE_NAME="$SGND_DOCKER_MODULE_NAME"
-    SGND_MODULE_VERSION="$SGND_DOCKER_MODULE_VERSION"
-    SGND_MODULE_DESC="$SGND_DOCKER_MODULE_DESC"
-
 # - Management dispatch -------------------------------------------------------------
     _docker_run_host() {
         local action="${1:?missing action}"

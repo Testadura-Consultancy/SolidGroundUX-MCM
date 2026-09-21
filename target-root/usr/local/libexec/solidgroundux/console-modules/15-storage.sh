@@ -74,15 +74,9 @@ set -uo pipefail
 # - Module metadata ----------------------------------------------------------------
     SGND_STORAGE_MODULE_ID="storage"
     SGND_STORAGE_MODULE_NAME="Storage"
-    SGND_STORAGE_MODULE_VERSION="1.2.0"
-    SGND_STORAGE_MODULE_DESC="Configure, reconcile, and inspect local storage volumes"
-
     SGND_MODULE_ID="${SGND_STORAGE_MODULE_ID}"
 
     SGND_MODULE_NAME="$SGND_STORAGE_MODULE_NAME"
-    SGND_MODULE_VERSION="$SGND_STORAGE_MODULE_VERSION"
-    SGND_MODULE_DESC="$SGND_STORAGE_MODULE_DESC"
-
 # - Management dispatch -------------------------------------------------------------
     _storage_run_action() {
         local action="${1:?missing action}"
@@ -144,7 +138,7 @@ set -uo pipefail
     sgnd_menu_register_group \
         "$SGND_STORAGE_MODULE_ID" \
         "$SGND_STORAGE_MODULE_NAME" \
-        "$SGND_STORAGE_MODULE_DESC" \
+        "$(sgnd_header_get_field_value "${BASH_SOURCE[0]}" "Metadata" "Purpose")" \
         0 1 240
 
     sgnd_menu_register_item "storage-configure" "$SGND_STORAGE_MODULE_ID" "Configure storage" "storage_configure" "Provision an unused disk as persistent local storage" 0 15 1 0

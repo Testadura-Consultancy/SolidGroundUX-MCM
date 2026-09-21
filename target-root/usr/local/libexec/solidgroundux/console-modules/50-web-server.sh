@@ -68,13 +68,8 @@ set -uo pipefail
 # - Module metadata ----------------------------------------------------------------
     SGND_WEB_SERVER_MODULE_ID="web-server"
     SGND_WEB_SERVER_MODULE_NAME="Web Server"
-    SGND_WEB_SERVER_MODULE_VERSION="1.3.0"
-    SGND_WEB_SERVER_MODULE_DESC="Install, configure, manage, validate, and inspect an Nginx web server"
     SGND_MODULE_ID="$SGND_WEB_SERVER_MODULE_ID"
     SGND_MODULE_NAME="$SGND_WEB_SERVER_MODULE_NAME"
-    SGND_MODULE_VERSION="$SGND_WEB_SERVER_MODULE_VERSION"
-    SGND_MODULE_DESC="$SGND_WEB_SERVER_MODULE_DESC"
-
 # - Management dispatch -------------------------------------------------------------
     _web_run_manage() { local action="${1:?missing action}"; _sgnd_run_module_script "manage-web-server.sh" --action "$action"; }
     _web_run_publish() { local action="${1:?missing action}"; _sgnd_run_module_script "publish-web-content.sh" --action "$action"; }

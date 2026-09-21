@@ -69,15 +69,9 @@ set -uo pipefail
 # - Module metadata ----------------------------------------------------------------
     SGND_SAMBA_FILE_MODULE_ID="samba-file-server"
     SGND_SAMBA_FILE_MODULE_NAME="Samba File Server"
-    SGND_SAMBA_FILE_MODULE_VERSION="1.0.0"
-    SGND_SAMBA_FILE_MODULE_DESC="Install, prepare, validate, and manage Samba file services"
-
     SGND_MODULE_ID="${SGND_SAMBA_FILE_MODULE_ID}"
 
     SGND_MODULE_NAME="$SGND_SAMBA_FILE_MODULE_NAME"
-    SGND_MODULE_VERSION="$SGND_SAMBA_FILE_MODULE_VERSION"
-    SGND_MODULE_DESC="$SGND_SAMBA_FILE_MODULE_DESC"
-
 # - Project executable dispatch ----------------------------------------------------
     # fn$ _smb_run_project_script - Run a management executable owned by this project
     #
@@ -221,7 +215,7 @@ set -uo pipefail
     sgnd_menu_register_group \
         "$SGND_SAMBA_FILE_MODULE_ID" \
         "$SGND_SAMBA_FILE_MODULE_NAME" \
-        "$SGND_SAMBA_FILE_MODULE_DESC" \
+        "$(sgnd_header_get_field_value "${BASH_SOURCE[0]}" "Metadata" "Purpose")" \
         0 1 300
 
     sgnd_menu_register_item "smb-prepare" "$SGND_SAMBA_FILE_MODULE_ID" "Prepare Samba file server" "_smb_prepare_file_server" "Run the complete Samba file-server preparation sequence" 0 15 1 0

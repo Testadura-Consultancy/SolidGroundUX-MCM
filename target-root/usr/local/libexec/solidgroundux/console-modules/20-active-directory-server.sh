@@ -68,13 +68,8 @@ set -uo pipefail
 # - Module metadata ----------------------------------------------------------------
     SGND_AD_SERVER_MODULE_ID="active-directory-server"
     SGND_AD_SERVER_MODULE_NAME="Active Directory Server"
-    SGND_AD_SERVER_MODULE_VERSION="1.1.0"
-    SGND_AD_SERVER_MODULE_DESC="Install, provision, validate, and inspect a Samba Active Directory domain controller"
     SGND_MODULE_ID="${SGND_AD_SERVER_MODULE_ID}"
     SGND_MODULE_NAME="$SGND_AD_SERVER_MODULE_NAME"
-    SGND_MODULE_VERSION="$SGND_AD_SERVER_MODULE_VERSION"
-    SGND_MODULE_DESC="$SGND_AD_SERVER_MODULE_DESC"
-
 # - Management dispatch -------------------------------------------------------------
     _adsvr_run_action() {
         local action="${1:?missing action}"
@@ -169,7 +164,7 @@ set -uo pipefail
     # ! Show AD server status
     #   > Show the configured Samba role, realm, and service state.
     #   > Handler: _adsvr_status
-    sgnd_menu_register_group "$SGND_AD_SERVER_MODULE_ID" "$SGND_AD_SERVER_MODULE_NAME" "$SGND_AD_SERVER_MODULE_DESC" 0 1 200
+    sgnd_menu_register_group "$SGND_AD_SERVER_MODULE_ID" "$SGND_AD_SERVER_MODULE_NAME" "$(sgnd_header_get_field_value "${BASH_SOURCE[0]}" "Metadata" "Purpose")" 0 1 200
     sgnd_menu_register_item "adsvr-provision" "$SGND_AD_SERVER_MODULE_ID" "Provision domain" "_adsvr_provision_domain" "Run the complete Active Directory server provisioning sequence" 0 15 1 0
     sgnd_menu_register_item "adsvr-install" "$SGND_AD_SERVER_MODULE_ID" "Install AD server prerequisites" "_adsvr_step_install_packages" "Install Samba AD/DC, Kerberos, and DNS utilities" 0 15 1 1
     sgnd_menu_register_item "adsvr-preflight" "$SGND_AD_SERVER_MODULE_ID" "Validate provisioning inputs" "_adsvr_step_preflight" "Collect realm settings and validate the machine before changes" 0 15 1 1

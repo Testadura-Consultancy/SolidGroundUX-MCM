@@ -69,13 +69,8 @@ set -uo pipefail
 # - Module metadata ----------------------------------------------------------------
     SGND_AD_MANAGEMENT_MODULE_ID="active-directory-management"
     SGND_AD_MANAGEMENT_MODULE_NAME="Active Directory Management"
-    SGND_AD_MANAGEMENT_MODULE_VERSION="1.1.0"
-    SGND_AD_MANAGEMENT_MODULE_DESC="Manage Active Directory users, groups, memberships, and computers"
     SGND_MODULE_ID="${SGND_AD_MANAGEMENT_MODULE_ID}"
     SGND_MODULE_NAME="$SGND_AD_MANAGEMENT_MODULE_NAME"
-    SGND_MODULE_VERSION="$SGND_AD_MANAGEMENT_MODULE_VERSION"
-    SGND_MODULE_DESC="$SGND_AD_MANAGEMENT_MODULE_DESC"
-
 # - Management dispatch -------------------------------------------------------------
     _admg_run_action() { local action="${1:?missing action}"; _sgnd_run_module_script "manage-active-directory.sh" --action "$action"; }
     _admg_validate() { _admg_run_action validate; }

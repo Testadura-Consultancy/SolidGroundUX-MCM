@@ -67,17 +67,11 @@ set -uo pipefail
 # - Module metadata ----------------------------------------------------------------
     SGND_COMPUTER_SETUP_MODULE_ID="computer-setup"
     SGND_COMPUTER_SETUP_MODULE_NAME="Computer Setup"
-    SGND_COMPUTER_SETUP_MODULE_VERSION="2.0.0"
-    SGND_COMPUTER_SETUP_MODULE_DESC="Prepare and validate the base computer"
-    
     SGND_COMPUTER_SUDOERS_FILE="/etc/sudoers.d/solidgroundux-receiver"
 
     SGND_MODULE_ID="${SGND_COMPUTER_SETUP_MODULE_ID}"
 
     SGND_MODULE_NAME="$SGND_COMPUTER_SETUP_MODULE_NAME"
-    SGND_MODULE_VERSION="$SGND_COMPUTER_SETUP_MODULE_VERSION"
-    SGND_MODULE_DESC="$SGND_COMPUTER_SETUP_MODULE_DESC"
-
 # - Module actions -----------------------------------------------------------------
     # fn: _computer_set_identity
         # . Purpose
@@ -491,7 +485,7 @@ set -uo pipefail
     sgnd_menu_register_group \
         "$SGND_COMPUTER_SETUP_MODULE_ID" \
         "$SGND_COMPUTER_SETUP_MODULE_NAME" \
-        "$SGND_COMPUTER_SETUP_MODULE_DESC" \
+        "$(sgnd_header_get_field_value "${BASH_SOURCE[0]}" "Metadata" "Purpose")" \
         0 1 100
 
     sgnd_menu_register_item "preparepc" "$SGND_COMPUTER_SETUP_MODULE_ID" "Prepare computer" "_computer_prepare" "Run the normal post-clone setup sequence" 0 15 1 0

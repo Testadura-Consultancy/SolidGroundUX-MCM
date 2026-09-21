@@ -99,18 +99,14 @@ set -uo pipefail
     fi
 # - Module metadata -------------------------------------------------------------
     # Replace SAMPLE_MODULE in all variable names and values below.
-    # MODULE_NAME and MODULE_DESC must remain literal quoted assignments because the
-    # main index reads them before sourcing this file.
+    # MODULE_NAME remains a literal quoted assignment for lightweight page discovery.
+    # Version and description are read from the canonical comment header.
     SGND_SAMPLE_MODULE_ID="sample-module"
     SGND_SAMPLE_MODULE_NAME="Sample Module"
-    SGND_SAMPLE_MODULE_VERSION="1.0.0"
-    SGND_SAMPLE_MODULE_DESC="Describe the module capability"
 
     # Transient console-loader metadata contract.
     SGND_MODULE_ID="${SGND_SAMPLE_MODULE_ID}"
     SGND_MODULE_NAME="${SGND_SAMPLE_MODULE_NAME}"
-    SGND_MODULE_VERSION="${SGND_SAMPLE_MODULE_VERSION}"
-    SGND_MODULE_DESC="${SGND_SAMPLE_MODULE_DESC}"
 
 # - Internal helpers -------------------------------------------------------------
     # fn$ _sample_format_status
@@ -200,7 +196,7 @@ set -uo pipefail
     sgnd_menu_register_group \
         "$SGND_SAMPLE_MODULE_ID" \
         "$SGND_SAMPLE_MODULE_NAME" \
-        "$SGND_SAMPLE_MODULE_DESC" \
+        "$(sgnd_header_get_field_value "${BASH_SOURCE[0]}" "Metadata" "Purpose")" \
         0 \
         1 \
         300

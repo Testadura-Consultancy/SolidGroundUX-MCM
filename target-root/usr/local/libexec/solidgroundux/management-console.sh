@@ -902,59 +902,69 @@ set -uo pipefail
         sgnd_dt_has_row "$SGND_GROUP_SCHEMA" SGND_GROUP_ROWS key "$key"
     }
 
-    # fn: _sgnd_console_show_loaded_module_metadata - Show metadata for loaded console modules
+    # fn: _sgnd_console_show_module_metadata - Show metadata for discovered console modules
         # . Purpose
-        #   Display the metadata recorded for modules that have been lazy-loaded in the
-        #   current console session.
+        #   Display lightweight metadata for every console module present in the configured
+        #   module source without sourcing module implementations.
         #
         # . Behavior
         #   - Available only from a root console session.
-        #   - Shows only modules that have actually been sourced during this session.
-        #   - Displays ID, name, version, description, and source file.
+        #   - Discovers all module files, including modules not yet lazy-loaded and modules
+        #     currently hidden from the console index.
+        #   - Displays ID, name, version, description, visibility state, and source file.
         #
         # . Returns
-        #   0 after displaying metadata; 126 when not running as root.
+        #   0 after displaying metadata; 126 when not running as root or discovery fails.
         # . Usage
-        #   _sgnd_console_show_loaded_module_metadata "<module_name>" "<state>"
-    _sgnd_console_show_loaded_module_metadata() {
+        #   _sgnd_console_show_module_metadata
+    _sgnd_console_show_module_metadata() {
         local i=0
-        local module_count="${#SGND_MODULE_ROWS[@]}"
+        local module_count=0
+        local module_file=""
         local module_id=""
         local module_name=""
         local module_version=""
+        local module_build=""
         local module_desc=""
-        local module_source=""
+        local module_state=""
         local render_width="${SGND_MENU_RENDER_WIDTH:-$(sgnd_terminal_width)}"
+        local -a module_files=()
 
         (( EUID == 0 )) || {
             saywarning "Module metadata is available only from a root console session."
             return 126
         }
 
+        mapfile -t module_files < <(_sgnd_console_discover_module_files) || return $?
+        module_count="${#module_files[@]}"
+
         sgnd_clear
         _sgnd_console_render_menu_title
-        sgnd_print "$(sgnd_sgr "$SGND_UI_TEXT" "" "$FX_BOLD")Loaded module metadata${RESET}"
+        sgnd_print "$(sgnd_sgr "$SGND_UI_TEXT" "" "$FX_BOLD")Module metadata${RESET}"
         sgnd_print_sectionheader --border "$LN_H" --maxwidth "$render_width"
         sgnd_print
 
         if (( module_count == 0 )); then
-            sgnd_print_labeledvalue --label "Loaded modules" --value "None" --labelwidth 18
+            sgnd_print_labeledvalue --label "Present modules" --value "None" --labelwidth 18
         else
-            sgnd_print_labeledvalue --label "Loaded modules" --value "$module_count" --labelwidth 18
+            sgnd_print_labeledvalue --label "Present modules" --value "$module_count" --labelwidth 18
             sgnd_print
 
             for (( i=0; i<module_count; i++ )); do
-                module_id="$(sgnd_dt_get "$SGND_MODULE_SCHEMA" SGND_MODULE_ROWS "$i" id)"
-                module_name="$(sgnd_dt_get "$SGND_MODULE_SCHEMA" SGND_MODULE_ROWS "$i" name)"
-                module_version="$(sgnd_dt_get "$SGND_MODULE_SCHEMA" SGND_MODULE_ROWS "$i" version)"
-                module_desc="$(sgnd_dt_get "$SGND_MODULE_SCHEMA" SGND_MODULE_ROWS "$i" desc)"
-                module_source="$(sgnd_dt_get "$SGND_MODULE_SCHEMA" SGND_MODULE_ROWS "$i" source)"
+                module_file="${module_files[$i]}"
+                module_id="$(_sgnd_console_module_id_from_filename "$module_file")"
+                _sgnd_console_module_metadata "$module_file" module_name module_desc module_version module_build
+                module_state="$(_sgnd_console_module_state_get "$module_id")"
 
                 sgnd_print_sectionheader "$module_name"
                 sgnd_print_labeledvalue --label "ID" --value "$module_id" --labelwidth 18
-                sgnd_print_labeledvalue --label "Version" --value "$module_version" --labelwidth 18
+                if [[ -n "$module_build" ]]; then
+                    module_version="${module_version:--} (${module_build})"
+                fi
+                sgnd_print_labeledvalue --label "Version" --value "${module_version:--}" --labelwidth 18
                 sgnd_print_labeledvalue --label "Description" --value "$module_desc" --labelwidth 18
-                sgnd_print_labeledvalue --label "Source" --value "$module_source" --labelwidth 18
+                sgnd_print_labeledvalue --label "Visibility" --value "${module_state^}" --labelwidth 18
+                sgnd_print_labeledvalue --label "Source" --value "$module_file" --labelwidth 18
                 sgnd_print
             done
         fi
@@ -1119,7 +1129,7 @@ set -uo pipefail
             for i in "${!module_files[@]}"; do
                 module="${module_files[$i]}"
                 module_id="$(_sgnd_console_module_id_from_filename "$module")"
-                _sgnd_console_module_literal_metadata "$module" module_name module_desc
+                _sgnd_console_module_metadata "$module" module_name module_desc
                 state="$(_sgnd_console_module_state_get "$module_id")"
                 module_ids+=("$module_id")
                 printf -v rendered_key '%*d' "$key_width" "$((i + 1))"
@@ -1184,31 +1194,40 @@ set -uo pipefail
         find "$module_path" -maxdepth 1 -type f -name '*.sh' -print0 | sort -z | tr '\0' '\n'
     }
 
-    # fn: _sgnd_console_module_literal_metadata - Read lightweight module metadata without sourcing the module
+    # fn: _sgnd_console_module_metadata - Read module metadata without sourcing the module
         # . Purpose
-        #   Read literal module name and description assignments for the index page.
+        #   Read lightweight page identity plus canonical header version and description.
         #
         # . Arguments
         #   $1  MODULE_FILE - Console module file.
         #   $2  OUTPUT_NAME - Variable receiving the display name.
-        #   $3  OUTPUT_DESC - Variable receiving the description.
+        #   $3  OUTPUT_DESC - Variable receiving the canonical Description section.
+        #   $4  OUTPUT_VERSION - Optional variable receiving Metadata/Version.
+        #   $5  OUTPUT_BUILD - Optional variable receiving Metadata/Build.
         #
         # . Returns
-        #   0 after producing metadata, using filename-derived fallbacks when needed.
+        #   0 after producing metadata, using a filename-derived name fallback when needed.
         #
         # . Usage
-        #   _sgnd_console_module_literal_metadata "$module" name desc
-    _sgnd_console_module_literal_metadata() {
+        #   _sgnd_console_module_metadata "$module" name desc version build
+    _sgnd_console_module_metadata() {
         local module_file="${1:?missing module file}"
         local output_name="${2:?missing name output variable}"
         local output_desc="${3:?missing description output variable}"
+        local output_version="${4:-}"
+        local output_build="${5:-}"
         local module_id=""
         local name=""
+        local version=""
+        local build=""
         local desc=""
         local fallback=""
 
         name="$(sed -nE 's/^[[:space:]]*[A-Z0-9_]+_MODULE_NAME="([^"]*)"[[:space:]]*$/\1/p' "$module_file" | head -n 1)"
-        desc="$(sed -nE 's/^[[:space:]]*[A-Z0-9_]+_MODULE_DESC="([^"]*)"[[:space:]]*$/\1/p' "$module_file" | head -n 1)"
+        sgnd_header_get_field "$module_file" "Metadata" "Version" version || version=""
+        sgnd_header_get_field "$module_file" "Metadata" "Build" build || build=""
+        sgnd_header_get_section "$module_file" "Description" desc || desc=""
+        desc="$(printf '%s\n' "$desc" | awk 'NF { gsub(/^[[:space:]]+|[[:space:]]+$/, ""); printf "%s%s", sep, $0; sep=" " } END { print "" }')"
 
         if [[ -z "$name" ]]; then
             module_id="$(_sgnd_console_module_id_from_filename "$module_file")"
@@ -1219,6 +1238,8 @@ set -uo pipefail
 
         printf -v "$output_name" '%s' "$name"
         printf -v "$output_desc" '%s' "$desc"
+        [[ -n "$output_version" ]] && printf -v "$output_version" '%s' "$version"
+        [[ -n "$output_build" ]] && printf -v "$output_build" '%s' "$build"
     }
 
     # fn: _sgnd_console_register_pages - Build the lightweight startup page index
@@ -1248,7 +1269,7 @@ set -uo pipefail
         for module in "${discovered_files[@]}"; do
             module_id="$(_sgnd_console_module_id_from_filename "$module")"
             _sgnd_console_module_enabled "$module_id" || continue
-            _sgnd_console_module_literal_metadata "$module" module_name module_desc
+            _sgnd_console_module_metadata "$module" module_name module_desc
             sgnd_dt_append "$SGND_PAGE_SCHEMA" SGND_CONSOLE_PAGE_ROWS \
                 "$module_id" "$module_name" "$module_desc" "$module" "0" || return $?
         done
@@ -1422,7 +1443,7 @@ set -uo pipefail
                 "$value_style" "$desc" "$RESET"
 
             left_text="M) · Module metadata"
-            desc="Show metadata for modules loaded in this console session"
+            desc="Show metadata for all modules present in the configured module source"
             printf '%*s%s' "$tpad" "" "$label_style"
             sgnd_padded_visible "$left_text" "$left_width_max"
             printf '%s%*s%s%s%s\n' \
@@ -1459,7 +1480,7 @@ set -uo pipefail
         local module_desc=""
         local module_count=0
 
-        unset SGND_MODULE_ID SGND_MODULE_NAME SGND_MODULE_VERSION SGND_MODULE_DESC
+        unset SGND_MODULE_ID SGND_MODULE_NAME
         unset SGND_CONSOLE_TITLE_OVERRIDE SGND_CONSOLE_DESC_OVERRIDE
         SGND_CURRENT_MODULE="$(_sgnd_console_module_id_from_filename "$module_file")"
         SGND_CURRENT_MODULE_SOURCE="$(basename -- "$module_file" .sh)"
@@ -1470,20 +1491,21 @@ set -uo pipefail
         source "$module_file" || {
             sayfail "Failed to load module: $module_file"
             unset SGND_CURRENT_MODULE SGND_CURRENT_MODULE_SOURCE SGND_CURRENT_MODULE_DIR
-            unset SGND_MODULE_ID SGND_MODULE_NAME SGND_MODULE_VERSION SGND_MODULE_DESC
+            unset SGND_MODULE_ID SGND_MODULE_NAME
             unset SGND_CONSOLE_TITLE_OVERRIDE SGND_CONSOLE_DESC_OVERRIDE
             return 126
         }
 
         module_id="$(_sgnd_console_module_id_from_filename "$module_file")"
         module_name="${SGND_MODULE_NAME:-}"
-        module_version="${SGND_MODULE_VERSION:-}"
-        module_desc="${SGND_MODULE_DESC:-}"
+        sgnd_header_get_field "$module_file" "Metadata" "Version" module_version || module_version=""
+        sgnd_header_get_section "$module_file" "Description" module_desc || module_desc=""
+        module_desc="$(printf '%s\n' "$module_desc" | awk 'NF { gsub(/^[[:space:]]+|[[:space:]]+$/, ""); printf "%s%s", sep, $0; sep=" " } END { print "" }')"
 
         if [[ -z "$module_name" || -z "$module_version" || -z "$module_desc" ]]; then
             sayfail "Module metadata is incomplete: $module_file"
             unset SGND_CURRENT_MODULE SGND_CURRENT_MODULE_SOURCE SGND_CURRENT_MODULE_DIR
-            unset SGND_MODULE_ID SGND_MODULE_NAME SGND_MODULE_VERSION SGND_MODULE_DESC
+            unset SGND_MODULE_ID SGND_MODULE_NAME
             unset SGND_CONSOLE_TITLE_OVERRIDE SGND_CONSOLE_DESC_OVERRIDE
             return 126
         fi
@@ -1491,7 +1513,7 @@ set -uo pipefail
         if sgnd_dt_has_row "$SGND_MODULE_SCHEMA" SGND_MODULE_ROWS id "$module_id"; then
             sayfail "Duplicate module ID rejected: $module_id"
             unset SGND_CURRENT_MODULE SGND_CURRENT_MODULE_SOURCE SGND_CURRENT_MODULE_DIR
-            unset SGND_MODULE_ID SGND_MODULE_NAME SGND_MODULE_VERSION SGND_MODULE_DESC
+            unset SGND_MODULE_ID SGND_MODULE_NAME
             unset SGND_CONSOLE_TITLE_OVERRIDE SGND_CONSOLE_DESC_OVERRIDE
             return 126
         fi
@@ -1506,13 +1528,13 @@ set -uo pipefail
             "$module_id" "$module_name" "$module_version" "$module_desc" "$module_file" || {
             sayfail "Failed to record module metadata: $module_id"
             unset SGND_CURRENT_MODULE SGND_CURRENT_MODULE_SOURCE SGND_CURRENT_MODULE_DIR
-            unset SGND_MODULE_ID SGND_MODULE_NAME SGND_MODULE_VERSION SGND_MODULE_DESC
+            unset SGND_MODULE_ID SGND_MODULE_NAME
             unset SGND_CONSOLE_TITLE_OVERRIDE SGND_CONSOLE_DESC_OVERRIDE
             return 126
         }
 
         unset SGND_CURRENT_MODULE SGND_CURRENT_MODULE_SOURCE SGND_CURRENT_MODULE_DIR
-        unset SGND_MODULE_ID SGND_MODULE_NAME SGND_MODULE_VERSION SGND_MODULE_DESC
+        unset SGND_MODULE_ID SGND_MODULE_NAME
         unset SGND_CONSOLE_TITLE_OVERRIDE SGND_CONSOLE_DESC_OVERRIDE
     }
 
@@ -2004,7 +2026,7 @@ set -uo pipefail
             fi
 
             if [[ "$SGND_CONSOLE_VIEW" == "index" && ( "$choice" == "M" || "$choice" == "m" ) && $EUID -eq 0 ]]; then
-                _sgnd_console_show_loaded_module_metadata || true
+                _sgnd_console_show_module_metadata || true
                 continue
             fi
 
