@@ -1,6 +1,6 @@
 {
   "folders": [
-    { "name": "SolidGrond Management Modules", "path": "." }
+    { "name": "SolidGround Management Console Modules", "path": "." }
   ],
   "settings": {
     "files.exclude": {

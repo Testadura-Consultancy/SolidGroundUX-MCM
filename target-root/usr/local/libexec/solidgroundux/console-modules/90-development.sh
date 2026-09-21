@@ -8,7 +8,10 @@
 #   Source      : 90-development.sh
 #   Type        : module
 #   Group       : Module Registration
-#   Purpose     : Provide SolidGroundUX workspace, deployment, release, and documentation tools
+#   Purpose     : Tools for workspace creation, deployment, release preparation, wrapper generation, and documentation.
+# Description:
+#   Provides SolidGroundUX SDK development tooling for workspace creation,
+#   deployment, release preparation, wrapper generation, and documentation.
 # ==================================================================================
 set -uo pipefail
 
@@ -66,7 +69,7 @@ set -uo pipefail
     SGND_MODULE_ID="${SGND_DEVELOPMENT_MODULE_ID}"
 
     SGND_MODULE_NAME="$SGND_DEVELOPMENT_MODULE_NAME"
-# - Development actions -----------------------------------------------------------
+# - Development actions ------------------------------------------------------------
     # fn: _dev_create_workspace
         # . Purpose
         #   Launch the canonical SolidGroundUX workspace-creation tool.
@@ -134,7 +137,7 @@ set -uo pipefail
 
 
 
-# - Module validation contract ------------------------------------------------------
+# - Module validation contract -----------------------------------------------------
     # Return codes:
     #   0 = Passed
     #   1 = Failed
@@ -148,7 +151,7 @@ set -uo pipefail
         return 0
     }
 
-# - Console registration ----------------------------------------------------------
+# - Console registration -----------------------------------------------------------
     # Provides SolidGroundUX development and release tooling from the management
     # console. Each menu item is a thin wrapper around the corresponding standalone
     # public command so the same workflows remain available outside the console.
