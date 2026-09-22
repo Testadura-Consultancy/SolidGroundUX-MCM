@@ -1,7 +1,7 @@
 <table>
 <tr>
 <td width="170" align="center" valign="middle">
-  <img width="96" height="96" alt="SolidGroundUX logo" src="target-root/usr/local/assets/SolidGround UX.png" />
+  <img width="96" height="96" alt="SolidGroundUX logo" src="target-root/usr/local/assets/mcm_readmelogo.png" />
 </td>
 <td valign="middle">
   <big><big><big><strong>SolidGroundUX: Management Console Modules</strong></big></big></big><br>

@@ -7,7 +7,7 @@ Subject manager#!/usr/bin/env bash
 #   Build       : 2626414
 #   Source      : manage-docker-server.sh
 #   Type        : script
-#   Group       : Console Actions
+#   Group       : Role Managers
 #   Purpose     : Install, configure, validate, and inspect a Docker host
 #
 #   Checksum : 8e17aa140bcb91b19f76c9e6c3f9fede79e483fdc922349f8e5cb084c94b7ad8

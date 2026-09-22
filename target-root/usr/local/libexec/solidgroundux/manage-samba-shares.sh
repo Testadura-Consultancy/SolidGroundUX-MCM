@@ -8,7 +8,7 @@
 #   Checksum    : b7c2a6cced612c942a6755aea451a81c6b7f10bd433453b1f27267292f2d86be
 #   Source      : manage-samba-shares.sh
 #   Type        : script
-#   Group       : Subject manager
+#   Group       : Role Managers
 #   Purpose     : Manage Samba shares
 #
 # Description:

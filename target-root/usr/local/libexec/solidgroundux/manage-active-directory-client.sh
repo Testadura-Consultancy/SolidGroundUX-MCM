@@ -7,7 +7,7 @@
 #   Build       : 2626501
 #   Source      : manage-active-directory-client.sh
 #   Type        : script
-#   Group       : Subject manager
+#   Group       : Role Managers
 #   Purpose     : Join, reconcile, validate, and inspect an Active Directory client
 #
 #   Checksum : 3aae7facce285f3ebb53a301d96758a3e04448bfb10a58a31eec551d9bbe0a32
@@ -159,7 +159,7 @@ set -uo pipefail
     : "${SGND_SCRIPT_VERSION:=2.1}"
     : "${SGND_SCRIPT_BUILD:=2625721}"
 
-# - Framework integration -----------------------------------------------------------
+# - Framework integration ----------------------------------------------------------
     SGND_USING=()
     SGND_ARGS_SPEC=(
         "action|a|enum|ACTION|Management action||join-all,install,preflight,dns,identity,discover,join,sssd,register,reconcile,validate,status,leave"
@@ -565,7 +565,7 @@ set -uo pipefail
     }
 
 
-# - Action dispatch -----------------------------------------------------------------
+# - Action dispatch ----------------------------------------------------------------
     _adc_action_is_mutating() {
         case "${1:-}" in join-all|install|dns|identity|join|sssd|register|reconcile|leave) return 0 ;; *) return 1 ;; esac
     }

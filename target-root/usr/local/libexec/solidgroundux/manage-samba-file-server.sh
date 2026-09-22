@@ -7,7 +7,7 @@
 #   Build       : 2626501
 #   Source      : manage-samba-file-server.sh
 #   Type        : script
-#   Group       : Subject manager
+#   Group       : Role Managers
 #   Purpose     : Prepare, validate, and inspect the Samba file-server service
 #
 #   Checksum : 873554ed26c846db5561e6942f2317839cf900ea5d572e3f2ad25467cdafa5c7

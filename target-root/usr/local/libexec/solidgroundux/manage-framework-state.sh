@@ -8,7 +8,7 @@
 #   Checksum    : 5238fb50df46978efdc2d2181ef359537fa441cf61b080e9c28047bfa972c6ce
 #   Source      : manage-framework-state.sh
 #   Type        : script
-#   Group       : Subject manager
+#   Group       : Role Managers
 #   Purpose     : Manage framework state
 #
 # Description:

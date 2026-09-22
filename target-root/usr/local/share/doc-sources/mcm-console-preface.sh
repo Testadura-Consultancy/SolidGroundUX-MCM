@@ -4,7 +4,7 @@
 # Metadata:
 #   Version     : 2.1
 #   Build       : 2626501
-#   Source      : solidground console_preface.sh
+#   Source      : mcm-console-preface.sh
 #   Type        : documentation
 #   Group       : Console
 #   Purpose     : Describe the SolidGround Management Console architecture and module contract
@@ -19,7 +19,7 @@
 # ==================================================================================
 # - SolidGround Management Console -------------------------------------------------
 # . Images
-#   smc.png :: SolidGround Management Console.
+#   mcm-console-overview.png :: SolidGround Management Console.
 #
 # > The SolidGround Management Console is the interactive administration shell for
 # > SolidGroundUX. It is built from a generic console host, a reusable menu engine,
@@ -37,7 +37,7 @@
 # -- Console Module Lifecycle ---------------------------------------------------------
 #
 # . Images
-#   module-lifecycle.png :: Management ConsoleModule Lifecycle.
+#   mcm-module-lifecycle.png :: Management ConsoleModule Lifecycle.
 #
 # > This page-level lazy-loading model keeps initial console startup small while
 # > preserving self-contained functional modules. Implementation code is parsed only
@@ -64,11 +64,6 @@
 # >         Standalone operational scripts used by console actions where the function
 # >         is better implemented outside the module itself.
 #
-# >     /usr/local/lib/solidgroundux/common/console-helpers.sh
-# >         Small console-specific helpers shared by more than one lazy-loaded module.
-# >         The console host loads this library through SGND_USING, so modules do not
-# >         depend on another module having been opened first.
-# >
 # >     /usr/local/lib/solidgroundux/common
 # >         Reusable framework libraries shared by executables and modules. Subject
 # >         implementation should remain in its owning module unless it is genuinely
@@ -76,13 +71,14 @@
 #
 # -- Governing Boundary -------------------------------------------------------------
 #
-# >     Modules own menu content; sgnd-menu owns menu mechanics; sgnd-console owns
-# >     application lifecycle and navigation between module pages.
+# >     Modules own menu content; the Framework-owned sgnd-menu library owns menu
+# >     mechanics; the MCM-owned sgnd-console host owns application lifecycle and
+# >     navigation between module pages.
 #
 # > Domain logic does not belong in sgnd-console or sgnd-menu. Likewise, modules should
 # > not implement their own paging, title bars, input loops, or generic navigation.
-# > A helper required by more than one module belongs in console-helpers.sh (or another
-# > appropriately scoped common library), not in one of the participating modules.
+# > A helper required by more than one module belongs in an appropriately owned reusable
+# > library, not in one of the participating modules.
 # >
 # > Public console/framework functions use `sgnd_*`. Helpers shared internally between
 # > cooperating SolidGroundUX libraries use `_sgnd_*` and are treated as
@@ -311,7 +307,7 @@
 # -- Creating a New Console Module --------------------------------------------------
 #
 # . Images
-#   new-consolemodule.png :: Workflow for creating a new console module.
+#   mcm-new-console-module.png :: Workflow for creating a new console module.
 #
 # > No change to sgnd-console is required for a normal new page. On the next start the
 # > module appears in the index and is loaded only if selected.

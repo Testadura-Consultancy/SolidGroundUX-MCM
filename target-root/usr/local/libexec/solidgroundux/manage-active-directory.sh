@@ -7,7 +7,7 @@
 #   Build       : 2626501
 #   Source      : manage-active-directory.sh
 #   Type        : script
-#   Group       : Subject manager
+#   Group       : Role Managers
 #   Purpose     : Manage Samba Active Directory users, groups, memberships, and computers
 #
 #   Checksum : 5e122f184b10b5eeade6cddce78039d350869a884a712770e575b8e81165a34d

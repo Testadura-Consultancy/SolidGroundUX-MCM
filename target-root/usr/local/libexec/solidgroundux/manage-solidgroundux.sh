@@ -7,7 +7,7 @@
 #   Build       : 2626501
 #   Source      : manage-solidgroundux.sh
 #   Type        : script
-#   Group       : Console Actions
+#   Group       : Role Managers
 #   Purpose     : Apply persistent SolidGroundUX framework management actions
 #
 #   Checksum : 44e9f256f84d431064f99d7417e5bc6f44cd7e154120a0df382979b9585fe240

@@ -8,7 +8,7 @@
 #   Checksum    : 31dd872e75d4afe3895daa9fb610c4c87b74edebdc77d429ea777c7b4f175858
 #   Source      : manage-framework-logging.sh
 #   Type        : script
-#   Group       : Subject manager
+#   Group       : Role Managers
 #   Purpose     : Manage framework logging
 #
 # Description:

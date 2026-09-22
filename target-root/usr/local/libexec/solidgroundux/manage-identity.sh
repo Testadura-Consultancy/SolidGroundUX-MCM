@@ -8,7 +8,7 @@
 #   Checksum    : bce37920258b35d23d60c6ecb36fd7e745d25e785f99a89a3ffad3239acfb2e7
 #   Source      : manage-identity.sh
 #   Type        : script
-#   Group       : Subject manager
+#   Group       : Role Managers
 #   Purpose     : Sets the hostname and IPv4 network configuration for a VM
 #
 # Description:

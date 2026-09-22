@@ -7,7 +7,7 @@
 #   Build       : 2626501
 #   Source      : manage-docker-containers.sh
 #   Type        : script
-#   Group       : Subject manager
+#   Group       : Role Managers
 #   Purpose     : Create and manage Docker containers and images
 #
 #   Checksum : 3bb7dd1348a70120cd0cbdcef103c4400d94da879160c7d9e07da5da36bb6c43
