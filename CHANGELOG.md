@@ -10,26 +10,32 @@ practical framework development.
 ### Added
 
 - Added the canonical per-module validation contract: `validate_module_<module-id-with-hyphens-replaced-by-underscores>`, `SGND_MODULE_VALIDATION_MESSAGE`, and standard Passed/Failed/Warning/Skipped return states.
-- Added Framework Test orchestration that combines framework-owned smoke/installation tests with Management Console-owned registration and module validation.
+- Added Framework Test orchestration that combines Framework-owned smoke/installation tests with Management Console-owned registration and module validation.
+- Added metadata discovery from canonical module headers so the console can show ID, Version/Build, Description, Visibility and Source without sourcing modules.
+- Added explicit development-context reporting for the console host and console application when either runs from a non-production root.
 
 ### Changed
 
-- Took ownership of the SolidGround Management Console host (`management-console.sh`) and public `sgnd-console` command, moved from the SolidGroundUX Framework so the console application and its management modules are versioned and released together. The reusable menu/runtime APIs remain Framework-owned.
-- Framework smoke-test ownership moved to the SolidGroundUX Framework. Management Console Modules now invokes the public `sgnd-smoketest` command instead of shipping its own smoke-test executable and wrapper.
-- Module applicability is determined by each module's canonical validator; the Framework Test runner no longer hardcodes role-specific validation knowledge.
-- The Management Console module template is owned by this product as a convenience template, while generic executable, library, documentation and wrapper templates remain Framework-owned.
-- Standardized module/action presentation around SolidGroundUX section-header, spacing, current-state and return-flow conventions across the corrected management modules.
+- Completed ownership of the SolidGround Management Console host (`management-console.sh`) and public `sgnd-console` command in this product. The reusable runtime and `sgnd-menu` API remain Framework-owned.
+- Framework smoke-test ownership moved to the SolidGroundUX Framework; Management Console Modules invokes the public `sgnd-smoketest` command rather than shipping a duplicate smoke-test executable.
+- Module applicability is determined by each module's canonical validator; the Framework Test runner no longer hardcodes server-role knowledge.
+- The Management Console module template is owned by this product; generic executable/library/documentation/wrapper templates are no longer treated as MCM-owned.
+- Standardized corrected module/action presentation around SolidGroundUX section headers, spacing, current-state display and return-flow conventions.
 - Continued the module/executable split so console modules remain presentation/orchestration layers and persistent operations are delegated to management executables.
+- Development-root console execution now consumes the installed Framework when no local Framework is present, while application-local MCM executables and modules continue to resolve from the MCM development tree.
 
 ### Removed
 
 - Removed the former Management Console-owned `framework-smoketest.sh` and `sgnd-framework-smoketest` wrapper; these are superseded by Framework-owned `sgnd-smoketest`.
+- Removed duplicated runtime Version/Description module metadata in favor of canonical comment-header metadata.
 
 ### Fixed
 
-- Fixed framework/module test integration after the product split, including console registration validation, module validator dispatch, smoke-test menu behavior, and public-command execution.
-- Fixed cross-module helper ownership exposed by lazy loading by moving shared helpers to their appropriate framework or subject-specific libraries.
+- Fixed framework/module test integration after the product split, including console registration validation, module validator dispatch, smoke-test menu behavior and public-command execution.
+- Fixed cross-module helper ownership exposed by lazy loading by moving shared helpers to their appropriate Framework or subject-specific libraries.
 - Fixed Active Directory, Storage, Samba, Web Server, SQL Server and Docker module validation/presentation issues found during the 2.1 correction pass.
+- Fixed Management Console development startup against an installed Framework after the repository split, including Framework bootstrap, UI style/palette and license resolution.
+- Fixed duplicate/development module registration issues encountered while separating the SDK tooling from the Management Console product.
 
 ## Release 1.2.2626021
 

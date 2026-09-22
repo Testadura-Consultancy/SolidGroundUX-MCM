@@ -4,35 +4,32 @@
   <img width="96" height="96" alt="SolidGroundUX logo" src="target-root/usr/local/assets/SolidGround UX.png" />
 </td>
 <td valign="middle">
-  <big><big><big><strong>SolidGroundUX: Management Console Modules</strong></big></big></big>
+  <big><big><big><strong>SolidGroundUX: Management Console Modules</strong></big></big></big><br>
+  <sub>Version 2.1.2626414 · © 2026 Testadura</sub>
 </td>
 </tr>
 </table>
 
 <table>
 <tr>
-<td width="25%" align="center">
-  <a href="https://testadura-consultancy.github.io/SolidgroundUX/"><strong>Documentation</strong></a><br>
-  Framework reference and guides
+<td width="33%" align="center">
+  <a href="target-root/usr/local/share/doc/SolidGroundUX Management Console Modules/index.html"><strong>Documentation</strong></a><br>
+  Product reference and guides
 </td>
-<td width="25%" align="center">
-  <a href="INSTALL.md"><strong>Installation</strong></a><br>
-  Installation and release management
-</td>
-<td width="25%" align="center">
+<td width="33%" align="center">
   <a href="CHANGELOG.md"><strong>Changelog</strong></a><br>
   Releases and development history
 </td>
-<td width="25%" align="center">
+<td width="33%" align="center">
   <a href="LICENSE"><strong>License</strong></a><br>
   Terms of use and redistribution
 </td>
 </tr>
 </table>
 
-------------------------------------------------------------------------
+---
 
-## About this project
+## About SolidGroundUX Management Console Modules
 
 The **SolidGroundUX Management Console Modules** provide
 system-management functionality for the SolidGroundUX Management
@@ -43,9 +40,7 @@ SolidGroundUX release. They are now maintained as a separate project so
 that management functionality can evolve independently from the
 SolidGroundUX framework itself.
 
-SolidGroundUX provides the framework, runtime, console engine and shared
-utilities. This project provides the modules and management-specific
-executables that use that framework.
+SolidGroundUX provides the framework, runtime and shared utilities. This project owns the Management Console host, its public `sgnd-console` command, the console modules, and the management-specific executables that use the Framework.
 
 ## Architecture
 
