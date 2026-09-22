@@ -1,5 +1,5 @@
 # ==================================================================================
-# SolidGroundUX - SolidGround Management Console
+# SolidGroundUX Management Console Modules - SolidGround Management Console
 # ----------------------------------------------------------------------------------
 # Metadata:
 #   Version     : 2.1
@@ -7,7 +7,7 @@
 #   Source      : mcm-console-preface.sh
 #   Type        : documentation
 #   Group       : Console
-#   Purpose     : Describe the SolidGround Management Console architecture and module contract
+#   Purpose     : Group preface
 #
 #   Checksum : 19bb9738007efdd8a9f3bb81d593fc5528a997c417888c598bd7d0afd1eef459
 # Attribution:

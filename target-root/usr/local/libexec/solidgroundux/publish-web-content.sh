@@ -7,7 +7,7 @@
 #   Build       : 2626501
 #   Source      : publish-web-content.sh
 #   Type        : script
-#   Group       : Console Actions
+#   Group       : Role Managers
 #   Purpose     : Publish local, remote, Git, and SolidGroundUX documentation content
 # =====================================================================================
 set -uo pipefail
