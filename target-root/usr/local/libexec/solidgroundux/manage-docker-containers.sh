@@ -4,13 +4,13 @@
 # ----------------------------------------------------------------------------------
 # Metadata:
 #   Version     : 2.1
-#   Build       : 2626501
+#   Build       : 2626523
 #   Source      : manage-docker-containers.sh
 #   Type        : script
 #   Group       : Role Managers
 #   Purpose     : Create and manage Docker containers and images
 #
-#   Checksum : 3bb7dd1348a70120cd0cbdcef103c4400d94da879160c7d9e07da5da36bb6c43
+#   Checksum : 19c69cd900848941cc13d5a801ba886fe64e03ec8a469c1d2eeb5990130497e8
 # Description:
 #   Provides a deliberately small first-version Docker container manager. It covers
 #   the common lifecycle and creation options without attempting to replace Docker

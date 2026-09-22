@@ -4,13 +4,13 @@
 # -------------------------------------------------------------------------------------
 # Metadata:
 #   Version     : 2.1
-#   Build       : 2626501
+#   Build       : 2626523
 #   Source      : manage-samba-file-server.sh
 #   Type        : script
 #   Group       : Role Managers
 #   Purpose     : Prepare, validate, and inspect the Samba file-server service
 #
-#   Checksum : 873554ed26c846db5561e6942f2317839cf900ea5d572e3f2ad25467cdafa5c7
+#   Checksum : e8d9ff2e879a5921c53ceb5872a515f2c05cceef331c4e98b75392dc8f8f196e
 # Description:
 #   Implements persistent Samba file-server management actions exposed by the
 #   30-samba-file-server Management Console module. Share lifecycle and ACL management

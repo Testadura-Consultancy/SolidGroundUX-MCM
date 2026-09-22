@@ -4,13 +4,13 @@
 # -------------------------------------------------------------------------------------
 # Metadata:
 #   Version     : 2.1
-#   Build       : 2626501
+#   Build       : 2626523
 #   Source      : manage-solidgroundux.sh
 #   Type        : script
 #   Group       : Role Managers
 #   Purpose     : Apply persistent SolidGroundUX framework management actions
 #
-#   Checksum : 44e9f256f84d431064f99d7417e5bc6f44cd7e154120a0df382979b9585fe240
+#   Checksum : bb540f35846fc1ec4fa2bda09cb07568f3678f507a79f3eb1cce569cf2839bc3
 # Description:
 #   Implements persistent framework configuration and logging actions dispatched by
 #   the SolidGroundUX Management Console. All mutating actions honor --dryrun and

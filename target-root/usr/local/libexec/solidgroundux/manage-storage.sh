@@ -4,13 +4,13 @@
 # -------------------------------------------------------------------------------------
 # Metadata:
 #   Version     : 2.1
-#   Build       : 2626501
+#   Build       : 2626523
 #   Source      : manage-storage.sh
 #   Type        : script
 #   Group       : Role Managers
 #   Purpose     : Configure, reconcile, validate, and inspect local storage volumes
 #
-#   Checksum : f63c0e738d4e9ea2dfae63adb300dc649c118f9b3ba8301c42d847e0163e1b9f
+#   Checksum : 1b8b73000e94ba6f0a63c920c9ef85dcc76f047e9c415db6138113bb0d98456f
 # Description:
 #   Implements persistent local-storage management actions exposed by the
 #   15-storage Management Console module.

@@ -4,8 +4,8 @@
 # ------------------------------------------------------------------------------------
 # Metadata:
 #   Version     : 2.1
-#   Build       : 2626501
-#   Checksum    : bce37920258b35d23d60c6ecb36fd7e745d25e785f99a89a3ffad3239acfb2e7
+#   Build       : 2626523
+#   Checksum    : 75fed672c6521c3c16213c2947298526dab2eeeeaf1e3cb14ec48adfb2fe327a
 #   Source      : manage-identity.sh
 #   Type        : script
 #   Group       : Role Managers

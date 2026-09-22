@@ -4,13 +4,13 @@
 # -------------------------------------------------------------------------------------
 # Metadata:
 #   Version     : 2.1
-#   Build       : 2626501
+#   Build       : 2626523
 #   Source      : manage-active-directory-server.sh
 #   Type        : script
 #   Group       : Role Managers
 #   Purpose     : Provision, validate, and inspect a Samba Active Directory domain controller
 #
-#   Checksum : 61a7dbc7cce4a8d3ef8d5c3e0dc6f5878d53a61597833b8acc3e5afeae8f9c9a
+#   Checksum : 9f2bbe16849c4142d14daad7b44794a5cc1ab4361c8394b4ff027df4c03a90c1
 # Description:
 #   Implements persistent Active Directory server management actions exposed by the
 #   20-active-directory-server Management Console module.

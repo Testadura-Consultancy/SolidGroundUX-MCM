@@ -3,13 +3,13 @@
 # ----------------------------------------------------------------------------------
 # Metadata:
 #   Version     : 2.1
-#   Build       : 2626501
+#   Build       : 2626523
 #   Source      : mcm-console-preface.sh
 #   Type        : documentation
 #   Group       : Console
 #   Purpose     : Group preface
 #
-#   Checksum : 19bb9738007efdd8a9f3bb81d593fc5528a997c417888c598bd7d0afd1eef459
+#   Checksum : adaa0cc410aa6632726c316dda7647dbb457fcb5bcb319f3954c0a175824f3a8
 # Attribution:
 #   Developers  : Mark Fieten
 #   Company     : Testadura Consultancy

@@ -4,7 +4,7 @@
 # ----------------------------------------------------------------------------------
 # Metadata:
 #   Version     : 2.1
-#   Build       : 2626501
+#   Build       : 2626523
 #   Source      : manage-sqlserver.sh
 #   Type        : script
 #   Group       : Role Managers
@@ -788,4 +788,4 @@ set -uo pipefail
         _run_action "$action"
     }
     main "$@"
-#   Checksum : e8b1f32fb3452939d6109991f4c6bc8be72aae6defb408bba264d5c2ec49894e
+#   Checksum : 07cd54e693a3207ae849e7e6853ffc93e131bf9228d98a40aa4ec1ecfca34711

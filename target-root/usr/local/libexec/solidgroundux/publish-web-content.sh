@@ -4,7 +4,7 @@
 # -------------------------------------------------------------------------------------
 # Metadata:
 #   Version     : 2.1
-#   Build       : 2626501
+#   Build       : 2626523
 #   Source      : publish-web-content.sh
 #   Type        : script
 #   Group       : Role Managers
@@ -687,4 +687,4 @@ set -uo pipefail
         _run_action "$action"
     }
     main "$@"
-#   Checksum : 9501ce60b314e59618e6d1ad0767fe014cd467beb64c7ae7e371921f2ee4a664
+#   Checksum : bbbc8eccc953c324e4d09e5834d83048cb340d1b8c61a04b9a0136ddda434453

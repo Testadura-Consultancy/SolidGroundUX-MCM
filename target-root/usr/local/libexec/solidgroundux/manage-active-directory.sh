@@ -4,13 +4,13 @@
 # -------------------------------------------------------------------------------------
 # Metadata:
 #   Version     : 2.1
-#   Build       : 2626501
+#   Build       : 2626523
 #   Source      : manage-active-directory.sh
 #   Type        : script
 #   Group       : Role Managers
 #   Purpose     : Manage Samba Active Directory users, groups, memberships, and computers
 #
-#   Checksum : 5e122f184b10b5eeade6cddce78039d350869a884a712770e575b8e81165a34d
+#   Checksum : ff14cec043c9a377581d7103f5f8c45125b30a753f0305d0405327e8dafe1fee
 # Description:
 #   Implements day-to-day directory administration exposed by the
 #   27-active-directory-management Management Console module.

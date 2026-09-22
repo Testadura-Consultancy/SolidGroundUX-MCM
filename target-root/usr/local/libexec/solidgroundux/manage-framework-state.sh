@@ -4,8 +4,8 @@
 # ------------------------------------------------------------------------------------
 # Metadata:
 #   Version     : 2.1
-#   Build       : 2626501
-#   Checksum    : 5238fb50df46978efdc2d2181ef359537fa441cf61b080e9c28047bfa972c6ce
+#   Build       : 2626523
+#   Checksum    : f76b604135094825c390d00939ca9247aa7aff9a58e84c2b7176c0ec6322c56a
 #   Source      : manage-framework-state.sh
 #   Type        : script
 #   Group       : Role Managers

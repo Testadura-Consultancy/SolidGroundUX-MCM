@@ -7,6 +7,8 @@ practical framework development.
 
 ## Unreleased
 
+## Release 2.1.2626523
+
 ### Added
 
 - Added the canonical per-module validation contract: `validate_module_<module-id-with-hyphens-replaced-by-underscores>`, `SGND_MODULE_VALIDATION_MESSAGE`, and standard Passed/Failed/Warning/Skipped return states.
