@@ -4,11 +4,11 @@
 # ------------------------------------------------------------------------------------
 # Metadata:
 #   Version     : 2.1
-#   Build       : 2626414
-#   Checksum    : 0db3e1e9a28ab4e93a816e5597ffe22fec4d4e35fa721580dac12c5fe3c24dd6
+#   Build       : 2626501
+#   Checksum    : b7c2a6cced612c942a6755aea451a81c6b7f10bd433453b1f27267292f2d86be
 #   Source      : manage-samba-shares.sh
 #   Type        : script
-#   Group       : Console Actions
+#   Group       : Subject manager
 #   Purpose     : Manage Samba shares
 #
 # Description:
@@ -125,7 +125,6 @@ set -uo pipefail
         # shellcheck source=/dev/null
         source "$exe_common"
     }
-
 # - Script identity ------------------------------------------------------------------
     # var: SGND_SCRIPT_FILE - Absolute path to the currently executing script
     SGND_SCRIPT_FILE="$(readlink -f "${BASH_SOURCE[0]}")"

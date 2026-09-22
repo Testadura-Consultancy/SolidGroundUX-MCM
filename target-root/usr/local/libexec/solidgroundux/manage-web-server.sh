@@ -4,7 +4,7 @@
 # -------------------------------------------------------------------------------------
 # Metadata:
 #   Version     : 2.1
-#   Build       : 2626415
+#   Build       : 2626501
 #   Source      : manage-web-server.sh
 #   Type        : script
 #   Group       : Console Actions
@@ -99,7 +99,6 @@ set -uo pipefail
         # shellcheck source=/dev/null
         source "$exe_common"
     }
-
 # - Script metadata ----------------------------------------------------------------
     SGND_SCRIPT_FILE="$(readlink -f "${BASH_SOURCE[0]}")"
     SGND_SCRIPT_DIR="$(cd -- "$(dirname -- "$SGND_SCRIPT_FILE")" && pwd)"
@@ -1115,4 +1114,4 @@ EOF
         _run_action "$action"
     }
     main "$@"
-#   Checksum : 10ca817001553842f28974716654934d237bd169e2cb6708de8202619ae337ff
+#   Checksum : ebcc6629c742fb0d7ba752a8eff3dca174164cc2cbc1d8826c46b2776c6f795e

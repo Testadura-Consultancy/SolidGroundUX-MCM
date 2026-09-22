@@ -4,13 +4,13 @@
 # -------------------------------------------------------------------------------------
 # Metadata:
 #   Version     : 2.1
-#   Build       : 2626414
+#   Build       : 2626501
 #   Source      : manage-active-directory-client.sh
 #   Type        : script
-#   Group       : Console Actions
+#   Group       : Subject manager
 #   Purpose     : Join, reconcile, validate, and inspect an Active Directory client
 #
-#   Checksum : 19386f5d0c524a318e7d54b2dd281ee6d598c5761c582c217496ad38152db3fe
+#   Checksum : 3aae7facce285f3ebb53a301d96758a3e04448bfb10a58a31eec551d9bbe0a32
 # Description:
 #   Implements persistent Active Directory client management actions exposed by the
 #   25-active-directory-client Management Console module.
@@ -104,8 +104,6 @@ set -uo pipefail
         # shellcheck source=/dev/null
         source "$exe_common"
     }
-
-
     _load_ad_management_library() {
         local script_file="" path_without_root="" component="" app_root="" lib_file=""
         local index=0 root_index=-1

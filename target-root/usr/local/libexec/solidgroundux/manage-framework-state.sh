@@ -4,11 +4,11 @@
 # ------------------------------------------------------------------------------------
 # Metadata:
 #   Version     : 2.1
-#   Build       : 2626414
-#   Checksum    : 9c3e8da345c94551623c0566d25cdfa7106577bd0e558d0f0d71e02c510add29
+#   Build       : 2626501
+#   Checksum    : 5238fb50df46978efdc2d2181ef359537fa441cf61b080e9c28047bfa972c6ce
 #   Source      : manage-framework-state.sh
 #   Type        : script
-#   Group       : Console Actions
+#   Group       : Subject manager
 #   Purpose     : Manage framework state
 #
 # Description:
@@ -123,7 +123,6 @@ set -uo pipefail
         # shellcheck source=/dev/null
         source "$exe_common"
     }
-
 # - Script identity ------------------------------------------------------------------
     # var: SGND_SCRIPT_FILE - Absolute path to the currently executing script
     SGND_SCRIPT_FILE="$(readlink -f "${BASH_SOURCE[0]}")"

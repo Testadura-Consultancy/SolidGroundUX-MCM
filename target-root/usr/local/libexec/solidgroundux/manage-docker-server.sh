@@ -1,4 +1,4 @@
-#!/usr/bin/env bash
+Subject manager#!/usr/bin/env bash
 # ==================================================================================
 # SolidGroundUX Management Console Modules - Manage Docker Server
 # ----------------------------------------------------------------------------------
@@ -104,7 +104,6 @@ set -uo pipefail
         # shellcheck source=/dev/null
         source "$exe_common"
     }
-
 # - Script metadata ----------------------------------------------------------------
     SGND_SCRIPT_FILE="$(readlink -f "${BASH_SOURCE[0]}")"
     SGND_SCRIPT_DIR="$(cd -- "$(dirname -- "$SGND_SCRIPT_FILE")" && pwd)"

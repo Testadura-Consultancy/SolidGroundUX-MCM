@@ -4,13 +4,13 @@
 # -------------------------------------------------------------------------------------
 # Metadata:
 #   Version     : 2.1
-#   Build       : 2626414
+#   Build       : 2626501
 #   Source      : manage-active-directory-server.sh
 #   Type        : script
-#   Group       : Console Actions
+#   Group       : Subject manager
 #   Purpose     : Provision, validate, and inspect a Samba Active Directory domain controller
 #
-#   Checksum : 415286935aac022095953ef6577aaacd43740a3e4b255ede72440841c5e61431
+#   Checksum : 61a7dbc7cce4a8d3ef8d5c3e0dc6f5878d53a61597833b8acc3e5afeae8f9c9a
 # Description:
 #   Implements persistent Active Directory server management actions exposed by the
 #   20-active-directory-server Management Console module.
@@ -104,8 +104,6 @@ set -uo pipefail
         # shellcheck source=/dev/null
         source "$exe_common"
     }
-
-
     _load_ad_management_library() {
         local script_file="" path_without_root="" component="" app_root="" lib_file=""
         local index=0 root_index=-1

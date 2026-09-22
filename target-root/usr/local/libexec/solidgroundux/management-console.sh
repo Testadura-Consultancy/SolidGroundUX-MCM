@@ -4,12 +4,12 @@
 # -------------------------------------------------------------------------------------
 # Metadata:
 #   Version     : 2.1
-#   Build       : 2626414
-#   Checksum    : c35420a64db513d4cfbaf76c2bd19be62ad3729c3338ca7227b00810391661b4
+#   Build       : 2626501
+#   Checksum    : 42c9c9d9cb847b64e1d4a79abcc9e0476a43ef6a53da28137d8a8560bef630f3
 #   Source      : management-console.sh
 #   Wrapper     : sgnd-console
 #   Type        : script
-#   Group       : SolidGround Console
+#   Group       : Console
 #   Purpose     : Provide a modular console interface for SolidGroundUX tooling
 #
 # Description:
@@ -135,7 +135,6 @@ set -uo pipefail
         # shellcheck source=/dev/null
         source "$exe_common"
     }
-
 # --- Script metadata (identity) ------------------------------------------------------
     SGND_SCRIPT_FILE="$(readlink -f "${BASH_SOURCE[0]}")"
     SGND_SCRIPT_DIR="$(cd -- "$(dirname -- "$SGND_SCRIPT_FILE")" && pwd)"

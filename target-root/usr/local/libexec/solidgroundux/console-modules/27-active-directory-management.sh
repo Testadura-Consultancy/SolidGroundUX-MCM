@@ -3,8 +3,8 @@
 # ----------------------------------------------------------------------------------
 # Metadata:
 #   Version     : 2.1
-#   Build       : 2626414
-#   Checksum    : c9e4a086971f9b14bae52eb6b354cd48bfad915602a72776d33c839bd4e642f9
+#   Build       : 2626501
+#   Checksum    : 6dd031c11481f22b2ca8c33dad7b60dc1997bbe525289dcea2dae4a05e31f565
 #   Source      : 27-active-directory-management.sh
 #   Type        : module
 #   Group       : Module Registration

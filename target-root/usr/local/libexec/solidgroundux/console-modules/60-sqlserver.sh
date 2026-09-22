@@ -3,13 +3,13 @@
 # ----------------------------------------------------------------------------------
 # Metadata:
 #   Version     : 2.1
-#   Build       : 2626414
+#   Build       : 2626501
 #   Source      : 60-sqlserver.sh
 #   Type        : module
 #   Group       : Module Registration
 #   Purpose     : Install, configure, manage, validate, and inspect Microsoft SQL Server
 #
-#   Checksum : 1c1ecdecddde6aa2c8372ac0a1470b24387431f68d911ddadbda27181c3ad8fb
+#   Checksum : 5ccd38edf45d3ef73a63f8156f7c95bf48263fe2268136666d8cade1784be7e8
 # Description:
 #   Registers Microsoft SQL Server host-management actions with the SolidGround
 #   Management Console. Persistent operations are implemented by manage-sqlserver.sh.

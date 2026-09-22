@@ -4,7 +4,7 @@
 # ----------------------------------------------------------------------------------
 # Metadata:
 #   Version     : 2.1
-#   Build       : 2626415
+#   Build       : 2626501
 #   Source      : manage-sqlserver.sh
 #   Type        : script
 #   Group       : Console Actions
@@ -99,7 +99,6 @@ set -uo pipefail
         # shellcheck source=/dev/null
         source "$exe_common"
     }
-
 # - Script metadata ----------------------------------------------------------------
     SGND_SCRIPT_FILE="$(readlink -f "${BASH_SOURCE[0]}")"
     SGND_SCRIPT_DIR="$(cd -- "$(dirname -- "$SGND_SCRIPT_FILE")" && pwd)"
@@ -789,4 +788,4 @@ set -uo pipefail
         _run_action "$action"
     }
     main "$@"
-#   Checksum : a8cfef057c619641e0d7ecbff89725534fdca45c42ef3c17f7d77799ecb30592
+#   Checksum : e8b1f32fb3452939d6109991f4c6bc8be72aae6defb408bba264d5c2ec49894e

@@ -4,7 +4,7 @@
 # -------------------------------------------------------------------------------------
 # Metadata:
 #   Version     : 2.1
-#   Build       : 2626415
+#   Build       : 2626501
 #   Source      : publish-web-content.sh
 #   Type        : script
 #   Group       : Console Actions
@@ -99,7 +99,6 @@ set -uo pipefail
         # shellcheck source=/dev/null
         source "$exe_common"
     }
-
 # - Script metadata ----------------------------------------------------------------
     SGND_SCRIPT_FILE="$(readlink -f "${BASH_SOURCE[0]}")"
     SGND_SCRIPT_DIR="$(cd -- "$(dirname -- "$SGND_SCRIPT_FILE")" && pwd)"
@@ -688,4 +687,4 @@ set -uo pipefail
         _run_action "$action"
     }
     main "$@"
-#   Checksum : a0f9b415b80a0f29117381c79e93d6d6027cde7798715d50d6dd67b6ebdde323
+#   Checksum : 9501ce60b314e59618e6d1ad0767fe014cd467beb64c7ae7e371921f2ee4a664

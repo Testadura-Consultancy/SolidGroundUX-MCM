@@ -3,8 +3,8 @@
 # ----------------------------------------------------------------------------------
 # Metadata:
 #   Version     : 2.1
-#   Build       : 2626414
-#   Checksum    : eb97e7e7d9fabbb4498d0b5446a9fe51aa2ea04e506a996224348698c8cb739a
+#   Build       : 2626501
+#   Checksum    : 8a9bfcd969d15aa5452586c79a0b0a2482abee8ab89dd2bb38c59be300088e4d
 #   Source      : 10-computer-setup.sh
 #   Type        : module
 #   Group       : Module Registration

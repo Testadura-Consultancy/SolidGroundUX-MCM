@@ -4,13 +4,13 @@
 # -------------------------------------------------------------------------------------
 # Metadata:
 #   Version     : 2.1
-#   Build       : 2626414
+#   Build       : 2626501
 #   Source      : manage-samba-file-server.sh
 #   Type        : script
-#   Group       : Console Actions
+#   Group       : Subject manager
 #   Purpose     : Prepare, validate, and inspect the Samba file-server service
 #
-#   Checksum : 473c47a04a20259fd23f0abef824bbf4876574b9bdc7896e9457a2a43ccf31e9
+#   Checksum : 873554ed26c846db5561e6942f2317839cf900ea5d572e3f2ad25467cdafa5c7
 # Description:
 #   Implements persistent Samba file-server management actions exposed by the
 #   30-samba-file-server Management Console module. Share lifecycle and ACL management
@@ -105,7 +105,6 @@ set -uo pipefail
         # shellcheck source=/dev/null
         source "$exe_common"
     }
-
 # - Script metadata ----------------------------------------------------------------
     SGND_SCRIPT_FILE="$(readlink -f "${BASH_SOURCE[0]}")"
     SGND_SCRIPT_DIR="$(cd -- "$(dirname -- "$SGND_SCRIPT_FILE")" && pwd)"

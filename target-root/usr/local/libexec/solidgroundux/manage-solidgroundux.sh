@@ -4,13 +4,13 @@
 # -------------------------------------------------------------------------------------
 # Metadata:
 #   Version     : 2.1
-#   Build       : 2626414
+#   Build       : 2626501
 #   Source      : manage-solidgroundux.sh
 #   Type        : script
 #   Group       : Console Actions
 #   Purpose     : Apply persistent SolidGroundUX framework management actions
 #
-#   Checksum : 526007297199baec3d33006a06514275ea3a4d2e175072a5431d7dd0a48fef85
+#   Checksum : 44e9f256f84d431064f99d7417e5bc6f44cd7e154120a0df382979b9585fe240
 # Description:
 #   Implements persistent framework configuration and logging actions dispatched by
 #   the SolidGroundUX Management Console. All mutating actions honor --dryrun and
@@ -112,7 +112,6 @@ set -uo pipefail
         # shellcheck source=/dev/null
         source "$exe_common"
     }
-
 # - Script metadata ----------------------------------------------------------------
     SGND_SCRIPT_FILE="$(readlink -f "${BASH_SOURCE[0]}")"
     SGND_SCRIPT_DIR="$(cd -- "$(dirname -- "$SGND_SCRIPT_FILE")" && pwd)"

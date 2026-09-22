@@ -4,11 +4,11 @@
 # ------------------------------------------------------------------------------------
 # Metadata:
 #   Version     : 2.1
-#   Build       : 2626414
-#   Checksum    : 6127339c86ebcc3eba880aac0d79cadf4747e3b9c5fdf4d8a6cc982c7742d8c1
+#   Build       : 2626501
+#   Checksum    : 31dd872e75d4afe3895daa9fb610c4c87b74edebdc77d429ea777c7b4f175858
 #   Source      : manage-framework-logging.sh
 #   Type        : script
-#   Group       : Console Actions
+#   Group       : Subject manager
 #   Purpose     : Manage framework logging
 #
 # Description:
@@ -123,7 +123,6 @@ set -uo pipefail
         # shellcheck source=/dev/null
         source "$exe_common"
     }
-
 # - Script identity ------------------------------------------------------------------
     # var: SGND_SCRIPT_FILE - Absolute path to the currently executing script
     SGND_SCRIPT_FILE="$(readlink -f "${BASH_SOURCE[0]}")"

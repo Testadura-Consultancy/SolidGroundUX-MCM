@@ -3,13 +3,13 @@
 # ----------------------------------------------------------------------------------
 # Metadata:
 #   Version     : 2.1
-#   Build       : 2626414
+#   Build       : 2626501
 #   Source      : 25-active-directory-client.sh
 #   Type        : module
 #   Group       : Module Registration
 #   Purpose     : Register Active Directory client management actions
 #
-#   Checksum : 06223de014350b10a86c04ca5f68ecaa0034ffb7fc9822f59ae07e47086e02e2
+#   Checksum : be848a1a7cc93bd3c748197ab63b36cecdb528fc642bb7adcf403b6797cca157
 # Description:
 #   Registers Active Directory client management actions with the SolidGround Management
 #   Console. Persistent join, reconciliation, validation, and repair operations are

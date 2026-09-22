@@ -4,13 +4,13 @@
 # -------------------------------------------------------------------------------------
 # Metadata:
 #   Version     : 2.1
-#   Build       : 2626414
+#   Build       : 2626501
 #   Source      : manage-storage.sh
 #   Type        : script
 #   Group       : Console Actions
 #   Purpose     : Configure, reconcile, validate, and inspect local storage volumes
 #
-#   Checksum : 000a9ef256d05a90a3ed3f6385a749b07dd8e5213bff1e64da039ed36aab0c58
+#   Checksum : f63c0e738d4e9ea2dfae63adb300dc649c118f9b3ba8301c42d847e0163e1b9f
 # Description:
 #   Implements persistent local-storage management actions exposed by the
 #   15-storage Management Console module.
@@ -104,7 +104,6 @@ set -uo pipefail
         # shellcheck source=/dev/null
         source "$exe_common"
     }
-
 # - Script metadata ----------------------------------------------------------------
     SGND_SCRIPT_FILE="$(readlink -f "${BASH_SOURCE[0]}")"
     SGND_SCRIPT_DIR="$(cd -- "$(dirname -- "$SGND_SCRIPT_FILE")" && pwd)"

@@ -3,8 +3,8 @@
 # ----------------------------------------------------------------------------------
 # Metadata:
 #   Version     : 2.1
-#   Build       : 2626414
-#   Checksum    : 53df6fec53b46fad58f42dd76133078175cef3137f7280abb53790b079a75ae7
+#   Build       : 2626501
+#   Checksum    : ffb5c6a255842c0f664dc002acf7e38c1985f0d26546bfb42ce54a4daa8dc471
 #   Source      : 90-development.sh
 #   Type        : module
 #   Group       : Module Registration

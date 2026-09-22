@@ -4,13 +4,13 @@
 # ----------------------------------------------------------------------------------
 # Metadata:
 #   Version     : 2.1
-#   Build       : 2626414
+#   Build       : 2626501
 #   Source      : manage-docker-containers.sh
 #   Type        : script
-#   Group       : Console Actions
+#   Group       : Subject manager
 #   Purpose     : Create and manage Docker containers and images
 #
-#   Checksum : ad40d436938609f068babde8a6bacf66651da4c13b4252beda916176bf658064
+#   Checksum : 3bb7dd1348a70120cd0cbdcef103c4400d94da879160c7d9e07da5da36bb6c43
 # Description:
 #   Provides a deliberately small first-version Docker container manager. It covers
 #   the common lifecycle and creation options without attempting to replace Docker
@@ -105,7 +105,6 @@ set -uo pipefail
         # shellcheck source=/dev/null
         source "$exe_common"
     }
-
 # - Script metadata ----------------------------------------------------------------
     SGND_SCRIPT_FILE="$(readlink -f "${BASH_SOURCE[0]}")"
     SGND_SCRIPT_DIR="$(cd -- "$(dirname -- "$SGND_SCRIPT_FILE")" && pwd)"

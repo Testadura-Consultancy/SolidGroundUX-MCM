@@ -4,11 +4,11 @@
 # ------------------------------------------------------------------------------------
 # Metadata:
 #   Version     : 2.1
-#   Build       : 2626414
-#   Checksum    : 277816e74cf64f3f8e20db0149238aa7f28120c323af37d7c4f7b69dc1a1e004
+#   Build       : 2626501
+#   Checksum    : bce37920258b35d23d60c6ecb36fd7e745d25e785f99a89a3ffad3239acfb2e7
 #   Source      : manage-identity.sh
 #   Type        : script
-#   Group       : Console Actions
+#   Group       : Subject manager
 #   Purpose     : Sets the hostname and IPv4 network configuration for a VM
 #
 # Description:
@@ -109,7 +109,6 @@ set -uo pipefail
         # shellcheck source=/dev/null
         source "$exe_common"
     }
-
 # - Script identity ------------------------------------------------------------------
     # var: SGND_SCRIPT_FILE - Absolute path to the currently executing script
     SGND_SCRIPT_FILE="$(readlink -f "${BASH_SOURCE[0]}")"

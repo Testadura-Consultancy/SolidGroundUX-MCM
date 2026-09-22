@@ -3,13 +3,13 @@
 # ----------------------------------------------------------------------------------
 # Metadata:
 #   Version     : 2.1
-#   Build       : 2626414
+#   Build       : 2626501
 #   Source      : 30-samba-file-server.sh
 #   Type        : module
 #   Group       : Module Registration
 #   Purpose     : Register and orchestrate Samba file-server management actions
 #
-#   Checksum : 9e87d430abe2b98a3d25f48bcabe56df2c05a10b78e6ec0bbbde7fa215669f74
+#   Checksum : d0df43d3129b49c92dea1d8f035fff5c45770789a14fd3d5296bd399a3f0ea4b
 # Description:
 #   Registers Samba file-server and share-management actions with the Management
 #   Console. Persistent server-management functionality is implemented by

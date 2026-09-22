@@ -3,13 +3,13 @@
 # ----------------------------------------------------------------------------------
 # Metadata:
 #   Version     : 2.1
-#   Build       : 2626414
+#   Build       : 2626501
 #   Source      : 50-web-server.sh
 #   Type        : module
 #   Group       : Module Registration
 #   Purpose     : Install, configure, manage, validate, and inspect an Nginx web server
 #
-#   Checksum : 4c5ee4ad352bd55a45df2ef0cc12a6e9238423e2ec3b4c87e821be134e9b9443
+#   Checksum : e64ce7c995b4d62adce3c7959000da90b76497c67a6bfd74e6c87606a7a27723
 # Description:
 #   Registers Nginx host, site, publishing, documentation, service, validation, and
 #   status actions with the SolidGround Management Console. Persistent operations are
