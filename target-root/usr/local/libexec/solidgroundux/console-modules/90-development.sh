@@ -132,7 +132,7 @@ set -uo pipefail
         # . Usage
         #   _dev_generate_docs
     _dev_generate_docs() {
-        _sgnd_run_public_command "sgnd-generate-docs"
+        _sgnd_run_public_command "sgnd-doc-generator"
     }
 
 
