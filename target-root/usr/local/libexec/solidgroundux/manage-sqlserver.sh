@@ -4,7 +4,7 @@
 # ----------------------------------------------------------------------------------
 # Metadata:
 #   Version     : 2.1
-#   Build       : 2626523
+#   Build       : 2626612
 #   Source      : manage-sqlserver.sh
 #   Type        : script
 #   Group       : Role Managers
@@ -26,7 +26,10 @@ set -uo pipefail
         #   - Resolves production scripts beneath /usr, /etc, or /var to root (/).
         #   - Resolves staged/development trees to the path prefix preceding the detected
         #     usr, etc, or var component.
-        #   - Loads sgnd-exe-common.sh from the resolved framework root.
+        #   - Loads sgnd-exe-common.sh from the resolved framework root when available.
+        #   - For staged/development trees where the executable common library is not
+        #     present, falls back to the installed framework copy without changing
+        #     SGND_FRAMEWORK_ROOT.
         #
         # . Globals (write)
         #   SGND_FRAMEWORK_ROOT
@@ -89,6 +92,10 @@ set -uo pipefail
             exe_common="/usr/local/lib/solidgroundux/common/sgnd-exe-common.sh"
         else
             exe_common="${SGND_FRAMEWORK_ROOT%/}/usr/local/lib/solidgroundux/common/sgnd-exe-common.sh"
+
+            if [[ ! -r "$exe_common" ]]; then
+                exe_common="/usr/local/lib/solidgroundux/common/sgnd-exe-common.sh"
+            fi
         fi
 
         [[ -r "$exe_common" ]] || {
@@ -788,4 +795,4 @@ set -uo pipefail
         _run_action "$action"
     }
     main "$@"
-#   Checksum : 07cd54e693a3207ae849e7e6853ffc93e131bf9228d98a40aa4ec1ecfca34711
+#   Checksum : 7a3d81e16353373225f1785f12d09387a4a94a579a3183c1a47b77fbca4623cb

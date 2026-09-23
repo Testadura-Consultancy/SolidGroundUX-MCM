@@ -4,8 +4,8 @@
 # -------------------------------------------------------------------------------------
 # Metadata:
 #   Version     : 2.1
-#   Build       : 2626501
-#   Checksum    : 42c9c9d9cb847b64e1d4a79abcc9e0476a43ef6a53da28137d8a8560bef630f3
+#   Build       : 2626612
+#   Checksum    : 8dfc6896d904c57d74bb6640c513df290d8e30c48052075dcc9d23d604a38d4e
 #   Source      : management-console.sh
 #   Wrapper     : sgnd-console
 #   Type        : script
@@ -62,7 +62,10 @@ set -uo pipefail
         #   - Resolves production scripts beneath /usr, /etc, or /var to root (/).
         #   - Resolves staged/development trees to the path prefix preceding the detected
         #     usr, etc, or var component.
-        #   - Loads sgnd-exe-common.sh from the resolved framework root.
+        #   - Loads sgnd-exe-common.sh from the resolved framework root when available.
+        #   - For staged/development trees where the executable common library is not
+        #     present, falls back to the installed framework copy without changing
+        #     SGND_FRAMEWORK_ROOT.
         #
         # . Globals (write)
         #   SGND_FRAMEWORK_ROOT
@@ -125,6 +128,10 @@ set -uo pipefail
             exe_common="/usr/local/lib/solidgroundux/common/sgnd-exe-common.sh"
         else
             exe_common="${SGND_FRAMEWORK_ROOT%/}/usr/local/lib/solidgroundux/common/sgnd-exe-common.sh"
+
+            if [[ ! -r "$exe_common" ]]; then
+                exe_common="/usr/local/lib/solidgroundux/common/sgnd-exe-common.sh"
+            fi
         fi
 
         [[ -r "$exe_common" ]] || {
@@ -140,6 +147,8 @@ set -uo pipefail
     SGND_SCRIPT_DIR="$(cd -- "$(dirname -- "$SGND_SCRIPT_FILE")" && pwd)"
     SGND_SCRIPT_BASE="$(basename -- "$SGND_SCRIPT_FILE")"
     SGND_SCRIPT_NAME="${SGND_SCRIPT_BASE%.sh}"
+    SGND_SCRIPT_TITLE="SolidGroundUX Management Console"
+    SGND_SCRIPT_DESCRIPTION="Modular application host"
 
 # --- Script metadata (framework integration) -----------------------------------------
     # SGND_USING
@@ -561,8 +570,8 @@ set -uo pipefail
     _sgnd_console_load_config() {
         local module_path="${VAL_APPCFG-}"
 
-        : "${SGND_CONSOLE_TITLE:=${SGND_SCRIPT_TITLE}}"
-        : "${SGND_CONSOLE_DESC:=${SGND_SCRIPT_DESCRIPTION:-$SGND_SCRIPT_DESC}}"
+        : "${SGND_CONSOLE_TITLE:=${SGND_SCRIPT_TITLE:-SolidGroundUX Management Console}}"
+        : "${SGND_CONSOLE_DESC:=${SGND_SCRIPT_DESCRIPTION:-${SGND_SCRIPT_DESC:-}}}"
         : "${SGND_PAGE_MAX_ROWS:=25}"
 
         if [[ -n "${VAL_TITLE:-}" ]]; then

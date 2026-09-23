@@ -4,13 +4,13 @@
 # -------------------------------------------------------------------------------------
 # Metadata:
 #   Version     : 2.1
-#   Build       : 2626523
+#   Build       : 2626612
 #   Source      : manage-solidgroundux.sh
 #   Type        : script
 #   Group       : Role Managers
 #   Purpose     : Apply persistent SolidGroundUX framework management actions
 #
-#   Checksum : bb540f35846fc1ec4fa2bda09cb07568f3678f507a79f3eb1cce569cf2839bc3
+#   Checksum : 8ac8e3c81742b2437db38eb71216a00700254d8b9fa8484178b839e247bb44ce
 # Description:
 #   Implements persistent framework configuration and logging actions dispatched by
 #   the SolidGroundUX Management Console. All mutating actions honor --dryrun and
@@ -39,7 +39,10 @@ set -uo pipefail
         #   - Resolves production scripts beneath /usr, /etc, or /var to root (/).
         #   - Resolves staged/development trees to the path prefix preceding the detected
         #     usr, etc, or var component.
-        #   - Loads sgnd-exe-common.sh from the resolved framework root.
+        #   - Loads sgnd-exe-common.sh from the resolved framework root when available.
+        #   - For staged/development trees where the executable common library is not
+        #     present, falls back to the installed framework copy without changing
+        #     SGND_FRAMEWORK_ROOT.
         #
         # . Globals (write)
         #   SGND_FRAMEWORK_ROOT
@@ -102,6 +105,10 @@ set -uo pipefail
             exe_common="/usr/local/lib/solidgroundux/common/sgnd-exe-common.sh"
         else
             exe_common="${SGND_FRAMEWORK_ROOT%/}/usr/local/lib/solidgroundux/common/sgnd-exe-common.sh"
+
+            if [[ ! -r "$exe_common" ]]; then
+                exe_common="/usr/local/lib/solidgroundux/common/sgnd-exe-common.sh"
+            fi
         fi
 
         [[ -r "$exe_common" ]] || {

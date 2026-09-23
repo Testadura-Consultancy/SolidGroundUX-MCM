@@ -4,13 +4,13 @@
 # -------------------------------------------------------------------------------------
 # Metadata:
 #   Version     : 2.1
-#   Build       : 2626523
+#   Build       : 2626612
 #   Source      : manage-active-directory-client.sh
 #   Type        : script
 #   Group       : Role Managers
 #   Purpose     : Join, reconcile, validate, and inspect an Active Directory client
 #
-#   Checksum : db6376b99b59b30fff45fcf515970d9e0150ef0be3ee6aed309030ad8234045b
+#   Checksum : 12f2d9436c415f40ec4655b2cad49af79899d44d5ec9d2eda9cfe5c2b3df4ef9
 # Description:
 #   Implements persistent Active Directory client management actions exposed by the
 #   25-active-directory-client Management Console module.
@@ -31,7 +31,10 @@ set -uo pipefail
         #   - Resolves production scripts beneath /usr, /etc, or /var to root (/).
         #   - Resolves staged/development trees to the path prefix preceding the detected
         #     usr, etc, or var component.
-        #   - Loads sgnd-exe-common.sh from the resolved framework root.
+        #   - Loads sgnd-exe-common.sh from the resolved framework root when available.
+        #   - For staged/development trees where the executable common library is not
+        #     present, falls back to the installed framework copy without changing
+        #     SGND_FRAMEWORK_ROOT.
         #
         # . Globals (write)
         #   SGND_FRAMEWORK_ROOT
@@ -94,6 +97,10 @@ set -uo pipefail
             exe_common="/usr/local/lib/solidgroundux/common/sgnd-exe-common.sh"
         else
             exe_common="${SGND_FRAMEWORK_ROOT%/}/usr/local/lib/solidgroundux/common/sgnd-exe-common.sh"
+
+            if [[ ! -r "$exe_common" ]]; then
+                exe_common="/usr/local/lib/solidgroundux/common/sgnd-exe-common.sh"
+            fi
         fi
 
         [[ -r "$exe_common" ]] || {

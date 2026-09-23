@@ -4,8 +4,8 @@
 # ------------------------------------------------------------------------------------
 # Metadata:
 #   Version     : 2.1
-#   Build       : 2626523
-#   Checksum    : 75fed672c6521c3c16213c2947298526dab2eeeeaf1e3cb14ec48adfb2fe327a
+#   Build       : 2626612
+#   Checksum    : 2215ceef3870f43caf80c505a2b843a1b3cbd38a4dcebd0c646e497b84d2e9fb
 #   Source      : manage-identity.sh
 #   Type        : script
 #   Group       : Role Managers
@@ -36,7 +36,10 @@ set -uo pipefail
         #   - Resolves production scripts beneath /usr, /etc, or /var to root (/).
         #   - Resolves staged/development trees to the path prefix preceding the detected
         #     usr, etc, or var component.
-        #   - Loads sgnd-exe-common.sh from the resolved framework root.
+        #   - Loads sgnd-exe-common.sh from the resolved framework root when available.
+        #   - For staged/development trees where the executable common library is not
+        #     present, falls back to the installed framework copy without changing
+        #     SGND_FRAMEWORK_ROOT.
         #
         # . Globals (write)
         #   SGND_FRAMEWORK_ROOT
@@ -99,6 +102,10 @@ set -uo pipefail
             exe_common="/usr/local/lib/solidgroundux/common/sgnd-exe-common.sh"
         else
             exe_common="${SGND_FRAMEWORK_ROOT%/}/usr/local/lib/solidgroundux/common/sgnd-exe-common.sh"
+
+            if [[ ! -r "$exe_common" ]]; then
+                exe_common="/usr/local/lib/solidgroundux/common/sgnd-exe-common.sh"
+            fi
         fi
 
         [[ -r "$exe_common" ]] || {

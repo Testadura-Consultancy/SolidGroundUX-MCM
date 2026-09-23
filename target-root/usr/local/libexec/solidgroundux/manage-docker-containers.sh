@@ -4,13 +4,13 @@
 # ----------------------------------------------------------------------------------
 # Metadata:
 #   Version     : 2.1
-#   Build       : 2626523
+#   Build       : 2626612
 #   Source      : manage-docker-containers.sh
 #   Type        : script
 #   Group       : Role Managers
 #   Purpose     : Create and manage Docker containers and images
 #
-#   Checksum : 19c69cd900848941cc13d5a801ba886fe64e03ec8a469c1d2eeb5990130497e8
+#   Checksum : b42a36d376c62fbc8e4bf0caecf4aa3d0f27fb1db2c707fade0a956e8bb479c1
 # Description:
 #   Provides a deliberately small first-version Docker container manager. It covers
 #   the common lifecycle and creation options without attempting to replace Docker
@@ -32,7 +32,10 @@ set -uo pipefail
         #   - Resolves production scripts beneath /usr, /etc, or /var to root (/).
         #   - Resolves staged/development trees to the path prefix preceding the detected
         #     usr, etc, or var component.
-        #   - Loads sgnd-exe-common.sh from the resolved framework root.
+        #   - Loads sgnd-exe-common.sh from the resolved framework root when available.
+        #   - For staged/development trees where the executable common library is not
+        #     present, falls back to the installed framework copy without changing
+        #     SGND_FRAMEWORK_ROOT.
         #
         # . Globals (write)
         #   SGND_FRAMEWORK_ROOT
@@ -95,6 +98,10 @@ set -uo pipefail
             exe_common="/usr/local/lib/solidgroundux/common/sgnd-exe-common.sh"
         else
             exe_common="${SGND_FRAMEWORK_ROOT%/}/usr/local/lib/solidgroundux/common/sgnd-exe-common.sh"
+
+            if [[ ! -r "$exe_common" ]]; then
+                exe_common="/usr/local/lib/solidgroundux/common/sgnd-exe-common.sh"
+            fi
         fi
 
         [[ -r "$exe_common" ]] || {

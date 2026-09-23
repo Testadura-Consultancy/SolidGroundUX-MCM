@@ -4,7 +4,7 @@
 # -------------------------------------------------------------------------------------
 # Metadata:
 #   Version     : 2.1
-#   Build       : 2626523
+#   Build       : 2626612
 #   Source      : publish-web-content.sh
 #   Type        : script
 #   Group       : Role Managers
@@ -26,7 +26,10 @@ set -uo pipefail
         #   - Resolves production scripts beneath /usr, /etc, or /var to root (/).
         #   - Resolves staged/development trees to the path prefix preceding the detected
         #     usr, etc, or var component.
-        #   - Loads sgnd-exe-common.sh from the resolved framework root.
+        #   - Loads sgnd-exe-common.sh from the resolved framework root when available.
+        #   - For staged/development trees where the executable common library is not
+        #     present, falls back to the installed framework copy without changing
+        #     SGND_FRAMEWORK_ROOT.
         #
         # . Globals (write)
         #   SGND_FRAMEWORK_ROOT
@@ -89,6 +92,10 @@ set -uo pipefail
             exe_common="/usr/local/lib/solidgroundux/common/sgnd-exe-common.sh"
         else
             exe_common="${SGND_FRAMEWORK_ROOT%/}/usr/local/lib/solidgroundux/common/sgnd-exe-common.sh"
+
+            if [[ ! -r "$exe_common" ]]; then
+                exe_common="/usr/local/lib/solidgroundux/common/sgnd-exe-common.sh"
+            fi
         fi
 
         [[ -r "$exe_common" ]] || {
@@ -687,4 +694,4 @@ set -uo pipefail
         _run_action "$action"
     }
     main "$@"
-#   Checksum : bbbc8eccc953c324e4d09e5834d83048cb340d1b8c61a04b9a0136ddda434453
+#   Checksum : 5c6bf621f19f3e2af9d6a8d657e93a07ff0d5450eb7f0ef1c6fc6b2b84d7cd4c

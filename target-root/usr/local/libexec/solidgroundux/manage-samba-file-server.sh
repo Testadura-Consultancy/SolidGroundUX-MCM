@@ -4,13 +4,13 @@
 # -------------------------------------------------------------------------------------
 # Metadata:
 #   Version     : 2.1
-#   Build       : 2626523
+#   Build       : 2626612
 #   Source      : manage-samba-file-server.sh
 #   Type        : script
 #   Group       : Role Managers
 #   Purpose     : Prepare, validate, and inspect the Samba file-server service
 #
-#   Checksum : e8d9ff2e879a5921c53ceb5872a515f2c05cceef331c4e98b75392dc8f8f196e
+#   Checksum : b5c8c60309420180a5a66fac1860162ebee9768200223d5b2ba25c797e247aad
 # Description:
 #   Implements persistent Samba file-server management actions exposed by the
 #   30-samba-file-server Management Console module. Share lifecycle and ACL management
@@ -32,7 +32,10 @@ set -uo pipefail
         #   - Resolves production scripts beneath /usr, /etc, or /var to root (/).
         #   - Resolves staged/development trees to the path prefix preceding the detected
         #     usr, etc, or var component.
-        #   - Loads sgnd-exe-common.sh from the resolved framework root.
+        #   - Loads sgnd-exe-common.sh from the resolved framework root when available.
+        #   - For staged/development trees where the executable common library is not
+        #     present, falls back to the installed framework copy without changing
+        #     SGND_FRAMEWORK_ROOT.
         #
         # . Globals (write)
         #   SGND_FRAMEWORK_ROOT
@@ -95,6 +98,10 @@ set -uo pipefail
             exe_common="/usr/local/lib/solidgroundux/common/sgnd-exe-common.sh"
         else
             exe_common="${SGND_FRAMEWORK_ROOT%/}/usr/local/lib/solidgroundux/common/sgnd-exe-common.sh"
+
+            if [[ ! -r "$exe_common" ]]; then
+                exe_common="/usr/local/lib/solidgroundux/common/sgnd-exe-common.sh"
+            fi
         fi
 
         [[ -r "$exe_common" ]] || {
