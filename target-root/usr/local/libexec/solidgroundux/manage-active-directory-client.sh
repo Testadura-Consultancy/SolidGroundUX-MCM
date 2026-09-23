@@ -292,9 +292,9 @@ set -uo pipefail
         (( ${FLAG_DRYRUN:-0} == 1 )) && { sayinfo "DRYRUN: Would set DNS to $SGND_ADC_DNS_SERVER."; return 0; }
 
         if [[ "$SGND_FRAMEWORK_ROOT" == "/" ]]; then
-            identity_script="/usr/local/libexec/solidgroundux/set-identity.sh"
+            identity_script="/usr/local/libexec/solidgroundux/manage-identity.sh"
         else
-            identity_script="${SGND_FRAMEWORK_ROOT%/}/usr/local/libexec/solidgroundux/set-identity.sh"
+            identity_script="${SGND_FRAMEWORK_ROOT%/}/usr/local/libexec/solidgroundux/manage-identity.sh"
         fi
 
         [[ -x "$identity_script" ]] || { sayfail "Cannot execute canonical identity tool: $identity_script"; return 1; }

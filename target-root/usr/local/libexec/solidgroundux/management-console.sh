@@ -1619,7 +1619,7 @@ set -uo pipefail
         #   Returns 1 when the script cannot be found or is not executable.
         #
         # . Usage
-        #   _sgnd_run_module_script "set-identity.sh"
+        #   _sgnd_run_module_script "manage-identity.sh"
         #   _sgnd_run_module_script "prepare-template.sh" --dryrun
     _sgnd_run_module_script() {
         local script_name="${1:?missing script name}"

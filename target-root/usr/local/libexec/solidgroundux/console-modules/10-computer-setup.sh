@@ -78,11 +78,11 @@ set -uo pipefail
         #   Run the canonical SolidGroundUX identity workflow.
         #
         # . Returns
-        #   Exit status from set-identity.sh.
+        #   Exit status from manage-identity.sh.
         # . Usage
         #   _computer_set_identity "<args...>"
     _computer_set_identity() {
-        _sgnd_run_module_script "set-identity.sh" "$@"
+        _sgnd_run_module_script "manage-identity.sh" "$@"
     }
 
     # fn: _computer_configure_ssh_service

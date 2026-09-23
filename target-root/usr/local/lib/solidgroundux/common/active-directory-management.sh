@@ -89,7 +89,7 @@ set -uo pipefail
             return 1
         }
 
-        _sgnd_run_module_script "set-identity.sh" --dns-only --DNS "$dns_server" --Auto
+        _sgnd_run_module_script "manage-identity.sh" --dns-only --DNS "$dns_server" --Auto
     }
 
 # - Shared validation --------------------------------------------------------------
