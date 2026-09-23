@@ -13,7 +13,7 @@
 <table>
 <tr>
 <td width="33%" align="center">
-  <a href="target-root/usr/local/share/doc/SolidGroundUX Management Console Modules/index.html"><strong>Documentation</strong></a><br>
+  <a href="https://testadura-consultancy.github.io/SolidgroundUX/"><strong>Documentation</strong></a><br>
   Product reference and guides
 </td>
 <td width="33%" align="center">
