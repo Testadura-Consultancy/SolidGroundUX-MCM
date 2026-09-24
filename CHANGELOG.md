@@ -5,6 +5,46 @@ All notable changes to SolidGroundUX Management Console Modules are documented i
 The format is inspired by *Keep a Changelog* while remaining focused on
 practical framework development.
 
+## Backlog
+
+### Computer setup module
+- Check endings: end with line; if ending with confirm or another prompt, don't show menu completion wait.
+
+### Storage module
+- Check endings: end with line; if ending with confirm or another prompt, don't show menu completion wait.
+- When configuring multiple mount points, there's no "Configure another?" prompt; it just jumps into the next.
+- Doesn't report subactions to main menu action.
+
+### AD Server module
+- Provision domain doesn't report the underlying menu actions as done or errored.
+- Check endings: end with line; if ending with confirm or another prompt, don't show menu completion wait.
+- Add functionality to configure a second domain controller (after detecting one is present).
+
+### AD Management
+- Check endings.
+- Group and User management should enable selecting multiple users or groups and applying actions to them.
+
+### AD Client module
+- Join domain doesn't show done/failed on subtasks.
+- Check endings: end with line; if ending with confirm or another prompt, don't show menu completion wait.
+
+### Samba file server
+- Manage shares doesn't have a return-to-menu option (probably others too).
+
+### Webserver module
+- Report finish to main menu.
+- Check endings.
+- After publishing documentation I get 403 Forbidden when accessing through a browser on a different computer.
+
+### SQL Server module
+- Report finish to main menu.
+- Check endings.
+- 12 Show server status: show mount points, not devices.
+
+### Docker module
+- Check endings.
+- Test container management once you know what you are doing.
+
 ## Unreleased
 
 ## Release 2.1.2626712
