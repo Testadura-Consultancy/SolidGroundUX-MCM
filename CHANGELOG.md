@@ -7,6 +7,8 @@ practical framework development.
 
 ## Unreleased
 
+## Release 2.1.2626712
+
 ### Changed
 - Samba share creation now selects a storage location immediately below the configured SolidGroundUX storage root before asking for the share name; the share path is derived from that location and existing backing directories can be reused.
 - Standardized Management Console public management wrappers on the current canonical wrapper template rather than direct fixed `/usr/local/libexec` execution.
