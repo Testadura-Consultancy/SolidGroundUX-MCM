@@ -3,7 +3,7 @@
 # ----------------------------------------------------------------------------------
 # Metadata:
 #   Version     : 2.1
-#   Build       : 2626710
+#   Build       : 2626711
 #   Source      : 30-samba-file-server.sh
 #   Type        : module
 #   Group       : Module Registration

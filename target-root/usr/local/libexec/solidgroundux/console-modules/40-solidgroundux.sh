@@ -3,7 +3,7 @@
 # ----------------------------------------------------------------------------------
 # Metadata:
 #   Version     : 2.1
-#   Build       : 2626710
+#   Build       : 2626711
 #   Checksum    : 2da22429934c5e9ed1efc27cdfe1ab898ea4d4c6c6cbad138fb6d0bdf1a54814
 #   Source      : 40-solidgroundux.sh
 #   Type        : module
@@ -22,7 +22,7 @@
 #   License       : Licensed under the Testadura Non-Commercial License (TD-NC) v1.1.
 # ==================================================================================
 set -uo pipefail
-# - Library guard ------------------------------------------------------------------
+# - Library guard ----------------------------------------------------------------
     # fn$ _sgnd_lib_guard - Enforce source-only, single-load library initialization
         # . Purpose
         #   Ensure the file is sourced as a library and initialized only once.
@@ -70,7 +70,7 @@ set -uo pipefail
         && declare -F sgnd_header_buffer_load >/dev/null 2>&1; then
         sgnd_module_init_metadata "${BASH_SOURCE[0]}"
     fi
-# - Module metadata -------------------------------------------------------------
+# - Module metadata --------------------------------------------------------------
     SGND_SOLIDGROUNDUX_MODULE_ID="solidgroundux"
     SGND_SOLIDGROUNDUX_MODULE_NAME="SolidGroundUX"
     SGND_MODULE_ID="${SGND_SOLIDGROUNDUX_MODULE_ID}"
@@ -117,7 +117,7 @@ set -uo pipefail
         #   _framework_smoketest
         #
     _framework_smoketest() {
-        _sgnd_run_public_command "sgnd-framework-smoketest"
+        _sgnd_run_public_command "sgnd-smoketest"
     }
 
     # fn: _framework_show_environment
@@ -128,7 +128,7 @@ set -uo pipefail
         #   _framework_show_environment
         #
     _framework_show_environment() {
-        _sgnd_run_public_command "sgnd-framework-smoketest" --show env
+        _sgnd_run_public_command "sgnd-smoketest" --show env
     }
 
     # fn: _framework_show_about
@@ -240,7 +240,7 @@ set -uo pipefail
         _sgnd_run_module_script "manage-framework-state.sh" --action reload
     }
 
-# - Module validation contract ------------------------------------------------------
+# - Module validation contract ---------------------------------------------------
     # Return codes:
     #   0 = Passed
     #   1 = Failed

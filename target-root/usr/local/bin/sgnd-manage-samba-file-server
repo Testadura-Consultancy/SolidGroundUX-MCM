@@ -1,2 +1,135 @@
 #!/usr/bin/env bash
-exec "/usr/local/libexec/solidgroundux/manage-samba-file-server.sh" "$@"
+# =====================================================================================
+# SolidGroundUX - Command Wrapper
+# -------------------------------------------------------------------------------------
+# Metadata:
+#   Version     : 1.0
+#   Build       : -
+#   Checksum    : d0227d9918b8f9791c05f4b66cba11e99383b902db80294ab63a5093258c23c0
+#   Source      : wrapper-template
+#   Type        : wrapper
+#   Group       : SDK
+#   Subgroup    : Templates
+#   Purpose     : Launch a configured SolidGroundUX target beneath the active framework root.
+#
+# Description:
+#   Resolves the active SolidGroundUX framework from this wrapper's physical path,
+#   loads the executable runtime context, then launches SGND_WRAPPER_TARGET beneath
+#   SGND_FRAMEWORK_ROOT.
+#
+# Attribution:
+#   Developers  : Mark Fieten
+#   Company     : Testadura Consultancy
+#   Client      : -
+#   Copyright   : © 2025 - 2026 Testadura Consultancy
+#   License     : Licensed under the Testadura Non-Commercial License (TD-NC) v1.1.
+# =====================================================================================
+
+set -uo pipefail
+
+# - Bootstrap -----------------------------------------------------------------------
+    # fn$ _framework_locator - Resolve and load the active SolidGroundUX framework
+        # . Purpose
+        #   Determine the filesystem root of the currently executing SolidGroundUX tree
+        #   from the script's physical path, then load the executable runtime library.
+        #
+        # . Behavior
+        #   - Resolves the physical path of the executing script.
+        #   - Treats usr, etc, and var as the canonical top-level SolidGroundUX tree roots.
+        #   - Uses the last occurrence of one of those path components to determine the
+        #     active filesystem root.
+        #   - Resolves production scripts beneath /usr, /etc, or /var to root (/).
+        #   - Resolves staged/development trees to the path prefix preceding the detected
+        #     usr, etc, or var component.
+        #   - Loads sgnd-exe-common.sh from the resolved framework root.
+        #
+        # . Globals (write)
+        #   SGND_FRAMEWORK_ROOT
+        #
+        # . Output
+        #   Writes fatal bootstrap errors to stderr using printf because framework UI
+        #   helpers are not available until sgnd-exe-common.sh has been loaded.
+        #
+        # . Returns
+        #   0 when the framework root was resolved and executable common library loaded.
+        #   126 when the script path cannot be resolved, no canonical root component can
+        #   be found, or the executable common library is unreadable.
+        #
+        # . Usage
+        #   _framework_locator || return $?
+    _framework_locator() {
+        local script_file=""
+        local path_without_root=""
+        local component=""
+        local framework_root=""
+        local exe_common=""
+        local index=0
+        local root_index=-1
+        local -a path_parts=()
+
+        script_file="$(readlink -f "${BASH_SOURCE[0]}")" || {
+            printf 'FATAL: Cannot resolve executable path: %s\n' "${BASH_SOURCE[0]}" >&2
+            return 126
+        }
+
+        path_without_root="${script_file#/}"
+        IFS='/' read -r -a path_parts <<< "$path_without_root"
+
+        for index in "${!path_parts[@]}"; do
+            component="${path_parts[$index]}"
+            case "$component" in
+                usr|etc|var)
+                    root_index=$index
+                    ;;
+            esac
+        done
+
+        if (( root_index < 0 )); then
+            printf 'FATAL: Cannot determine SolidGroundUX framework root from: %s\n' "$script_file" >&2
+            return 126
+        fi
+
+        if (( root_index == 0 )); then
+            framework_root="/"
+        else
+            framework_root=""
+            for (( index=0; index<root_index; index++ )); do
+                framework_root+="/${path_parts[$index]}"
+            done
+        fi
+
+        SGND_FRAMEWORK_ROOT="$framework_root"
+
+        if [[ "$SGND_FRAMEWORK_ROOT" == "/" ]]; then
+            exe_common="/usr/local/lib/solidgroundux/common/sgnd-exe-common.sh"
+        else
+            exe_common="${SGND_FRAMEWORK_ROOT%/}/usr/local/lib/solidgroundux/common/sgnd-exe-common.sh"
+        fi
+
+        [[ -r "$exe_common" ]] || {
+            printf 'FATAL: Cannot read executable common library: %s\n' "$exe_common" >&2
+            return 126
+        }
+
+        # shellcheck source=/dev/null
+        source "$exe_common"
+    }
+
+# - Wrapper target -------------------------------------------------------------------
+    SGND_WRAPPER_TARGET="usr/local/libexec/solidgroundux/manage-samba-file-server.sh"
+
+# - Main -----------------------------------------------------------------------------
+    _framework_locator || exit $?
+
+    if [[ "$SGND_FRAMEWORK_ROOT" == "/" ]]; then
+        target="/${SGND_WRAPPER_TARGET#/}"
+    else
+        target="${SGND_FRAMEWORK_ROOT%/}/${SGND_WRAPPER_TARGET#/}"
+    fi
+
+    [[ -f "$target" ]] || {
+        printf 'FATAL: Wrapper target not found: %s\n' "$target" >&2
+        exit 127
+    }
+
+    exec bash "$target" "$@"

@@ -4,7 +4,7 @@
 # ------------------------------------------------------------------------------------
 # Metadata:
 #   Version     : 2.1
-#   Build       : 2626710
+#   Build       : 2626711
 #   Checksum    : 2215ceef3870f43caf80c505a2b843a1b3cbd38a4dcebd0c646e497b84d2e9fb
 #   Source      : manage-identity.sh
 #   Type        : script

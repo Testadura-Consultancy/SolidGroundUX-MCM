@@ -4,7 +4,7 @@
 # ------------------------------------------------------------------------------------
 # Metadata:
 #   Version     : 2.1
-#   Build       : 2626710
+#   Build       : 2626711
 #   Checksum    : e0ca15a407d641178da1eba0eebc09db4f552cb3b280d623150bfa27b77d07ea
 #   Source      : manage-samba-shares.sh
 #   Type        : script

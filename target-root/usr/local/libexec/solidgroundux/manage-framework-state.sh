@@ -4,7 +4,7 @@
 # ------------------------------------------------------------------------------------
 # Metadata:
 #   Version     : 2.1
-#   Build       : 2626710
+#   Build       : 2626711
 #   Checksum    : 7e72b5ccd1f63071f9b3be68418b73a0d211def306ce373cbdbf3a7339ac9859
 #   Source      : manage-framework-state.sh
 #   Type        : script

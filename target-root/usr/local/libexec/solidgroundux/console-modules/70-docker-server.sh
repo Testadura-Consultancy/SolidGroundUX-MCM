@@ -3,7 +3,7 @@
 # ----------------------------------------------------------------------------------
 # Metadata:
 #   Version     : 2.1
-#   Build       : 2626710
+#   Build       : 2626711
 #   Source      : 70-docker-server.sh
 #   Type        : module
 #   Group       : Module Registration
