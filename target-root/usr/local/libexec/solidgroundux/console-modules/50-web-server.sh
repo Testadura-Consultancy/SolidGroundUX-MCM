@@ -3,7 +3,7 @@
 # ----------------------------------------------------------------------------------
 # Metadata:
 #   Version     : 2.1
-#   Build       : 2626501
+#   Build       : 2626710
 #   Source      : 50-web-server.sh
 #   Type        : module
 #   Group       : Module Registration

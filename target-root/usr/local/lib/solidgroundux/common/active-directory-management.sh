@@ -4,13 +4,13 @@
 # -------------------------------------------------------------------------------------
 # Metadata:
 #   Version     : 2.1
-#   Build       : 2626414
+#   Build       : 2626710
 #   Source      : active-directory-management.sh
 #   Type        : library
 #   Group       : Common Core
 #   Purpose     : Provide shared Active Directory discovery and validation primitives
 #
-#   Checksum : 10f9f0976c2d2d81adf58301d9ca074240e0beab099cf92d587af9ae5fdb0f4d
+#   Checksum : 56e9ceddb6a01551f2c3d6c0a701a0b37b998680858b77a291428a56e4289e36
 # Description:
 #   Shared Active Directory primitives used by the server, client, and directory
 #   management executables. Role-specific provisioning and mutation remain outside
@@ -78,18 +78,25 @@ set -uo pipefail
         #   Exit status from the canonical identity workflow.
     sgnd_console_set_dns_server() {
         local dns_server="${1:-}"
+        local identity_script=""
 
         [[ -n "$dns_server" ]] || {
             sayfail "A DNS server IPv4 address is required."
             return 1
         }
 
-        declare -F _sgnd_run_module_script >/dev/null 2>&1 || {
-            sayfail "Console module-script runner is unavailable."
+        if [[ "${SGND_FRAMEWORK_ROOT:-/}" == "/" ]]; then
+            identity_script="/usr/local/libexec/solidgroundux/manage-identity.sh"
+        else
+            identity_script="${SGND_FRAMEWORK_ROOT%/}/usr/local/libexec/solidgroundux/manage-identity.sh"
+        fi
+
+        [[ -x "$identity_script" ]] || {
+            sayfail "Canonical identity manager is unavailable: $identity_script"
             return 1
         }
 
-        _sgnd_run_module_script "manage-identity.sh" --dns-only --DNS "$dns_server" --Auto
+        "$identity_script" --dns-only --DNS "$dns_server" --Auto
     }
 
 # - Shared validation --------------------------------------------------------------

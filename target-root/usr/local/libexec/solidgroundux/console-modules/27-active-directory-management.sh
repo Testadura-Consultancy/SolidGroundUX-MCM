@@ -3,14 +3,13 @@
 # ----------------------------------------------------------------------------------
 # Metadata:
 #   Version     : 2.1
-#   Build       : 2626501
-#   Checksum    : 6dd031c11481f22b2ca8c33dad7b60dc1997bbe525289dcea2dae4a05e31f565
+#   Build       : 2626710
+#   Checksum    : ece66c45f5bd38a4f25d95c1a21db211199eec28acb586c0ce3c3d4da5a87595
 #   Source      : 27-active-directory-management.sh
 #   Type        : module
 #   Group       : Module Registration
 #   Purpose     : Register Active Directory object-management actions
 #
-
 # Description:
 #   Registers day-to-day Active Directory administration actions with the SolidGround
 #   Management Console. Persistent object management is implemented by

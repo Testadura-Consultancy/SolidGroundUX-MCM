@@ -3,7 +3,7 @@
 # ----------------------------------------------------------------------------------
 # Metadata:
 #   Version     : 2.1
-#   Build       : 2626501
+#   Build       : 2626710
 #   Source      : 25-active-directory-client.sh
 #   Type        : module
 #   Group       : Module Registration

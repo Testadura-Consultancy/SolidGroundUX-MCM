@@ -4,7 +4,7 @@
 # ------------------------------------------------------------------------------------
 # Metadata:
 #   Version     : 2.1
-#   Build       : 2626612
+#   Build       : 2626710
 #   Checksum    : 39ac7930bf4136bb58af917acbd99692e967b0d09d120bf9269cba4fba364c35
 #   Source      : manage-framework-logging.sh
 #   Type        : script

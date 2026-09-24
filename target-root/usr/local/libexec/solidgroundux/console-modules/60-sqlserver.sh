@@ -3,7 +3,7 @@
 # ----------------------------------------------------------------------------------
 # Metadata:
 #   Version     : 2.1
-#   Build       : 2626501
+#   Build       : 2626710
 #   Source      : 60-sqlserver.sh
 #   Type        : module
 #   Group       : Module Registration

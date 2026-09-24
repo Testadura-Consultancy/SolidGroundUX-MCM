@@ -4,7 +4,7 @@
 # ----------------------------------------------------------------------------------
 # Metadata:
 #   Version     : 2.1
-#   Build       : 2626612
+#   Build       : 2626710
 #   Source      : manage-docker-containers.sh
 #   Type        : script
 #   Group       : Role Managers

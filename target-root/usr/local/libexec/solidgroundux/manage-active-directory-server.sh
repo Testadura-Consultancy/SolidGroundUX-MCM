@@ -4,13 +4,13 @@
 # -------------------------------------------------------------------------------------
 # Metadata:
 #   Version     : 2.1
-#   Build       : 2626612
+#   Build       : 2626710
 #   Source      : manage-active-directory-server.sh
 #   Type        : script
 #   Group       : Role Managers
 #   Purpose     : Provision, validate, and inspect a Samba Active Directory domain controller
 #
-#   Checksum : ff01bba66befcd71e4d3f3c39299b1d9618a0feb59c73ff43c00961fdf6cc509
+#   Checksum : 7c80c874af8a565baaa98c7046ab15d846fc3b32cc42f2e60fee707d9ceb2aa2
 # Description:
 #   Implements persistent Active Directory server management actions exposed by the
 #   20-active-directory-server Management Console module.
@@ -342,6 +342,32 @@ set -uo pipefail
         return 1
     }
 
+    # fn: _adsvr_wait_dns_port_free
+        # . Purpose
+        #   Wait until IPv4 TCP and UDP port 53 are free for Samba DNS.
+        #
+        # . Returns
+        #   0 when both IPv4 DNS ports are free before timeout; 1 otherwise.
+        #
+        # . Usage
+        #   _adsvr_wait_dns_port_free
+    _adsvr_wait_dns_port_free() {
+        local elapsed=0 timeout_seconds="${1:-10}"
+        local tcp="" udp=""
+        while (( elapsed < timeout_seconds )); do
+            tcp="$(sudo ss -lntp4 2>/dev/null || true)"
+            udp="$(sudo ss -lnup4 2>/dev/null || true)"
+            if ! grep -Eq '(^|[[:space:]])[^[:space:]]*:53[[:space:]]' <<< "$tcp" && \
+               ! grep -Eq '(^|[[:space:]])[^[:space:]]*:53[[:space:]]' <<< "$udp"; then
+                return 0
+            fi
+            sleep 1
+            elapsed=$((elapsed + 1))
+        done
+        sayfail "IPv4 DNS port 53 was not released for Samba."
+        return 1
+    }
+
     # fn: _adsvr_wait_dns
         # . Purpose
         #   Wait until Samba owns IPv4 TCP and UDP port 53 on the domain controller.
@@ -487,7 +513,7 @@ set -uo pipefail
         # . Usage
         #   _adsvr_step_resolver
     _adsvr_step_resolver() {
-        local dropin_dir="/etc/systemd/resolved.conf.d" dropin_file="/etc/systemd/resolved.conf.d/solidgroundux-samba-ad.conf" listeners=""
+        local dropin_dir="/etc/systemd/resolved.conf.d" dropin_file="/etc/systemd/resolved.conf.d/solidgroundux-samba-ad.conf"
         _adsvr_require_context || return 1
         declare -F sgnd_console_set_dns_server >/dev/null 2>&1 || { sayfail "Console DNS helper is unavailable."; return 1; }
         (( ${FLAG_DRYRUN:-0} == 1 )) && { sayinfo "DRYRUN: Would point the DC at its own DNS and release port 53."; return 0; }
@@ -497,9 +523,7 @@ set -uo pipefail
         grep -Fxq "Domains=~$SGND_AD_DNS_DOMAIN" "$dropin_file" && grep -Fxq 'DNSStubListener=no' "$dropin_file" || return 1
         sudo ln -sfn /run/systemd/resolve/resolv.conf /etc/resolv.conf || return 1
         sudo systemctl restart systemd-resolved.service || return 1
-        sleep 1
-        listeners="$(sudo ss -lntup 2>/dev/null | grep -E '127\.0\.0\.(53|54):53[[:space:]]' | grep -F 'systemd-resolve' || true)"
-        [[ -z "$listeners" ]] || { sayfail "systemd-resolved still owns an IPv4 DNS stub listener."; return 1; }
+        _adsvr_wait_dns_port_free 10 || return 1
         sayok "Local resolver prepared for Samba AD DNS."
     }
 

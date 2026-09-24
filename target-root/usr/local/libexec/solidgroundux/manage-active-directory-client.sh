@@ -4,13 +4,13 @@
 # -------------------------------------------------------------------------------------
 # Metadata:
 #   Version     : 2.1
-#   Build       : 2626612
+#   Build       : 2626710
 #   Source      : manage-active-directory-client.sh
 #   Type        : script
 #   Group       : Role Managers
 #   Purpose     : Join, reconcile, validate, and inspect an Active Directory client
 #
-#   Checksum : 12f2d9436c415f40ec4655b2cad49af79899d44d5ec9d2eda9cfe5c2b3df4ef9
+#   Checksum : 04389cb3df71f77bd6d6c6ed5f60b697b0a4e07e52fced24c5f2556f7616911d
 # Description:
 #   Implements persistent Active Directory client management actions exposed by the
 #   25-active-directory-client Management Console module.
