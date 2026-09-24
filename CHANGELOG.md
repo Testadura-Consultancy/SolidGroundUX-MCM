@@ -7,6 +7,23 @@ practical framework development.
 
 ## Unreleased
 
+### Changed
+- Samba share creation now selects a storage location immediately below the configured SolidGroundUX storage root before asking for the share name; the share path is derived from that location and existing backing directories can be reused.
+- Standardized Management Console public management wrappers on the current canonical wrapper template rather than direct fixed `/usr/local/libexec` execution.
+
+### Removed
+- Removed remaining references to the superseded `sgnd-framework-smoketest` command and stale `framework-smoketest.sh` implementation; Framework testing uses the Framework-owned `sgnd-smoketest` command.
+
+### Fixed
+- Fixed Active Directory shared management code so it invokes the canonical identity-management executable directly instead of depending on the Management Console's private module-script runner.
+- Fixed Active Directory server provisioning so resolver handoff waits for IPv4 DNS port 53 to become available before starting Samba, preventing intermittent DNS-listener failures during fresh domain-controller provisioning.
+- Fixed Active Directory Management module metadata formatting that caused lazy-load metadata validation to fail and subsequent retries to produce duplicate menu registrations.
+- Fixed Samba managed-share discovery and validation so shares can reside beneath selected top-level storage locations rather than being restricted to `/srv/storage/shares`.
+
+### Verified
+- Verified fresh Active Directory Domain Controller provisioning end-to-end on Ubuntu 24.04, with all provisioning, DNS, Kerberos, LDAP, registration, validation and status steps completing successfully.
+- Verified Active Directory Client workflow on a fresh Ubuntu system joining an existing known-good Active Directory domain.
+
 ## Release 2.1.2626523
 
 ### Added

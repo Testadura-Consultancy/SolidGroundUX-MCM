@@ -3,8 +3,8 @@
 # ----------------------------------------------------------------------------------
 # Metadata:
 #   Version     : 2.1
-#   Build       : 2626711
-#   Checksum    : 2da22429934c5e9ed1efc27cdfe1ab898ea4d4c6c6cbad138fb6d0bdf1a54814
+#   Build       : 2626712
+#   Checksum    : ebab49ddcb7bf8340f95a25eb0c6d223c12917c73384726142c7906aa7c8c1a7
 #   Source      : 40-solidgroundux.sh
 #   Type        : module
 #   Group       : Module Registration
@@ -22,7 +22,7 @@
 #   License       : Licensed under the Testadura Non-Commercial License (TD-NC) v1.1.
 # ==================================================================================
 set -uo pipefail
-# - Library guard ----------------------------------------------------------------
+# - Library guard ------------------------------------------------------------------
     # fn$ _sgnd_lib_guard - Enforce source-only, single-load library initialization
         # . Purpose
         #   Ensure the file is sourced as a library and initialized only once.

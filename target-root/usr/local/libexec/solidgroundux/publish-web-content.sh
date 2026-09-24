@@ -4,7 +4,7 @@
 # -------------------------------------------------------------------------------------
 # Metadata:
 #   Version     : 2.1
-#   Build       : 2626711
+#   Build       : 2626712
 #   Source      : publish-web-content.sh
 #   Type        : script
 #   Group       : Role Managers
