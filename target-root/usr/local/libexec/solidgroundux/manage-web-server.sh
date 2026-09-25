@@ -119,7 +119,7 @@ set -uo pipefail
 # - Framework integration -----------------------------------------------------------
     SGND_USING=()
     SGND_ARGS_SPEC=(
-        "action|a|enum|ACTION|Management action||prepare,install,configure-root,manage-sites,configure-documentation,documentation-status,service,firewall,validate,status"
+        "action|a|enum|ACTION|Management action||prepare,install,start,configure-root,manage-sites,configure-documentation,documentation-status,service,firewall,validate,status"
     )
     SGND_SCRIPT_EXAMPLES=(
         "  $SGND_SCRIPT_NAME --action status"
@@ -754,6 +754,76 @@ EOF
         sayok "Site disabled: $site"
     }
 
+
+    # fn: _web_server_change_document_root - Change the document root for an Nginx site
+        # . Returns
+        #   0 on success; non-zero when the operation cannot be completed.
+        # . Usage
+        #   _web_server_change_document_root
+    _web_server_change_document_root() {
+        local site=""
+        local config_file=""
+        local current_root=""
+        local document_root=""
+        local temp_file=""
+        local backup_file=""
+        local -a sites=()
+
+        mapfile -t sites < <(_web_server_available_sites 2>/dev/null || true)
+        (( ${#sites[@]} > 0 )) || { saywarning "No Nginx sites are available."; return 0; }
+        _web_ask_selection --label "Change document root" --var site --items "${sites[@]}" || return 0
+
+        config_file="/etc/nginx/sites-available/$site"
+        current_root="$(_web_server_site_document_root "$site" 2>/dev/null || true)"
+        [[ -n "$current_root" ]] || { sayfail "Could not determine document root for $site."; return 1; }
+
+        ask --label "Document root" --var document_root --default "$current_root" --back || return 0
+        [[ "$document_root" == /* && "$document_root" != "/" ]] || {
+            sayfail "Document root must be an absolute path other than /."
+            return 1
+        }
+        [[ "$document_root" != *$'\n'* && "$document_root" != *$'\r'* ]] || {
+            sayfail "Document root contains invalid characters."
+            return 1
+        }
+
+        [[ "$document_root" != "$current_root" ]] || { sayok "Document root is already configured as $current_root"; return 0; }
+        _web_server_ensure_directory "$document_root" "www-data:www-data" || return 1
+
+        if (( ${FLAG_DRYRUN:-0} == 1 )); then
+            sayinfo "DRYRUN: Would change document root for $site from $current_root to $document_root."
+            return 0
+        fi
+
+        temp_file="$(mktemp "${TMPDIR:-/tmp}/sgnd-nginx-site.XXXXXX")" || return 1
+        backup_file="$(mktemp "${TMPDIR:-/tmp}/sgnd-nginx-site-backup.XXXXXX")" || { rm -f -- "$temp_file"; return 1; }
+        sudo cp -- "$config_file" "$backup_file" || { rm -f -- "$temp_file" "$backup_file"; return 1; }
+        sudo chown "$(id -u):$(id -g)" "$backup_file" || { rm -f -- "$temp_file" "$backup_file"; return 1; }
+
+        awk -v new_root="$document_root" '
+            BEGIN { changed=0 }
+            !changed && $1 == "root" { print "    root " new_root ";"; changed=1; next }
+            { print }
+            END { if (!changed) exit 3 }
+        ' "$config_file" > "$temp_file" || { rm -f -- "$temp_file" "$backup_file"; sayfail "Could not update document root in $config_file."; return 1; }
+
+        sudo cp -- "$temp_file" "$config_file" || { rm -f -- "$temp_file" "$backup_file"; return 1; }
+        if ! _web_server_reload; then
+            sudo cp -- "$backup_file" "$config_file" >/dev/null 2>&1 || true
+            sudo nginx -t >/dev/null 2>&1 && sudo systemctl reload nginx.service >/dev/null 2>&1 || true
+            rm -f -- "$temp_file" "$backup_file"
+            sayfail "Document root change was rolled back because Nginx validation or reload failed."
+            return 1
+        fi
+
+        rm -f -- "$temp_file" "$backup_file"
+        if [[ "${SGND_WEB_DOC_SITE:-}" == "$site" ]]; then
+            SGND_WEB_DOC_ROOT="$document_root"
+            _web_server_save_state || return 1
+        fi
+        sayok "Document root changed for $site: $document_root"
+    }
+
     # fn: _web_server_remove_site - Remove an Nginx site configuration
         # . Returns
         #   0 on success; non-zero when the operation cannot be completed.
@@ -870,11 +940,12 @@ EOF
         #   _web_server_manage_sites
     _web_server_manage_sites() {
         local action=""
-        _web_ask_selection --label "Site management" --var action --items "Create site" "Enable site" "Disable site" "Remove site" "Remove site content" "List sites" || return 0
+        _web_ask_selection --label "Site management" --var action --items "Create site" "Enable site" "Disable site" "Change document root" "Remove site" "Remove site content" "List sites" || return 0
         case "$action" in
             "Create site") _web_server_create_site ;;
             "Enable site") _web_server_enable_site ;;
             "Disable site") _web_server_disable_site ;;
+            "Change document root") _web_server_change_document_root ;;
             "Remove site") _web_server_remove_site ;;
             "Remove site content") _web_server_remove_site_content ;;
             "List sites") _web_server_list_sites ;;
@@ -1093,6 +1164,7 @@ EOF
         case "$action" in
             prepare) _web_server_prepare || rc=$? ;;
             install) _web_server_step_install_packages || rc=$? ;;
+            start) _web_server_step_start || rc=$? ;;
             configure-root) _web_server_configure_root || rc=$? ;;
             manage-sites) _web_server_manage_sites || rc=$? ;;
             configure-documentation) _web_server_configure_documentation_site || rc=$? ;;

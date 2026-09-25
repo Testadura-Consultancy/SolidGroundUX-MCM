@@ -338,6 +338,41 @@ set -uo pipefail
             sudo chmod 0755 "$path" || return 1
         fi
     }
+
+
+    # Resolve a local source directory to the directory that actually contains
+    # the site's index file. If exactly one immediate child contains an index,
+    # offer that child as the web root rather than silently publishing one level too high.
+    _web_server_resolve_local_web_root() {
+        local input_dir="$1"
+        local var_name="$2"
+        local candidate=""
+        local decision="YES"
+        local -a candidates=()
+
+        [[ -d "$input_dir" ]] || return 1
+        if [[ -f "$input_dir/index.html" || -f "$input_dir/index.htm" ]]; then
+            printf -v "$var_name" '%s' "$input_dir"
+            return 0
+        fi
+
+        while IFS= read -r -d '' candidate; do
+            if [[ -f "$candidate/index.html" || -f "$candidate/index.htm" ]]; then
+                candidates+=("$candidate")
+            fi
+        done < <(find "$input_dir" -mindepth 1 -maxdepth 1 -type d -print0 2>/dev/null)
+
+        if (( ${#candidates[@]} == 1 )); then
+            ask_decision --label "Use detected web root ${candidates[0]}" --choices "YES|Y,NO|N" --default "YES" --var decision
+            if [[ "$decision" == "YES" ]]; then
+                printf -v "$var_name" '%s' "${candidates[0]}"
+                return 0
+            fi
+        fi
+
+        sayfail "Source web root must contain index.html or index.htm: $input_dir"
+        return 1
+    }
     # fn: _web_server_publish_key - Return the dedicated SolidGroundUX publishing key path
         # . Returns
         #   0 on success.
@@ -460,16 +495,17 @@ set -uo pipefail
 
         case "$source_type" in
             "Local directory")
-                ask --label "Source directory" --var source_dir --default "$source_dir" --back || return 0
+                ask --label "Source web root" --var source_dir --default "$source_dir" --back || return 0
                 [[ -d "$source_dir" ]] || { sayfail "Source directory does not exist: $source_dir"; return 1; }
+                _web_server_resolve_local_web_root "$source_dir" source_dir || return 1
                 source_spec="$source_dir/"
                 ;;
             "Remote machine")
                 command -v ssh >/dev/null 2>&1 || { sayfail "ssh is required for remote publishing."; return 1; }
                 ask --label "Source host" --var source_host --default "$source_host" --back || return 0
                 ask --label "Source user" --var source_user --default "$source_user" --back || return 0
-                ask --label "Source directory" --var source_dir --default "$source_dir" --back || return 0
-                [[ -n "$source_host" && -n "$source_user" && -n "$source_dir" ]] || { sayfail "Source host, user, and directory are required."; return 1; }
+                ask --label "Source web root" --var source_dir --default "$source_dir" --back || return 0
+                [[ -n "$source_host" && -n "$source_user" && -n "$source_dir" ]] || { sayfail "Source host, user, and web root are required."; return 1; }
                 remote="${source_user}@${source_host}"
                 key="$(_web_server_publish_key)"
                 if ! _web_server_remote_access_ready "$remote"; then
@@ -477,7 +513,7 @@ set -uo pipefail
                     _web_server_setup_remote_access "$remote" || return 1
                 fi
                 if (( ${FLAG_DRYRUN:-0} == 0 )); then
-                    ssh -o BatchMode=yes -o ConnectTimeout=8 -o IdentitiesOnly=yes -i "$key" "$remote" "test -d '$source_dir'" >/dev/null 2>&1 || { sayfail "Remote source directory does not exist or is not accessible: $remote:$source_dir"; return 1; }
+                    ssh -o BatchMode=yes -o ConnectTimeout=8 -o IdentitiesOnly=yes -i "$key" "$remote" "test -d '$source_dir' && { test -f '$source_dir/index.html' || test -f '$source_dir/index.htm'; }" >/dev/null 2>&1 || { sayfail "Remote source web root is not accessible or has no index.html/index.htm: $remote:$source_dir"; return 1; }
                 fi
                 source_spec="${remote}:${source_dir}/"
                 ;;
@@ -485,7 +521,7 @@ set -uo pipefail
                 command -v git >/dev/null 2>&1 || { sayfail "git is required for Git repository publishing."; return 1; }
                 ask --label "Repository URL" --var repository --default "$repository" --back || return 0
                 ask --label "Branch or tag" --var repo_ref --default "$repo_ref" --back || return 0
-                ask --label "Repository path" --var repo_path --default "$repo_path" --back || return 0
+                ask --label "Repository web root" --var repo_path --default "$repo_path" --back || return 0
                 [[ -n "$repository" && -n "$repo_ref" ]] || { sayfail "Repository URL and branch/tag are required."; return 1; }
                 if (( ${FLAG_DRYRUN:-0} == 1 )); then
                     source_spec="$repository@$repo_ref:${repo_path:-/}"
@@ -494,6 +530,7 @@ set -uo pipefail
                     git clone --quiet --depth 1 --branch "$repo_ref" "$repository" "$temp_dir/repository" || { rm -rf -- "$temp_dir"; return 1; }
                     source_dir="$temp_dir/repository/${repo_path#/}"
                     [[ -d "$source_dir" ]] || { sayfail "Repository path does not exist: ${repo_path:-/}"; rm -rf -- "$temp_dir"; return 1; }
+                    _web_server_resolve_local_web_root "$source_dir" source_dir || { rm -rf -- "$temp_dir"; return 1; }
                     source_spec="$source_dir/"
                 fi
                 ;;
@@ -583,37 +620,39 @@ set -uo pipefail
 
         case "$source_type" in
             "Installed documentation")
-                [[ -n "$source_dir" ]] || source_dir="share/doc"
+                [[ -n "$source_dir" && -d "$source_dir" ]] || source_dir="$installed_docs"
                 sgnd_print
                 sgnd_print_sectionheader ""
-                ask --label "Source directory" --var source_dir --default "$source_dir" --back || return 0
+                ask --label "Documentation web root" --var source_dir --default "$source_dir" --back || return 0
                 if [[ "$source_dir" != /* ]]; then
                     source_dir="$(readlink -m -- "$source_dir")"
                 fi
                 [[ -d "$source_dir" ]] || { sayfail "Installed documentation directory does not exist: $source_dir"; return 1; }
+                _web_server_resolve_local_web_root "$source_dir" source_dir || return 1
                 SGND_WEB_DOC_SOURCE_DIR="$source_dir"
                 _web_server_save_state || return 1
                 source_spec="$source_dir/"
                 ;;
             "Local directory")
-                ask --label "Source directory" --var source_dir --default "$source_dir" --back || return 0
+                ask --label "Documentation web root" --var source_dir --default "$source_dir" --back || return 0
                 [[ -d "$source_dir" ]] || { sayfail "Source directory does not exist: $source_dir"; return 1; }
+                _web_server_resolve_local_web_root "$source_dir" source_dir || return 1
                 source_spec="$source_dir/"
                 ;;
             "Remote machine")
                 command -v ssh >/dev/null 2>&1 || { sayfail "ssh is required for remote documentation publishing."; return 1; }
                 ask --label "Source host" --var source_host --default "$source_host" --back || return 0
                 ask --label "Source user" --var source_user --default "$source_user" --back || return 0
-                ask --label "Source directory" --var source_dir --default "$source_dir" --back || return 0
-                [[ -n "$source_host" && -n "$source_user" && -n "$source_dir" ]] || { sayfail "Source host, user, and directory are required."; return 1; }
+                ask --label "Documentation web root" --var source_dir --default "$source_dir" --back || return 0
+                [[ -n "$source_host" && -n "$source_user" && -n "$source_dir" ]] || { sayfail "Source host, user, and web root are required."; return 1; }
                 remote="${source_user}@${source_host}"
                 key="$(_web_server_publish_key)"
                 if ! _web_server_remote_access_ready "$remote"; then
                     saywarning "Passwordless SSH publishing access is not configured for $remote."
                     _web_server_setup_remote_access "$remote" || return 1
                 fi
-                if ! ssh -o BatchMode=yes -o ConnectTimeout=8 -o IdentitiesOnly=yes -i "$key" "$remote" "test -d '$source_dir'" >/dev/null 2>&1; then
-                    sayfail "Remote documentation directory does not exist or is not accessible: $remote:$source_dir"
+                if ! ssh -o BatchMode=yes -o ConnectTimeout=8 -o IdentitiesOnly=yes -i "$key" "$remote" "test -d '$source_dir' && { test -f '$source_dir/index.html' || test -f '$source_dir/index.htm'; }" >/dev/null 2>&1; then
+                    sayfail "Remote documentation web root is not accessible or has no index.html/index.htm: $remote:$source_dir"
                     return 1
                 fi
                 source_spec="${remote}:${source_dir}/"
@@ -622,7 +661,7 @@ set -uo pipefail
                 command -v git >/dev/null 2>&1 || { sayfail "git is required for GitHub documentation publishing."; return 1; }
                 ask --label "Repository URL" --var repository --default "$repository" --back || return 0
                 ask --label "Branch or tag" --var repo_ref --default "$repo_ref" --back || return 0
-                ask --label "Documentation path" --var repo_path --default "$repo_path" --back || return 0
+                ask --label "Documentation web root" --var repo_path --default "$repo_path" --back || return 0
                 [[ -n "$repository" && -n "$repo_ref" && -n "$repo_path" ]] || { sayfail "Repository URL, branch/tag, and documentation path are required."; return 1; }
                 if (( ${FLAG_DRYRUN:-0} == 1 )); then
                     source_spec="$repository@$repo_ref:$repo_path"
@@ -631,6 +670,7 @@ set -uo pipefail
                     git clone --quiet --depth 1 --branch "$repo_ref" "$repository" "$temp_dir/repository" || { rm -rf -- "$temp_dir"; return 1; }
                     source_dir="$temp_dir/repository/${repo_path#/}"
                     [[ -d "$source_dir" ]] || { sayfail "Documentation path does not exist in repository: $repo_path"; rm -rf -- "$temp_dir"; return 1; }
+                    _web_server_resolve_local_web_root "$source_dir" source_dir || { rm -rf -- "$temp_dir"; return 1; }
                     source_spec="$source_dir/"
                 fi
                 ;;

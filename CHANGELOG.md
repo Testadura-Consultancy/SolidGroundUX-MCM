@@ -31,11 +31,6 @@ practical framework development.
 ### Samba file server
 - Manage shares doesn't have a return-to-menu option (probably others too).
 
-### Webserver module
-- Report finish to main menu.
-- Check endings.
-- After publishing documentation I get 403 Forbidden when accessing through a browser on a different computer.
-
 ### SQL Server module
 - Report finish to main menu.
 - Check endings.
@@ -46,6 +41,12 @@ practical framework development.
 - Test container management once you know what you are doing.
 
 ## Unreleased
+
+### Webserver module
+- Added completion status reporting for web-server preparation steps, including separate status for Nginx installation and web-service startup.
+- Standardized web-server action endings and removed redundant menu wait times for actions that handle their own continuation dialogs.
+- Improved web-content and SolidGroundUX documentation publishing to resolve and validate the actual source web root, preventing nested publication directories that could result in HTTP 403 responses.
+- Added site document-root management, allowing the document root of an existing Nginx site to be changed.
 
 ## Release 2.1.2626712
 

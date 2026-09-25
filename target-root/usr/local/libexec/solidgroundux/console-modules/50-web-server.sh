@@ -74,8 +74,30 @@ set -uo pipefail
     _web_run_manage() { local action="${1:?missing action}"; _sgnd_run_module_script "manage-web-server.sh" --action "$action"; }
     _web_run_publish() { local action="${1:?missing action}"; _sgnd_run_module_script "publish-web-content.sh" --action "$action"; }
 
-    web_prepare()                 { _web_run_manage prepare; }
+    web_prepare() {
+        local rc=0
+
+        if _web_run_manage install; then
+            sgnd_menu_set_item_status "web-install" "success"
+        else
+            rc=$?
+            sgnd_menu_set_item_status "web-install" "failed"
+            sgnd_menu_set_item_status "web-start" "never"
+            return "$rc"
+        fi
+
+        if _web_run_manage start; then
+            sgnd_menu_set_item_status "web-start" "success"
+        else
+            rc=$?
+            sgnd_menu_set_item_status "web-start" "failed"
+            return "$rc"
+        fi
+
+        return 0
+    }
     web_install()                 { _web_run_manage install; }
+    web_start()                   { _web_run_manage start; }
     web_configure_root()          { _web_run_manage configure-root; }
     web_manage_sites()            { _web_run_manage manage-sites; }
     web_publish()                 { _web_run_publish publish-site; }
@@ -115,9 +137,10 @@ set -uo pipefail
     sgnd_menu_register_group "web-service" "Service" "Nginx service, firewall, validation, and status" 0 1 520
 
     sgnd_menu_register_item "web-prepare" "$SGND_WEB_SERVER_MODULE_ID" "Prepare web server" "web_prepare" "Install, validate, enable, and start Nginx" 0 15 1 0
-    sgnd_menu_register_item "web-install" "$SGND_WEB_SERVER_MODULE_ID" "Install Nginx" "web_install" "Install Nginx and basic web-server utilities" 0 15 1 1
+    sgnd_menu_register_item "web-install" "$SGND_WEB_SERVER_MODULE_ID" "Install Nginx" "web_install" "Install Nginx and basic web-server utilities" 0 0 1 1
+    sgnd_menu_register_item "web-start" "$SGND_WEB_SERVER_MODULE_ID" "Start web service" "web_start" "Enable and start nginx.service" 0 0 1 1
     sgnd_menu_register_item "web-root" "$SGND_WEB_SERVER_MODULE_ID" "Configure web content root" "web_configure_root" "Select or create the storage location used for web content" 0 15 1 0
-    sgnd_menu_register_item "web-sites" "$SGND_WEB_SERVER_MODULE_ID" "Manage sites" "web_manage_sites" "Create, enable, disable, remove, clear content from, and list Nginx sites" 0 15 1 0
+    sgnd_menu_register_item "web-sites" "$SGND_WEB_SERVER_MODULE_ID" "Manage sites" "web_manage_sites" "Create, enable, disable, change document roots, remove, clear content from, and list Nginx sites" 0 15 1 0
     sgnd_menu_register_item "web-publish" "$SGND_WEB_SERVER_MODULE_ID" "Publish web content" "web_publish" "Publish a local, remote, or Git repository source into an Nginx site" 0 15 1 0
 
     sgnd_menu_register_item "web-doc-configure" "web-documentation" "Configure documentation site" "web_doc_configure" "Create or select the Nginx site used for SolidGroundUX documentation" 0 15 1 0
