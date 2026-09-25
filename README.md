@@ -13,7 +13,7 @@
 <table>
 <tr>
 <td width="33%" align="center">
-  <a href="https://testadura-consultancy.github.io/SolidgroundUX/"><strong>Documentation</strong></a><br>
+  <a href="https://testadura-consultancy.github.io/SolidGroundUX/"><strong>Documentation</strong></a><br>
   Product reference and guides
 </td>
 <td width="33%" align="center">
