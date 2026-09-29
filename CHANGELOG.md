@@ -13,7 +13,6 @@ practical framework development.
 ### Storage module
 - Check endings: end with line; if ending with confirm or another prompt, don't show menu completion wait.
 - When configuring multiple mount points, there's no "Configure another?" prompt; it just jumps into the next.
-- Doesn't report subactions to main menu action.
 
 ### AD Server module
 - Provision domain doesn't report the underlying menu actions as done or errored.
@@ -28,9 +27,6 @@ practical framework development.
 - Join domain doesn't show done/failed on subtasks.
 - Check endings: end with line; if ending with confirm or another prompt, don't show menu completion wait.
 
-### Samba file server
-- Manage shares doesn't have a return-to-menu option (probably others too).
-
 ### SQL Server module
 - Report finish to main menu.
 - Check endings.
@@ -41,6 +37,24 @@ practical framework development.
 - Test container management once you know what you are doing.
 
 ## Unreleased
+
+### Storage module
+- Added recovery for restored or reattached `SGND_STORAGE` volumes whose filesystem UUID no longer matches the SolidGroundUX-managed `/etc/fstab` entry; persistence reconciliation can identify an unambiguous managed volume, confirm the repair, update persistent configuration, and remount it without reprovisioning.
+- Added completion-status propagation for composite storage configuration so completed storage subtasks are reflected by their Management Console status icons.
+
+### Samba file server
+- Simplified Samba authentication preparation so the server derives its mode from host Active Directory membership: AD members are configured for ADS integration and non-members for standalone operation, leaving domain membership ownership with the AD Client module.
+- Completed Samba ADS integration and validation around Samba machine trust, Winbind domain state, NETLOGON connectivity, SSSD-backed host membership, and DNS verification.
+- Improved Samba share-root preparation and validation so managed share paths remain traversable by authorized identities.
+- Expanded **Show shares** into the consolidated share/access overview, including authentication mode, backing path and directory state, path traversal, explicit group access, and access-configuration state; removed the now-redundant **Show access** action.
+- Added multiple-selection support for Active Directory groups when granting share access, applying the selected access level to every selected group and share.
+- Improved share creation so the managed share root is displayed, the backing directory defaults to the share name but can be overridden with a relative path, and an existing suitable backing directory is reused rather than treated as an error.
+- Added optional immediate access configuration after creating a share and kept new shares secure until explicit access is assigned.
+- Added standalone Samba identity management for local Samba users and groups while keeping those actions unavailable in Active Directory mode.
+- Added access-identity reconciliation support for managed shares.
+- Fixed share-root traversal permissions that could allow Samba share discovery while filesystem traversal still denied authorized AD users.
+- Fixed multi-group access assignment where only one selected Active Directory group could receive the requested rights.
+- Fixed composite Samba preparation so completed child actions report their status to the Management Console.
 
 ### Webserver module
 - Added completion status reporting for web-server preparation steps, including separate status for Nginx installation and web-service startup.

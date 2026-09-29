@@ -367,17 +367,23 @@ set -uo pipefail
 
     # fn: _adc_step_sssd
         # . Purpose
-        #   Enable, restart, and validate the SSSD client service.
+        #   Normalize, enable, restart, and validate the SSSD client service.
+        #
+        # . Behavior
+        #   - Removes obsolete SolidGroundUX-managed SSSD settings through the shared AD API.
+        #   - Validates the resulting SSSD configuration before activation.
+        #   - Enables and restarts sssd.service only after configuration validation succeeds.
         #
         # . Returns
-        #   0 when SSSD is active; non-zero otherwise.
+        #   0 when the SSSD configuration is valid and the service is active; non-zero otherwise.
         #
         # . Usage
         #   _adc_step_sssd
     _adc_step_sssd() {
-        (( ${FLAG_DRYRUN:-0} == 1 )) && { sayinfo "DRYRUN: Would restart SSSD."; return 0; }
+        (( ${FLAG_DRYRUN:-0} == 1 )) && { sayinfo "DRYRUN: Would normalize, validate, and restart SSSD."; return 0; }
+        sgnd_ad_normalize_sssd_config || return $?
         sudo systemctl enable sssd.service >/dev/null 2>&1 || true
-        sudo systemctl restart sssd.service || return 1
+        sudo systemctl restart sssd.service || { sayfail "SSSD could not be restarted."; return 1; }
         systemctl is-active --quiet sssd.service || { sayfail "SSSD is not active."; return 1; }
         sayok "SSSD is active."
     }
@@ -445,6 +451,12 @@ set -uo pipefail
         [[ -n "$realm" ]] && sgnd_ad_discover_kerberos "$realm" "$dns_server" && sgnd_print_labeledvalue --label "Kerberos discovery" --value "Passed" || { sgnd_print_labeledvalue --label "Kerberos discovery" --value "Failed"; failures=$((failures+1)); }
         [[ -n "$realm" ]] && sgnd_ad_discover_ldap "$realm" "$dns_server" && sgnd_print_labeledvalue --label "LDAP discovery" --value "Passed" || { sgnd_print_labeledvalue --label "LDAP discovery" --value "Failed"; failures=$((failures+1)); }
         systemctl is-active --quiet sssd.service && sgnd_print_labeledvalue --label "SSSD service" --value "Passed" || { sgnd_print_labeledvalue --label "SSSD service" --value "Failed"; failures=$((failures+1)); }
+        if sudo sssctl config-check >/dev/null 2>&1; then
+            sgnd_print_labeledvalue --label "SSSD configuration" --value "Passed"
+        else
+            sgnd_print_labeledvalue --label "SSSD configuration" --value "Failed"
+            failures=$((failures+1))
+        fi
         if [[ -n "$current_dns" && ( -z "$desired_dns" || "$current_dns" == "$desired_dns" ) ]]; then
             sgnd_print_labeledvalue --label "AD DNS configured" --value "Passed ($current_dns)"
         else

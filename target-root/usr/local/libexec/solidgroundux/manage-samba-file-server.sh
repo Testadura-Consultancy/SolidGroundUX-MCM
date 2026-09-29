@@ -4,7 +4,7 @@
 # -------------------------------------------------------------------------------------
 # Metadata:
 #   Version     : 2.1
-#   Build       : 2626711
+#   Build       : 2626712
 #   Source      : manage-samba-file-server.sh
 #   Type        : script
 #   Group       : Role Managers
@@ -112,6 +112,63 @@ set -uo pipefail
         # shellcheck source=/dev/null
         source "$exe_common"
     }
+# - Project libraries ---------------------------------------------------------------
+    # fn$ _load_ad_management - Load shared Active Directory discovery APIs
+        # . Returns
+        #   0 when the project Active Directory management library is loaded.
+        #
+        # . Usage
+        #   _load_ad_management || return $?
+    _load_ad_management() {
+        local app_root=""
+        local lib_file=""
+        local script_file=""
+        local path_without_root=""
+        local component=""
+        local index=0
+        local root_index=-1
+        local -a path_parts=()
+
+        script_file="$(readlink -f "${BASH_SOURCE[0]}")" || return 126
+        path_without_root="${script_file#/}"
+        IFS='/' read -r -a path_parts <<< "$path_without_root"
+
+        for index in "${!path_parts[@]}"; do
+            component="${path_parts[$index]}"
+            case "$component" in
+                usr|etc|var) root_index=$index ;;
+            esac
+        done
+
+        (( root_index >= 0 )) || {
+            sayfail "Cannot determine Samba application root."
+            return 126
+        }
+
+        if (( root_index == 0 )); then
+            app_root="/"
+        else
+            app_root=""
+            for (( index=0; index<root_index; index++ )); do
+                app_root+="/${path_parts[$index]}"
+            done
+        fi
+
+        if [[ "$app_root" == "/" ]]; then
+            lib_file="/usr/local/lib/solidgroundux/common/active-directory-management.sh"
+        else
+            lib_file="${app_root%/}/usr/local/lib/solidgroundux/common/active-directory-management.sh"
+        fi
+
+        [[ -r "$lib_file" ]] || {
+            sayfail "Cannot read Active Directory management library: $lib_file"
+            return 126
+        }
+
+        # shellcheck source=/dev/null
+        source "$lib_file"
+    }
+
 # - Script metadata ----------------------------------------------------------------
     SGND_SCRIPT_FILE="$(readlink -f "${BASH_SOURCE[0]}")"
     SGND_SCRIPT_DIR="$(cd -- "$(dirname -- "$SGND_SCRIPT_FILE")" && pwd)"
@@ -129,7 +186,7 @@ set -uo pipefail
 # - Framework integration -----------------------------------------------------------
     SGND_USING=()
     SGND_ARGS_SPEC=(
-        "action|a|enum|ACTION|Management action||prepare,install,storage,share-root,service,validate,status"
+        "action|a|enum|ACTION|Management action||prepare,install,authentication,storage,share-root,service,validate,status"
     )
     SGND_SCRIPT_EXAMPLES=(
         "  $SGND_SCRIPT_NAME --action prepare"
@@ -147,6 +204,7 @@ set -uo pipefail
     SGND_SAMBA_STORAGE_ROOT="$SGND_STORAGE_DEFAULT_MOUNTPOINT"
     SGND_SAMBA_SHARE_ROOT="$SGND_SAMBA_STORAGE_ROOT/shares"
     SGND_SAMBA_CONFIG="/etc/samba/smb.conf"
+    SGND_SSSD_CONFIG="/etc/sssd/sssd.conf"
 
 # - Helpers -------------------------------------------------------------------------
     _dryrun_complete() {
@@ -160,6 +218,12 @@ set -uo pipefail
 
         if [[ -r "$SGND_STORAGE_CONFIG_FILE" ]]; then
             mountpoint="$(awk -F= '
+                $1 == "SGND_STORAGE_MOUNTPOINTS" {
+                    value=substr($0, index($0, "=") + 1)
+                    split(value, parts, ":")
+                    print parts[1]
+                    exit
+                }
                 $1 == "SGND_STORAGE_MOUNTPOINT" {
                     print substr($0, index($0, "=") + 1)
                     exit
@@ -351,21 +415,546 @@ set -uo pipefail
     }
 
 
+    # fn: _smb_auth_mode - Return the configured Samba authentication mode
+        # . Purpose
+        #   Report Samba's active authentication mode independently of the Linux host's
+        #   realm membership so a domain-joined host can legitimately run Samba standalone.
+        #
+        # . Output
+        #   Writes "ad" when Samba security is ADS, otherwise "standalone".
+        #
+        # . Returns
+        #   0 always.
+        #
+        # . Usage
+        #   mode="$(_smb_auth_mode)"
+    _smb_auth_mode() {
+        local security=""
+
+        security="$(sudo testparm -s --parameter-name security 2>/dev/null || true)"
+        if [[ "${security^^}" == "ADS" ]]; then
+            printf 'ad\n'
+        else
+            printf 'standalone\n'
+        fi
+    }
+
+    # fn: _smb_validate_hostname_dns - Verify the server FQDN resolves to its primary IPv4 address
+        # . Purpose
+        #   Confirm the DNS state required for clients to reach the Samba server by hostname.
+        #
+        # . Behavior
+        #   - Uses the shared Active Directory network/DNS APIs.
+        #   - Verifies the local FQDN resolves to the host's primary IPv4 address.
+        #   - Does not create or modify DNS records; AD-client provisioning owns DNS registration.
+        #
+        # . Returns
+        #   0 when the FQDN resolves to the primary IPv4 address; non-zero otherwise.
+        #
+        # . Usage
+        #   _smb_validate_hostname_dns || return $?
+    _smb_validate_hostname_dns() {
+        local fqdn=""
+        local ip=""
+        local dns_server=""
+
+        fqdn="$(hostname -f 2>/dev/null || true)"
+        ip="$(sgnd_ad_primary_ipv4 2>/dev/null || true)"
+        dns_server="$(sgnd_ad_current_dns 2>/dev/null || true)"
+
+        [[ -n "$fqdn" && -n "$ip" ]] || {
+            sayfail "Cannot determine the Samba server FQDN and primary IPv4 address for DNS validation."
+            return 1
+        }
+
+        if sgnd_ad_dns_a_record_matches "$fqdn" "$ip" "$dns_server"; then
+            sayok "DNS resolves $fqdn to $ip."
+            return 0
+        fi
+
+        sayfail "DNS does not resolve $fqdn to the server address $ip."
+        return 1
+    }
+
+    # fn: _smb_write_auth_config - Normalize Samba global authentication settings
+        # . Purpose
+        #   Keep share definitions intact while replacing only SolidGroundUX-owned global
+        #   authentication and identity-mapping settings.
+        #
+        # . Arguments
+        #   $1  Authentication mode: ad or standalone.
+        #   $2  AD realm when mode is ad.
+        #   $3  AD short/NetBIOS domain when mode is ad.
+        #
+        # . Returns
+        #   0 when smb.conf is updated; non-zero on rewrite/install failure.
+        #
+        # . Usage
+        #   _smb_write_auth_config ad TESTADURA.HQ TESTADURA
+    _smb_write_auth_config() {
+        local mode="${1:?missing authentication mode}"
+        local realm="${2:-}"
+        local workgroup="${3:-WORKGROUP}"
+        local tmp_file=""
+
+        [[ -f "$SGND_SAMBA_CONFIG" ]] || {
+            sayfail "Samba configuration is unavailable: $SGND_SAMBA_CONFIG"
+            return 1
+        }
+
+        tmp_file="$(mktemp)" || return 1
+
+        awk -v mode="$mode" -v realm="$realm" -v workgroup="$workgroup" '
+            function managed(line, key) {
+                key=line
+                sub(/^[[:space:]]*/, "", key)
+                sub(/[[:space:]]*=.*/, "", key)
+                key=tolower(key)
+                return key == "workgroup" \
+                    || key == "security" \
+                    || key == "realm" \
+                    || key == "kerberos method" \
+                    || key == "map to guest" \
+                    || key == "winbind use default domain" \
+                    || key == "winbind refresh tickets" \
+                    || key ~ /^idmap config[[:space:]].*/
+            }
+            function emit_settings() {
+                if (emitted) return
+                print ""
+                print "\t# SolidGroundUX authentication"
+                if (mode == "ad") {
+                    print "\tworkgroup = " workgroup
+                    print "\tsecurity = ADS"
+                    print "\trealm = " realm
+                    print "\tkerberos method = secrets and keytab"
+                    print "\tmap to guest = Never"
+                    print "\twinbind use default domain = No"
+                    print "\twinbind refresh tickets = Yes"
+                    print "\tidmap config * : backend = tdb"
+                    print "\tidmap config * : range = 100000-199999"
+                    print "\tidmap config " workgroup " : backend = sss"
+                    print "\tidmap config " workgroup " : range = 200000-2147483647"
+                } else {
+                    print "\tworkgroup = WORKGROUP"
+                    print "\tsecurity = USER"
+                    print "\tmap to guest = Bad User"
+                }
+                emitted=1
+            }
+            BEGIN { in_global=0; saw_global=0; emitted=0 }
+            /^\[[^]]+\][[:space:]]*$/ {
+                section=tolower($0)
+                if (in_global) emit_settings()
+                in_global=(section == "[global]")
+                if (in_global) saw_global=1
+                print
+                next
+            }
+            {
+                if (in_global && managed($0)) next
+                if (in_global && $0 ~ /^[[:space:]]*#[[:space:]]*SolidGroundUX authentication[[:space:]]*$/) next
+                print
+            }
+            END {
+                if (in_global) emit_settings()
+                if (!saw_global) {
+                    print ""
+                    print "[global]"
+                    emit_settings()
+                }
+            }
+        ' "$SGND_SAMBA_CONFIG" > "$tmp_file" || {
+            rm -f "$tmp_file"
+            return 1
+        }
+
+        sudo install -o root -g root -m 0644 "$tmp_file" "$SGND_SAMBA_CONFIG" || {
+            rm -f "$tmp_file"
+            return 1
+        }
+        rm -f "$tmp_file"
+    }
+
+    # fn: _smb_enable_sssd_samba_password_sync - Keep Samba machine credentials synchronized by SSSD
+        # . Purpose
+        #   Enable SSSD's Samba machine-account password synchronization for the joined domain.
+        #
+        # . Behavior
+        #   - Delegates generic SSSD normalization to the shared Active Directory API.
+        #   - Reads the protected SSSD configuration through sudo.
+        #   - Adds ad_update_samba_machine_account_password=true to the joined domain section when needed.
+        #   - Validates a root-owned temporary candidate with sssctl before replacing the live configuration.
+        #   - Preserves the live configuration file's existing owner, group, and mode.
+        #   - Reports validation diagnostics through sayfail rather than writing ad-hoc error output.
+        #   - Restarts SSSD after validation so the setting is active immediately.
+        #   - Restores the original configuration when a changed file cannot be activated successfully.
+        #
+        # . Arguments
+        #   $1  Joined AD realm.
+        #
+        # . Returns
+        #   0 when the setting is present, validated, and active; non-zero otherwise.
+        #
+        # . Usage
+        #   _smb_enable_sssd_samba_password_sync TESTADURA.HQ
+    _smb_enable_sssd_samba_password_sync() {
+        local realm="${1:?missing realm}"
+        local domain_section="domain/${realm,,}"
+        local source_file=""
+        local candidate_file=""
+        local validation_dir=""
+        local validation_file=""
+        local snippet_dir=""
+        local validation_output=""
+        local file_uid=""
+        local file_gid=""
+        local file_mode=""
+        local needs_install=0
+        local awk_rc=0
+        local line=""
+
+        sudo test -r "$SGND_SSSD_CONFIG" || {
+            sayfail "SSSD configuration is unavailable: $SGND_SSSD_CONFIG"
+            return 1
+        }
+
+        command -v sssctl >/dev/null 2>&1 || {
+            sayfail "sssctl is unavailable; the SSSD configuration cannot be safely validated."
+            return 1
+        }
+
+        # Normalize SSSD through the shared Active Directory API before adding
+        # Samba-specific password synchronization. This keeps ownership of
+        # generic AD-client configuration repair outside the Samba manager.
+        sgnd_ad_normalize_sssd_config || return $?
+
+        file_uid="$(sudo stat -c '%u' "$SGND_SSSD_CONFIG")" || {
+            sayfail "Cannot determine the owner of $SGND_SSSD_CONFIG."
+            return 1
+        }
+        file_gid="$(sudo stat -c '%g' "$SGND_SSSD_CONFIG")" || {
+            sayfail "Cannot determine the group of $SGND_SSSD_CONFIG."
+            return 1
+        }
+        file_mode="$(sudo stat -c '%a' "$SGND_SSSD_CONFIG")" || {
+            sayfail "Cannot determine the permissions of $SGND_SSSD_CONFIG."
+            return 1
+        }
+
+        source_file="$(mktemp)" || {
+            sayfail "Cannot create a temporary SSSD configuration copy."
+            return 1
+        }
+        sudo cat "$SGND_SSSD_CONFIG" > "$source_file" || {
+            rm -f "$source_file"
+            sayfail "Cannot read $SGND_SSSD_CONFIG."
+            return 1
+        }
+
+        candidate_file="$(mktemp)" || {
+            rm -f "$source_file"
+            sayfail "Cannot create a temporary SSSD configuration candidate."
+            return 1
+        }
+
+        awk -v section="[$domain_section]" '
+            BEGIN { in_domain=0; saw_domain=0; found=0 }
+            function emit_setting() {
+                if (!found) {
+                    print "ad_update_samba_machine_account_password = true"
+                    found=1
+                }
+            }
+            /^\[[^]]+\][[:space:]]*$/ {
+                if (in_domain) emit_setting()
+                in_domain=(tolower($0)==tolower(section))
+                if (in_domain) saw_domain=1
+                print
+                next
+            }
+            {
+                if (in_domain && /^[[:space:]]*ad_update_samba_machine_account_password[[:space:]]*=/) {
+                    if ($0 ~ /^[[:space:]]*ad_update_samba_machine_account_password[[:space:]]*=[[:space:]]*true[[:space:]]*$/) {
+                        found=1
+                        print
+                    }
+                    next
+                }
+                print
+            }
+            END {
+                if (in_domain) emit_setting()
+                if (!saw_domain) exit 3
+            }
+        ' "$source_file" > "$candidate_file"
+        awk_rc=$?
+
+        case $awk_rc in
+            0) ;;
+            3)
+                rm -f "$source_file" "$candidate_file"
+                sayfail "SSSD domain section [$domain_section] was not found."
+                return 1
+                ;;
+            *)
+                rm -f "$source_file" "$candidate_file"
+                sayfail "Failed to prepare the SSSD Samba password-synchronization setting."
+                return 1
+                ;;
+        esac
+
+        if ! cmp -s "$source_file" "$candidate_file"; then
+            needs_install=1
+        fi
+
+        validation_dir="$(sudo mktemp -d /tmp/sgnd-sssd-validate.XXXXXX)" || {
+            rm -f "$source_file" "$candidate_file"
+            sayfail "Cannot create the protected SSSD validation workspace."
+            return 1
+        }
+        validation_file="$validation_dir/sssd.conf"
+
+        if ! sudo install -o root -g root -m 0600 "$candidate_file" "$validation_file"; then
+            sudo rm -rf "$validation_dir"
+            rm -f "$source_file" "$candidate_file"
+            sayfail "Cannot prepare the SSSD validation candidate."
+            return 1
+        fi
+
+        if sudo test -d /etc/sssd/conf.d; then
+            snippet_dir="/etc/sssd/conf.d"
+        else
+            snippet_dir="$validation_dir/conf.d"
+            if ! sudo mkdir -m 0700 "$snippet_dir"; then
+                sudo rm -rf "$validation_dir"
+                rm -f "$source_file" "$candidate_file"
+                sayfail "Cannot prepare the SSSD validation snippet directory."
+                return 1
+            fi
+        fi
+
+        if ! validation_output="$(sudo sssctl config-check -c "$validation_file" -s "$snippet_dir" 2>&1)"; then
+            while IFS= read -r line; do
+                [[ -n "$line" ]] && sayfail "$line"
+            done <<< "$validation_output"
+            sayfail "SSSD configuration validation failed; the existing configuration was not changed."
+            sudo rm -rf "$validation_dir"
+            rm -f "$source_file" "$candidate_file"
+            return 1
+        fi
+
+        sudo rm -rf "$validation_dir"
+
+        if (( needs_install == 1 )); then
+            if ! sudo install -o "$file_uid" -g "$file_gid" -m "$file_mode" "$candidate_file" "$SGND_SSSD_CONFIG"; then
+                rm -f "$source_file" "$candidate_file"
+                sayfail "Cannot update $SGND_SSSD_CONFIG."
+                return 1
+            fi
+        fi
+        rm -f "$candidate_file"
+
+        if ! sudo systemctl restart sssd.service; then
+            sayfail "SSSD could not be restarted after enabling Samba machine-account password synchronization."
+            if (( needs_install == 1 )); then
+                if sudo install -o "$file_uid" -g "$file_gid" -m "$file_mode" "$source_file" "$SGND_SSSD_CONFIG"; then
+                    saywarning "The previous SSSD configuration was restored."
+                    if ! sudo systemctl restart sssd.service; then
+                        sayfail "SSSD could not be restarted after restoring the previous configuration."
+                    fi
+                else
+                    sayfail "The previous SSSD configuration could not be restored."
+                fi
+            fi
+            rm -f "$source_file"
+            return 1
+        fi
+
+        if ! systemctl is-active --quiet sssd.service; then
+            sayfail "SSSD is not active after applying Samba machine-account password synchronization."
+            if (( needs_install == 1 )); then
+                if sudo install -o "$file_uid" -g "$file_gid" -m "$file_mode" "$source_file" "$SGND_SSSD_CONFIG"; then
+                    saywarning "The previous SSSD configuration was restored."
+                    if ! sudo systemctl restart sssd.service; then
+                        sayfail "SSSD could not be restarted after restoring the previous configuration."
+                    fi
+                else
+                    sayfail "The previous SSSD configuration could not be restored."
+                fi
+            fi
+            rm -f "$source_file"
+            return 1
+        fi
+
+        rm -f "$source_file"
+        return 0
+    }
+
+    # fn: _smb_configure_authentication - Configure Samba from the host identity state
+        # . Purpose
+        #   Configure Samba for the authentication model already established on the host.
+        #   Active Directory membership is owned by the AD-client module; Samba adapts to it.
+        #
+        # . Behavior
+        #   - Detects existing realm/SSSD membership without asking the administrator to choose a mode.
+        #   - Configures standalone USER security when the host is not joined to Active Directory.
+        #   - Configures ADS security, Winbind, and SSSD-backed ID mapping when the host is an AD member.
+        #   - Never joins or leaves the Linux host realm; AD-client provisioning owns that lifecycle.
+        #   - Normalizes SSSD and enables synchronization of future Samba machine-account password changes.
+        #   - Tests the Samba ADS trust before attempting a Samba-native member-server join.
+        #   - When Samba has no valid ADS trust, asks for an authorized AD join account and performs
+        #     net ads join; the command obtains the account password interactively from the terminal.
+        #   - Restarts Winbind after the Samba trust exists so Winbind reloads the ADS domain state.
+        #   - Validates the Samba trust, Winbind trust secret, own domain, NETLOGON, and hostname DNS.
+        #   - Suppresses Samba's duplicate dynamic DNS update because AD-client provisioning owns
+        #     the host DNS A record.
+        #
+        # . Returns
+        #   0 when Samba matches the detected host identity state and validates successfully.
+        #   Non-zero when configuration, trust establishment, or validation fails.
+        #
+        # . Usage
+        #   _smb_configure_authentication
+    _smb_configure_authentication() {
+        local mode="standalone"
+        local realm=""
+        local workgroup=""
+        local join_account="Administrator"
+        local own_domain=""
+
+        if sgnd_ad_is_domain_member; then
+            mode="ad"
+            sayinfo "Active Directory membership detected; configuring Samba as an AD member server."
+        else
+            sayinfo "No Active Directory membership detected; configuring Samba as a standalone WORKGROUP server."
+        fi
+
+        if [[ "$mode" == "standalone" ]]; then
+            if (( ${FLAG_DRYRUN:-0} == 1 )); then
+                sayinfo "DRYRUN: Would configure Samba as a standalone WORKGROUP server."
+                _dryrun_complete
+                return 0
+            fi
+
+            _smb_write_auth_config standalone || return 1
+            sudo testparm -s >/dev/null 2>&1 || {
+                sayfail "Standalone Samba configuration validation failed."
+                return 1
+            }
+            sudo systemctl disable --now winbind.service >/dev/null 2>&1 || true
+            sudo systemctl restart smbd.service >/dev/null 2>&1 || {
+                sayfail "Samba could not be restarted after configuring standalone authentication."
+                return 1
+            }
+            sayok "Samba authentication configured for standalone WORKGROUP mode."
+            return 0
+        fi
+
+        realm="$(sgnd_ad_current_realm 2>/dev/null || true)"
+        [[ -n "$realm" ]] || {
+            sayfail "Active Directory membership was detected but the joined realm could not be resolved."
+            return 1
+        }
+        realm="${realm^^}"
+
+        workgroup="$(sgnd_ad_current_netbios_domain "$realm" 2>/dev/null || true)"
+        [[ -n "$workgroup" ]] || {
+            sayfail "Active Directory short/NetBIOS domain could not be discovered for $realm."
+            return 1
+        }
+
+        if (( ${FLAG_DRYRUN:-0} == 1 )); then
+            sayinfo "DRYRUN: Host is joined to $realm; would configure Samba as an AD member server for $workgroup."
+            sayinfo "DRYRUN: Would install Winbind, configure SSSD-backed ID mapping, establish Samba ADS trust when required, restart Winbind, and validate trust and NETLOGON."
+            _dryrun_complete
+            return 0
+        fi
+
+        sudo env DEBIAN_FRONTEND=noninteractive apt-get install -y winbind sssd-common || return 1
+        _smb_write_auth_config ad "$realm" "$workgroup" || return 1
+        sudo testparm -s >/dev/null 2>&1 || {
+            sayfail "Active Directory Samba configuration validation failed."
+            return 1
+        }
+
+        _smb_enable_sssd_samba_password_sync "$realm" || return 1
+
+        if ! sudo net ads testjoin >/dev/null 2>&1; then
+            sayinfo "Samba does not yet have a valid Active Directory trust for $realm."
+            ask --label "AD join account" --var join_account --default "$join_account" --validate sgnd_ad_validate_account || return $?
+            sayinfo "Joining Samba to $realm as $join_account."
+
+            # net obtains the password from the controlling terminal. The password prompt is
+            # intentionally interactive. DNS registration is owned by AD-client provisioning,
+            # so Samba is told not to attempt a second dynamic DNS update.
+            sudo net ads join --no-dns-updates -U "$join_account" </dev/tty || {
+                sayfail "Samba could not establish an Active Directory trust for $realm."
+                return 1
+            }
+        fi
+
+        if ! sudo systemctl enable winbind.service >/dev/null 2>&1; then
+            sayfail "Winbind could not be enabled."
+            return 1
+        fi
+        if ! sudo systemctl restart winbind.service >/dev/null 2>&1; then
+            sayfail "Winbind could not be restarted after establishing the Samba trust."
+            return 1
+        fi
+        sudo systemctl restart smbd.service >/dev/null 2>&1 || {
+            sayfail "Samba could not be restarted after configuring Active Directory authentication."
+            return 1
+        }
+
+        sudo net ads testjoin >/dev/null 2>&1 || {
+            sayfail "Samba Active Directory trust validation failed."
+            return 1
+        }
+
+        own_domain="$(sudo wbinfo --own-domain 2>/dev/null || true)"
+        [[ "${own_domain^^}" == "${workgroup^^}" ]] || {
+            sayfail "Winbind reports domain '${own_domain:-unknown}' instead of '$workgroup'."
+            return 1
+        }
+
+        sudo wbinfo -t >/dev/null 2>&1 || {
+            sayfail "Winbind machine-account trust validation failed."
+            return 1
+        }
+        sudo wbinfo --ping-dc >/dev/null 2>&1 || {
+            sayfail "Winbind could not establish a NETLOGON connection to an Active Directory domain controller."
+            return 1
+        }
+
+        _smb_validate_hostname_dns || return $?
+
+        sayok "Samba authentication configured for Active Directory realm $realm ($workgroup)."
+    }
+
 # - Actions -------------------------------------------------------------------------
     _smb_install_packages() {
+        local -a packages=(acl attr samba samba-common-bin smbclient)
+
+        if sgnd_ad_is_domain_member; then
+            packages+=(winbind sssd-common)
+        fi
+
         if (( ${FLAG_DRYRUN:-0} == 1 )); then
             sayinfo "DRYRUN: Would refresh APT package metadata."
-            sayinfo "DRYRUN: Would install packages: acl attr samba samba-common-bin smbclient."
+            sayinfo "DRYRUN: Would install packages: ${packages[*]}."
             _dryrun_complete
             return 0
         fi
 
         sudo apt-get update || return 1
-        sudo env DEBIAN_FRONTEND=noninteractive apt-get install -y \
-            acl attr samba samba-common-bin smbclient || return 1
+        sudo env DEBIAN_FRONTEND=noninteractive apt-get install -y "${packages[@]}" || return 1
 
         command -v smbd >/dev/null 2>&1 || return 1
         command -v testparm >/dev/null 2>&1 || return 1
+        if sgnd_ad_is_domain_member; then
+            command -v wbinfo >/dev/null 2>&1 || return 1
+        fi
         sayok "Samba file-server prerequisites installed."
     }
 
@@ -380,13 +969,17 @@ set -uo pipefail
 
         if (( ${FLAG_DRYRUN:-0} == 1 )); then
             sayinfo "DRYRUN: Would create or normalize Samba share root '$SGND_SAMBA_SHARE_ROOT'."
-            sayinfo "DRYRUN: Would apply directory mode 0770."
+            sayinfo "DRYRUN: Would apply directory mode 0711 so authorized share users can traverse to managed shares without listing the container directory."
             _dryrun_complete
             return 0
         fi
 
-        sudo install -d -m 0770 "$SGND_SAMBA_SHARE_ROOT" || return 1
+        sudo install -d -m 0711 "$SGND_SAMBA_SHARE_ROOT" || return 1
         [[ -d "$SGND_SAMBA_SHARE_ROOT" ]] || return 1
+        [[ "$(stat -c '%a' "$SGND_SAMBA_SHARE_ROOT" 2>/dev/null || true)" == "711" ]] || {
+            sayfail "Samba share root permissions are not 0711: $SGND_SAMBA_SHARE_ROOT"
+            return 1
+        }
         sayok "Samba share root prepared at $SGND_SAMBA_SHARE_ROOT."
     }
 
@@ -427,6 +1020,7 @@ set -uo pipefail
         sgnd_print_sectionheader --text "Prepare Samba File Server"
 
         _smb_install_packages || return $?
+        _smb_configure_authentication || return $?
         _smb_validate_storage || return $?
         _smb_prepare_share_root || return $?
         _smb_start_service || return $?
@@ -438,6 +1032,15 @@ set -uo pipefail
         fi
     }
 
+    # fn: _smb_validate - Validate Samba file-server configuration and runtime state
+        # . Behavior
+        #   - Validates Samba tools, smb.conf, smbd, storage, share-root traversal, and configured shares.
+        #   - On AD members, validates ADS realm/workgroup settings, the Samba machine trust,
+        #     Winbind own-domain identity, the Winbind trust secret, and NETLOGON DC connectivity.
+        #   - Validates that SSSD Samba machine-account password synchronization remains enabled.
+        #
+        # . Returns
+        #   0 when all checks pass; non-zero when one or more checks fail.
     _smb_validate() {
         _smb_refresh_storage_paths
         local failures=0
@@ -445,6 +1048,12 @@ set -uo pipefail
         local share_name=""
         local share_path=""
         local share_count=0
+        local auth_mode=""
+        local realm=""
+        local workgroup=""
+        local configured_realm=""
+        local configured_security=""
+        local configured_workgroup=""
 
         sgnd_print
         sgnd_print_sectionheader --text "Validate Samba File Server"
@@ -473,6 +1082,62 @@ set -uo pipefail
         fi
         sgnd_print_labeledvalue --label "smbd service" --value "$result" --labelwidth 24
 
+        auth_mode="$(_smb_auth_mode)"
+        configured_security="$(sudo testparm -s --parameter-name security 2>/dev/null || true)"
+        configured_workgroup="$(sudo testparm -s --parameter-name workgroup 2>/dev/null || true)"
+
+        if [[ "$auth_mode" == "ad" ]]; then
+            realm="$(sgnd_ad_current_realm 2>/dev/null || true)"
+            realm="${realm^^}"
+            workgroup="$(sgnd_ad_current_netbios_domain "$realm" 2>/dev/null || true)"
+            configured_realm="$(sudo testparm -s --parameter-name realm 2>/dev/null || true)"
+            configured_realm="${configured_realm^^}"
+
+            if [[ "${configured_security^^}" == "ADS" && "$configured_realm" == "$realm" && "${configured_workgroup^^}" == "${workgroup^^}" ]]; then
+                result="Passed ($realm)"
+            else
+                result="Failed"
+                failures=$((failures + 1))
+            fi
+            sgnd_print_labeledvalue --label "Authentication" --value "$result" --labelwidth 24
+
+            if systemctl is-active --quiet winbind.service \
+                && sudo net ads testjoin >/dev/null 2>&1 \
+                && [[ "$(sudo wbinfo --own-domain 2>/dev/null || true)" == "$workgroup" ]] \
+                && sudo wbinfo -t >/dev/null 2>&1 \
+                && sudo wbinfo --ping-dc >/dev/null 2>&1; then
+                result="Passed"
+            else
+                result="Failed"
+                failures=$((failures + 1))
+            fi
+            sgnd_print_labeledvalue --label "AD machine trust" --value "$result" --labelwidth 24
+
+            if sudo grep -Eiq '^[[:space:]]*ad_update_samba_machine_account_password[[:space:]]*=[[:space:]]*true[[:space:]]*$' "$SGND_SSSD_CONFIG" 2>/dev/null; then
+                result="Passed"
+            else
+                result="Failed"
+                failures=$((failures + 1))
+            fi
+            sgnd_print_labeledvalue --label "SSSD Samba sync" --value "$result" --labelwidth 24
+
+            if _smb_validate_hostname_dns >/dev/null 2>&1; then
+                result="Passed"
+            else
+                result="Failed"
+                failures=$((failures + 1))
+            fi
+            sgnd_print_labeledvalue --label "Hostname DNS" --value "$result" --labelwidth 24
+        else
+            if [[ "${configured_security^^}" == "USER" && "${configured_workgroup^^}" == "WORKGROUP" ]]; then
+                result="Passed (standalone)"
+            else
+                result="Failed"
+                failures=$((failures + 1))
+            fi
+            sgnd_print_labeledvalue --label "Authentication" --value "$result" --labelwidth 24
+        fi
+
         if mountpoint -q "$SGND_SAMBA_STORAGE_ROOT"; then
             result="Passed"
         else
@@ -488,6 +1153,14 @@ set -uo pipefail
             failures=$((failures + 1))
         fi
         sgnd_print_labeledvalue --label "Share root" --value "$result" --labelwidth 24
+
+        if [[ -d "$SGND_SAMBA_SHARE_ROOT" && "$(stat -c '%a' "$SGND_SAMBA_SHARE_ROOT" 2>/dev/null || true)" == "711" ]]; then
+            result="Passed"
+        else
+            result="Failed"
+            failures=$((failures + 1))
+        fi
+        sgnd_print_labeledvalue --label "Share root traversal" --value "$result" --labelwidth 24
 
         if command -v testparm >/dev/null 2>&1; then
             while IFS= read -r share_name; do
@@ -523,6 +1196,11 @@ set -uo pipefail
         local config_state="unavailable"
         local storage_state="not configured"
         local share_root_state="not available"
+        local auth_mode="standalone"
+        local realm=""
+        local samba_role="unavailable"
+        local workgroup=""
+        local dns_state="not applicable"
 
         if command -v smbd >/dev/null 2>&1; then
             service_state="$(systemctl is-active smbd.service 2>/dev/null || true)"
@@ -543,7 +1221,27 @@ set -uo pipefail
         sgnd_print
         sgnd_print_sectionheader --text "Samba File Server"
         sgnd_print_labeledvalue --label "Service" --value "$service_state" --labelwidth 20
+        auth_mode="$(_smb_auth_mode)"
+        samba_role="$(sudo testparm -s --parameter-name 'server role' 2>/dev/null || true)"
+        workgroup="$(sudo testparm -s --parameter-name workgroup 2>/dev/null || true)"
+        if [[ "$auth_mode" == "ad" ]]; then
+            realm="$(sgnd_ad_current_realm 2>/dev/null || true)"
+            auth_mode="Active Directory"
+            if _smb_validate_hostname_dns >/dev/null 2>&1; then
+                dns_state="valid"
+            else
+                dns_state="invalid"
+            fi
+        else
+            auth_mode="Standalone"
+        fi
+
         sgnd_print_labeledvalue --label "Configuration" --value "$config_state" --labelwidth 20
+        sgnd_print_labeledvalue --label "Authentication" --value "$auth_mode" --labelwidth 20
+        [[ -n "$realm" ]] && sgnd_print_labeledvalue --label "Realm" --value "${realm^^}" --labelwidth 20
+        [[ -n "$workgroup" ]] && sgnd_print_labeledvalue --label "Workgroup/domain" --value "$workgroup" --labelwidth 20
+        [[ -n "$samba_role" ]] && sgnd_print_labeledvalue --label "Samba role" --value "$samba_role" --labelwidth 20
+        [[ "$auth_mode" == "Active Directory" ]] && sgnd_print_labeledvalue --label "Hostname DNS" --value "$dns_state" --labelwidth 20
         sgnd_print_labeledvalue --label "Storage" --value "$storage_state" --labelwidth 20
         sgnd_print_labeledvalue --label "Share root" --value "$share_root_state" --labelwidth 20
         sgnd_print
@@ -554,8 +1252,9 @@ set -uo pipefail
 
         case "$action" in
             prepare)    _smb_prepare_file_server ;;
-            install)    _smb_install_packages ;;
-            storage)    _smb_validate_storage ;;
+            install)         _smb_install_packages ;;
+            authentication)  _smb_configure_authentication ;;
+            storage)         _smb_validate_storage ;;
             share-root) _smb_prepare_share_root ;;
             service)    _smb_start_service ;;
             validate)   _smb_validate ;;
@@ -573,6 +1272,7 @@ set -uo pipefail
         local selection=""
 
         _framework_locator || return $?
+        _load_ad_management || return $?
         sgnd_exe_start "$@" || return $?
 
         action="${ACTION:-}"
@@ -584,6 +1284,7 @@ set -uo pipefail
                 --items \
                     "Prepare Samba file server" \
                     "Install Samba prerequisites" \
+                    "Configure Samba authentication" \
                     "Validate storage" \
                     "Prepare share root" \
                     "Start Samba service" \
@@ -593,6 +1294,7 @@ set -uo pipefail
             case "$selection" in
                 "Prepare Samba file server") action="prepare" ;;
                 "Install Samba prerequisites") action="install" ;;
+                "Configure Samba authentication") action="authentication" ;;
                 "Validate storage") action="storage" ;;
                 "Prepare share root") action="share-root" ;;
                 "Start Samba service") action="service" ;;

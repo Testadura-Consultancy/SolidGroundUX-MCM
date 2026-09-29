@@ -578,7 +578,7 @@ set -uo pipefail
         #   - Requires explicit confirmation before destructive changes.
         #   - Creates one GPT partition and formats it as ext4 or XFS.
         #   - Adds the filesystem UUID to /etc/fstab and mounts it.
-        #   -         #   - Honors console dry-run mode.
+        #   - Honors console dry-run mode.
         #
         # Inputs (globals):
         #   FLAG_DRYRUN
@@ -1056,11 +1056,55 @@ set -uo pipefail
     }
 
     # fn$ storage_reconcile_persistence
+        # . Purpose
+        #   Repair or clean stale SolidGroundUX-managed /etc/fstab storage entries.
+        #
+        # . Behavior
+        #   - Detects stale managed entries whose configured source no longer resolves.
+        #   - Detects filesystems labelled SGND_STORAGE that are present but not referenced by
+        #     a valid managed /etc/fstab entry.
+        #   - When exactly one stale entry and one replacement SGND_STORAGE filesystem exist,
+        #     offers to replace the stale UUID/source while preserving mount point and options.
+        #   - Validates the resulting /etc/fstab before activation and restores the backup on failure.
+        #   - Mounts the repaired filesystem when its target is currently unmounted.
+        #   - Falls back to the previous explicit stale-entry removal workflow when repair is ambiguous.
+        #   - Never formats, repartitions, or otherwise modifies filesystem contents.
+        #   - Honors console dry-run mode.
+        #
+        # . Returns
+        #   0 when persistence is already valid, repaired, removed by explicit confirmation, or cancelled.
+        #   Non-zero when a requested repair/removal cannot be completed safely.
+        #
+        # . Usage
+        #   storage_reconcile_persistence
     storage_reconcile_persistence() {
-        local decision="Yes" backup_file="" temp_file="" source="" target="" filesystem="" options=""
+        local decision="Yes"
+        local backup_file=""
+        local temp_file=""
+        local stale_file=""
+        local source=""
+        local target=""
+        local filesystem=""
+        local options=""
         local stale_count=0
+        local candidate_count=0
+        local candidate_device=""
+        local candidate_uuid=""
+        local candidate_filesystem=""
+        local candidate_source=""
+        local stale_source=""
+        local stale_target=""
+        local stale_filesystem=""
+        local stale_options=""
+        local device=""
+        local uuid=""
+        local detected_filesystem=""
+        local mounted_target=""
+        local referenced=0
+
         sgnd_print
         sgnd_print_sectionheader "Reconcile storage persistence"
+
         while IFS='|' read -r source target filesystem options; do
             [[ -n "$source" && -n "$target" ]] || continue
             sgnd_print_labeledvalue --label "Managed storage" --value "$target" --labelwidth 24
@@ -1072,25 +1116,151 @@ set -uo pipefail
         while IFS='|' read -r source target filesystem options; do
             [[ -n "$source" && -n "$target" ]] || continue
             stale_count=$((stale_count + 1))
+            stale_source="$source"
+            stale_target="$target"
+            stale_filesystem="$filesystem"
+            stale_options="$options"
             saywarning "Stale managed fstab entry: $source -> $target ($filesystem, $options)"
         done < <(_storage_list_stale_managed_fstab_entries)
+
         if (( stale_count == 0 )); then
             sayok "All SolidGroundUX-managed storage entries are valid; no stale entries were found."
             return 0
         fi
-        if (( ${FLAG_DRYRUN:-0} == 1 )); then
-            sayinfo "DRYRUN: Would remove $stale_count stale SolidGroundUX-managed storage entry/entries from /etc/fstab."
-            _storage_dryrun_complete; return 0
+
+        # A restored/re-attached storage disk commonly has a new UUID while retaining the
+        # canonical SGND_STORAGE label. Repair automatically only when the mapping is unique.
+        if (( stale_count == 1 )); then
+            while IFS= read -r device; do
+                [[ -n "$device" ]] || continue
+                device="$(readlink -f -- "$device" 2>/dev/null || true)"
+                [[ -b "$device" ]] || continue
+                uuid="$(blkid -s UUID -o value "$device" 2>/dev/null || true)"
+                detected_filesystem="$(blkid -s TYPE -o value "$device" 2>/dev/null || true)"
+                [[ -n "$uuid" && -n "$detected_filesystem" ]] || continue
+
+                referenced=0
+                if awk -v uuid_source="UUID=$uuid" -v device_source="$device" '
+                    $0 !~ /^[[:space:]]*#/ && NF >= 2 && ($1 == uuid_source || $1 == device_source) { found=1 }
+                    END { exit(found ? 0 : 1) }
+                ' /etc/fstab 2>/dev/null; then
+                    referenced=1
+                fi
+                (( referenced == 0 )) || continue
+
+                mounted_target="$(findmnt -rn -S "$device" -o TARGET 2>/dev/null | head -n 1 || true)"
+                [[ -z "$mounted_target" || "$mounted_target" == "$stale_target" ]] || continue
+                [[ "${detected_filesystem,,}" == "${stale_filesystem,,}" ]] || continue
+
+                candidate_count=$((candidate_count + 1))
+                candidate_device="$device"
+                candidate_uuid="$uuid"
+                candidate_filesystem="$detected_filesystem"
+            done < <(blkid -t LABEL=SGND_STORAGE -o device 2>/dev/null | sort -u)
         fi
-        ask_decision --label "Remove stale SolidGroundUX-managed fstab entries?" --choices "Yes|Y,No|N" --default "Yes" --var decision || return $?
-        [[ "${decision^^}" == "YES" ]] || { sayinfo "Storage persistence reconciliation cancelled."; return 0; }
+
+        if (( stale_count == 1 && candidate_count == 1 )); then
+            candidate_source="UUID=$candidate_uuid"
+            sgnd_print_sectionheader "Repair detected storage mapping"
+            sgnd_print_labeledvalue --label "Mount point" --value "$stale_target" --labelwidth 24
+            sgnd_print_labeledvalue --label "Stale source" --value "$stale_source" --labelwidth 24
+            sgnd_print_labeledvalue --label "Detected device" --value "$candidate_device" --labelwidth 24
+            sgnd_print_labeledvalue --label "Detected UUID" --value "$candidate_uuid" --labelwidth 24
+            sgnd_print_labeledvalue --label "Filesystem" --value "$candidate_filesystem" --labelwidth 24
+
+            if (( ${FLAG_DRYRUN:-0} == 1 )); then
+                sayinfo "DRYRUN: Would replace '$stale_source' with '$candidate_source' for '$stale_target'."
+                sayinfo "DRYRUN: Would validate /etc/fstab and mount '$stale_target' when currently unmounted."
+                _storage_dryrun_complete
+                return 0
+            fi
+
+            ask_decision \
+                --label "Repair this storage mapping?" \
+                --choices "Yes|Y,No|N" \
+                --default "Yes" \
+                --var decision || return $?
+            [[ "${decision^^}" == "YES" ]] || {
+                sayinfo "Storage persistence repair cancelled."
+                return 0
+            }
+
+            backup_file="/etc/fstab.pre-storage-repair.$(date +%Y%m%d%H%M%S)"
+            temp_file="$(mktemp)" || return 1
+            sudo cp -a /etc/fstab "$backup_file" || { rm -f -- "$temp_file"; return 1; }
+
+            awk -v old_source="$stale_source" -v target="$stale_target" -v new_source="$candidate_source" '
+                BEGIN { managed=0 }
+                $0 == "# SolidGroundUX managed storage" { print; managed=1; next }
+                managed && NF >= 4 {
+                    if ($1 == old_source && $2 == target) $1 = new_source
+                    print
+                    managed=0
+                    next
+                }
+                { print }
+            ' /etc/fstab > "$temp_file" || { rm -f -- "$temp_file"; return 1; }
+
+            sudo install -m 0644 "$temp_file" /etc/fstab || { rm -f -- "$temp_file"; return 1; }
+            rm -f -- "$temp_file"
+
+            if ! findmnt --verify --tab-file /etc/fstab >/dev/null 2>&1; then
+                sayfail "Repaired /etc/fstab did not validate; restoring the previous file."
+                sudo cp -a "$backup_file" /etc/fstab
+                return 1
+            fi
+
+            sudo systemctl daemon-reload || {
+                sayfail "systemd could not reload the repaired storage configuration; restoring /etc/fstab."
+                sudo cp -a "$backup_file" /etc/fstab
+                sudo systemctl daemon-reload >/dev/null 2>&1 || true
+                return 1
+            }
+
+            sudo install -d -m 0755 "$stale_target" || return 1
+            if ! mountpoint -q "$stale_target"; then
+                if ! sudo mount "$stale_target"; then
+                    sayfail "The repaired storage filesystem could not be mounted at $stale_target; restoring /etc/fstab."
+                    sudo cp -a "$backup_file" /etc/fstab
+                    sudo systemctl daemon-reload >/dev/null 2>&1 || true
+                    return 1
+                fi
+            fi
+
+            _storage_save_configuration || {
+                sayfail "Storage was repaired and mounted, but the managed storage configuration could not be persisted."
+                return 1
+            }
+
+            sayok "Storage persistence repaired for $stale_target."
+            sayinfo "Backup retained at $backup_file."
+            return 0
+        fi
+
+        saywarning "The stale storage mapping cannot be repaired automatically because the replacement is ambiguous or unavailable."
+        if (( ${FLAG_DRYRUN:-0} == 1 )); then
+            sayinfo "DRYRUN: Would offer removal of $stale_count stale SolidGroundUX-managed storage entry/entries from /etc/fstab."
+            _storage_dryrun_complete
+            return 0
+        fi
+
+        ask_decision \
+            --label "Remove stale SolidGroundUX-managed fstab entries?" \
+            --choices "Yes|Y,No|N" \
+            --default "No" \
+            --var decision || return $?
+        [[ "${decision^^}" == "YES" ]] || {
+            sayinfo "Storage persistence reconciliation cancelled; stale entries were left unchanged."
+            return 0
+        }
+
         backup_file="/etc/fstab.pre-storage-reconcile.$(date +%Y%m%d%H%M%S)"
         temp_file="$(mktemp)" || return 1
-        local stale_file=""
         stale_file="$(mktemp)" || { rm -f -- "$temp_file"; return 1; }
         sudo cp -a /etc/fstab "$backup_file" || { rm -f -- "$temp_file" "$stale_file"; return 1; }
         _storage_list_stale_managed_fstab_entries | awk -F'|' '{print $1 "|" $2}' > "$stale_file"
-        awk -v stale_file="$stale_file" '''
+
+        awk -v stale_file="$stale_file" '
             BEGIN {
                 while ((getline k < stale_file) > 0) stale[k] = 1
                 close(stale_file)
@@ -1108,11 +1278,18 @@ set -uo pipefail
                 print marker; marker = ""; managed = 0
             }
             { print }
-        ''' /etc/fstab > "$temp_file" || { rm -f -- "$stale_file" "$temp_file"; return 1; }
+        ' /etc/fstab > "$temp_file" || { rm -f -- "$stale_file" "$temp_file"; return 1; }
+
         rm -f -- "$stale_file"
         sudo install -m 0644 "$temp_file" /etc/fstab || { rm -f -- "$temp_file"; return 1; }
         rm -f -- "$temp_file"
-        findmnt --verify --tab-file /etc/fstab >/dev/null 2>&1 || { sayfail "Reconciled /etc/fstab did not validate; restoring backup."; sudo cp -a "$backup_file" /etc/fstab; return 1; }
+
+        if ! findmnt --verify --tab-file /etc/fstab >/dev/null 2>&1; then
+            sayfail "Reconciled /etc/fstab did not validate; restoring backup."
+            sudo cp -a "$backup_file" /etc/fstab
+            return 1
+        fi
+
         _storage_save_configuration || true
         sayok "Removed $stale_count stale SolidGroundUX-managed storage entry/entries from /etc/fstab."
         sayinfo "Backup retained at $backup_file."

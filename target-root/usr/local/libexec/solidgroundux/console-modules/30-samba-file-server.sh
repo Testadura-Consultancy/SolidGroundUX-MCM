@@ -3,7 +3,7 @@
 # ----------------------------------------------------------------------------------
 # Metadata:
 #   Version     : 2.1
-#   Build       : 2626711
+#   Build       : 2626712
 #   Source      : 30-samba-file-server.sh
 #   Type        : module
 #   Group       : Module Registration
@@ -118,6 +118,10 @@ set -uo pipefail
         _smb_run_server_action install
     }
 
+    _smb_step_configure_authentication() {
+        _smb_run_server_action authentication
+    }
+
     _smb_step_validate_storage() {
         _smb_run_server_action storage
     }
@@ -130,8 +134,44 @@ set -uo pipefail
         _smb_run_server_action service
     }
 
+    # fn: _smb_prepare_file_server - Run and track the complete Samba preparation sequence
+        # . Purpose
+        #   Execute the same registered child actions used by menu items 2-6 so composite
+        #   preparation leaves each child menu status synchronized with its actual result.
+        #
+        # . Behavior
+        #   - Runs install, authentication, storage, share-root, and service actions in order.
+        #   - Uses management-console action tracking when available so every child receives
+        #     the same persisted checkmark/cross status as an individually selected action.
+        #   - Stops at the first failing child action and preserves that child's failed status.
+        #   - Falls back to direct child execution when invoked outside management-console.
+        #
+        # . Returns
+        #   0 when all child actions succeed; otherwise the first failing child return code.
+        #
+        # . Usage
+        #   _smb_prepare_file_server
     _smb_prepare_file_server() {
-        _smb_run_server_action prepare
+        local rc=0
+
+        if declare -F sgnd_console_run_tracked >/dev/null 2>&1; then
+            sgnd_console_run_tracked "smb-install" _smb_step_install_packages || return $?
+            sgnd_console_run_tracked "smb-authentication" _smb_step_configure_authentication || return $?
+            sgnd_console_run_tracked "smb-storage" _smb_step_validate_storage || return $?
+            sgnd_console_run_tracked "smb-share-root" _smb_step_prepare_share_root || return $?
+            sgnd_console_run_tracked "smb-service" _smb_step_start_service || return $?
+            return 0
+        fi
+
+        _smb_step_install_packages || rc=$?
+        (( rc == 0 )) || return "$rc"
+        _smb_step_configure_authentication || rc=$?
+        (( rc == 0 )) || return "$rc"
+        _smb_step_validate_storage || rc=$?
+        (( rc == 0 )) || return "$rc"
+        _smb_step_prepare_share_root || rc=$?
+        (( rc == 0 )) || return "$rc"
+        _smb_step_start_service
     }
 
     _smb_validate() {
@@ -187,6 +227,10 @@ set -uo pipefail
     #   > Install Samba file-server packages and command-line utilities.
     #   > Handler: _smb_step_install_packages
     #
+    # ! Configure Samba authentication
+    #   > Detect host AD membership and configure Samba authentication to match.
+    #   > Handler: _smb_step_configure_authentication
+    #
     # ! Validate storage
     #   > Require the configured SolidGroundUX storage mount.
     #   > Handler: _smb_step_validate_storage
@@ -220,6 +264,7 @@ set -uo pipefail
 
     sgnd_menu_register_item "smb-prepare" "$SGND_SAMBA_FILE_MODULE_ID" "Prepare Samba file server" "_smb_prepare_file_server" "Run the complete Samba file-server preparation sequence" 0 15 1 0
     sgnd_menu_register_item "smb-install" "$SGND_SAMBA_FILE_MODULE_ID" "Install Samba prerequisites" "_smb_step_install_packages" "Install Samba file-server packages and command-line utilities" 0 15 1 1
+    sgnd_menu_register_item "smb-authentication" "$SGND_SAMBA_FILE_MODULE_ID" "Configure Samba authentication" "_smb_step_configure_authentication" "Detect host AD membership and configure Samba authentication accordingly" 0 15 1 1
     sgnd_menu_register_item "smb-storage" "$SGND_SAMBA_FILE_MODULE_ID" "Validate storage" "_smb_step_validate_storage" "Require the configured SolidGroundUX storage mount" 0 15 1 1
     sgnd_menu_register_item "smb-share-root" "$SGND_SAMBA_FILE_MODULE_ID" "Prepare share root" "_smb_step_prepare_share_root" "Create and validate the configured Samba share root" 0 20 1 1
     sgnd_menu_register_item "smb-service" "$SGND_SAMBA_FILE_MODULE_ID" "Start Samba service" "_smb_step_start_service" "Validate the configuration and start smbd.service" 0 25 1 1

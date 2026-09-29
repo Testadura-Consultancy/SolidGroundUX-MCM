@@ -149,6 +149,203 @@ set -uo pipefail
         printf '%s\n' "$realm"
     }
 
+    # fn: sgnd_ad_current_netbios_domain - Return the joined AD domain short name
+        # . Purpose
+        #   Resolve the NetBIOS/short domain name for the currently joined Active Directory realm.
+        #
+        # . Arguments
+        #   $1  Optional realm name. Defaults to the currently joined realm.
+        #
+        # . Output
+        #   Writes the short domain name, for example TESTADURA.
+        #
+        # . Returns
+        #   0 when the short domain name can be discovered; 1 otherwise.
+        #
+        # . Usage
+        #   workgroup="$(sgnd_ad_current_netbios_domain)" || return 1
+    sgnd_ad_current_netbios_domain() {
+        local realm="${1:-}"
+        local workgroup=""
+
+        [[ -n "$realm" ]] || realm="$(sgnd_ad_current_realm 2>/dev/null || true)"
+        [[ -n "$realm" ]] || return 1
+        command -v adcli >/dev/null 2>&1 || return 1
+
+        workgroup="$(
+            adcli info "$realm" 2>/dev/null |
+                awk -F'[[:space:]]*=[[:space:]]*' '
+                    tolower($1) ~ /^[[:space:]]*domain-short[[:space:]]*$/ {
+                        print $2
+                        exit
+                    }
+                '
+        )"
+        [[ -n "$workgroup" ]] || return 1
+        printf '%s\n' "${workgroup^^}"
+    }
+
+    # fn: sgnd_ad_normalize_sssd_config - Normalize and validate SolidGroundUX-managed SSSD configuration
+        # . Purpose
+        #   Remove obsolete SSSD settings created by earlier SolidGroundUX AD-client
+        #   releases and verify the resulting configuration before activation.
+        #
+        # . Behavior
+        #   - Reads /etc/sssd/sssd.conf through sudo so protected permissions are respected.
+        #   - Removes config_file_version only from the [sssd] section when present.
+        #   - Validates a protected temporary candidate with sssctl before replacing the live file.
+        #   - Preserves the existing owner, group, and permissions when replacing the live file.
+        #   - Restarts SSSD only after a validated change is installed.
+        #   - Restores the previous configuration when restart or activation validation fails.
+        #   - Routes diagnostics and status messages through SolidGroundUX logging primitives.
+        #
+        # . Side effects
+        #   May update /etc/sssd/sssd.conf and restart sssd.service.
+        #
+        # . Returns
+        #   0 when the configuration is already valid or is normalized successfully.
+        #   1 when the configuration cannot be read, validated, installed, or activated.
+        #
+        # . Usage
+        #   sgnd_ad_normalize_sssd_config
+    sgnd_ad_normalize_sssd_config() {
+        local sssd_config="/etc/sssd/sssd.conf"
+        local current_file=""
+        local candidate_file=""
+        local validation_dir=""
+        local validation_file=""
+        local snippet_dir="/etc/sssd/conf.d"
+        local validation_output=""
+        local owner=""
+        local group=""
+        local mode=""
+        local changed=0
+        local line=""
+
+        command -v sssctl >/dev/null 2>&1 || {
+            sayfail "sssctl is unavailable; the SSSD configuration cannot be safely validated."
+            return 1
+        }
+        sudo test -r "$sssd_config" || {
+            sayfail "SSSD configuration is unavailable: $sssd_config"
+            return 1
+        }
+
+        owner="$(sudo stat -c '%U' "$sssd_config" 2>/dev/null)" || {
+            sayfail "Cannot determine the owner of $sssd_config."
+            return 1
+        }
+        group="$(sudo stat -c '%G' "$sssd_config" 2>/dev/null)" || {
+            sayfail "Cannot determine the group of $sssd_config."
+            return 1
+        }
+        mode="$(sudo stat -c '%a' "$sssd_config" 2>/dev/null)" || {
+            sayfail "Cannot determine the permissions of $sssd_config."
+            return 1
+        }
+
+        current_file="$(mktemp)" || {
+            sayfail "Cannot create a temporary SSSD configuration copy."
+            return 1
+        }
+        candidate_file="$(mktemp)" || {
+            rm -f "$current_file"
+            sayfail "Cannot create a temporary SSSD configuration candidate."
+            return 1
+        }
+
+        if ! sudo cat "$sssd_config" > "$current_file"; then
+            rm -f "$current_file" "$candidate_file"
+            sayfail "Cannot read $sssd_config."
+            return 1
+        fi
+
+        awk '
+            BEGIN { in_sssd=0 }
+            /^[[:space:]]*\[/ {
+                in_sssd = ($0 ~ /^[[:space:]]*\[sssd\][[:space:]]*$/)
+            }
+            in_sssd && /^[[:space:]]*config_file_version[[:space:]]*=/ {
+                changed=1
+                next
+            }
+            { print }
+            END { if (changed) exit 10 }
+        ' "$current_file" > "$candidate_file"
+        case $? in
+            0) changed=0 ;;
+            10) changed=1 ;;
+            *)
+                rm -f "$current_file" "$candidate_file"
+                sayfail "Failed to prepare the normalized SSSD configuration candidate."
+                return 1
+                ;;
+        esac
+
+        validation_dir="$(sudo mktemp -d /tmp/sgnd-sssd-validate.XXXXXX)" || {
+            rm -f "$current_file" "$candidate_file"
+            sayfail "Cannot create the protected SSSD validation workspace."
+            return 1
+        }
+        validation_file="$validation_dir/sssd.conf"
+        if ! sudo install -o root -g root -m 0600 "$candidate_file" "$validation_file"; then
+            sudo rm -rf "$validation_dir"
+            rm -f "$current_file" "$candidate_file"
+            sayfail "Cannot prepare the SSSD validation candidate."
+            return 1
+        fi
+
+        if ! sudo test -d "$snippet_dir"; then
+            snippet_dir="$validation_dir/conf.d"
+            if ! sudo install -d -o root -g root -m 0755 "$snippet_dir"; then
+                sudo rm -rf "$validation_dir"
+                rm -f "$current_file" "$candidate_file"
+                sayfail "Cannot prepare the SSSD validation snippet directory."
+                return 1
+            fi
+        fi
+
+        if ! validation_output="$(sudo sssctl config-check -c "$validation_file" -s "$snippet_dir" 2>&1)"; then
+            while IFS= read -r line; do
+                [[ -n "$line" ]] && sayfail "$line"
+            done <<< "$validation_output"
+            sayfail "SSSD configuration validation failed; the existing configuration was not changed."
+            sudo rm -rf "$validation_dir"
+            rm -f "$current_file" "$candidate_file"
+            return 1
+        fi
+        sudo rm -rf "$validation_dir"
+
+        if (( changed == 0 )); then
+            rm -f "$current_file" "$candidate_file"
+            return 0
+        fi
+
+        if ! sudo install -o "$owner" -g "$group" -m "$mode" "$candidate_file" "$sssd_config"; then
+            rm -f "$current_file" "$candidate_file"
+            sayfail "Cannot update $sssd_config."
+            return 1
+        fi
+
+        if ! sudo systemctl restart sssd.service || ! systemctl is-active --quiet sssd.service; then
+            sayfail "SSSD could not be activated after normalizing its configuration."
+            if sudo install -o "$owner" -g "$group" -m "$mode" "$current_file" "$sssd_config"; then
+                saywarning "The previous SSSD configuration was restored."
+                if ! sudo systemctl restart sssd.service; then
+                    sayfail "SSSD could not be restarted after restoring the previous configuration."
+                fi
+            else
+                sayfail "The previous SSSD configuration could not be restored."
+            fi
+            rm -f "$current_file" "$candidate_file"
+            return 1
+        fi
+
+        rm -f "$current_file" "$candidate_file"
+        sayok "SSSD configuration normalized and validated."
+        return 0
+    }
+
     sgnd_ad_is_domain_controller() {
         command -v testparm >/dev/null 2>&1 || return 1
         [[ -s /var/lib/samba/private/sam.ldb ]] || return 1

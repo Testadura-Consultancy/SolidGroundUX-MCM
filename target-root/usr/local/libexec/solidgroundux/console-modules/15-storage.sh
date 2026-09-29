@@ -1,5 +1,5 @@
 # ==================================================================================
-# SSolidGroundUX Management Console Modules - Storage
+# SolidGroundUX Management Console Modules - Storage
 # ----------------------------------------------------------------------------------
 # Metadata:
 #   Version     : 2.1
@@ -83,7 +83,57 @@ set -uo pipefail
         _sgnd_run_module_script "manage-storage.sh" --action "$action"
     }
 
-    storage_configure()                 { _storage_run_action configure; }
+    # fn: storage_configure - Configure storage and synchronize completed child-action statuses
+        # . Purpose
+        #   Provision storage and reflect the mount and configuration-reconciliation work
+        #   already completed inside that workflow in the console action-status markers.
+        #
+        # . Behavior
+        #   - Runs the canonical configure action first.
+        #   - Verifies every persisted SolidGroundUX mount point is mounted afterward.
+        #   - Records Mount storage with the verified mount result.
+        #   - Records Reconcile storage configuration as successful because configure persists
+        #     the same canonical managed mount-point set through _storage_save_configuration.
+        #   - Does not mark unrelated actions such as unmount, expand, persistence repair, or validation.
+        #   - Uses the verified console result-recording API when available.
+        #
+        # . Returns
+        #   0 when configuration succeeds and all persisted mount points are mounted; otherwise non-zero.
+        #
+        # . Usage
+        #   storage_configure
+    storage_configure() {
+        local mountpoint=""
+        local mount_rc=0
+        local mount_count=0
+
+        _storage_run_action configure || return $?
+
+        while IFS= read -r mountpoint; do
+            [[ -n "$mountpoint" ]] || continue
+            mount_count=$((mount_count + 1))
+            mountpoint -q "$mountpoint" || mount_rc=1
+        done < <(awk -F= '
+            $1 == "SGND_STORAGE_MOUNTPOINTS" {
+                value=substr($0,index($0,"=")+1)
+                n=split(value,parts,":")
+                for(i=1;i<=n;i++) if(parts[i] != "") print parts[i]
+            }
+        ' /etc/solidgroundux/storage.cfg 2>/dev/null)
+
+        (( mount_count > 0 )) || mount_rc=1
+
+        if declare -F sgnd_console_record_action_result >/dev/null 2>&1; then
+            sgnd_console_record_action_result "storage-mount" "$mount_rc" || true
+            if (( mount_rc == 0 )); then
+                sgnd_console_record_action_result "storage-reconcile" 0 || true
+            fi
+        fi
+
+        (( mount_rc == 0 )) || return 1
+        return 0
+    }
+
     storage_mount()                     { _storage_run_action mount; }
     storage_unmount()                   { _storage_run_action unmount; }
     storage_expand()                    { _storage_run_action expand; }
@@ -130,7 +180,7 @@ set -uo pipefail
     # ! Reconcile storage configuration
     #   > Update SolidGroundUX storage configuration from all managed SGND_STORAGE volumes.
     # ! Reconcile storage persistence
-    #   > Remove only stale SolidGroundUX-managed storage entries from /etc/fstab.
+    #   > Repair stale UUID mappings from detected SGND_STORAGE filesystems or remove stale entries explicitly.
     # ! Validate storage provisioning
     #   > Run active checks including configuration reconciliation.
     # ! Show storage status
@@ -146,7 +196,7 @@ set -uo pipefail
     sgnd_menu_register_item "storage-unmount" "$SGND_STORAGE_MODULE_ID" "Unmount storage" "storage_unmount" "Unmount storage while keeping its persistent configuration" 0 15 1 1
     sgnd_menu_register_item "storage-expand" "$SGND_STORAGE_MODULE_ID" "Expand storage" "storage_expand" "Expand the partition and filesystem after enlarging its disk" 0 20 1 1
     sgnd_menu_register_item "storage-reconcile" "$SGND_STORAGE_MODULE_ID" "Reconcile storage configuration" "storage_reconcile" "Update SolidGroundUX storage configuration from the existing SGND_STORAGE volume" 0 20 1 0
-    sgnd_menu_register_item "storage-reconcile-persistence" "$SGND_STORAGE_MODULE_ID" "Reconcile storage persistence" "storage_reconcile_persistence" "Remove stale SolidGroundUX-managed storage entries from /etc/fstab" 0 22 1 0
+    sgnd_menu_register_item "storage-reconcile-persistence" "$SGND_STORAGE_MODULE_ID" "Reconcile storage persistence" "storage_reconcile_persistence" "Repair stale SGND_STORAGE UUID mappings or explicitly remove stale managed entries" 0 22 1 0
     sgnd_menu_register_item "storage-validate" "$SGND_STORAGE_MODULE_ID" "Validate storage provisioning" "storage_validate_provisioning" "Run active checks including configuration reconciliation" 0 25 1 0
     sgnd_menu_register_item "storage-status" "$SGND_STORAGE_MODULE_ID" "Show storage status" "storage_status" "Show local disks and configured storage status" 0 30 1 0
 

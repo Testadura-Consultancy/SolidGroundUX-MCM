@@ -4,7 +4,7 @@
 # ------------------------------------------------------------------------------------
 # Metadata:
 #   Version     : 2.1
-#   Build       : 2626711
+#   Build       : 2626712
 #   Checksum    : e0ca15a407d641178da1eba0eebc09db4f552cb3b280d623150bfa27b77d07ea
 #   Source      : manage-samba-shares.sh
 #   Type        : script
@@ -331,6 +331,12 @@ set -uo pipefail
 
         if [[ -r "$SGND_STORAGE_CONFIG_FILE" ]]; then
             mountpoint="$(awk -F= '
+                $1 == "SGND_STORAGE_MOUNTPOINTS" {
+                    value=substr($0, index($0, "=") + 1)
+                    split(value, parts, ":")
+                    print parts[1]
+                    exit
+                }
                 $1 == "SGND_STORAGE_MOUNTPOINT" {
                     print substr($0, index($0, "=") + 1)
                     exit
@@ -502,6 +508,25 @@ set -uo pipefail
         sudo testparm -s --section-name "$1" --parameter-name path 2>/dev/null || true
     }
 
+    # fn: _share_root_traversable - Verify the managed share container traversal contract
+        # . Purpose
+        #   Ensure authenticated share users can traverse the SolidGroundUX share container
+        #   without granting filesystem-level directory listing access to that container.
+        #
+        # . Behavior
+        #   - Requires the managed share root to exist.
+        #   - Requires mode 0711, the canonical SolidGroundUX Samba share-root mode.
+        #
+        # . Returns
+        #   0 when the share root exists with mode 0711; 1 otherwise.
+        #
+        # . Usage
+        #   _share_root_traversable
+    _share_root_traversable() {
+        [[ -d "$SGND_SAMBA_SHARE_ROOT" ]] || return 1
+        [[ "$(stat -c '%a' "$SGND_SAMBA_SHARE_ROOT" 2>/dev/null || true)" == "711" ]]
+    }
+
     # fn: _list_managed_shares - Discover shares beneath the SolidGroundUX share root
         # . Outputs (globals)
         #   MANAGED_SHARES
@@ -632,6 +657,41 @@ set -uo pipefail
         grep -Eqi "^[[:space:]]*\\[$share_name\\][[:space:]]*$" "$SGND_SAMBA_CONFIG"
     }
 
+
+    # fn: _share_path_in_use - Test whether a backing directory is already used by a managed share
+        # . Arguments
+        #   $1 PATH
+        #
+        # . Returns
+        #   0 when another managed Samba share already uses PATH; 1 otherwise.
+        #
+        # . Usage
+        #   _share_path_in_use "/srv/storage/shares/Install"
+    _share_path_in_use() {
+        local candidate_path="${1:-}"
+        local share=""
+        local share_path=""
+
+        [[ -n "$candidate_path" ]] || return 1
+        command -v testparm >/dev/null 2>&1 || return 1
+
+        while IFS= read -r share; do
+            [[ -n "$share" ]] || continue
+            case "${share,,}" in
+                global|printers|print\$) continue ;;
+            esac
+
+            share_path="$(_share_path "$share")"
+            [[ "$share_path" == "$SGND_SAMBA_SHARE_ROOT/"* ]] || continue
+            [[ "$share_path" == "$candidate_path" ]] && return 0
+        done < <(
+            sudo testparm -s 2>/dev/null |
+                awk '/^\[[^]]+\]$/ { name=$0; gsub(/^\[|\]$/, "", name); print name }'
+        )
+
+        return 1
+    }
+
     # fn: _reload_samba - Validate and reload Samba configuration
         # . Usage
         #   _reload_samba
@@ -644,16 +704,33 @@ set -uo pipefail
     }
 
     # fn: _create_share - Create a managed share and backing directory
+        # . Behavior
+        #   - Requires the managed share root to satisfy the 0711 traversal contract.
+        #   - Defaults the backing-directory path to the share name but allows the
+        #     administrator to override it with another relative path beneath the share root.
+        #   - Reuses an existing backing directory when the selected path already exists.
+        #   - Creates a missing backing directory securely with mode 0770.
+        #   - Rejects backing paths already used by another managed Samba share.
+        #   - Adds and validates the Samba share definition.
+        #   - Offers to configure group access immediately after successful creation.
+        #
         # . Usage
         #   _create_share
     _create_share() {
         local share_name=""
+        local directory_path=""
         local comment=""
         local browsable="Yes"
         local read_only="No"
         local share_path=""
+        local create_directory=0
         local backup=""
         local dlg_rc=0
+
+        _share_root_traversable || {
+            sayfail "Samba share root is unavailable or not traversable with mode 0711: $SGND_SAMBA_SHARE_ROOT"
+            return 1
+        }
 
         while :; do
             share_name=""
@@ -664,11 +741,30 @@ set -uo pipefail
                 continue
             }
 
-            share_path="$SGND_SAMBA_SHARE_ROOT/$share_name"
-            [[ ! -e "$share_path" ]] || {
-                sayfail "The backing directory already exists: $share_path"
+            directory_path="$share_name"
+            sgnd_print_labeledvalue --label "Share root" --value "$SGND_SAMBA_SHARE_ROOT"
+            ask \
+                --label "Directory (Q=Back)" \
+                --var directory_path \
+                --default "$directory_path" \
+                --validate _validate_relative_path \
+                --back || return 0
+
+            share_path="$SGND_SAMBA_SHARE_ROOT/$directory_path"
+            if _share_path_in_use "$share_path"; then
+                sayfail "Backing directory is already used by another managed Samba share: $share_path"
                 continue
-            }
+            fi
+
+            create_directory=0
+            if sudo test -d "$share_path"; then
+                sayinfo "Backing directory already exists; it will be used: $share_path"
+            elif sudo test -e "$share_path"; then
+                sayfail "The selected backing path exists but is not a directory: $share_path"
+                continue
+            else
+                create_directory=1
+            fi
 
             comment="$share_name share"
             ask --label "Description (Q=Back)" --var comment --default "$comment" --back || return 0
@@ -680,7 +776,11 @@ set -uo pipefail
             [[ "${read_only^^}" == "QUIT" || "${read_only^^}" == "Q" ]] && return 0
 
             if (( ${FLAG_DRYRUN:-0} == 1 )); then
-                sayinfo "DRYRUN: Would create backing directory '$share_path' with mode 0770."
+                if (( create_directory == 1 )); then
+                    sayinfo "DRYRUN: Would create backing directory '$share_path' with mode 0770."
+                else
+                    sayinfo "DRYRUN: Would reuse existing backing directory '$share_path'."
+                fi
                 sayinfo "DRYRUN: Would add Samba share '$share_name' to '$SGND_SAMBA_CONFIG'."
                 sayinfo "DRYRUN: Share settings would be browseable=${browsable,,}, read only=${read_only,,}, guest ok=no."
                 sayinfo "DRYRUN: Would validate the updated Samba configuration and reload smbd.service."
@@ -688,7 +788,9 @@ set -uo pipefail
             else
                 backup="$SGND_SAMBA_CONFIG.pre-share.$(date +%Y%m%d%H%M%S)"
                 sudo cp -a "$SGND_SAMBA_CONFIG" "$backup" || return 1
-                sudo install -d -m 0770 "$share_path" || return 1
+                if (( create_directory == 1 )); then
+                    sudo install -d -m 0770 "$share_path" || return 1
+                fi
 
                 printf '%s\n' \
                     '' \
@@ -705,12 +807,26 @@ set -uo pipefail
 
                 if ! _reload_samba; then
                     sudo cp -a "$backup" "$SGND_SAMBA_CONFIG"
-                    sudo rm -rf -- "$share_path"
+                    if (( create_directory == 1 )); then
+                        sudo rm -rf -- "$share_path"
+                    fi
                     return 1
                 fi
 
                 sayok "Samba share '$share_name' created."
                 sgnd_print_labeledvalue --label "Directory" --value "$share_path" --labelwidth 18
+
+                local configure_access="Yes"
+                local access_mode=""
+                ask_decision --label "Configure access now" --choices "Yes|Y,No|N" --default "Yes" --var configure_access || return $?
+                if [[ "${configure_access^^}" == "YES" || "${configure_access^^}" == "Y" ]]; then
+                    SELECTED_SHARES=("$share_name")
+                    _smb_ask_selection --label "Initial access level" --var access_mode --items "Read only" "Read / write" || return 0
+                    case "$access_mode" in
+                        "Read only") _apply_group_access read || return $? ;;
+                        "Read / write") _apply_group_access write || return $? ;;
+                    esac
+                fi
             fi
 
             dlg_rc=0
@@ -1253,23 +1369,29 @@ set -uo pipefail
         return 0
     }
 
-    # fn: _select_group - Select or enter an AD/NSS group
+    # fn: _select_groups - Select or enter one or more AD/NSS groups
+        # . Purpose
+        #   Allow one or more Active Directory groups to be selected in a single operation.
+        #   A manual group entry remains available as a single additional identity.
+        #
         # . Arguments
-        #   $1 OUTPUT_VAR
+        #   $1 OUTPUT_ARRAY_VAR
         #
         # . Returns
-        #   0 with a resolvable group; 1 on cancellation.
+        #   0 with one or more resolvable groups; 1 on cancellation or lookup failure.
         #
         # . Usage
-        #   _select_group group_name || return $?
-    _select_group() {
-        local output_var="$1"
-        local selected=""
+        #   _select_groups groups || return $?
+    _select_groups() {
+        local output_var="${1:?missing output array variable}"
         local entered=""
         local realm=""
         local realm_lower=""
+        local selected=""
         local qualified=""
         local -a choices=()
+        local -a selections=()
+        local -a resolved=()
 
         realm="$(realm list --name-only 2>/dev/null | head -n 1 || true)"
         [[ -n "$realm" ]] || {
@@ -1283,27 +1405,33 @@ set -uo pipefail
         choices=("${DISCOVERED_GROUPS[@]}" "Enter group manually")
 
         _smb_ask_selection \
-            --label "Select Active Directory group" \
-            --var selected \
+            --label "Select Active Directory group(s)" \
+            --var selections \
+            --multi \
             --items "${choices[@]}" || return 1
 
-        if [[ "$selected" == "Enter group manually" ]]; then
-            ask --label "AD group (Q=Back)" --var entered --back || return 1
-            selected="$entered"
-        fi
+        for selected in "${selections[@]}"; do
+            if [[ "$selected" == "Enter group manually" ]]; then
+                ask --label "AD group (Q=Back)" --var entered --back || return 1
+                selected="$entered"
+            fi
 
-        if [[ "$selected" == *"@"* ]]; then
-            qualified="$selected"
-        else
-            qualified="${selected}@${realm_lower}"
-        fi
+            if [[ "$selected" == *"@"* ]]; then
+                qualified="$selected"
+            else
+                qualified="${selected}@${realm_lower}"
+            fi
 
-        if ! getent group "$qualified" >/dev/null 2>&1; then
-            sayfail "Group cannot be resolved through NSS: $qualified"
-            return 1
-        fi
+            if ! getent group "$qualified" >/dev/null 2>&1; then
+                sayfail "Group cannot be resolved through NSS: $qualified"
+                return 1
+            fi
+            resolved+=("$qualified")
+        done
 
-        printf -v "$output_var" '%s' "$qualified"
+        (( ${#resolved[@]} > 0 )) || return 1
+        local -n output_ref="$output_var"
+        output_ref=("${resolved[@]}")
         return 0
     }
 
@@ -1426,23 +1554,29 @@ set -uo pipefail
         local share=""
         local path=""
         local perms="r-x"
+        local -a groups=()
 
         [[ "$mode" == "write" ]] && perms="rwx"
-        _select_group group || return $?
+        _select_access_groups groups || return $?
 
         for share in "${SELECTED_SHARES[@]}"; do
             path="$(_share_path "$share")"
             sudo test -d "$path" || { sayfail "Share path not found: $path"; return 1; }
 
-            if (( ${FLAG_DRYRUN:-0} == 1 )); then
-                sayinfo "DRYRUN: Would grant $mode ACL access to '$group' on '$share' and synchronize the Samba access lists."
-                continue
-            fi
+            for group in "${groups[@]}"; do
+                if (( ${FLAG_DRYRUN:-0} == 1 )); then
+                    sayinfo "DRYRUN: Would grant $mode ACL access to '$group' on '$share'."
+                    continue
+                fi
 
-            sudo setfacl -m "g:$group:$perms" -m "m::rwx" -- "$path" || return 1
-            sudo setfacl -m "d:g:$group:$perms" -m "d:m::rwx" -- "$path" || return 1
-            _sync_share_samba_access "$share" || return $?
-            sayok "Granted $mode access to '$group' on '$share'."
+                sudo setfacl -m "g:$group:$perms" -m "m::rwx" -- "$path" || return 1
+                sudo setfacl -m "d:g:$group:$perms" -m "d:m::rwx" -- "$path" || return 1
+                sayok "Granted $mode access to '$group' on '$share'."
+            done
+
+            if (( ${FLAG_DRYRUN:-0} == 0 )); then
+                _sync_share_samba_access "$share" || return $?
+            fi
         done
 
         if (( ${FLAG_DRYRUN:-0} == 1 )); then
@@ -1547,41 +1681,7 @@ set -uo pipefail
         return 0
     }
 
-    # fn: _show_access - Display current share paths and named group ACLs
-        # . Returns
-        #   0 after displaying access state.
-        #
-        # . Usage
-        #   _show_access
-    _show_access() {
-        local share=""
-        local path=""
-        local group=""
-        local perms=""
-        local role=""
-        local count=0
-
-        for share in "${SELECTED_SHARES[@]}"; do
-            path="$(_share_path "$share")"
-            sgnd_print
-            sgnd_print_sectionheader --text "$share"
-            sgnd_print_labeledvalue --label "Path" --value "$path" --labelwidth 20
-            count=0
-
-            while IFS='|' read -r group perms; do
-                [[ -n "$group" ]] || continue
-                role="Read only"
-                [[ "$perms" == *w* ]] && role="Read / write"
-                sgnd_print_labeledvalue --label "$group" --value "$role ($perms)" --labelwidth 30
-                count=$((count + 1))
-            done < <(_acl_groups_for_share "$share" || true)
-
-            (( count > 0 )) || sgnd_print --text "No named group ACLs assigned." --pad 2
-        done
-        return 0
-    }
-
-    # fn: _validate_selected - Validate selected share paths, ACLs, and Samba configuration
+    # fn: _validate_selected - Validate selected share paths, traversal, ACLs, and Samba configuration
         # . Returns
         #   0 when selected shares validate; 1 otherwise.
         #
@@ -1618,6 +1718,14 @@ set -uo pipefail
             fi
             sgnd_print_labeledvalue --label "Managed path" --value "$result" --labelwidth 24
             sgnd_print_labeledvalue --label "Path" --value "${path:-Unavailable}" --labelwidth 24
+
+            if _share_root_traversable; then
+                result="Passed"
+            else
+                result="Failed"
+                failures=$((failures + 1))
+            fi
+            sgnd_print_labeledvalue --label "Path traversal" --value "$result" --labelwidth 24
 
             if [[ -n "$path" ]] && sudo getfacl -cp -- "$path" >/dev/null 2>&1; then
                 result="Passed"
@@ -1656,6 +1764,230 @@ set -uo pipefail
         return "$validation_rc"
     }
 
+# - Authentication-aware identity management ---------------------------------------
+    # fn: _smb_runtime_auth_mode - Return the configured Samba authentication mode
+        # . Returns
+        #   Writes "ad" for ADS security and "standalone" otherwise.
+        # . Usage
+        #   mode="$(_smb_runtime_auth_mode)"
+    _smb_runtime_auth_mode() {
+        local security=""
+        security="$(sudo testparm -s --parameter-name security 2>/dev/null || true)"
+        [[ "${security^^}" == "ADS" ]] && printf 'ad\n' || printf 'standalone\n'
+    }
+
+    # fn: _smb_manage_local_users - Manage local Linux/Samba accounts for standalone authentication
+        # . Purpose
+        #   Create, enable, change passwords for, remove, or list local Samba accounts.
+        # . Behavior
+        #   Creating a Samba account creates the matching Linux account when it does not exist.
+        #   Removing Samba access does not delete the Linux account or its files.
+        # . Returns
+        #   0 after the requested operation; non-zero on command failure.
+        # . Usage
+        #   _smb_manage_local_users
+    _smb_manage_local_users() {
+        local action="" user=""
+        _smb_ask_selection --label "Manage local Samba users" --var action --items \
+            "List Samba users" "Create/enable Samba user" "Change Samba password" "Remove Samba user" || return 0
+        case "$action" in
+            "List Samba users")
+                sgnd_print
+                sgnd_print_sectionheader --text "Local Samba users"
+                sudo pdbedit -L 2>/dev/null | while IFS=: read -r user _; do
+                    [[ -n "$user" ]] && sgnd_print_labeledvalue --label "User" --value "$user" --labelwidth 18
+                done
+                ;;
+            "Create/enable Samba user")
+                ask --label "Local user (Q=Back)" --var user --validate _validate_share_name --back || return 0
+                if ! getent -s files passwd "$user" >/dev/null 2>&1; then
+                    sudo useradd -m -s /bin/bash "$user" || { sayfail "Local Linux user '$user' could not be created."; return 1; }
+                    sayok "Local Linux user '$user' created."
+                fi
+                sayinfo "Enter the Samba password for '$user'."
+                sudo smbpasswd -a "$user" </dev/tty || { sayfail "Samba account '$user' could not be enabled."; return 1; }
+                sayok "Local Samba user '$user' is enabled."
+                ;;
+            "Change Samba password")
+                ask --label "Local Samba user (Q=Back)" --var user --validate _validate_share_name --back || return 0
+                sudo pdbedit -L 2>/dev/null | cut -d: -f1 | grep -Fxq "$user" || { sayfail "Samba user '$user' does not exist."; return 1; }
+                sudo smbpasswd "$user" </dev/tty || { sayfail "Samba password for '$user' could not be changed."; return 1; }
+                sayok "Samba password for '$user' changed."
+                ;;
+            "Remove Samba user")
+                ask --label "Local Samba user (Q=Back)" --var user --validate _validate_share_name --back || return 0
+                sudo smbpasswd -x "$user" >/dev/null 2>&1 || { sayfail "Samba user '$user' could not be removed."; return 1; }
+                sayok "Samba user '$user' removed; the Linux account was preserved."
+                ;;
+        esac
+    }
+
+    # fn: _smb_manage_local_groups - Manage local groups used for standalone share access
+        # . Behavior
+        #   - Lists and manages groups from the local files NSS source only.
+        #   - Does not mix SSSD/Active Directory groups into standalone group selection.
+        #
+        # . Returns
+        #   0 after the requested operation; non-zero on command failure.
+        # . Usage
+        #   _smb_manage_local_groups
+    _smb_manage_local_groups() {
+        local action="" group="" user=""
+        _smb_ask_selection --label "Manage local Samba groups" --var action --items \
+            "List local groups" "Create local group" "Add user to local group" "Remove user from local group" "Remove local group" || return 0
+        case "$action" in
+            "List local groups")
+                sgnd_print
+                sgnd_print_sectionheader --text "Local groups"
+                getent -s files group | awk -F: '$3 >= 1000 {print $1}' | while IFS= read -r group; do
+                    sgnd_print_labeledvalue --label "Group" --value "$group" --labelwidth 18
+                done
+                ;;
+            "Create local group")
+                ask --label "Group name (Q=Back)" --var group --validate _validate_share_name --back || return 0
+                getent -s files group "$group" >/dev/null 2>&1 && { saywarning "Group '$group' already exists."; return 0; }
+                sudo groupadd "$group" || { sayfail "Local group '$group' could not be created."; return 1; }
+                sayok "Local group '$group' created."
+                ;;
+            "Add user to local group")
+                ask --label "Local user (Q=Back)" --var user --validate _validate_share_name --back || return 0
+                ask --label "Local group (Q=Back)" --var group --validate _validate_share_name --back || return 0
+                getent -s files passwd "$user" >/dev/null 2>&1 || { sayfail "Local user '$user' does not exist."; return 1; }
+                getent -s files group "$group" >/dev/null 2>&1 || { sayfail "Local group '$group' does not exist."; return 1; }
+                sudo usermod -aG "$group" "$user" || { sayfail "User '$user' could not be added to '$group'."; return 1; }
+                sayok "User '$user' added to '$group'."
+                ;;
+            "Remove user from local group")
+                ask --label "Local user (Q=Back)" --var user --validate _validate_share_name --back || return 0
+                ask --label "Local group (Q=Back)" --var group --validate _validate_share_name --back || return 0
+                sudo gpasswd -d "$user" "$group" >/dev/null 2>&1 || { sayfail "User '$user' could not be removed from '$group'."; return 1; }
+                sayok "User '$user' removed from '$group'."
+                ;;
+            "Remove local group")
+                ask --label "Local group (Q=Back)" --var group --validate _validate_share_name --back || return 0
+                sudo groupdel "$group" || { sayfail "Local group '$group' could not be removed."; return 1; }
+                sayok "Local group '$group' removed."
+                ;;
+        esac
+    }
+
+    # fn: _select_access_groups - Select one or more access groups appropriate to the active Samba mode
+        # . Purpose
+        #   Return multiple AD groups in AD mode while retaining single-group selection for
+        #   standalone local groups. Copies the selected identities into the caller-provided
+        #   array explicitly so Bash dynamic scoping cannot redirect the result into a helper-local
+        #   array with the same name.
+        # . Arguments
+        #   $1 OUTPUT_ARRAY_VAR
+        # . Returns
+        #   0 with one or more resolvable groups; 1 on cancellation or lookup failure.
+        # . Usage
+        #   _select_access_groups groups || return $?
+    _select_access_groups() {
+        local output_var="${1:?missing output array variable}"
+        local mode="" selected=""
+        local -a local_groups=()
+        local -a selected_groups=()
+        local -n output_ref="$output_var"
+
+        mode="$(_smb_runtime_auth_mode)"
+        if [[ "$mode" == "ad" ]]; then
+            _select_groups selected_groups || return $?
+            output_ref=("${selected_groups[@]}")
+            return 0
+        fi
+
+        mapfile -t local_groups < <(getent -s files group | awk -F: '$3 >= 1000 {print $1}' | LC_ALL=C sort -fu)
+        (( ${#local_groups[@]} > 0 )) || { saywarning "No local groups are available."; return 1; }
+        _smb_ask_selection --label "Select local access group" --var selected --items "${local_groups[@]}" || return 1
+        output_ref=("$selected")
+        return 0
+    }
+
+    # fn: _show_shares_overview - Display comprehensive managed-share access information
+        # . Behavior
+        #   - Shows the active authentication mode and canonical share-root traversal state.
+        #   - Shows each managed path and backing-directory state.
+        #   - Shows explicit group ACLs and their read-only/read-write access level.
+        #   - Reports whether a Samba access list is present when explicit ACL groups exist.
+        #
+        # . Returns
+        #   0 after displaying the overview.
+        # . Usage
+        #   _show_shares_overview
+    _show_shares_overview() {
+        local share="" path="" group="" perms="" access="" mode="" count=0
+        local traversal="Blocked"
+        local config_state=""
+        local valid_users=""
+
+        mode="$(_smb_runtime_auth_mode)"
+        _share_root_traversable && traversal="Available"
+        _list_managed_shares || return $?
+        sgnd_print
+        sgnd_print_sectionheader --text "Samba shares"
+        sgnd_print_labeledvalue --label "Authentication" --value "$([[ "$mode" == ad ]] && printf 'Active Directory' || printf 'Standalone')" --labelwidth 20
+        sgnd_print_labeledvalue --label "Share-root traversal" --value "$traversal" --labelwidth 20
+
+        for share in "${MANAGED_SHARES[@]}"; do
+            path="$(_share_path "$share")"
+            sgnd_print
+            sgnd_print_sectionheader --text "$share"
+            sgnd_print_labeledvalue --label "Path" --value "${path:-Unavailable}" --labelwidth 20
+            sgnd_print_labeledvalue --label "Backing directory" --value "$(sudo test -d "$path" && printf 'Available' || printf 'Missing')" --labelwidth 20
+            sgnd_print_labeledvalue --label "Path traversal" --value "$traversal" --labelwidth 20
+
+            count=0
+            while IFS='|' read -r group perms; do
+                [[ -n "$group" ]] || continue
+                access="Read only"; [[ "$perms" == *w* ]] && access="Read / write"
+                sgnd_print_labeledvalue --label "$group" --value "$access" --labelwidth 32
+                count=$((count + 1))
+            done < <(_acl_groups_for_share "$share" || true)
+
+            valid_users="$(sudo testparm -s --section-name "$share" --parameter-name 'valid users' 2>/dev/null || true)"
+            if (( count == 0 )); then
+                config_state="No access assigned"
+                sgnd_print --text "No explicit group access assigned." --pad 2
+            elif [[ -n "$valid_users" ]]; then
+                config_state="Configured"
+            else
+                config_state="Missing Samba access list"
+            fi
+            sgnd_print_labeledvalue --label "Access configuration" --value "$config_state" --labelwidth 20
+        done
+        ask_dlg_autocontinue --seconds 15 --message "Press Enter to return to share management." --pause || true
+    }
+
+    # fn: _reconcile_access_group - Replace one assigned group identity with another
+        # . Purpose
+        #   Reconcile share ACL identities after changing Samba authentication mode without guessing mappings.
+        # . Returns
+        #   0 after replacement; non-zero on failure or cancellation.
+        # . Usage
+        #   _reconcile_access_group
+    _reconcile_access_group() {
+        local source="" target="" share="" path="" perms="" found=0
+        _smb_menu_require_selection || return $?
+        _select_assigned_group source || return $?
+        _select_access_group target || return $?
+        [[ "$source" != "$target" ]] || { saywarning "Source and target groups are the same."; return 0; }
+        for share in "${SELECTED_SHARES[@]}"; do
+            path="$(_share_path "$share")"
+            found=0
+            while IFS='|' read -r group perms; do
+                [[ "$group" == "$source" ]] || continue
+                found=1
+                sudo setfacl -m "g:$target:$perms" -- "$path" || return 1
+                sudo setfacl -m "d:g:$target:$perms" -- "$path" || return 1
+                sudo setfacl -x "g:$source" -- "$path" 2>/dev/null || true
+                sudo setfacl -x "d:g:$source" -- "$path" 2>/dev/null || true
+            done < <(_acl_groups_for_share "$share" || true)
+            (( found )) && _sync_share_samba_access "$share" || true
+        done
+        sayok "Access identity '$source' reconciled to '$target' on the selected shares."
+    }
+
 # - Standard share-management menu -------------------------------------------------
     _smb_menu_require_selection() {
         (( ${#SELECTED_SHARES[@]} > 0 )) || {
@@ -1665,20 +1997,15 @@ set -uo pipefail
     }
 
     _smb_menu_create_share()        { _create_share; }
+    _smb_menu_show_shares()          { _show_shares_overview; }
+    _smb_menu_local_users()          { _smb_manage_local_users; }
+    _smb_menu_local_groups()         { _smb_manage_local_groups; }
+    _smb_menu_reconcile()            { _reconcile_access_group; }
     _smb_menu_remove_share()        { _remove_share; }
     _smb_menu_create_subdirectory() { _create_subdirectory; }
     _smb_menu_list_subdirectories() { _list_subdirectories; }
     _smb_menu_remove_subdirectory() { _remove_subdirectory; }
     _smb_menu_select_shares()       { _select_shares; }
-    _smb_menu_show_access() {
-        _smb_menu_require_selection || return $?
-        _show_access
-        local rc=$?
-        sgnd_print
-        sgnd_print_sectionheader ""
-        ask_dlg_autocontinue --seconds 15 --message "Press Enter to return to share management." --pause || true
-        return "$rc"
-    }
     _smb_menu_grant_read() {
         _smb_menu_require_selection || return $?
         _apply_group_access read
@@ -1698,7 +2025,10 @@ set -uo pipefail
 
     _smb_menu_build() {
         local selection_state=2
+        local standalone_identity_state=2
         local selected_text="None selected"
+
+        [[ "$(_smb_runtime_auth_mode)" == "standalone" ]] && standalone_identity_state=1
 
         (( ${#SELECTED_SHARES[@]} > 0 )) && {
             selection_state=1
@@ -1715,16 +2045,21 @@ set -uo pipefail
         sgnd_menu_register_item "remove"     "share-create-remove" "Remove share"                        "_smb_menu_remove_share"        "" 0 0 1 0
 
         sgnd_menu_register_group "share-management" "Share management" "" 0 1 20
+        sgnd_menu_register_item "show"       "share-management" "Show shares"                         "_smb_menu_show_shares"         "" 0 0 1 0
         sgnd_menu_register_item "select"     "share-management" "Select shares"                        "_smb_menu_select_shares"       "" 0 0 1 0
         sgnd_menu_register_item "mkdir"      "share-management" "Create subdirectory"                  "_smb_menu_create_subdirectory" "" 0 0 "$selection_state" 0
         sgnd_menu_register_item "listdirs"   "share-management" "List subdirectories"                  "_smb_menu_list_subdirectories" "" 0 0 "$selection_state" 0
         sgnd_menu_register_item "rmdir"      "share-management" "Remove subdirectory"                  "_smb_menu_remove_subdirectory" "" 0 0 "$selection_state" 0
-        sgnd_menu_register_item "access"     "share-management" "Show access"                          "_smb_menu_show_access"         "" 0 0 "$selection_state" 0
-        sgnd_menu_register_item "grant-read" "share-management" "Grant read-only access to AD group"   "_smb_menu_grant_read"          "" 0 0 "$selection_state" 0
-        sgnd_menu_register_item "grant-rw"   "share-management" "Grant read/write access to AD group"  "_smb_menu_grant_write"         "" 0 0 "$selection_state" 0
-        sgnd_menu_register_item "remove-acl" "share-management" "Remove AD group access"               "_smb_menu_remove_access"       "" 0 0 "$selection_state" 0
+        sgnd_menu_register_item "grant-read" "share-management" "Grant read-only access to group"   "_smb_menu_grant_read"          "" 0 0 "$selection_state" 0
+        sgnd_menu_register_item "grant-rw"   "share-management" "Grant read/write access to group"  "_smb_menu_grant_write"         "" 0 0 "$selection_state" 0
+        sgnd_menu_register_item "remove-acl" "share-management" "Remove group access"                  "_smb_menu_remove_access"       "" 0 0 "$selection_state" 0
+        sgnd_menu_register_item "reconcile"  "share-management" "Reconcile access identity"            "_smb_menu_reconcile"           "" 0 0 "$selection_state" 0
 
-        sgnd_menu_register_group "share-validation" "Validation" "" 0 1 30
+        sgnd_menu_register_group "standalone-identities" "Standalone identities" "" 0 1 30
+        sgnd_menu_register_item "local-users"  "standalone-identities" "Manage local Samba users"           "_smb_menu_local_users"         "" 0 0 "$standalone_identity_state" 0
+        sgnd_menu_register_item "local-groups" "standalone-identities" "Manage local groups"                "_smb_menu_local_groups"        "" 0 0 "$standalone_identity_state" 0
+
+        sgnd_menu_register_group "share-validation" "Validation" "" 0 1 40
         sgnd_menu_register_item "validate"   "share-validation" "Validate selected shares"             "_smb_menu_validate"            "" 0 0 "$selection_state" 0
     }
 
