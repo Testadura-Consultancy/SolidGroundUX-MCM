@@ -273,7 +273,10 @@ set -uo pipefail
         #   _adc_step_preflight
     _adc_step_preflight() {
         _adc_collect_context || return 1
-        if sgnd_ad_is_domain_member; then sayfail "This machine is already joined to an Active Directory realm."; return 1; fi
+        if sgnd_ad_is_domain_member; then
+            saywarning "This machine is already joined to an Active Directory realm; no join is required."
+            return 2
+        fi
         sayok "Active Directory client inputs validated."
     }
 
@@ -348,6 +351,96 @@ set -uo pipefail
         sayok "Active Directory services discovered."
     }
 
+    # fn: _adc_host_keytab_valid - Validate the local Active Directory host keytab
+        # . Purpose
+        #   Confirm that /etc/krb5.keytab exists, contains usable principals, and authenticates
+        #   the machine account against the joined Active Directory realm.
+        #
+        # . Returns
+        #   0 when the host keytab is readable by root and adcli validates the machine trust;
+        #   1 otherwise.
+        #
+        # . Usage
+        #   _adc_host_keytab_valid
+    _adc_host_keytab_valid() {
+        sudo test -s /etc/krb5.keytab || return 1
+        sudo klist -kte /etc/krb5.keytab >/dev/null 2>&1 || return 1
+        sudo adcli testjoin --host-keytab=/etc/krb5.keytab >/dev/null 2>&1 || return 1
+        return 0
+    }
+
+    # fn: _adc_ensure_host_keytab - Repair a missing or invalid Active Directory host keytab
+        # . Purpose
+        #   Restore the machine keytab required by SSSD without changing the configured realm,
+        #   DNS, or host identity.
+        #
+        # . Behavior
+        #   - Returns immediately when /etc/krb5.keytab already validates.
+        #   - Requires an existing realmd domain membership before attempting repair.
+        #   - Uses adcli join with the existing machine identity to refresh the computer-account
+        #     password and recreate /etc/krb5.keytab.
+        #   - Prompts for an authorized AD account only when repair is actually required.
+        #   - Validates the recreated keytab with klist and adcli testjoin before returning.
+        #
+        # . Returns
+        #   0 when the keytab is already valid or repaired successfully; non-zero otherwise.
+        #
+        # . Usage
+        #   _adc_ensure_host_keytab
+    _adc_ensure_host_keytab() {
+        local realm=""
+        local fqdn=""
+        local computer_name=""
+        local repair_account="${SGND_ADC_ACCOUNT:-Administrator}"
+
+        _adc_host_keytab_valid && return 0
+
+        realm="$(realm list --name-only 2>/dev/null | head -n 1 || true)"
+        [[ -n "$realm" ]] || {
+            sayfail "A host keytab cannot be repaired because this machine is not joined to an Active Directory realm."
+            return 1
+        }
+
+        fqdn="$(hostname -f 2>/dev/null || true)"
+        computer_name="$(hostname -s 2>/dev/null || true)"
+        [[ -n "$fqdn" && -n "$computer_name" ]] || {
+            sayfail "The machine identity required to repair /etc/krb5.keytab could not be determined."
+            return 1
+        }
+
+        if (( ${FLAG_DRYRUN:-0} == 1 )); then
+            sayinfo "DRYRUN: Would repair /etc/krb5.keytab for '$computer_name' in realm '$realm'."
+            return 0
+        fi
+
+        saywarning "Active Directory host keytab is missing or invalid: /etc/krb5.keytab"
+        ask \
+            --label "AD repair account" \
+            --var repair_account \
+            --default "$repair_account" \
+            --validate _adc_validate_account || return $?
+
+        sayinfo "Repairing the Active Directory host keytab for $fqdn."
+        sudo adcli join \
+            --domain="$realm" \
+            --login-user="$repair_account" \
+            --host-fqdn="$fqdn" \
+            --computer-name="$computer_name" \
+            --host-keytab=/etc/krb5.keytab \
+            </dev/tty || {
+                sayfail "Active Directory host keytab repair failed."
+                return 1
+            }
+
+        _adc_host_keytab_valid || {
+            sayfail "The repaired Active Directory host keytab could not be validated."
+            return 1
+        }
+
+        sayok "Active Directory host keytab repaired and validated."
+        return 0
+    }
+
     # fn: _adc_step_join
         # . Purpose
         #   Join the machine to the selected Active Directory realm.
@@ -362,7 +455,8 @@ set -uo pipefail
         (( ${FLAG_DRYRUN:-0} == 1 )) && { sayinfo "DRYRUN: Would join $SGND_ADC_REALM as $SGND_ADC_ACCOUNT."; return 0; }
         sudo realm join --user="$SGND_ADC_ACCOUNT" "$SGND_ADC_REALM" </dev/tty || return $?
         realm list --name-only 2>/dev/null | grep -Fqi "$SGND_ADC_REALM" || { sayfail "Realm membership could not be validated."; return 1; }
-        sayok "Machine joined to $SGND_ADC_REALM."
+        _adc_ensure_host_keytab || return $?
+        sayok "Machine joined to $SGND_ADC_REALM with a validated host keytab."
     }
 
     # fn: _adc_step_sssd
@@ -408,30 +502,71 @@ set -uo pipefail
         sayok "Client DNS record registered."
     }
 
-    # fn: _adc_join_domain
+    # fn: _adc_join_domain - Run the complete Active Directory client join sequence
         # . Purpose
-        #   Run the complete tracked Active Directory client join sequence.
+        #   Execute the complete join workflow in one process so collected join context is
+        #   preserved while exposing the failing child step to the console module.
+        #
+        # . Behavior
+        #   - Reports each child step before it starts so progress remains visible during the run.
+        #   - Keeps realm, DNS, account, and machine identity context in this process.
+        #   - Returns a distinct workflow status for each failing child step.
+        #   - Returns a distinct cancellation status when the administrator declines the join.
         #
         # . Returns
-        #   0 when the join completes or is cancelled before changes; non-zero on a failed step.
+        #   0  when every join step succeeds.
+        #   21 when prerequisite installation fails.
+        #   20 when the machine is already joined (warning; no join required).
+        #   22 when join-input validation fails.
+        #   23 when the administrator cancels after successful preflight.
+        #   24 when Active Directory DNS configuration fails.
+        #   25 when client identity preparation fails.
+        #   26 when Active Directory service discovery fails.
+        #   27 when the realm join fails.
+        #   28 when SSSD activation fails.
+        #   29 when client DNS registration fails.
         #
         # . Usage
         #   _adc_join_domain
     _adc_join_domain() {
         local decision="No"
-        _adc_step_install_packages || return $?
-        _adc_step_preflight || return $?
+
+        sayinfo "Join step 1/8: Install AD client prerequisites."
+        _adc_step_install_packages || return 21
+
+        sayinfo "Join step 2/8: Validate join inputs."
+        _adc_step_preflight
+        case $? in
+            0) ;;
+            2) return 20 ;;
+            *) return 22 ;;
+        esac
+
         sgnd_print
         sgnd_print_sectionheader ""
         ask_decision --label "Join $SGND_ADC_FQDN to $SGND_ADC_REALM?" --choices "Yes|Y,No|N" --default "No" --var decision
-        [[ "${decision^^}" == "YES" ]] || { sayinfo "Domain join cancelled."; return 0; }
-        _adc_step_dns || return $?
-        _adc_step_identity || return $?
-        _adc_step_discover || return $?
-        _adc_step_join || return $?
-        _adc_step_sssd || return $?
-        _adc_step_register_dns || return $?
+        [[ "${decision^^}" == "YES" ]] || { sayinfo "Domain join cancelled."; return 23; }
+
+        sayinfo "Join step 3/8: Configure Active Directory DNS."
+        _adc_step_dns || return 24
+
+        sayinfo "Join step 4/8: Prepare client identity."
+        _adc_step_identity || return 25
+
+        sayinfo "Join step 5/8: Discover Active Directory services."
+        _adc_step_discover || return 26
+
+        sayinfo "Join step 6/8: Join Active Directory realm."
+        _adc_step_join || return 27
+
+        sayinfo "Join step 7/8: Start SSSD."
+        _adc_step_sssd || return 28
+
+        sayinfo "Join step 8/8: Register client DNS."
+        _adc_step_register_dns || return 29
+
         sayok "Active Directory client join sequence completed."
+        return 0
     }
 
     # fn: _adc_validate - Validate Active Directory client membership and local integration
@@ -448,6 +583,12 @@ set -uo pipefail
         sgnd_print_sectionheader "Active Directory client validation"
 
         [[ -n "$realm" ]] && sgnd_print_labeledvalue --label "Realm membership" --value "Passed ($realm)" || { sgnd_print_labeledvalue --label "Realm membership" --value "Failed"; failures=$((failures+1)); }
+        if [[ -n "$realm" ]] && _adc_host_keytab_valid; then
+            sgnd_print_labeledvalue --label "Host keytab" --value "Passed"
+        else
+            sgnd_print_labeledvalue --label "Host keytab" --value "Failed"
+            failures=$((failures+1))
+        fi
         [[ -n "$realm" ]] && sgnd_ad_discover_kerberos "$realm" "$dns_server" && sgnd_print_labeledvalue --label "Kerberos discovery" --value "Passed" || { sgnd_print_labeledvalue --label "Kerberos discovery" --value "Failed"; failures=$((failures+1)); }
         [[ -n "$realm" ]] && sgnd_ad_discover_ldap "$realm" "$dns_server" && sgnd_print_labeledvalue --label "LDAP discovery" --value "Passed" || { sgnd_print_labeledvalue --label "LDAP discovery" --value "Failed"; failures=$((failures+1)); }
         systemctl is-active --quiet sssd.service && sgnd_print_labeledvalue --label "SSSD service" --value "Passed" || { sgnd_print_labeledvalue --label "SSSD service" --value "Failed"; failures=$((failures+1)); }
@@ -481,6 +622,10 @@ set -uo pipefail
     }
 
     # fn: _adc_reconcile - Repair safe local Active Directory client drift
+        # . Behavior
+        #   - Reconciles DNS and machine identity drift.
+        #   - Repairs a missing or invalid /etc/krb5.keytab before SSSD activation.
+        #   - Restarts SSSD when inactive and repairs the client DNS record when needed.
     _adc_reconcile() {
         local realm="" current_dns="" desired_dns="" ip="" fqdn="" repaired=0
         realm="$(realm list --name-only 2>/dev/null | head -n 1)"
@@ -521,6 +666,15 @@ set -uo pipefail
                 sayinfo "DRYRUN: Would reconcile machine identity to '$SGND_ADC_FQDN'."
             else
                 _adc_step_identity || return $?
+            fi
+        fi
+
+        if ! _adc_host_keytab_valid; then
+            repaired=1
+            if (( ${FLAG_DRYRUN:-0} == 1 )); then
+                sayinfo "DRYRUN: Would repair and validate /etc/krb5.keytab."
+            else
+                _adc_ensure_host_keytab || return $?
             fi
         fi
 

@@ -13,8 +13,9 @@
 #   Checksum : b5c8c60309420180a5a66fac1860162ebee9768200223d5b2ba25c797e247aad
 # Description:
 #   Implements persistent Samba file-server management actions exposed by the
-#   30-samba-file-server Management Console module. Share lifecycle and ACL management
-#   remain in manage-samba-shares.sh.
+#   30-samba-file-server Management Console module. Share lifecycle/share-level access
+#   remain in manage-samba-shares.sh; directory lifecycle/access remain in
+#   manage-samba-directories.sh.
 # =====================================================================================
 set -uo pipefail
 
@@ -177,7 +178,7 @@ set -uo pipefail
     SGND_SCRIPT_TITLE="Manage Samba File Server"
     : "${SGND_SCRIPT_DESC:=Prepare, validate, and inspect Samba file-server services.}"
     : "${SGND_SCRIPT_VERSION:=2.1}"
-    : "${SGND_SCRIPT_BUILD:=2624123}"
+    : "${SGND_SCRIPT_BUILD:=2626712}"
     : "${SGND_SCRIPT_DEVELOPERS:=Mark Fieten}"
     : "${SGND_SCRIPT_COMPANY:=Testadura Consultancy}"
     : "${SGND_SCRIPT_COPYRIGHT:=© 2025 - 2026 Testadura Consultancy}"
@@ -791,6 +792,75 @@ set -uo pipefail
         return 0
     }
 
+    # fn: _smb_reconcile_machine_credentials - Synchronize AD machine credentials across SSSD and Samba
+        # . Purpose
+        #   Repair a split-brain AD member state where the host keytab is valid but Samba's
+        #   machine-account secret is missing or stale.
+        #
+        # . Behavior
+        #   - Uses adcli as the machine-account authority so /etc/krb5.keytab and Samba's
+        #     machine-account database are updated from the same password change.
+        #   - Forces one machine-password update only when trust validation has already failed.
+        #   - Uses the existing machine credentials when they are valid.
+        #   - Falls back to an explicitly entered AD account only when machine credentials
+        #     cannot perform the repair.
+        #   - Does not create or remove realm membership.
+        #
+        # . Arguments
+        #   $1  Joined Active Directory realm.
+        #
+        # . Returns
+        #   0 when adcli can validate the repaired machine credentials; non-zero otherwise.
+        #
+        # . Usage
+        #   _smb_reconcile_machine_credentials TESTADURA.HQ
+    _smb_reconcile_machine_credentials() {
+        local realm="${1:?missing realm}"
+        local repair_account="Administrator"
+
+        command -v adcli >/dev/null 2>&1 || {
+            sayfail "adcli is unavailable; Samba machine credentials cannot be reconciled safely."
+            return 1
+        }
+
+        if sudo adcli testjoin --domain="$realm" >/dev/null 2>&1; then
+            sayinfo "Host machine credentials are valid; synchronizing Samba machine credentials from the host join."
+            sudo adcli update \
+                --domain="$realm" \
+                --add-samba-data \
+                --computer-password-lifetime=0 || {
+                sayfail "Samba machine credentials could not be synchronized from the valid host join."
+                return 1
+            }
+        else
+            saywarning "Host machine credentials cannot perform the Samba trust repair without an authorized AD account."
+            ask \
+                --label "AD repair account" \
+                --var repair_account \
+                --default "$repair_account" \
+                --validate sgnd_ad_validate_account || return $?
+
+            sayinfo "Repairing host and Samba machine credentials for $realm as $repair_account."
+            sudo adcli update \
+                --domain="$realm" \
+                --login-user="$repair_account" \
+                --prompt-password \
+                --add-samba-data \
+                --computer-password-lifetime=0 </dev/tty || {
+                sayfail "Host and Samba machine credentials could not be reconciled for $realm."
+                return 1
+            }
+        fi
+
+        sudo adcli testjoin --domain="$realm" >/dev/null 2>&1 || {
+            sayfail "Host machine-account validation failed after Samba credential reconciliation."
+            return 1
+        }
+
+        sayok "Host and Samba machine credentials reconciled for $realm."
+        return 0
+    }
+
     # fn: _smb_configure_authentication - Configure Samba from the host identity state
         # . Purpose
         #   Configure Samba for the authentication model already established on the host.
@@ -802,10 +872,12 @@ set -uo pipefail
         #   - Configures ADS security, Winbind, and SSSD-backed ID mapping when the host is an AD member.
         #   - Never joins or leaves the Linux host realm; AD-client provisioning owns that lifecycle.
         #   - Normalizes SSSD and enables synchronization of future Samba machine-account password changes.
-        #   - Tests the Samba ADS trust before attempting a Samba-native member-server join.
-        #   - When Samba has no valid ADS trust, asks for an authorized AD join account and performs
-        #     net ads join; the command obtains the account password interactively from the terminal.
-        #   - Restarts Winbind after the Samba trust exists so Winbind reloads the ADS domain state.
+        #   - Starts Winbind and validates both the Samba ADS join and Winbind workstation secret.
+        #   - When those credential stores disagree, uses adcli update --add-samba-data to rotate
+        #     the machine password once and update the host keytab and Samba databases together.
+        #   - Falls back to an authorized AD repair account only when current machine credentials
+        #     cannot perform the reconciliation.
+        #   - Restarts SSSD, Winbind, and smbd after credential reconciliation.
         #   - Validates the Samba trust, Winbind trust secret, own domain, NETLOGON, and hostname DNS.
         #   - Suppresses Samba's duplicate dynamic DNS update because AD-client provisioning owns
         #     the host DNS A record.
@@ -820,13 +892,22 @@ set -uo pipefail
         local mode="standalone"
         local realm=""
         local workgroup=""
-        local join_account="Administrator"
         local own_domain=""
+        local current_mode=""
+
+        sgnd_print
+        sgnd_print_sectionheader --text "Configure Samba Authentication"
+        current_mode="$(_smb_auth_mode)"
+        sgnd_print_labeledvalue --label "Current mode" --value "$([[ "$current_mode" == "ad" ]] && printf 'Active Directory' || printf 'Standalone')" --labelwidth 22
 
         if sgnd_ad_is_domain_member; then
             mode="ad"
+            sgnd_print_labeledvalue --label "Host identity" --value "Active Directory member" --labelwidth 22
+            sgnd_print_labeledvalue --label "Target mode" --value "Active Directory" --labelwidth 22
             sayinfo "Active Directory membership detected; configuring Samba as an AD member server."
         else
+            sgnd_print_labeledvalue --label "Host identity" --value "Standalone" --labelwidth 22
+            sgnd_print_labeledvalue --label "Target mode" --value "Standalone" --labelwidth 22
             sayinfo "No Active Directory membership detected; configuring Samba as a standalone WORKGROUP server."
         fi
 
@@ -847,6 +928,7 @@ set -uo pipefail
                 sayfail "Samba could not be restarted after configuring standalone authentication."
                 return 1
             }
+            sgnd_print_labeledvalue --label "Result" --value "Standalone WORKGROUP" --labelwidth 22
             sayok "Samba authentication configured for standalone WORKGROUP mode."
             return 0
         fi
@@ -880,28 +962,33 @@ set -uo pipefail
 
         _smb_enable_sssd_samba_password_sync "$realm" || return 1
 
-        if ! sudo net ads testjoin >/dev/null 2>&1; then
-            sayinfo "Samba does not yet have a valid Active Directory trust for $realm."
-            ask --label "AD join account" --var join_account --default "$join_account" --validate sgnd_ad_validate_account || return $?
-            sayinfo "Joining Samba to $realm as $join_account."
-
-            # net obtains the password from the controlling terminal. The password prompt is
-            # intentionally interactive. DNS registration is owned by AD-client provisioning,
-            # so Samba is told not to attempt a second dynamic DNS update.
-            sudo net ads join --no-dns-updates -U "$join_account" </dev/tty || {
-                sayfail "Samba could not establish an Active Directory trust for $realm."
-                return 1
-            }
-        fi
-
         if ! sudo systemctl enable winbind.service >/dev/null 2>&1; then
             sayfail "Winbind could not be enabled."
             return 1
         fi
         if ! sudo systemctl restart winbind.service >/dev/null 2>&1; then
-            sayfail "Winbind could not be restarted after establishing the Samba trust."
+            sayfail "Winbind could not be restarted before trust validation."
             return 1
         fi
+
+        # realmd/adcli owns the host machine account and keytab. A previous standalone/AD
+        # transition can leave Samba's secrets database stale even while net ads testjoin
+        # still succeeds. Require both views of the trust to agree; if they do not, rotate
+        # the machine password once through adcli and write the same credential to Samba.
+        if ! sudo net ads testjoin >/dev/null 2>&1 || ! sudo wbinfo -t >/dev/null 2>&1; then
+            saywarning "Samba and host machine-account credentials are not synchronized; reconciling them."
+            _smb_reconcile_machine_credentials "$realm" || return $?
+
+            sudo systemctl restart sssd.service >/dev/null 2>&1 || {
+                sayfail "SSSD could not be restarted after machine-credential reconciliation."
+                return 1
+            }
+            sudo systemctl restart winbind.service >/dev/null 2>&1 || {
+                sayfail "Winbind could not be restarted after machine-credential reconciliation."
+                return 1
+            }
+        fi
+
         sudo systemctl restart smbd.service >/dev/null 2>&1 || {
             sayfail "Samba could not be restarted after configuring Active Directory authentication."
             return 1
@@ -919,7 +1006,7 @@ set -uo pipefail
         }
 
         sudo wbinfo -t >/dev/null 2>&1 || {
-            sayfail "Winbind machine-account trust validation failed."
+            sayfail "Winbind machine-account trust validation failed after credential reconciliation."
             return 1
         }
         sudo wbinfo --ping-dc >/dev/null 2>&1 || {
@@ -929,6 +1016,7 @@ set -uo pipefail
 
         _smb_validate_hostname_dns || return $?
 
+        sgnd_print_labeledvalue --label "Result" --value "Active Directory ($realm / $workgroup)" --labelwidth 22
         sayok "Samba authentication configured for Active Directory realm $realm ($workgroup)."
     }
 

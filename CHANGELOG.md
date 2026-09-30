@@ -24,7 +24,6 @@ practical framework development.
 - Group and User management should enable selecting multiple users or groups and applying actions to them.
 
 ### AD Client module
-- Join domain doesn't show done/failed on subtasks.
 - Check endings: end with line; if ending with confirm or another prompt, don't show menu completion wait.
 
 ### SQL Server module
@@ -42,6 +41,12 @@ practical framework development.
 - Added recovery for restored or reattached `SGND_STORAGE` volumes whose filesystem UUID no longer matches the SolidGroundUX-managed `/etc/fstab` entry; persistence reconciliation can identify an unambiguous managed volume, confirm the repair, update persistent configuration, and remount it without reprovisioning.
 - Added completion-status propagation for composite storage configuration so completed storage subtasks are reflected by their Management Console status icons.
 
+### AD Client module
+- Added tracked subtask reporting for the composite domain-join workflow so completed, failed, warning, and unexecuted join steps are reflected correctly in Management Console status.
+- Changed an already-joined domain preflight result from failure to warning, preventing an existing membership from being presented as an error.
+- Added host Kerberos keytab validation to AD client join and validation.
+- Expanded AD client reconciliation to detect and repair a missing or invalid `/etc/krb5.keytab` before restarting SSSD, allowing an existing valid realm membership to be repaired without a leave/rejoin cycle.
+
 ### Samba file server
 - Simplified Samba authentication preparation so the server derives its mode from host Active Directory membership: AD members are configured for ADS integration and non-members for standalone operation, leaving domain membership ownership with the AD Client module.
 - Completed Samba ADS integration and validation around Samba machine trust, Winbind domain state, NETLOGON connectivity, SSSD-backed host membership, and DNS verification.
@@ -55,6 +60,12 @@ practical framework development.
 - Fixed share-root traversal permissions that could allow Samba share discovery while filesystem traversal still denied authorized AD users.
 - Fixed multi-group access assignment where only one selected Active Directory group could receive the requested rights.
 - Fixed composite Samba preparation so completed child actions report their status to the Management Console.
+- Added dedicated Samba directory management, separating filesystem directory lifecycle and ACL management from Samba share management, with share-root protection, multi-directory selection, explicit/default ACL inspection, and independently selectable Read, Write, and Traverse permissions.
+- Added stateful default share access group and access level, with authentication-mode-aware group selection and support for clearing the saved default.
+- Improved standalone local-group selection by excluding `nogroup` and user-private primary groups while retaining deliberate Samba access groups.
+- Fixed share access reconciliation to use the authentication-aware single-group selector and correctly propagate Samba access synchronization failures.
+- Improved Samba authentication reconfiguration with visible current/target mode reporting and progress through the transition steps.
+- Fixed standalone-to-AD Samba transitions where Winbind retained stale machine-account credentials by synchronizing Samba machine-account data from the valid host AD membership before trust validation.
 
 ### Webserver module
 - Added completion status reporting for web-server preparation steps, including separate status for Nginx installation and web-service startup.

@@ -72,7 +72,134 @@ set -uo pipefail
     SGND_MODULE_NAME="$SGND_AD_CLIENT_MODULE_NAME"
 # - Management dispatch -------------------------------------------------------------
     _adc_run_action() { local action="${1:?missing action}"; _sgnd_run_module_script "manage-active-directory-client.sh" --action "$action"; }
-    _adc_join_domain()            { _adc_run_action join-all; }
+
+    # fn: _adc_record_join_step - Persist one child-step result in the console action tracker
+        # . Arguments
+        #   $1 ITEM_KEY
+        #   $2 RESULT_CODE
+        #
+        # . Returns
+        #   0 always; tracking is best-effort when the console tracker is unavailable.
+        #
+        # . Usage
+        #   _adc_record_join_step "adc-install" 0
+    _adc_record_join_step() {
+        local item_key="${1:?missing item key}"
+        local result_code="${2:-0}"
+
+        if declare -F sgnd_console_record_action_result >/dev/null 2>&1; then
+            sgnd_console_record_action_result "$item_key" "$result_code" || true
+        fi
+        return 0
+    }
+
+    # fn: _adc_join_domain - Run the composite join and synchronize child menu statuses
+        # . Purpose
+        #   Keep the stateful join workflow inside the management executable while mapping its
+        #   distinct workflow return codes back onto the registered console child actions.
+        #
+        # . Behavior
+        #   - Preserves the management executable's single-process join context.
+        #   - Marks every completed child action successful.
+        #   - Marks the failing child action failed.
+        #   - Leaves steps after a failure untouched.
+        #   - Treats administrator cancellation after preflight as a successful parent action.
+        #   - Treats an already joined machine as a warning, not as a failed or successful join.
+        #
+        # . Returns
+        #   0 when the join succeeds or is cancelled after preflight.
+        #   2 when the machine is already joined and no join is required.
+        #   Otherwise the workflow failure code.
+        #
+        # . Usage
+        #   _adc_join_domain
+    _adc_join_domain() {
+        local rc=0
+
+        _adc_run_action join-all || rc=$?
+
+        case "$rc" in
+            0)
+                _adc_record_join_step "adc-install" 0
+                _adc_record_join_step "adc-preflight" 0
+                _adc_record_join_step "adc-dns" 0
+                _adc_record_join_step "adc-identity" 0
+                _adc_record_join_step "adc-discover" 0
+                _adc_record_join_step "adc-join-step" 0
+                _adc_record_join_step "adc-sssd" 0
+                _adc_record_join_step "adc-register" 0
+                return 0
+                ;;
+            20)
+                _adc_record_join_step "adc-install" 0
+                _adc_record_join_step "adc-preflight" 2
+                return 2
+                ;;
+            21)
+                _adc_record_join_step "adc-install" 1
+                ;;
+            22)
+                _adc_record_join_step "adc-install" 0
+                _adc_record_join_step "adc-preflight" 1
+                ;;
+            23)
+                _adc_record_join_step "adc-install" 0
+                _adc_record_join_step "adc-preflight" 0
+                return 0
+                ;;
+            24)
+                _adc_record_join_step "adc-install" 0
+                _adc_record_join_step "adc-preflight" 0
+                _adc_record_join_step "adc-dns" 1
+                ;;
+            25)
+                _adc_record_join_step "adc-install" 0
+                _adc_record_join_step "adc-preflight" 0
+                _adc_record_join_step "adc-dns" 0
+                _adc_record_join_step "adc-identity" 1
+                ;;
+            26)
+                _adc_record_join_step "adc-install" 0
+                _adc_record_join_step "adc-preflight" 0
+                _adc_record_join_step "adc-dns" 0
+                _adc_record_join_step "adc-identity" 0
+                _adc_record_join_step "adc-discover" 1
+                ;;
+            27)
+                _adc_record_join_step "adc-install" 0
+                _adc_record_join_step "adc-preflight" 0
+                _adc_record_join_step "adc-dns" 0
+                _adc_record_join_step "adc-identity" 0
+                _adc_record_join_step "adc-discover" 0
+                _adc_record_join_step "adc-join-step" 1
+                ;;
+            28)
+                _adc_record_join_step "adc-install" 0
+                _adc_record_join_step "adc-preflight" 0
+                _adc_record_join_step "adc-dns" 0
+                _adc_record_join_step "adc-identity" 0
+                _adc_record_join_step "adc-discover" 0
+                _adc_record_join_step "adc-join-step" 0
+                _adc_record_join_step "adc-sssd" 1
+                ;;
+            29)
+                _adc_record_join_step "adc-install" 0
+                _adc_record_join_step "adc-preflight" 0
+                _adc_record_join_step "adc-dns" 0
+                _adc_record_join_step "adc-identity" 0
+                _adc_record_join_step "adc-discover" 0
+                _adc_record_join_step "adc-join-step" 0
+                _adc_record_join_step "adc-sssd" 0
+                _adc_record_join_step "adc-register" 1
+                ;;
+            *)
+                sayfail "Active Directory join workflow returned unexpected status: $rc"
+                ;;
+        esac
+
+        return "$rc"
+    }
+
     _adc_step_install_packages()  { _adc_run_action install; }
     _adc_step_preflight()         { _adc_run_action preflight; }
     _adc_step_dns()               { _adc_run_action dns; }

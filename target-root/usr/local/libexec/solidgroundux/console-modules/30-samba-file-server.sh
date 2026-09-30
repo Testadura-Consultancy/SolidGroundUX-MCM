@@ -11,10 +11,11 @@
 #
 #   Checksum : d0df43d3129b49c92dea1d8f035fff5c45770789a14fd3d5296bd399a3f0ea4b
 # Description:
-#   Registers Samba file-server and share-management actions with the Management
-#   Console. Persistent server-management functionality is implemented by
-#   manage-samba-file-server.sh; share lifecycle and access management is implemented
-#   by manage-samba-shares.sh.
+#   Registers Samba file-server, share-management, and directory-management actions with
+#   the Management Console. Persistent server-management functionality is implemented by
+#   manage-samba-file-server.sh; share lifecycle/access is implemented by
+#   manage-samba-shares.sh; directory lifecycle/access is implemented by
+#   manage-samba-directories.sh.
 # ==================================================================================
 set -uo pipefail
 
@@ -154,23 +155,36 @@ set -uo pipefail
     _smb_prepare_file_server() {
         local rc=0
 
+        sgnd_print
+        sgnd_print_sectionheader --text "Prepare Samba File Server"
+
         if declare -F sgnd_console_run_tracked >/dev/null 2>&1; then
+            sgnd_print_labeledvalue --label "Step" --value "Install Samba prerequisites" --labelwidth 18
             sgnd_console_run_tracked "smb-install" _smb_step_install_packages || return $?
+            sgnd_print_labeledvalue --label "Step" --value "Configure Samba authentication" --labelwidth 18
             sgnd_console_run_tracked "smb-authentication" _smb_step_configure_authentication || return $?
+            sgnd_print_labeledvalue --label "Step" --value "Validate storage" --labelwidth 18
             sgnd_console_run_tracked "smb-storage" _smb_step_validate_storage || return $?
+            sgnd_print_labeledvalue --label "Step" --value "Prepare share root" --labelwidth 18
             sgnd_console_run_tracked "smb-share-root" _smb_step_prepare_share_root || return $?
+            sgnd_print_labeledvalue --label "Step" --value "Start Samba service" --labelwidth 18
             sgnd_console_run_tracked "smb-service" _smb_step_start_service || return $?
             return 0
         fi
 
+        sgnd_print_labeledvalue --label "Step" --value "Install Samba prerequisites" --labelwidth 18
         _smb_step_install_packages || rc=$?
         (( rc == 0 )) || return "$rc"
+        sgnd_print_labeledvalue --label "Step" --value "Configure Samba authentication" --labelwidth 18
         _smb_step_configure_authentication || rc=$?
         (( rc == 0 )) || return "$rc"
+        sgnd_print_labeledvalue --label "Step" --value "Validate storage" --labelwidth 18
         _smb_step_validate_storage || rc=$?
         (( rc == 0 )) || return "$rc"
+        sgnd_print_labeledvalue --label "Step" --value "Prepare share root" --labelwidth 18
         _smb_step_prepare_share_root || rc=$?
         (( rc == 0 )) || return "$rc"
+        sgnd_print_labeledvalue --label "Step" --value "Start Samba service" --labelwidth 18
         _smb_step_start_service
     }
 
@@ -185,6 +199,10 @@ set -uo pipefail
 # - Share management dispatch ------------------------------------------------------
     _smb_manage_shares() {
         _smb_run_project_script "manage-samba-shares.sh"
+    }
+
+    _smb_manage_directories() {
+        _smb_run_project_script "manage-samba-directories.sh"
     }
 
 # - Module validation contract ------------------------------------------------------
@@ -253,9 +271,14 @@ set -uo pipefail
     #
     # . Samba Shares
     # ! Manage shares
-    #   > Create, remove, structure, validate, and manage access to Samba shares.
+    #   > Create, remove, validate, and manage share-level access.
     #   > Handler: _smb_manage_shares
     #   > Script: /usr/local/libexec/solidgroundux/manage-samba-shares.sh
+    #
+    # ! Manage directories
+    #   > Create, remove, inspect, and manage directory-level user/group access.
+    #   > Handler: _smb_manage_directories
+    #   > Script: /usr/local/libexec/solidgroundux/manage-samba-directories.sh
     sgnd_menu_register_group \
         "$SGND_SAMBA_FILE_MODULE_ID" \
         "$SGND_SAMBA_FILE_MODULE_NAME" \
@@ -275,9 +298,10 @@ set -uo pipefail
     sgnd_menu_register_group \
         "samba-shares" \
         "Samba Shares" \
-        "Create, remove, structure, and secure managed Samba shares" \
+        "Create, remove, secure shares, and manage directory-level access" \
         0 1 310
 
-    sgnd_menu_register_item "smb-share-manage" "samba-shares" "Manage shares" "_smb_manage_shares" "Create, remove, structure, validate, and manage access to Samba shares" 0 15 1 0
+    sgnd_menu_register_item "smb-share-manage" "samba-shares" "Manage shares" "_smb_manage_shares" "Create, remove, validate, and manage share-level access" 0 0 1 0
+    sgnd_menu_register_item "smb-directory-manage" "samba-shares" "Manage directories" "_smb_manage_directories" "Create, remove, inspect, and manage directory-level access" 0 0 1 0
 
     sayinfo "Samba File Server module registered with the console."
