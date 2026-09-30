@@ -4,13 +4,13 @@
 # -------------------------------------------------------------------------------------
 # Metadata:
 #   Version     : 2.1
-#   Build       : 2626711
+#   Build       : 2627308
 #   Source      : active-directory-management.sh
 #   Type        : library
 #   Group       : Common Core
 #   Purpose     : Provide shared Active Directory discovery and validation primitives
 #
-#   Checksum : 56e9ceddb6a01551f2c3d6c0a701a0b37b998680858b77a291428a56e4289e36
+#   Checksum : 089809fefa51d7ac3f169f28367e837fa4b00f29208266a2831f3df459ce990a
 # Description:
 #   Shared Active Directory primitives used by the server, client, and directory
 #   management executables. Role-specific provisioning and mutation remain outside

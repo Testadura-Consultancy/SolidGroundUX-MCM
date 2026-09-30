@@ -4,7 +4,7 @@
 # ----------------------------------------------------------------------------------
 # Metadata:
 #   Version     : 2.1
-#   Build       : 2626712
+#   Build       : 2627322
 #   Source      : manage-sqlserver.sh
 #   Type        : script
 #   Group       : Role Managers

@@ -4,12 +4,13 @@
 # -------------------------------------------------------------------------------------
 # Metadata:
 #   Version     : 2.1
-#   Build       : 2626712
+#   Build       : 2627322
 #   Source      : manage-samba-directories.sh
 #   Type        : script
 #   Group       : Role Managers
 #   Purpose     : Manage directories and directory-level access beneath Samba share storage
 #
+#   Checksum : 23b2cf432e484a9cce87c8c4e91b02b4ec3e45f71bc16bc597f4ffcc2a11016f
 # Description:
 #   Provides interactive directory lifecycle and POSIX ACL management beneath the
 #   SolidGroundUX Samba share root. Samba share roots are identified from the effective
@@ -21,11 +22,34 @@ set -uo pipefail
 # - Bootstrap -----------------------------------------------------------------------
     # fn$ _framework_locator - Resolve and load the active SolidGroundUX framework
         # . Purpose
-        #   Resolve the filesystem root of the currently executing SolidGroundUX tree and
-        #   load the executable runtime support library.
+        #   Determine the filesystem root of the currently executing SolidGroundUX tree
+        #   from the script's physical path, then load the executable runtime library.
+        #
+        # . Behavior
+        #   - Resolves the physical path of the executing script.
+        #   - Treats usr, etc, and var as the canonical top-level SolidGroundUX tree roots.
+        #   - Uses the last occurrence of one of those path components to determine the
+        #     active filesystem root.
+        #   - Resolves production scripts beneath /usr, /etc, or /var to root (/).
+        #   - Resolves staged/development trees to the path prefix preceding the detected
+        #     usr, etc, or var component.
+        #   - Loads sgnd-exe-common.sh from the resolved framework root when available.
+        #   - For staged/development trees where the executable common library is not
+        #     present, falls back to the installed framework copy without changing
+        #     SGND_FRAMEWORK_ROOT.
+        #
+        # . Globals (write)
+        #   SGND_FRAMEWORK_ROOT
+        #
+        # . Output
+        #   Writes fatal bootstrap errors to stderr using printf because framework UI
+        #   helpers are not available until sgnd-exe-common.sh has been loaded.
+        #
         # . Returns
-        #   0 when the framework root is resolved and executable common library loaded.
-        #   126 when the script path or common library cannot be resolved.
+        #   0 when the framework root was resolved and executable common library loaded.
+        #   126 when the script path cannot be resolved, no canonical root component can
+        #   be found, or the executable common library is unreadable.
+        #
         # . Usage
         #   _framework_locator || return $?
     _framework_locator() {
@@ -45,17 +69,20 @@ set -uo pipefail
 
         path_without_root="${script_file#/}"
         IFS='/' read -r -a path_parts <<< "$path_without_root"
+
         for index in "${!path_parts[@]}"; do
             component="${path_parts[$index]}"
             case "$component" in
-                usr|etc|var) root_index=$index ;;
+                usr|etc|var)
+                    root_index=$index
+                    ;;
             esac
         done
 
-        (( root_index >= 0 )) || {
+        if (( root_index < 0 )); then
             printf 'FATAL: Cannot determine SolidGroundUX framework root from: %s\n' "$script_file" >&2
             return 126
-        }
+        fi
 
         if (( root_index == 0 )); then
             framework_root="/"
@@ -67,17 +94,22 @@ set -uo pipefail
         fi
 
         SGND_FRAMEWORK_ROOT="$framework_root"
+
         if [[ "$SGND_FRAMEWORK_ROOT" == "/" ]]; then
             exe_common="/usr/local/lib/solidgroundux/common/sgnd-exe-common.sh"
         else
             exe_common="${SGND_FRAMEWORK_ROOT%/}/usr/local/lib/solidgroundux/common/sgnd-exe-common.sh"
-            [[ -r "$exe_common" ]] || exe_common="/usr/local/lib/solidgroundux/common/sgnd-exe-common.sh"
+
+            if [[ ! -r "$exe_common" ]]; then
+                exe_common="/usr/local/lib/solidgroundux/common/sgnd-exe-common.sh"
+            fi
         fi
 
         [[ -r "$exe_common" ]] || {
             printf 'FATAL: Cannot read executable common library: %s\n' "$exe_common" >&2
             return 126
         }
+
         # shellcheck source=/dev/null
         source "$exe_common"
     }
@@ -399,7 +431,7 @@ set -uo pipefail
         local base_dn=""
         local filter=""
         local identity=""
-        local -a values=()
+        local -a discovered=()
 
         realm="$(realm list --name-only 2>/dev/null | head -n 1 || true)"
         [[ -n "$realm" ]] || { saywarning "No joined Active Directory realm was found."; return 1; }
@@ -417,16 +449,16 @@ set -uo pipefail
         esac
 
         while IFS= read -r identity; do
-            [[ -n "$identity" ]] && values+=("$identity")
+            [[ -n "$identity" ]] && discovered+=("$identity")
         done < <(
             ldapsearch -N -Y GSSAPI -H "ldap://$dc" -b "$base_dn" "$filter" sAMAccountName 2>/dev/null |
                 awk -F': ' '/^sAMAccountName: / { print $2 }' |
                 LC_ALL=C sort -fu
         )
 
-        (( ${#values[@]} > 0 )) || { saywarning "No Active Directory ${type}s could be discovered."; return 1; }
+        (( ${#discovered[@]} > 0 )) || { saywarning "No Active Directory ${type}s could be discovered."; return 1; }
         local -n output_ref="$output_var"
-        output_ref=("${values[@]}")
+        output_ref=("${discovered[@]}")
     }
 
     # fn: _list_local_access_groups_raw - List deliberate local access groups
@@ -556,7 +588,8 @@ set -uo pipefail
         local -a identities=()
 
         _require_directory_selection || return $?
-        _select_identities "$type" identities || return 0
+        _select_identities "$type" identities || return $?
+        (( ${#identities[@]} > 0 )) || { saywarning "No $type identities were selected."; return 1; }
         _select_permissions perms || return 0
         [[ "$type" == "group" ]] && acl_prefix="g"
 

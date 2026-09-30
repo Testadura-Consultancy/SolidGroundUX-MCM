@@ -4,13 +4,13 @@
 # -------------------------------------------------------------------------------------
 # Metadata:
 #   Version     : 2.1
-#   Build       : 2626712
+#   Build       : 2627322
 #   Source      : manage-samba-file-server.sh
 #   Type        : script
 #   Group       : Role Managers
 #   Purpose     : Prepare, validate, and inspect the Samba file-server service
 #
-#   Checksum : b5c8c60309420180a5a66fac1860162ebee9768200223d5b2ba25c797e247aad
+#   Checksum : 7f0d34a42b509bf7459a56615e5ebd22c05de9c9fb21081594a60adf87abe31b
 # Description:
 #   Implements persistent Samba file-server management actions exposed by the
 #   30-samba-file-server Management Console module. Share lifecycle/share-level access
@@ -792,72 +792,72 @@ set -uo pipefail
         return 0
     }
 
-    # fn: _smb_reconcile_machine_credentials - Synchronize AD machine credentials across SSSD and Samba
+    # fn: _smb_establish_ads_trust - Establish Samba machine trust for an existing AD member host
         # . Purpose
-        #   Repair a split-brain AD member state where the host keytab is valid but Samba's
-        #   machine-account secret is missing or stale.
+        #   Populate or repair Samba's own machine-account trust after the AD-client module has
+        #   already joined the Linux host to Active Directory.
         #
         # . Behavior
-        #   - Uses adcli as the machine-account authority so /etc/krb5.keytab and Samba's
-        #     machine-account database are updated from the same password change.
-        #   - Forces one machine-password update only when trust validation has already failed.
-        #   - Uses the existing machine credentials when they are valid.
-        #   - Falls back to an explicitly entered AD account only when machine credentials
-        #     cannot perform the repair.
-        #   - Does not create or remove realm membership.
+        #   - Requires the host realm membership to remain valid; this function does not own the
+        #     Linux realm join or leave lifecycle.
+        #   - Prompts for an authorized AD account and uses Samba's net ads join to establish the
+        #     Samba machine secret in secrets.tdb.
+        #   - Runs net ads join directly against the controlling terminal so Samba can collect
+        #     the account password using the same interactive path as a successful shell join.
+        #   - Treats net ads testjoin as the authoritative success check; ancillary DNS-update
+        #     warnings from net ads join do not invalidate an established Samba trust.
+        #   - Leaves hostname DNS registration to the AD-client module.
         #
         # . Arguments
         #   $1  Joined Active Directory realm.
         #
         # . Returns
-        #   0 when adcli can validate the repaired machine credentials; non-zero otherwise.
+        #   0 when Samba validates its ADS machine trust; non-zero otherwise.
         #
         # . Usage
-        #   _smb_reconcile_machine_credentials TESTADURA.HQ
-    _smb_reconcile_machine_credentials() {
+        #   _smb_establish_ads_trust TESTADURA.HQ
+    _smb_establish_ads_trust() {
         local realm="${1:?missing realm}"
-        local repair_account="Administrator"
+        local join_account="Administrator"
 
-        command -v adcli >/dev/null 2>&1 || {
-            sayfail "adcli is unavailable; Samba machine credentials cannot be reconciled safely."
+        command -v net >/dev/null 2>&1 || {
+            sayfail "Samba net utility is unavailable; Samba ADS trust cannot be established."
             return 1
         }
 
-        if sudo adcli testjoin --domain="$realm" >/dev/null 2>&1; then
-            sayinfo "Host machine credentials are valid; synchronizing Samba machine credentials from the host join."
-            sudo adcli update \
-                --domain="$realm" \
-                --add-samba-data \
-                --computer-password-lifetime=0 || {
-                sayfail "Samba machine credentials could not be synchronized from the valid host join."
-                return 1
-            }
-        else
-            saywarning "Host machine credentials cannot perform the Samba trust repair without an authorized AD account."
-            ask \
-                --label "AD repair account" \
-                --var repair_account \
-                --default "$repair_account" \
-                --validate sgnd_ad_validate_account || return $?
-
-            sayinfo "Repairing host and Samba machine credentials for $realm as $repair_account."
-            sudo adcli update \
-                --domain="$realm" \
-                --login-user="$repair_account" \
-                --prompt-password \
-                --add-samba-data \
-                --computer-password-lifetime=0 </dev/tty || {
-                sayfail "Host and Samba machine credentials could not be reconciled for $realm."
-                return 1
-            }
-        fi
-
-        sudo adcli testjoin --domain="$realm" >/dev/null 2>&1 || {
-            sayfail "Host machine-account validation failed after Samba credential reconciliation."
+        # The AD-client module owns host membership. Refuse to turn a Samba trust repair into
+        # an implicit host-domain join when the host membership itself is not valid.
+        sgnd_ad_is_domain_member || {
+            sayfail "The host is not an Active Directory member; Samba ADS trust cannot be established."
             return 1
         }
 
-        sayok "Host and Samba machine credentials reconciled for $realm."
+        ask \
+            --label "AD join account" \
+            --var join_account \
+            --default "$join_account" \
+            --validate sgnd_ad_validate_account || return $?
+
+        sayinfo "Establishing Samba Active Directory trust for $realm as $join_account."
+
+        # Keep this command attached to the real terminal. net ads join performs its own
+        # interactive password exchange; capturing stdout/stderr in command substitution also
+        # captures that prompt and breaks the authentication path.
+        sudo net ads join -U "$join_account" </dev/tty >/dev/tty 2>&1 || {
+            # Samba can return ancillary diagnostics during a successful join. Check the
+            # resulting machine trust before deciding that the operation failed.
+            sudo net ads testjoin >/dev/null 2>&1 || {
+                sayfail "Samba Active Directory trust could not be established for $realm."
+                return 1
+            }
+        }
+
+        sudo net ads testjoin >/dev/null 2>&1 || {
+            sayfail "Samba Active Directory trust could not be established for $realm."
+            return 1
+        }
+
+        sayok "Samba Active Directory trust established for $realm."
         return 0
     }
 
@@ -873,14 +873,13 @@ set -uo pipefail
         #   - Never joins or leaves the Linux host realm; AD-client provisioning owns that lifecycle.
         #   - Normalizes SSSD and enables synchronization of future Samba machine-account password changes.
         #   - Starts Winbind and validates both the Samba ADS join and Winbind workstation secret.
-        #   - When those credential stores disagree, uses adcli update --add-samba-data to rotate
-        #     the machine password once and update the host keytab and Samba databases together.
-        #   - Falls back to an authorized AD repair account only when current machine credentials
-        #     cannot perform the reconciliation.
-        #   - Restarts SSSD, Winbind, and smbd after credential reconciliation.
+        #   - When Samba trust is missing or stale, establishes Samba's own ADS machine trust with
+        #     net ads join while leaving Linux realm membership under AD-client ownership.
+        #   - Prompts for an authorized AD account only when Samba trust must be established.
+        #   - Restarts SSSD, Winbind, and smbd after Samba trust establishment.
         #   - Validates the Samba trust, Winbind trust secret, own domain, NETLOGON, and hostname DNS.
-        #   - Suppresses Samba's duplicate dynamic DNS update because AD-client provisioning owns
-        #     the host DNS A record.
+        #   - Leaves host DNS registration under AD-client ownership and validates the resulting
+        #     hostname A record separately after Samba trust is established.
         #
         # . Returns
         #   0 when Samba matches the detected host identity state and validates successfully.
@@ -966,25 +965,36 @@ set -uo pipefail
             sayfail "Winbind could not be enabled."
             return 1
         fi
-        if ! sudo systemctl restart winbind.service >/dev/null 2>&1; then
-            sayfail "Winbind could not be restarted before trust validation."
-            return 1
-        fi
 
-        # realmd/adcli owns the host machine account and keytab. A previous standalone/AD
-        # transition can leave Samba's secrets database stale even while net ads testjoin
-        # still succeeds. Require both views of the trust to agree; if they do not, rotate
-        # the machine password once through adcli and write the same credential to Samba.
-        if ! sudo net ads testjoin >/dev/null 2>&1 || ! sudo wbinfo -t >/dev/null 2>&1; then
-            saywarning "Samba and host machine-account credentials are not synchronized; reconciling them."
-            _smb_reconcile_machine_credentials "$realm" || return $?
+        # The AD-client module owns the host realm membership. Samba still needs its own ADS
+        # machine trust in secrets.tdb. A fresh AD-member Samba setup or a standalone-to-AD
+        # transition can therefore leave Winbind unable to start until Samba establishes that
+        # trust. Try Winbind first; when the Samba trust is absent or stale, establish it with
+        # net ads join and then restart the identity services.
+        if ! sudo systemctl restart winbind.service >/dev/null 2>&1; then
+            saywarning "Winbind could not start because Samba Active Directory trust is missing or stale; establishing it."
+            _smb_establish_ads_trust "$realm" || return $?
 
             sudo systemctl restart sssd.service >/dev/null 2>&1 || {
-                sayfail "SSSD could not be restarted after machine-credential reconciliation."
+                sayfail "SSSD could not be restarted after establishing Samba Active Directory trust."
                 return 1
             }
             sudo systemctl restart winbind.service >/dev/null 2>&1 || {
-                sayfail "Winbind could not be restarted after machine-credential reconciliation."
+                sayfail "Winbind could not be restarted after establishing Samba Active Directory trust."
+                return 1
+            }
+        fi
+
+        if ! sudo net ads testjoin >/dev/null 2>&1 || ! sudo wbinfo -t >/dev/null 2>&1; then
+            saywarning "Samba Active Directory trust is missing or stale; establishing it."
+            _smb_establish_ads_trust "$realm" || return $?
+
+            sudo systemctl restart sssd.service >/dev/null 2>&1 || {
+                sayfail "SSSD could not be restarted after establishing Samba Active Directory trust."
+                return 1
+            }
+            sudo systemctl restart winbind.service >/dev/null 2>&1 || {
+                sayfail "Winbind could not be restarted after establishing Samba Active Directory trust."
                 return 1
             }
         fi
@@ -1006,7 +1016,7 @@ set -uo pipefail
         }
 
         sudo wbinfo -t >/dev/null 2>&1 || {
-            sayfail "Winbind machine-account trust validation failed after credential reconciliation."
+            sayfail "Winbind machine-account trust validation failed after establishing Samba Active Directory trust."
             return 1
         }
         sudo wbinfo --ping-dc >/dev/null 2>&1 || {

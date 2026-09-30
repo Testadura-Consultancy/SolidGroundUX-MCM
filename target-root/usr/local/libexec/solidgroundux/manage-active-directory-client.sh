@@ -4,13 +4,13 @@
 # -------------------------------------------------------------------------------------
 # Metadata:
 #   Version     : 2.1
-#   Build       : 2626711
+#   Build       : 2627322
 #   Source      : manage-active-directory-client.sh
 #   Type        : script
 #   Group       : Role Managers
 #   Purpose     : Join, reconcile, validate, and inspect an Active Directory client
 #
-#   Checksum : 04389cb3df71f77bd6d6c6ed5f60b697b0a4e07e52fced24c5f2556f7616911d
+#   Checksum : d7aa2534ad3f68f3233b65def509042520ed4c33fb6120e095621b1bbd78d2ae
 # Description:
 #   Implements persistent Active Directory client management actions exposed by the
 #   25-active-directory-client Management Console module.
@@ -301,7 +301,7 @@ set -uo pipefail
         fi
 
         [[ -x "$identity_script" ]] || { sayfail "Cannot execute canonical identity tool: $identity_script"; return 1; }
-        "$identity_script" --dns-only --DNS "$SGND_ADC_DNS_SERVER" --Auto || return $?
+        "$identity_script" --dns-only --DNS "$SGND_ADC_DNS_SERVER" --DNS-search "$SGND_ADC_REALM" --Auto || return $?
         sudo resolvectl flush-caches 2>/dev/null || true
         host -t SOA "$SGND_ADC_REALM" "$SGND_ADC_DNS_SERVER" >/dev/null 2>&1 || { sayfail "$SGND_ADC_DNS_SERVER is not authoritative for $SGND_ADC_REALM."; return 1; }
         sayok "Client DNS points to the Active Directory DNS server."
@@ -569,7 +569,7 @@ set -uo pipefail
         return 0
     }
 
-    # fn: _adc_validate - Validate Active Directory client membership and local integration
+    # fn: _adc_validate - Validate Active Directory client membership, DNS/search-domain configuration, and local integration
     _adc_validate() {
         local realm="" failures=0 expected_fqdn="" current_dns="" ip="" dns_server="" desired_dns=""
         realm="$(realm list --name-only 2>/dev/null | head -n 1)"
@@ -604,6 +604,14 @@ set -uo pipefail
             sgnd_print_labeledvalue --label "AD DNS configured" --value "Failed (${current_dns:-none}; expected ${desired_dns:-unknown})"
             failures=$((failures+1))
         fi
+        local current_search_domain=""
+        current_search_domain="$(resolvectl domain "$(ip -o -4 route show to default 2>/dev/null | awk '{print $5; exit}')" 2>/dev/null | awk -F: 'NR == 1 {gsub(/^[[:space:]]+|[[:space:]]+$/, "", $2); split($2, domains, /[[:space:]]+/); for (i = 1; i <= length(domains); i++) if (domains[i] !~ /^~/ && domains[i] != "") {print domains[i]; exit}}')"
+        if [[ -n "$realm" && "${current_search_domain,,}" == "${realm,,}" ]]; then
+            sgnd_print_labeledvalue --label "DNS search domain" --value "Passed ($current_search_domain)"
+        else
+            sgnd_print_labeledvalue --label "DNS search domain" --value "Failed (${current_search_domain:-none}; expected ${realm:-unknown})"
+            failures=$((failures+1))
+        fi
         if [[ -n "$realm" && -n "$ip" && "$expected_fqdn" == *."${realm,,}" ]]; then
             sgnd_print_labeledvalue --label "Machine FQDN" --value "Passed ($expected_fqdn)"
         else
@@ -623,11 +631,11 @@ set -uo pipefail
 
     # fn: _adc_reconcile - Repair safe local Active Directory client drift
         # . Behavior
-        #   - Reconciles DNS and machine identity drift.
+        #   - Reconciles DNS server, DNS search-domain, and machine identity drift.
         #   - Repairs a missing or invalid /etc/krb5.keytab before SSSD activation.
         #   - Restarts SSSD when inactive and repairs the client DNS record when needed.
     _adc_reconcile() {
-        local realm="" current_dns="" desired_dns="" ip="" fqdn="" repaired=0
+        local realm="" current_dns="" desired_dns="" current_search_domain="" primary_iface="" ip="" fqdn="" repaired=0
         realm="$(realm list --name-only 2>/dev/null | head -n 1)"
         [[ -n "$realm" ]] || { sayfail "This machine is not joined to an Active Directory realm; use Join domain or an explicit rejoin."; return 1; }
         ip="$(sgnd_ad_primary_ipv4)"
@@ -641,22 +649,31 @@ set -uo pipefail
         SGND_ADC_HOSTNAME_SHORT="$(hostname -s 2>/dev/null || true)"
         SGND_ADC_FQDN="${SGND_ADC_HOSTNAME_SHORT}.${SGND_ADC_REALM}"
         fqdn="$(hostname -f 2>/dev/null || true)"
+        primary_iface="$(ip -o -4 route show to default 2>/dev/null | awk '{print $5; exit}')"
+        if [[ -n "$primary_iface" ]] && command -v resolvectl >/dev/null 2>&1; then
+            current_search_domain="$(resolvectl domain "$primary_iface" 2>/dev/null | awk -F: 'NR == 1 {gsub(/^[[:space:]]+|[[:space:]]+$/, "", $2); split($2, domains, /[[:space:]]+/); for (i = 1; i <= length(domains); i++) if (domains[i] !~ /^~/ && domains[i] != "") {print domains[i]; exit}}')"
+        fi
 
         sgnd_print
         sgnd_print_sectionheader "Reconcile Active Directory client"
         sgnd_print_labeledvalue --label "Realm" --value "$realm"
         sgnd_print_labeledvalue --label "Current DNS" --value "${current_dns:-Not detected}"
         sgnd_print_labeledvalue --label "Detected AD DNS" --value "${desired_dns:-Not detected}"
+        sgnd_print_labeledvalue --label "DNS search domain" --value "${current_search_domain:-Not detected}"
 
-        if [[ -n "$desired_dns" && "$current_dns" != "$desired_dns" ]]; then
+        if [[ -n "$desired_dns" && ( "$current_dns" != "$desired_dns" || "${current_search_domain,,}" != "${SGND_ADC_REALM,,}" ) ]]; then
             repaired=1
             if (( ${FLAG_DRYRUN:-0} == 1 )); then
-                sayinfo "DRYRUN: Would point the client resolver at Active Directory DNS '$desired_dns'."
+                sayinfo "DRYRUN: Would reconcile Active Directory DNS to '$desired_dns' with search domain '$SGND_ADC_REALM'."
             else
-                declare -F sgnd_console_set_dns_server >/dev/null 2>&1 || { sayfail "Console DNS helper is unavailable."; return 1; }
-                sgnd_console_set_dns_server "$desired_dns" || return $?
-                sudo resolvectl flush-caches 2>/dev/null || true
-                sayok "Active Directory DNS reconciled to $desired_dns."
+                _adc_step_dns || return $?
+                current_dns="$(sgnd_ad_current_dns)"
+                current_search_domain="$(resolvectl domain "$primary_iface" 2>/dev/null | awk -F: 'NR == 1 {gsub(/^[[:space:]]+|[[:space:]]+$/, "", $2); split($2, domains, /[[:space:]]+/); for (i = 1; i <= length(domains); i++) if (domains[i] !~ /^~/ && domains[i] != "") {print domains[i]; exit}}')"
+                [[ "$current_dns" == "$desired_dns" && "${current_search_domain,,}" == "${SGND_ADC_REALM,,}" ]] || {
+                    sayfail "Active Directory DNS reconciliation did not produce the expected DNS server and search domain."
+                    return 1
+                }
+                sayok "Active Directory DNS reconciled to $desired_dns with search domain $SGND_ADC_REALM."
             fi
         fi
 

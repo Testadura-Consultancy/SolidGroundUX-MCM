@@ -4,8 +4,8 @@
 # ------------------------------------------------------------------------------------
 # Metadata:
 #   Version     : 2.1
-#   Build       : 2626712
-#   Checksum    : e0ca15a407d641178da1eba0eebc09db4f552cb3b280d623150bfa27b77d07ea
+#   Build       : 2627308
+#   Checksum    : 887ae973495041b099c9868a60bdf9f5746fb6bca8d6124f0f65ad1437ca3ca4
 #   Source      : manage-samba-shares.sh
 #   Type        : script
 #   Group       : Role Managers

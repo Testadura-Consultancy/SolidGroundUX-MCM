@@ -3,13 +3,13 @@
 # ----------------------------------------------------------------------------------
 # Metadata:
 #   Version     : 2.1
-#   Build       : 2626711
+#   Build       : 2627308
 #   Source      : 15-storage.sh
 #   Type        : module
 #   Group       : Module Registration
 #   Purpose     : Configure and inspect local storage volumes
 #
-#   Checksum : ae0514ebcffb4ba803eb6ba22fd837e2fd996b3a6286cb98d1474bb09686aa70
+#   Checksum : 127febfca050df0f8003d3e5b7775be069d690913bc6431bf3d721fe486a8feb
 # Description:
 #   Registers local-storage management actions with the SolidGround Management Console.
 #   Persistent storage operations are implemented by manage-storage.sh.

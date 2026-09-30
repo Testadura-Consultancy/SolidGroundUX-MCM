@@ -4,8 +4,8 @@
 # ------------------------------------------------------------------------------------
 # Metadata:
 #   Version     : 2.1
-#   Build       : 2626711
-#   Checksum    : 2215ceef3870f43caf80c505a2b843a1b3cbd38a4dcebd0c646e497b84d2e9fb
+#   Build       : 2627322
+#   Checksum    : 2e41ae913a287f5b68bb2513d4ebff936895014e5c9418c1bcb75688e7391f94
 #   Source      : manage-identity.sh
 #   Type        : script
 #   Group       : Role Managers
@@ -371,7 +371,7 @@ set -uo pipefail
 
         if [[ -z "$TARGET_DNS_SEARCH" ]]; then
             if command -v resolvectl >/dev/null 2>&1 && [[ -n "$PRIMARY_IFACE" ]]; then
-                TARGET_DNS_SEARCH="$(resolvectl domain "$PRIMARY_IFACE" 2>/dev/null | awk -F: 'NR == 1 {gsub(/^[[:space:]]+|[[:space:]]+$/, "", $2); for (i = 1; i <= NF; i++) if ($i !~ /^~/) {print $i; exit}}')"
+                TARGET_DNS_SEARCH="$(resolvectl domain "$PRIMARY_IFACE" 2>/dev/null | awk -F: 'NR == 1 {gsub(/^[[:space:]]+|[[:space:]]+$/, "", $2); split($2, domains, /[[:space:]]+/); for (i = 1; i <= length(domains); i++) if (domains[i] !~ /^~/ && domains[i] != "") {print domains[i]; exit}}')"
             fi
             if [[ -z "$TARGET_DNS_SEARCH" && -r "$NETPLAN_FILE" ]]; then
                 TARGET_DNS_SEARCH="$(awk '/^[[:space:]]*search:[[:space:]]*$/ {getline; sub(/^[[:space:]]*-[[:space:]]*/, ""); print; exit}' "$NETPLAN_FILE")"
