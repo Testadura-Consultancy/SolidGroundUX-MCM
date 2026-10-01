@@ -3,7 +3,7 @@
 # ----------------------------------------------------------------------------------
 # Metadata:
 #   Version     : 2.1
-#   Build       : 2626711
+#   Build       : 2627412
 #   Source      : mcm-console-preface.sh
 #   Type        : documentation
 #   Group       : Console

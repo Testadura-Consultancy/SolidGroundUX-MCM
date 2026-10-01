@@ -4,11 +4,23 @@
 # -------------------------------------------------------------------------------------
 # Metadata:
 #   Version     : 2.1
-#   Build       : 2627322
+#   Build       : 2627412
+#   Shortname   : PUBLISH_WEB_CONTENT
 #   Source      : publish-web-content.sh
 #   Type        : script
 #   Group       : Role Managers
 #   Purpose     : Publish local, remote, Git, and SolidGroundUX documentation content
+#
+#   Checksum : 7baf0966654a994326c52c60740887f10a2cffc90fe018c8f719d2d57d62ab24
+# Description:
+#   Publish local, remote, Git, and SolidGroundUX documentation content to Nginx sites.
+#
+# Attribution:
+#   Developers    : Mark Fieten
+#   Company       : Testadura Consultancy
+#   Client        : -
+#   Copyright     : © 2025 - 2026 Testadura Consultancy
+#   License       : Licensed under the Testadura Non-Commercial License (TD-NC) v1.1.
 # =====================================================================================
 set -uo pipefail
 
@@ -111,11 +123,6 @@ set -uo pipefail
     SGND_SCRIPT_DIR="$(cd -- "$(dirname -- "$SGND_SCRIPT_FILE")" && pwd)"
     SGND_SCRIPT_BASE="$(basename -- "$SGND_SCRIPT_FILE")"
     SGND_SCRIPT_NAME="${SGND_SCRIPT_BASE%.sh}"
-    SGND_SCRIPT_TITLE="Publish Web Content"
-    : "${SGND_SCRIPT_DESC:=Publish local, remote, Git, and SolidGroundUX documentation content to Nginx sites.}"
-    : "${SGND_SCRIPT_VERSION:=2.1}"
-    : "${SGND_SCRIPT_BUILD:=2625722}"
-
 # - Framework integration -----------------------------------------------------------
     SGND_USING=()
     SGND_ARGS_SPEC=(

@@ -4,17 +4,25 @@
 # ----------------------------------------------------------------------------------
 # Metadata:
 #   Version     : 2.1
-#   Build       : 2626711
+#   Build       : 2627412
+#   Shortname   : MANAGE_DOCKER_CONTAINERS
 #   Source      : manage-docker-containers.sh
 #   Type        : script
 #   Group       : Role Managers
 #   Purpose     : Create and manage Docker containers and images
 #
-#   Checksum : b42a36d376c62fbc8e4bf0caecf4aa3d0f27fb1db2c707fade0a956e8bb479c1
+#   Checksum : a134e428271c076fe9fbfc6cd4ca8fc6545acc560227b26edab709f3518c4f16
 # Description:
 #   Provides a deliberately small first-version Docker container manager. It covers
 #   the common lifecycle and creation options without attempting to replace Docker
 #   Compose or a full container-management product.
+#
+# Attribution:
+#   Developers    : Mark Fieten
+#   Company       : Testadura Consultancy
+#   Client        : -
+#   Copyright     : © 2025 - 2026 Testadura Consultancy
+#   License       : Licensed under the Testadura Non-Commercial License (TD-NC) v1.1.
 # ==================================================================================
 set -uo pipefail
 
@@ -117,11 +125,6 @@ set -uo pipefail
     SGND_SCRIPT_DIR="$(cd -- "$(dirname -- "$SGND_SCRIPT_FILE")" && pwd)"
     SGND_SCRIPT_BASE="$(basename -- "$SGND_SCRIPT_FILE")"
     SGND_SCRIPT_NAME="${SGND_SCRIPT_BASE%.sh}"
-    SGND_SCRIPT_TITLE="Manage Docker Containers"
-    : "${SGND_SCRIPT_DESC:=Create and manage Docker containers and images.}"
-    : "${SGND_SCRIPT_VERSION:=2.1}"
-    : "${SGND_SCRIPT_BUILD:=2625802}"
-
 # - Framework integration -----------------------------------------------------------
     SGND_USING=()
     SGND_ARGS_SPEC=(

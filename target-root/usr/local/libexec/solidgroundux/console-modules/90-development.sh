@@ -3,8 +3,9 @@
 # ----------------------------------------------------------------------------------
 # Metadata:
 #   Version     : 2.1
-#   Build       : 2626711
-#   Checksum    : 586fb658d0ad54a31464cae643789799b660585ce5e2227d86426c848de5b075
+#   Build       : 2627412
+#   Shortname   : DEVELOPMENT
+#   Checksum    : 8b12ee6f1502e15bf8e7a45951695f9cbb4bab475913874584dbd6e8e7da518c
 #   Source      : 90-development.sh
 #   Type        : module
 #   Group       : Module Registration

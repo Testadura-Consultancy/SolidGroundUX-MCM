@@ -4,16 +4,24 @@
 # -------------------------------------------------------------------------------------
 # Metadata:
 #   Version     : 2.1
-#   Build       : 2627322
+#   Build       : 2627412
+#   Shortname   : MANAGE_AD_CLIENT
 #   Source      : manage-active-directory-client.sh
 #   Type        : script
 #   Group       : Role Managers
 #   Purpose     : Join, reconcile, validate, and inspect an Active Directory client
 #
-#   Checksum : d7aa2534ad3f68f3233b65def509042520ed4c33fb6120e095621b1bbd78d2ae
+#   Checksum : 2c51917c4b11d48a773e27c47f75f5a25263b9edaf8cad70fa3b8471bef2f40e
 # Description:
 #   Implements persistent Active Directory client management actions exposed by the
 #   25-active-directory-client Management Console module.
+#
+# Attribution:
+#   Developers    : Mark Fieten
+#   Company       : Testadura Consultancy
+#   Client        : -
+#   Copyright     : © 2025 - 2026 Testadura Consultancy
+#   License       : Licensed under the Testadura Non-Commercial License (TD-NC) v1.1.
 # =====================================================================================
 set -uo pipefail
 
@@ -161,11 +169,6 @@ set -uo pipefail
     SGND_SCRIPT_DIR="$(cd -- "$(dirname -- "$SGND_SCRIPT_FILE")" && pwd)"
     SGND_SCRIPT_BASE="$(basename -- "$SGND_SCRIPT_FILE")"
     SGND_SCRIPT_NAME="${SGND_SCRIPT_BASE%.sh}"
-    SGND_SCRIPT_TITLE="Manage Active Directory Client"
-    : "${SGND_SCRIPT_DESC:=Join, reconcile, validate, and inspect Active Directory client membership.}"
-    : "${SGND_SCRIPT_VERSION:=2.1}"
-    : "${SGND_SCRIPT_BUILD:=2625721}"
-
 # - Framework integration ----------------------------------------------------------
     SGND_USING=()
     SGND_ARGS_SPEC=(

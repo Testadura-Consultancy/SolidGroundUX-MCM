@@ -4,13 +4,14 @@
 # -------------------------------------------------------------------------------------
 # Metadata:
 #   Version     : 2.1
-#   Build       : 2626711
+#   Build       : 2627412
+#   Shortname   : MANAGE_SOLIDGROUNDUX
 #   Source      : manage-solidgroundux.sh
 #   Type        : script
 #   Group       : Role Managers
 #   Purpose     : Apply persistent SolidGroundUX framework management actions
 #
-#   Checksum : 8ac8e3c81742b2437db38eb71216a00700254d8b9fa8484178b839e247bb44ce
+#   Checksum : 3f6a8ce90ba7fe95aa9abc24cf8e7a6e0e1a8f22dc4d407c8002fb07a86f1a3e
 # Description:
 #   Implements persistent framework configuration and logging actions dispatched by
 #   the SolidGroundUX Management Console. All mutating actions honor --dryrun and
@@ -124,15 +125,6 @@ set -uo pipefail
     SGND_SCRIPT_DIR="$(cd -- "$(dirname -- "$SGND_SCRIPT_FILE")" && pwd)"
     SGND_SCRIPT_BASE="$(basename -- "$SGND_SCRIPT_FILE")"
     SGND_SCRIPT_NAME="${SGND_SCRIPT_BASE%.sh}"
-    SGND_SCRIPT_TITLE="Manage SolidGroundUX"
-    : "${SGND_SCRIPT_DESC:=Manage persistent SolidGroundUX framework settings and logging.}"
-    : "${SGND_SCRIPT_VERSION:=2.1}"
-    : "${SGND_SCRIPT_BUILD:=2624123}"
-    : "${SGND_SCRIPT_DEVELOPERS:=Mark Fieten}"
-    : "${SGND_SCRIPT_COMPANY:=Testadura Consultancy}"
-    : "${SGND_SCRIPT_COPYRIGHT:=2025 - 2026 Testadura Consultancy}"
-    : "${SGND_SCRIPT_LICENSE:=Testadura Non-Commercial License (TD-NC) v1.1.}"
-
 # - Framework integration ---------------------------------------------------------
     SGND_USING=()
     SGND_ARGS_SPEC=(

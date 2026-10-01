@@ -4,18 +4,26 @@
 # -------------------------------------------------------------------------------------
 # Metadata:
 #   Version     : 2.1
-#   Build       : 2627322
+#   Build       : 2627412
+#   Shortname   : MANAGE_SAMBA_SERVER
 #   Source      : manage-samba-file-server.sh
 #   Type        : script
 #   Group       : Role Managers
 #   Purpose     : Prepare, validate, and inspect the Samba file-server service
 #
-#   Checksum : 7f0d34a42b509bf7459a56615e5ebd22c05de9c9fb21081594a60adf87abe31b
+#   Checksum : 4a8880accee6a7db6ad40f2ec0c23b5620953c6d27f0b411c0e40670c70445c1
 # Description:
 #   Implements persistent Samba file-server management actions exposed by the
 #   30-samba-file-server Management Console module. Share lifecycle/share-level access
 #   remain in manage-samba-shares.sh; directory lifecycle/access remain in
 #   manage-samba-directories.sh.
+#
+# Attribution:
+#   Developers    : Mark Fieten
+#   Company       : Testadura Consultancy
+#   Client        : -
+#   Copyright     : © 2025 - 2026 Testadura Consultancy
+#   License       : Licensed under the Testadura Non-Commercial License (TD-NC) v1.1.
 # =====================================================================================
 set -uo pipefail
 
@@ -175,15 +183,6 @@ set -uo pipefail
     SGND_SCRIPT_DIR="$(cd -- "$(dirname -- "$SGND_SCRIPT_FILE")" && pwd)"
     SGND_SCRIPT_BASE="$(basename -- "$SGND_SCRIPT_FILE")"
     SGND_SCRIPT_NAME="${SGND_SCRIPT_BASE%.sh}"
-    SGND_SCRIPT_TITLE="Manage Samba File Server"
-    : "${SGND_SCRIPT_DESC:=Prepare, validate, and inspect Samba file-server services.}"
-    : "${SGND_SCRIPT_VERSION:=2.1}"
-    : "${SGND_SCRIPT_BUILD:=2626712}"
-    : "${SGND_SCRIPT_DEVELOPERS:=Mark Fieten}"
-    : "${SGND_SCRIPT_COMPANY:=Testadura Consultancy}"
-    : "${SGND_SCRIPT_COPYRIGHT:=© 2025 - 2026 Testadura Consultancy}"
-    : "${SGND_SCRIPT_LICENSE:=Testadura Non-Commercial License (TD-NC) v1.1.}"
-
 # - Framework integration -----------------------------------------------------------
     SGND_USING=()
     SGND_ARGS_SPEC=(

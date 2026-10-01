@@ -4,8 +4,9 @@
 # ------------------------------------------------------------------------------------
 # Metadata:
 #   Version     : 2.1
-#   Build       : 2627308
-#   Checksum    : 887ae973495041b099c9868a60bdf9f5746fb6bca8d6124f0f65ad1437ca3ca4
+#   Build       : 2627412
+#   Shortname   : MANAGE_SAMBA_SHARES
+#   Checksum    : 5c3d49bab9348d5a1315c3445cb720ce39f3a9a80b6506bbdf7f71fdf88fde1f
 #   Source      : manage-samba-shares.sh
 #   Type        : script
 #   Group       : Role Managers
@@ -146,31 +147,6 @@ set -uo pipefail
 
     # var: SGND_SCRIPT_NAME - Script basename without the .sh extension
     SGND_SCRIPT_NAME="${SGND_SCRIPT_BASE%.sh}"
-    # var$ SGND_SCRIPT_FILE
-        # Absolute path to the currently executing script.
-    SGND_SCRIPT_FILE="$(readlink -f "${BASH_SOURCE[0]}")"
-
-    # var$ SGND_SCRIPT_DIR
-        # Directory containing the currently executing script.
-    SGND_SCRIPT_DIR="$(cd -- "$(dirname -- "$SGND_SCRIPT_FILE")" && pwd)"
-
-    # var$ SGND_SCRIPT_BASE
-        # Filename of the currently executing script, including extension.
-    SGND_SCRIPT_BASE="$(basename -- "$SGND_SCRIPT_FILE")"
-
-    # var$ SGND_SCRIPT_NAME
-        # Script basename without the .sh extension; used for help and display text.
-    SGND_SCRIPT_NAME="${SGND_SCRIPT_BASE%.sh}"
-
-# - Script metadata ----------------------------------------------------------------
-    SGND_SCRIPT_TITLE="Manage Samba Shares"
-    : "${SGND_SCRIPT_DESC:=Create, remove, validate, and manage access to Samba shares.}"
-    : "${SGND_SCRIPT_VERSION:=2.1}"
-    : "${SGND_SCRIPT_BUILD:=2626712}"
-    : "${SGND_SCRIPT_DEVELOPERS:=Mark Fieten}"
-    : "${SGND_SCRIPT_COMPANY:=Testadura Consultancy}"
-    : "${SGND_SCRIPT_COPYRIGHT:=© 2025 - 2026 Testadura Consultancy}"
-    : "${SGND_SCRIPT_LICENSE:=Testadura Non-Commercial License (TD-NC) v1.1.}"
 
 # - Framework integration ----------------------------------------------------------
     # var: SGND_USING - Optional framework libraries to source after core bootstrap

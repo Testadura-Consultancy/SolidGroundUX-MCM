@@ -4,8 +4,9 @@
 # ------------------------------------------------------------------------------------
 # Metadata:
 #   Version     : 2.1
-#   Build       : 2626711
-#   Checksum    : 39ac7930bf4136bb58af917acbd99692e967b0d09d120bf9269cba4fba364c35
+#   Build       : 2627412
+#   Shortname   : MANAGE_FRAMEWORK_LOGGING
+#   Checksum    : 91ae5814a93a2c25a88abc5e764eba5fcabe9eae7442acea3a228b211966399b
 #   Source      : manage-framework-logging.sh
 #   Type        : script
 #   Group       : Role Managers
@@ -142,22 +143,6 @@ set -uo pipefail
 
     # var: SGND_SCRIPT_NAME - Script basename without the .sh extension
     SGND_SCRIPT_NAME="${SGND_SCRIPT_BASE%.sh}"
-    # var$ SGND_SCRIPT_FILE
-        # Absolute path to the currently executing script.
-    SGND_SCRIPT_FILE="$(readlink -f "${BASH_SOURCE[0]}")"
-
-    # var$ SGND_SCRIPT_DIR
-        # Directory containing the currently executing script.
-    SGND_SCRIPT_DIR="$(cd -- "$(dirname -- "$SGND_SCRIPT_FILE")" && pwd)"
-
-    # var$ SGND_SCRIPT_BASE
-        # Filename of the currently executing script, including extension.
-    SGND_SCRIPT_BASE="$(basename -- "$SGND_SCRIPT_FILE")"
-
-    # var$ SGND_SCRIPT_NAME
-        # Script basename without the .sh extension; used for help and display text.
-    SGND_SCRIPT_NAME="${SGND_SCRIPT_BASE%.sh}"
-    SGND_SCRIPT_TITLE="Manage Framework Logging"
 
 # - Framework integration ----------------------------------------------------------
     # var: SGND_USING - Optional framework libraries to source after core bootstrap

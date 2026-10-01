@@ -4,8 +4,9 @@
 # ------------------------------------------------------------------------------------
 # Metadata:
 #   Version     : 2.1
-#   Build       : 2627322
-#   Checksum    : 2e41ae913a287f5b68bb2513d4ebff936895014e5c9418c1bcb75688e7391f94
+#   Build       : 2627412
+#   Shortname   : MANAGE_IDENTITY
+#   Checksum    : 75a2fd3062300859dbcf1430ba6ac1898409025c663232ff514c0e958f9f6f4f
 #   Source      : manage-identity.sh
 #   Type        : script
 #   Group       : Role Managers
@@ -127,21 +128,6 @@ set -uo pipefail
     SGND_SCRIPT_BASE="$(basename -- "$SGND_SCRIPT_FILE")"
 
     # var: SGND_SCRIPT_NAME - Script basename without the .sh extension
-    SGND_SCRIPT_NAME="${SGND_SCRIPT_BASE%.sh}"
-    # var$ SGND_SCRIPT_FILE
-        # Absolute path to the currently executing script.
-    SGND_SCRIPT_FILE="$(readlink -f "${BASH_SOURCE[0]}")"
-
-    # var$ SGND_SCRIPT_DIR
-        # Directory containing the currently executing script.
-    SGND_SCRIPT_DIR="$(cd -- "$(dirname -- "$SGND_SCRIPT_FILE")" && pwd)"
-
-    # var$ SGND_SCRIPT_BASE
-        # Filename of the currently executing script, including extension.
-    SGND_SCRIPT_BASE="$(basename -- "$SGND_SCRIPT_FILE")"
-
-    # var$ SGND_SCRIPT_NAME
-        # Script basename without the .sh extension; used for help and display text.
     SGND_SCRIPT_NAME="${SGND_SCRIPT_BASE%.sh}"
 
 # - Framework integration ----------------------------------------------------------

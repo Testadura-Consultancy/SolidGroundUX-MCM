@@ -4,8 +4,9 @@
 # -------------------------------------------------------------------------------------
 # Metadata:
 #   Version     : 2.1
-#   Build       : 2626711
-#   Checksum    : 0ce93680abec1c67ddd38977e729a78bb0527ca6e2cc2a36ba2ded1f4c43613f
+#   Build       : 2627412
+#   Shortname   : MANAGEMENT_CONSOLE
+#   Checksum    : a5367d924f0c4bc830887b875f0eaeefd2cbbd81cf0183e5ee827a053cb1cc52
 #   Source      : management-console.sh
 #   Wrapper     : sgnd-console
 #   Type        : script
@@ -147,8 +148,6 @@ set -uo pipefail
     SGND_SCRIPT_DIR="$(cd -- "$(dirname -- "$SGND_SCRIPT_FILE")" && pwd)"
     SGND_SCRIPT_BASE="$(basename -- "$SGND_SCRIPT_FILE")"
     SGND_SCRIPT_NAME="${SGND_SCRIPT_BASE%.sh}"
-    SGND_SCRIPT_TITLE="SolidGroundUX Management Console"
-    SGND_SCRIPT_DESCRIPTION="Modular application host"
 
 # --- Script metadata (framework integration) -----------------------------------------
     # SGND_USING
@@ -293,7 +292,8 @@ set -uo pipefail
         SGND_ITEM_SCHEMA="key|group|label|handler|desc|source|builtin|waitsecs|visible"
         declare -ag SGND_ITEM_ROWS=()
 
-        SGND_MODULE_SCHEMA="id|name|version|desc|source"
+        # Loaded module registry: operational identity only; full Description stays in the source header.
+        SGND_MODULE_SCHEMA="id|shortname|title|type|version|build|loaddate|source"
         declare -ag SGND_MODULE_ROWS=()
 
         SGND_PAGE_SCHEMA="id|name|desc|source|loaded"
@@ -347,6 +347,12 @@ set -uo pipefail
         declare -ag SGND_ITEM_CACHE_WAITSECS=()
         declare -ag SGND_ITEM_CACHE_VISIBLE=()
 
+        # Management Console navigation contract:
+        #   - Esc returns from a module page to the console index.
+        #   - Esc on the console index asks for confirmation before exiting.
+        #   - Q/q exit handling is disabled for this host.
+        SGND_MENU_Q_EXIT=0
+        SGND_MENU_ESC_LABEL="Previous menu"
         SGND_CLEAR_ONRENDER=1
 
         SGND_PAGE_INDEX=0
@@ -871,7 +877,7 @@ set -uo pipefail
 
                 for (( i=0; i<row_count; i++ )); do
                     if [[ "$(sgnd_dt_get "$SGND_MODULE_SCHEMA" SGND_MODULE_ROWS "$i" id)" == "$module_id" ]]; then
-                        module_name="$(sgnd_dt_get "$SGND_MODULE_SCHEMA" SGND_MODULE_ROWS "$i" name)"
+                        module_name="$(sgnd_dt_get "$SGND_MODULE_SCHEMA" SGND_MODULE_ROWS "$i" title)"
                         break
                     fi
                 done
@@ -1149,13 +1155,13 @@ set -uo pipefail
 
             sgnd_print
             sgnd_print_sectionheader --border "$LN_H" --maxwidth "${SGND_MENU_RENDER_WIDTH:-$(sgnd_terminal_width)}"
-            sgnd_print "Q) Return"
+            sgnd_print "<Esc> Return"
             printf '%sSelect option%s : ' "$(sgnd_sgr "$SGND_UI_LABEL")" "$RESET" >/dev/tty
             SGND_LAST_WAITSECS=0
             sgnd_menu_read_choice choice || return $?
 
             case "$choice" in
-                EXIT|ESC) return 0 ;;
+                ESC) return 0 ;;
             esac
 
             if [[ ! "$choice" =~ ^[0-9]+$ ]]; then
@@ -1465,6 +1471,59 @@ set -uo pipefail
     }
 
     # --- Module loading -------------------------------------------------------------
+    # fn: _sgnd_console_rollback_module_registration - Roll back rows added by a failed module load
+        # . Purpose
+        #   Restore the console registration model to its pre-load state when a module
+        #   fails while sourcing or fails metadata validation after registering rows.
+        #
+        # . Arguments
+        #   $1  GROUP_COUNT   Group-row count before module loading.
+        #   $2  ITEM_COUNT    Item-row count before module loading.
+        #   $3  MODULE_COUNT  Loaded-module row count before module loading.
+        #   $4  TITLE         Console title before module loading.
+        #   $5  DESCRIPTION   Console description before module loading.
+        #
+        # . Returns
+        #   0 after restoring rows and invalidating model/layout caches.
+        #
+        # . Usage
+        #   _sgnd_console_rollback_module_registration "$group_count" "$item_count" "$module_count" "$title" "$desc"
+    _sgnd_console_rollback_module_registration() {
+        local group_count="${1:-0}"
+        local item_count="${2:-0}"
+        local module_count="${3:-0}"
+        local console_title="${4:-}"
+        local console_desc="${5:-}"
+
+        SGND_GROUP_ROWS=("${SGND_GROUP_ROWS[@]:0:group_count}")
+        SGND_ITEM_ROWS=("${SGND_ITEM_ROWS[@]:0:item_count}")
+        SGND_MODULE_ROWS=("${SGND_MODULE_ROWS[@]:0:module_count}")
+        SGND_CONSOLE_TITLE="$console_title"
+        SGND_CONSOLE_DESC="$console_desc"
+
+        SGND_CONSOLE_MODEL_CACHE_GROUP_COUNT=-1
+        SGND_CONSOLE_MODEL_CACHE_ITEM_COUNT=-1
+        SGND_CONSOLE_GROUP_INDEX_CACHE_GENERATION=-1
+        SGND_CONSOLE_VISIBLE_INDEX_CACHE_SIGNATURE=""
+        SGND_CONSOLE_LABEL_WIDTH_CACHE_GENERATION=-1
+        SGND_CONSOLE_LAYOUT_CACHE_KEY=""
+        SGND_GROUP_CACHE_KEY=()
+        SGND_GROUP_CACHE_LABEL=()
+        SGND_GROUP_CACHE_BUILTIN=()
+        SGND_GROUP_CACHE_VISIBLE=()
+        SGND_GROUP_CACHE_ORD=()
+        SGND_GROUP_CACHE_INDEX_BY_KEY=()
+        SGND_ITEM_CACHE_KEY=()
+        SGND_ITEM_CACHE_GROUP=()
+        SGND_ITEM_CACHE_LABEL=()
+        SGND_ITEM_CACHE_HANDLER=()
+        SGND_ITEM_CACHE_DESC=()
+        SGND_ITEM_CACHE_BUILTIN=()
+        SGND_ITEM_CACHE_WAITSECS=()
+        SGND_ITEM_CACHE_VISIBLE=()
+        return 0
+    }
+
     # fn: _sgnd_console_source_module - Source one console module
         # . Arguments
         #   $1  MODULE_FILE
@@ -1473,6 +1532,11 @@ set -uo pipefail
         # Outputs (globals):
         #   SGND_CURRENT_MODULE
         #   SGND_CURRENT_MODULE_DIR
+        #   SGND_MODULE_ROWS - Adds one loaded-module registry row with load timestamp.
+        #
+        # . Behavior
+        #   - Group/item/module registrations are transactional for each load attempt.
+        #   - Failed sourcing or metadata validation restores the pre-load registration model.
         #
         # . Returns
         #   0 on success.
@@ -1483,10 +1547,19 @@ set -uo pipefail
     _sgnd_console_source_module() {
         local module_file="${1:?missing module file}"
         local module_id=""
+        local module_shortname=""
         local module_name=""
+        local module_type=""
         local module_version=""
+        local module_build=""
         local module_desc=""
+        local module_loaded=""
         local module_count=0
+        local group_count_before="${#SGND_GROUP_ROWS[@]}"
+        local item_count_before="${#SGND_ITEM_ROWS[@]}"
+        local module_count_before="${#SGND_MODULE_ROWS[@]}"
+        local console_title_before="${SGND_CONSOLE_TITLE:-}"
+        local console_desc_before="${SGND_CONSOLE_DESC:-}"
 
         unset SGND_MODULE_ID SGND_MODULE_NAME
         unset SGND_CONSOLE_TITLE_OVERRIDE SGND_CONSOLE_DESC_OVERRIDE
@@ -1497,6 +1570,9 @@ set -uo pipefail
 
         # shellcheck source=/dev/null
         source "$module_file" || {
+            _sgnd_console_rollback_module_registration \
+                "$group_count_before" "$item_count_before" "$module_count_before" \
+                "$console_title_before" "$console_desc_before"
             sayfail "Failed to load module: $module_file"
             unset SGND_CURRENT_MODULE SGND_CURRENT_MODULE_SOURCE SGND_CURRENT_MODULE_DIR
             unset SGND_MODULE_ID SGND_MODULE_NAME
@@ -1506,11 +1582,20 @@ set -uo pipefail
 
         module_id="$(_sgnd_console_module_id_from_filename "$module_file")"
         module_name="${SGND_MODULE_NAME:-}"
+        sgnd_header_get_field "$module_file" "Metadata" "Shortname" module_shortname || module_shortname=""
+        sgnd_header_get_field "$module_file" "Metadata" "Type" module_type || module_type=""
         sgnd_header_get_field "$module_file" "Metadata" "Version" module_version || module_version=""
+        sgnd_header_get_field "$module_file" "Metadata" "Build" module_build || module_build=""
         sgnd_header_get_section "$module_file" "Description" module_desc || module_desc=""
         module_desc="$(printf '%s\n' "$module_desc" | awk 'NF { gsub(/^[[:space:]]+|[[:space:]]+$/, ""); printf "%s%s", sep, $0; sep=" " } END { print "" }')"
+        [[ -n "$module_shortname" ]] || module_shortname="${module_id//-/_}"
+        module_shortname="${module_shortname^^}"
+        module_loaded="$(date -Is)"
 
         if [[ -z "$module_name" || -z "$module_version" || -z "$module_desc" ]]; then
+            _sgnd_console_rollback_module_registration \
+                "$group_count_before" "$item_count_before" "$module_count_before" \
+                "$console_title_before" "$console_desc_before"
             sayfail "Module metadata is incomplete: $module_file"
             unset SGND_CURRENT_MODULE SGND_CURRENT_MODULE_SOURCE SGND_CURRENT_MODULE_DIR
             unset SGND_MODULE_ID SGND_MODULE_NAME
@@ -1519,6 +1604,9 @@ set -uo pipefail
         fi
 
         if sgnd_dt_has_row "$SGND_MODULE_SCHEMA" SGND_MODULE_ROWS id "$module_id"; then
+            _sgnd_console_rollback_module_registration \
+                "$group_count_before" "$item_count_before" "$module_count_before" \
+                "$console_title_before" "$console_desc_before"
             sayfail "Duplicate module ID rejected: $module_id"
             unset SGND_CURRENT_MODULE SGND_CURRENT_MODULE_SOURCE SGND_CURRENT_MODULE_DIR
             unset SGND_MODULE_ID SGND_MODULE_NAME
@@ -1533,7 +1621,10 @@ set -uo pipefail
         fi
 
         sgnd_dt_append "$SGND_MODULE_SCHEMA" SGND_MODULE_ROWS \
-            "$module_id" "$module_name" "$module_version" "$module_desc" "$module_file" || {
+            "$module_id" "$module_shortname" "$module_name" "$module_type" "$module_version" "$module_build" "$module_loaded" "$module_file" || {
+            _sgnd_console_rollback_module_registration \
+                "$group_count_before" "$item_count_before" "$module_count_before" \
+                "$console_title_before" "$console_desc_before"
             sayfail "Failed to record module metadata: $module_id"
             unset SGND_CURRENT_MODULE SGND_CURRENT_MODULE_SOURCE SGND_CURRENT_MODULE_DIR
             unset SGND_MODULE_ID SGND_MODULE_NAME
@@ -1761,6 +1852,32 @@ set -uo pipefail
 
 # --- Console loop --------------------------------------------------------------------
 
+    # fn: _sgnd_console_confirm_exit - Confirm exit from the console index
+        # . Purpose
+        #   Require explicit confirmation when Esc is pressed on the top-level console index.
+        #
+        # . Behavior
+        #   - Prompts with YES/NO choices using the framework decision primitive.
+        #   - Defaults to NO so an accidental Esc does not end the console session.
+        #
+        # . Returns
+        #   0 when the user confirms exit.
+        #   1 when the user chooses to remain in the console.
+        #
+        # . Usage
+        #   _sgnd_console_confirm_exit && return 0
+    _sgnd_console_confirm_exit() {
+        local decision="NO"
+
+        ask_decision \
+            --label "Exit SolidGround Management Console" \
+            --choices "Yes|Y,NO|N" \
+            --default "No" \
+            --var decision
+
+        [[ "$decision" == "YES" ]]
+    }
+
 # --- Console execution-context controls ---------------------------------------------
     # fn: _sgnd_console_toggle_dryrun - Toggle dry-run/commit mode
         # . Purpose
@@ -1971,6 +2088,9 @@ set -uo pipefail
         #   - Renders the menu.
         #   - Builds the valid choice list for the current menu state.
         #   - Reads normalized keyboard input through sgnd_menu_read_choice.
+        #   - Esc returns from a module page to the index.
+        #   - Esc on the index asks for confirmation before exiting the console.
+        #   - Q/q are not exit controls in the Management Console.
         #   - Dispatches the selected handler.
         #   - Exits when a handler returns sentinel value 200.
         #   - Shows an interruptible post-action countdown when SGND_LAST_WAITSECS is non-zero.
@@ -1991,8 +2111,10 @@ set -uo pipefail
 
         while true; do
             if [[ "$SGND_CONSOLE_VIEW" == "index" ]]; then
+                SGND_MENU_ESC_LABEL="Exit"
                 _sgnd_console_show_index
             else
+                SGND_MENU_ESC_LABEL="Previous menu"
                 sgnd_menu_show_menu
             fi
 
@@ -2003,8 +2125,12 @@ set -uo pipefail
 
             case "$choice" in
                 EXIT)
-                    sayinfo "Exiting console"
-                    return 0
+                    # Generic EXIT remains supported for non-Q reader controls.
+                    _sgnd_console_confirm_exit && {
+                        sayinfo "Exiting console"
+                        return 0
+                    }
+                    continue
                     ;;
                 REDRAW)
                     _sgnd_console_redraw
@@ -2020,7 +2146,13 @@ set -uo pipefail
                         SGND_CONSOLE_ACTIVE_PAGE=""
                         SGND_MENU_ACTIVE_SOURCE=""
                         SGND_PAGE_INDEX=0
+                        continue
                     fi
+
+                    _sgnd_console_confirm_exit && {
+                        sayinfo "Exiting console"
+                        return 0
+                    }
                     continue
                     ;;
             esac

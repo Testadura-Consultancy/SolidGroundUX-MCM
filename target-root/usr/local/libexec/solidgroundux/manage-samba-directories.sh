@@ -4,18 +4,26 @@
 # -------------------------------------------------------------------------------------
 # Metadata:
 #   Version     : 2.1
-#   Build       : 2627322
+#   Build       : 2627412
+#   Shortname   : MANAGE_SAMBA_DIRECTORIES
 #   Source      : manage-samba-directories.sh
 #   Type        : script
 #   Group       : Role Managers
 #   Purpose     : Manage directories and directory-level access beneath Samba share storage
 #
-#   Checksum : 23b2cf432e484a9cce87c8c4e91b02b4ec3e45f71bc16bc597f4ffcc2a11016f
+#   Checksum : 35f463ec92b268f75fd2889ef8002fc8cb3f9bdb4f3e2553c5743f8bab6f4b29
 # Description:
 #   Provides interactive directory lifecycle and POSIX ACL management beneath the
 #   SolidGroundUX Samba share root. Samba share roots are identified from the effective
 #   Samba configuration and displayed with their share names. Share-level access remains
 #   owned by manage-samba-shares.sh.
+#
+# Attribution:
+#   Developers    : Mark Fieten
+#   Company       : Testadura Consultancy
+#   Client        : -
+#   Copyright     : © 2025 - 2026 Testadura Consultancy
+#   License       : Licensed under the Testadura Non-Commercial License (TD-NC) v1.1.
 # =====================================================================================
 set -uo pipefail
 
@@ -165,15 +173,6 @@ set -uo pipefail
     SGND_SCRIPT_DIR="$(cd -- "$(dirname -- "$SGND_SCRIPT_FILE")" && pwd)"
     SGND_SCRIPT_BASE="$(basename -- "$SGND_SCRIPT_FILE")"
     SGND_SCRIPT_NAME="${SGND_SCRIPT_BASE%.sh}"
-    SGND_SCRIPT_TITLE="Manage Samba Directories"
-    : "${SGND_SCRIPT_DESC:=Create, remove, inspect, and secure directories beneath Samba share storage.}"
-    : "${SGND_SCRIPT_VERSION:=2.1}"
-    : "${SGND_SCRIPT_BUILD:=2626712}"
-    : "${SGND_SCRIPT_DEVELOPERS:=Mark Fieten}"
-    : "${SGND_SCRIPT_COMPANY:=Testadura Consultancy}"
-    : "${SGND_SCRIPT_COPYRIGHT:=© 2025 - 2026 Testadura Consultancy}"
-    : "${SGND_SCRIPT_LICENSE:=Testadura Non-Commercial License (TD-NC) v1.1.}"
-
 # - Framework integration ----------------------------------------------------------
     SGND_USING=(
         sgnd-datatable.sh

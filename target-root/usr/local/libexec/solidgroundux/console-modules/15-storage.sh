@@ -3,13 +3,14 @@
 # ----------------------------------------------------------------------------------
 # Metadata:
 #   Version     : 2.1
-#   Build       : 2627308
+#   Build       : 2627412
+#   Shortname   : STORAGE
 #   Source      : 15-storage.sh
 #   Type        : module
 #   Group       : Module Registration
 #   Purpose     : Configure and inspect local storage volumes
 #
-#   Checksum : 127febfca050df0f8003d3e5b7775be069d690913bc6431bf3d721fe486a8feb
+#   Checksum : 1aff021433ae0eda1136a18673ded4e172082064341941707cbfb1f930a0d34e
 # Description:
 #   Registers local-storage management actions with the SolidGround Management Console.
 #   Persistent storage operations are implemented by manage-storage.sh.
@@ -191,14 +192,14 @@ set -uo pipefail
         "$(sgnd_header_get_field_value "${BASH_SOURCE[0]}" "Metadata" "Purpose")" \
         0 1 240
 
-    sgnd_menu_register_item "storage-configure" "$SGND_STORAGE_MODULE_ID" "Configure storage" "storage_configure" "Provision an unused disk as persistent local storage" 0 15 1 0
-    sgnd_menu_register_item "storage-mount" "$SGND_STORAGE_MODULE_ID" "Mount storage" "storage_mount" "Mount the configured local storage filesystem" 0 15 1 1
-    sgnd_menu_register_item "storage-unmount" "$SGND_STORAGE_MODULE_ID" "Unmount storage" "storage_unmount" "Unmount storage while keeping its persistent configuration" 0 15 1 0
-    sgnd_menu_register_item "storage-expand" "$SGND_STORAGE_MODULE_ID" "Expand storage" "storage_expand" "Expand the partition and filesystem after enlarging its disk" 0 20 1 0
-    sgnd_menu_register_item "storage-reconcile" "$SGND_STORAGE_MODULE_ID" "Reconcile storage configuration" "storage_reconcile" "Update SolidGroundUX storage configuration from the existing SGND_STORAGE volume" 0 20 1 0
-    sgnd_menu_register_item "storage-reconcile-persistence" "$SGND_STORAGE_MODULE_ID" "Reconcile storage persistence" "storage_reconcile_persistence" "Repair stale SGND_STORAGE UUID mappings or explicitly remove stale managed entries" 0 22 1 0
-    sgnd_menu_register_item "storage-validate" "$SGND_STORAGE_MODULE_ID" "Validate storage provisioning" "storage_validate_provisioning" "Run active checks including configuration reconciliation" 0 25 1 0
-    sgnd_menu_register_item "storage-status" "$SGND_STORAGE_MODULE_ID" "Show storage status" "storage_status" "Show local disks and configured storage status" 0 30 1 0
+    sgnd_menu_register_item "storage-configure" "$SGND_STORAGE_MODULE_ID" "Configure storage" "storage_configure" "Provision an unused disk as persistent local storage" 0 0 1 0
+    sgnd_menu_register_item "storage-mount" "$SGND_STORAGE_MODULE_ID" "Mount storage" "storage_mount" "Mount the configured local storage filesystem" 0 0 1 1
+    sgnd_menu_register_item "storage-unmount" "$SGND_STORAGE_MODULE_ID" "Unmount storage" "storage_unmount" "Unmount storage while keeping its persistent configuration" 0 0 1 0
+    sgnd_menu_register_item "storage-expand" "$SGND_STORAGE_MODULE_ID" "Expand storage" "storage_expand" "Expand the partition and filesystem after enlarging its disk" 0 0 1 0
+    sgnd_menu_register_item "storage-reconcile" "$SGND_STORAGE_MODULE_ID" "Reconcile storage configuration" "storage_reconcile" "Update SolidGroundUX storage configuration from the existing SGND_STORAGE volume" 0 0 1 0
+    sgnd_menu_register_item "storage-reconcile-persistence" "$SGND_STORAGE_MODULE_ID" "Reconcile storage persistence" "storage_reconcile_persistence" "Repair stale SGND_STORAGE UUID mappings or explicitly remove stale managed entries" 0 0 1 0
+    sgnd_menu_register_item "storage-validate" "$SGND_STORAGE_MODULE_ID" "Validate storage provisioning" "storage_validate_provisioning" "Run active checks including configuration reconciliation" 0 0 1 0
+    sgnd_menu_register_item "storage-status" "$SGND_STORAGE_MODULE_ID" "Show storage status" "storage_status" "Show local disks and configured storage status" 0 0 1 0
 
     # . Storage Access
     sgnd_menu_register_group \
@@ -209,6 +210,6 @@ set -uo pipefail
 
     sgnd_menu_register_item "storage-access-status" "storage-access" "Show storage access" "storage_access_status" "Show ownership and permissions for managed storage roots" 0 15 1 0
     sgnd_menu_register_item "storage-access-set" "storage-access" "Set storage access" "storage_set_access" "Set owner, group, and Unix permissions for one or more managed storage roots" 0 0 1 0
-    sgnd_menu_register_item "storage-access-reset" "storage-access" "Restore default access" "storage_restore_access_defaults" "Restore canonical ownership and permissions for managed storage roots" 0 25 1 0
+    sgnd_menu_register_item "storage-access-reset" "storage-access" "Restore default access" "storage_restore_access_defaults" "Restore canonical ownership and permissions for managed storage roots" 0 0 1 0
 
     sayinfo "Storage module registered with the console."

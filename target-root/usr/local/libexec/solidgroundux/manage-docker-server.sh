@@ -1,19 +1,27 @@
-Subject manager#!/usr/bin/env bash
+#!/usr/bin/env bash
 # ==================================================================================
 # SolidGroundUX Management Console Modules - Manage Docker Server
 # ----------------------------------------------------------------------------------
 # Metadata:
 #   Version     : 2.1
-#   Build       : 2626414
+#   Build       : 2627412
+#   Shortname   : MANAGE_DOCKER
 #   Source      : manage-docker-server.sh
 #   Type        : script
 #   Group       : Role Managers
 #   Purpose     : Install, configure, validate, and inspect a Docker host
 #
-#   Checksum : 8e17aa140bcb91b19f76c9e6c3f9fede79e483fdc922349f8e5cb084c94b7ad8
+#   Checksum : b4a78d50d9a797c9109a05ab894f58649c01f066671ce170524a4abef2393aa9
 # Description:
 #   Provides first-version Docker host management for SolidGroundUX. The script
 #   deliberately avoids migrating an existing Docker data root automatically.
+#
+# Attribution:
+#   Developers    : Mark Fieten
+#   Company       : Testadura Consultancy
+#   Client        : -
+#   Copyright     : © 2025 - 2026 Testadura Consultancy
+#   License       : Licensed under the Testadura Non-Commercial License (TD-NC) v1.1.
 # ==================================================================================
 set -uo pipefail
 
@@ -116,11 +124,6 @@ set -uo pipefail
     SGND_SCRIPT_DIR="$(cd -- "$(dirname -- "$SGND_SCRIPT_FILE")" && pwd)"
     SGND_SCRIPT_BASE="$(basename -- "$SGND_SCRIPT_FILE")"
     SGND_SCRIPT_NAME="${SGND_SCRIPT_BASE%.sh}"
-    SGND_SCRIPT_TITLE="Manage Docker Server"
-    : "${SGND_SCRIPT_DESC:=Install, configure, validate, and inspect a Docker host.}"
-    : "${SGND_SCRIPT_VERSION:=2.1}"
-    : "${SGND_SCRIPT_BUILD:=2625802}"
-
 # - Framework integration -----------------------------------------------------------
     SGND_USING=()
     SGND_ARGS_SPEC=(

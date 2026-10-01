@@ -3,8 +3,9 @@
 # ----------------------------------------------------------------------------------
 # Metadata:
 #   Version     : 2.1
-#   Build       : 2626711
-#   Checksum    : ece66c45f5bd38a4f25d95c1a21db211199eec28acb586c0ce3c3d4da5a87595
+#   Build       : 2627412
+#   Shortname   : AD_MANAGEMENT
+#   Checksum    : c1fbd7e0415e3fe9bb7744d5844742e7d274250e87f7d01847573c20202747d6
 #   Source      : 27-active-directory-management.sh
 #   Type        : module
 #   Group       : Module Registration

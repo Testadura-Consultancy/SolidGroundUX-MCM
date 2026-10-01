@@ -4,11 +4,23 @@
 # ----------------------------------------------------------------------------------
 # Metadata:
 #   Version     : 2.1
-#   Build       : 2627322
+#   Build       : 2627412
+#   Shortname   : MANAGE_SQLSERVER
 #   Source      : manage-sqlserver.sh
 #   Type        : script
 #   Group       : Role Managers
 #   Purpose     : Install, configure, manage, validate, and inspect Microsoft SQL Server
+#
+#   Checksum : 78817099f37654de8e389a18a804ea4679535eade2774e5675d80db4ba4d1c72
+# Description:
+#   Install, configure, manage, validate, and inspect Microsoft SQL Server.
+#
+# Attribution:
+#   Developers    : Mark Fieten
+#   Company       : Testadura Consultancy
+#   Client        : -
+#   Copyright     : © 2025 - 2026 Testadura Consultancy
+#   License       : Licensed under the Testadura Non-Commercial License (TD-NC) v1.1.
 # ==================================================================================
 set -uo pipefail
 
@@ -111,11 +123,6 @@ set -uo pipefail
     SGND_SCRIPT_DIR="$(cd -- "$(dirname -- "$SGND_SCRIPT_FILE")" && pwd)"
     SGND_SCRIPT_BASE="$(basename -- "$SGND_SCRIPT_FILE")"
     SGND_SCRIPT_NAME="${SGND_SCRIPT_BASE%.sh}"
-    SGND_SCRIPT_TITLE="Manage SQL Server"
-    : "${SGND_SCRIPT_DESC:=Install, configure, manage, validate, and inspect Microsoft SQL Server.}"
-    : "${SGND_SCRIPT_VERSION:=2.1}"
-    : "${SGND_SCRIPT_BUILD:=2625801}"
-
 # - Framework integration -----------------------------------------------------------
     SGND_USING=()
     SGND_ARGS_SPEC=(

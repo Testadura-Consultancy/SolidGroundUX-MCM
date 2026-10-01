@@ -4,16 +4,24 @@
 # -------------------------------------------------------------------------------------
 # Metadata:
 #   Version     : 2.1
-#   Build       : 2627308
+#   Build       : 2627412
+#   Shortname   : MANAGE_STORAGE
 #   Source      : manage-storage.sh
 #   Type        : script
 #   Group       : Role Managers
 #   Purpose     : Configure, reconcile, validate, and inspect local storage volumes
 #
-#   Checksum : 7f81deacc61b05529cf5b5e8f869210f3d39d69b23918e40c5e99fd2fe79e212
+#   Checksum : b4500451d6cb4970c1ec918d4006a7a24b21af35a8705671b3c9c861591288fb
 # Description:
 #   Implements persistent local-storage management actions exposed by the
 #   15-storage Management Console module.
+#
+# Attribution:
+#   Developers    : Mark Fieten
+#   Company       : Testadura Consultancy
+#   Client        : -
+#   Copyright     : © 2025 - 2026 Testadura Consultancy
+#   License       : Licensed under the Testadura Non-Commercial License (TD-NC) v1.1.
 # =====================================================================================
 set -uo pipefail
 
@@ -116,11 +124,6 @@ set -uo pipefail
     SGND_SCRIPT_DIR="$(cd -- "$(dirname -- "$SGND_SCRIPT_FILE")" && pwd)"
     SGND_SCRIPT_BASE="$(basename -- "$SGND_SCRIPT_FILE")"
     SGND_SCRIPT_NAME="${SGND_SCRIPT_BASE%.sh}"
-    SGND_SCRIPT_TITLE="Manage Storage"
-    : "${SGND_SCRIPT_DESC:=Configure, reconcile, validate, and inspect local storage volumes.}"
-    : "${SGND_SCRIPT_VERSION:=2.1}"
-    : "${SGND_SCRIPT_BUILD:=2625721}"
-
 # - Framework integration -----------------------------------------------------------
     SGND_USING=()
     SGND_ARGS_SPEC=(

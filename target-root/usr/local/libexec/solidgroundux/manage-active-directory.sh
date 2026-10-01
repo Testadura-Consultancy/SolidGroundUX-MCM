@@ -4,16 +4,24 @@
 # -------------------------------------------------------------------------------------
 # Metadata:
 #   Version     : 2.1
-#   Build       : 2626711
+#   Build       : 2627412
+#   Shortname   : MANAGE_AD
 #   Source      : manage-active-directory.sh
 #   Type        : script
 #   Group       : Role Managers
 #   Purpose     : Manage Samba Active Directory users, groups, memberships, and computers
 #
-#   Checksum : 8037584b041409635d98e89044620a2dc436ef20eb35948d50b44bae95920af5
+#   Checksum : 17f5acdd36f138315549b1a19979762550040ddc5e9cbeaa135153442855e6f8
 # Description:
 #   Implements day-to-day directory administration exposed by the
 #   27-active-directory-management Management Console module.
+#
+# Attribution:
+#   Developers    : Mark Fieten
+#   Company       : Testadura Consultancy
+#   Client        : -
+#   Copyright     : © 2025 - 2026 Testadura Consultancy
+#   License       : Licensed under the Testadura Non-Commercial License (TD-NC) v1.1.
 # =====================================================================================
 set -uo pipefail
 
@@ -161,11 +169,6 @@ set -uo pipefail
     SGND_SCRIPT_DIR="$(cd -- "$(dirname -- "$SGND_SCRIPT_FILE")" && pwd)"
     SGND_SCRIPT_BASE="$(basename -- "$SGND_SCRIPT_FILE")"
     SGND_SCRIPT_NAME="${SGND_SCRIPT_BASE%.sh}"
-    SGND_SCRIPT_TITLE="Manage Active Directory"
-    : "${SGND_SCRIPT_DESC:=Manage Active Directory users, groups, memberships, and computers.}"
-    : "${SGND_SCRIPT_VERSION:=2.1}"
-    : "${SGND_SCRIPT_BUILD:=2625721}"
-
 # - Framework integration -----------------------------------------------------------
     SGND_USING=()
     SGND_ARGS_SPEC=(

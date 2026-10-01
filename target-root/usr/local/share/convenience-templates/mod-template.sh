@@ -3,8 +3,9 @@
 # ----------------------------------------------------------------------------------
 # Metadata:
 #   Version     : 2.1
-#   Build       : 2626711
-#   Checksum    : 879b0aa0786c0b8b3168d7583bd3dc21a91d5e0ce6632f5115d88f2c255ffc9e
+#   Build       : 2627412
+#   Shortname   : SAMPLE_MODULE
+#   Checksum    : 681f813f4af09c0fb4247dd8a76b2527325a8461a0a02abe99363b786aa36b1c
 #   Source      : mod-template.sh
 #   Type        : module
 #   Group       : SDK

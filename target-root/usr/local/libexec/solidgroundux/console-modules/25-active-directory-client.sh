@@ -3,13 +3,14 @@
 # ----------------------------------------------------------------------------------
 # Metadata:
 #   Version     : 2.1
-#   Build       : 2627308
+#   Build       : 2627412
+#   Shortname   : AD_CLIENT
 #   Source      : 25-active-directory-client.sh
 #   Type        : module
 #   Group       : Module Registration
 #   Purpose     : Register Active Directory client management actions
 #
-#   Checksum : ffb10209a9880a3065bc1313be8b939bb79961a7a96a6855cc416b9001403f47
+#   Checksum : a2bb566211b87ffacbbbbeb10ddb7ee3d72809d7dd1149a062dcfa0b12cb5067
 # Description:
 #   Registers Active Directory client management actions with the SolidGround Management
 #   Console. Persistent join, reconciliation, validation, and repair operations are

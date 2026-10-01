@@ -3,8 +3,9 @@
 # ----------------------------------------------------------------------------------
 # Metadata:
 #   Version     : 2.1
-#   Build       : 2626711
-#   Checksum    : 712238f8cef1f8331493ce8f46a8307d23547f30aea0114066ce98fbfb1ddb22
+#   Build       : 2627412
+#   Shortname   : AD_SERVER
+#   Checksum    : bb7696204e4d104dfb2fa125e2c14f9b1f5ad765177341241e61d9f064029634
 #   Source      : 20-active-directory-server.sh
 #   Type        : module
 #   Group       : Module Registration

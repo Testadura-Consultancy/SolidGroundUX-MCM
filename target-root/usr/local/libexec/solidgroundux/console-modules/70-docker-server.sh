@@ -3,13 +3,14 @@
 # ----------------------------------------------------------------------------------
 # Metadata:
 #   Version     : 2.1
-#   Build       : 2626711
+#   Build       : 2627412
+#   Shortname   : DOCKER
 #   Source      : 70-docker-server.sh
 #   Type        : module
 #   Group       : Module Registration
 #   Purpose     : Install, configure, manage, validate, and inspect a Docker host and its containers
 #
-#   Checksum : a710a01ae827da1426b6448ad0293cc697867ab3a2647b4cbd4d64ee339c9559
+#   Checksum : ffeecaac4bc83b3e9ce58ba9dc2db9fe5e908ea2a009cd5770d86213ef07529f
 # Description:
 #   Registers Docker host and container-management actions with the SolidGround
 #   Management Console. Persistent host operations are implemented by

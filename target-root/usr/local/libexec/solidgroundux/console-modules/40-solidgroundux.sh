@@ -3,8 +3,9 @@
 # ----------------------------------------------------------------------------------
 # Metadata:
 #   Version     : 2.1
-#   Build       : 2626712
-#   Checksum    : ebab49ddcb7bf8340f95a25eb0c6d223c12917c73384726142c7906aa7c8c1a7
+#   Build       : 2627412
+#   Shortname   : SOLIDGROUNDUX
+#   Checksum    : 08d98eb7688ea3a5a595516e9ce6e7112728cf3604d6dc5df09cd38cb86985e2
 #   Source      : 40-solidgroundux.sh
 #   Type        : module
 #   Group       : Module Registration
@@ -240,6 +241,110 @@ set -uo pipefail
         _sgnd_run_module_script "manage-framework-state.sh" --action reload
     }
 
+# - Loaded module registry ---------------------------------------------------------
+    # fn: _framework_show_module_registry - Show the loaded Management Console module registry
+        # . Purpose
+        #   Display modules loaded in the current console session and inspect one module in detail.
+        #
+        # . Behavior
+        #   - Reads the existing SGND_MODULE_ROWS registry owned by the Management Console host.
+        #   - Shows shortname, title, type, version, build, and load timestamp for every loaded module.
+        #   - Lets the operator select a loaded module and shows its canonical Description and source path.
+        #   - Does not create or maintain a second module registry.
+        #
+        # Inputs (globals):
+        #   SGND_MODULE_SCHEMA
+        #   SGND_MODULE_ROWS
+        #
+        # . Returns
+        #   0 after display or cancellation.
+        #
+        # . Usage
+        #   _framework_show_module_registry
+    _framework_show_module_registry() {
+        local module_count=0
+        local i=0
+        local selected=""
+        local selected_index=-1
+        local shortname=""
+        local name=""
+        local type=""
+        local version=""
+        local build=""
+        local loaded=""
+        local source=""
+        local desc=""
+        local line=""
+        local -a choices=()
+
+        if ! declare -p SGND_MODULE_ROWS >/dev/null 2>&1 \
+            || [[ -z "${SGND_MODULE_SCHEMA:-}" ]]; then
+            saywarning "The Management Console module registry is not available."
+            return 0
+        fi
+
+        module_count="$(sgnd_dt_row_count SGND_MODULE_ROWS)"
+        sgnd_print
+        sgnd_print_sectionheader "Loaded module registry"
+        sgnd_print_labeledvalue --label "Loaded modules" --value "$module_count" --labelwidth 18
+
+        (( module_count > 0 )) || return 0
+
+        sgnd_print
+        printf -v line '%-18s %-28s %-10s %-8s %-10s %s' \
+            "Shortname" "Title" "Type" "Version" "Build" "Loaded"
+        sgnd_print "$line"
+        sgnd_print_sectionheader ""
+
+        for (( i=0; i<module_count; i++ )); do
+            shortname="$(sgnd_dt_get "$SGND_MODULE_SCHEMA" SGND_MODULE_ROWS "$i" shortname)"
+            name="$(sgnd_dt_get "$SGND_MODULE_SCHEMA" SGND_MODULE_ROWS "$i" title)"
+            type="$(sgnd_dt_get "$SGND_MODULE_SCHEMA" SGND_MODULE_ROWS "$i" type)"
+            version="$(sgnd_dt_get "$SGND_MODULE_SCHEMA" SGND_MODULE_ROWS "$i" version)"
+            build="$(sgnd_dt_get "$SGND_MODULE_SCHEMA" SGND_MODULE_ROWS "$i" build)"
+            loaded="$(sgnd_dt_get "$SGND_MODULE_SCHEMA" SGND_MODULE_ROWS "$i" loaddate)"
+
+            printf -v line '%-18.18s %-28.28s %-10.10s %-8.8s %-10.10s %s' \
+                "${shortname:--}" "${name:--}" "${type:--}" "${version:--}" "${build:--}" "${loaded:--}"
+            sgnd_print "$line"
+            choices+=("${shortname:--} | ${name:--}")
+        done
+
+        ask_selection --label "Module details" --var selected --items "${choices[@]}" || { SGND_LAST_WAITSECS=0; return 0; }
+
+        for (( i=0; i<module_count; i++ )); do
+            shortname="$(sgnd_dt_get "$SGND_MODULE_SCHEMA" SGND_MODULE_ROWS "$i" shortname)"
+            name="$(sgnd_dt_get "$SGND_MODULE_SCHEMA" SGND_MODULE_ROWS "$i" title)"
+            [[ "$selected" == "${shortname:--} | ${name:--}" ]] || continue
+            selected_index=$i
+            break
+        done
+
+        (( selected_index >= 0 )) || return 0
+
+        shortname="$(sgnd_dt_get "$SGND_MODULE_SCHEMA" SGND_MODULE_ROWS "$selected_index" shortname)"
+        name="$(sgnd_dt_get "$SGND_MODULE_SCHEMA" SGND_MODULE_ROWS "$selected_index" title)"
+        type="$(sgnd_dt_get "$SGND_MODULE_SCHEMA" SGND_MODULE_ROWS "$selected_index" type)"
+        version="$(sgnd_dt_get "$SGND_MODULE_SCHEMA" SGND_MODULE_ROWS "$selected_index" version)"
+        build="$(sgnd_dt_get "$SGND_MODULE_SCHEMA" SGND_MODULE_ROWS "$selected_index" build)"
+        loaded="$(sgnd_dt_get "$SGND_MODULE_SCHEMA" SGND_MODULE_ROWS "$selected_index" loaddate)"
+        source="$(sgnd_dt_get "$SGND_MODULE_SCHEMA" SGND_MODULE_ROWS "$selected_index" source)"
+        sgnd_header_get_section "$source" "Description" desc || desc=""
+        desc="$(printf '%s\n' "$desc" | awk 'NF { gsub(/^[[:space:]]+|[[:space:]]+$/, ""); printf "%s%s", sep, $0; sep=" " } END { print "" }')"
+
+        sgnd_print
+        sgnd_print_sectionheader "${name:-$shortname}"
+        sgnd_print_labeledvalue --label "Shortname" --value "${shortname:--}" --labelwidth 18
+        sgnd_print_labeledvalue --label "Title" --value "${name:--}" --labelwidth 18
+        sgnd_print_labeledvalue --label "Description" --value "${desc:--}" --labelwidth 18
+        sgnd_print_labeledvalue --label "Type" --value "${type:--}" --labelwidth 18
+        sgnd_print_labeledvalue --label "Version" --value "${version:--}" --labelwidth 18
+        sgnd_print_labeledvalue --label "Build" --value "${build:--}" --labelwidth 18
+        sgnd_print_labeledvalue --label "Loaded" --value "${loaded:--}" --labelwidth 18
+        sgnd_print_labeledvalue --label "Source" --value "${source:--}" --labelwidth 18
+        return 0
+    }
+
 # - Module validation contract ---------------------------------------------------
     # Return codes:
     #   0 = Passed
@@ -330,6 +435,10 @@ set -uo pipefail
     #   > Handler: _framework_log_rotate
     #
     # . Framework Diagnostics
+    # ! View loaded modules
+    #   > Show the current Management Console loaded-module registry and inspect module details.
+    #   > Handler: _framework_show_module_registry
+    #
     # ! Framework smoke test
     #   > Run the complete SolidGroundUX framework smoke test.
     #   > Handler: _framework_smoketest
@@ -358,5 +467,6 @@ set -uo pipefail
     sgnd_menu_register_item "log-errors" "framework-logging" "Show recent errors" "_framework_log_show_errors" "Show the most recent error, failure, and fatal log entries" 0 30 1
     sgnd_menu_register_item "log-rotate" "framework-logging" "Rotate current logfile" "_framework_log_rotate" "Rotate the active framework logfile using the configured retention settings" 0 30 1
 
-    sgnd_menu_register_group "diagnostics" "Framework Diagnostics" "Run the complete framework smoke test" 0 1 850
+    sgnd_menu_register_group "diagnostics" "Framework Diagnostics" "Inspect loaded modules and run framework diagnostics" 0 1 850
+    sgnd_menu_register_item "module-registry" "diagnostics" "View loaded modules" "_framework_show_module_registry" "Show the loaded Management Console module registry and inspect module metadata" 0 15 1
     sgnd_menu_register_item "smoketest" "diagnostics" "Framework smoke test" "_framework_smoketest" "Run the complete SolidGroundUX framework smoke test" 0 30 1

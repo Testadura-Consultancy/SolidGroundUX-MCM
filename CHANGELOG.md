@@ -7,35 +7,57 @@ practical framework development.
 
 ## Backlog
 
-### Computer setup module
-- Check endings: end with line; if ending with confirm or another prompt, don't show menu completion wait.
-
 ### Storage module
-- Check endings: end with line; if ending with confirm or another prompt, don't show menu completion wait.
 - When configuring multiple mount points, there's no "Configure another?" prompt; it just jumps into the next.
 
 ### AD Server module
 - Provision domain doesn't report the underlying menu actions as done or errored.
-- Check endings: end with line; if ending with confirm or another prompt, don't show menu completion wait.
 - Add functionality to configure a second domain controller (after detecting one is present).
 
 ### AD Management
-- Check endings.
 - Group and User management should enable selecting multiple users or groups and applying actions to them.
 
 ### AD Client module
-- Check endings: end with line; if ending with confirm or another prompt, don't show menu completion wait.
+- Leaving a domain currently requires two passes before client status reliably reports that the machine is no longer joined; investigate leave/reconciliation/state refresh.
+
+### Samba file server
+- Review the directory-management workflow so the active/selected directory set is always obvious, for example through path/tree context and clearer selection highlighting.
+- Re-test multi-directory rights application and multi-group access assignment after the workflow cleanup; current E2E results indicate the configuration works overall, but these multi-selection flows remain unclear.
 
 ### SQL Server module
 - Report finish to main menu.
-- Check endings.
 - 12 Show server status: show mount points, not devices.
 
 ### Docker module
-- Check endings.
 - Test container management once you know what you are doing.
 
+### Management Console
+- Make lazy module loading transactional so registrations made by a module are rolled back when metadata validation or module loading fails, preventing duplicate registrations on a later retry.
+
 ## Unreleased
+
+### Management Console
+- Added a loaded-module registry view under **SolidGroundUX -> Framework Diagnostics**, showing module Shortname, Title, Type, Version, Build, load timestamp, and source, with selectable detailed metadata including Description.
+- Expanded the loaded-module registry schema and registration flow to retain canonical header identity for modules loaded during the current console session.
+- Changed console navigation so `Esc` is the canonical return/exit key: `Esc` returns from a module page to the main index and, on the main index, asks for confirmation before exiting.
+- Removed `Q/q` as a Management Console exit shortcut and made the footer/help text context-aware (`Esc Previous menu` on module pages and `Esc Exit` on the main index).
+- Standardized end-of-action behavior across console modules so actions that immediately return/redraw do not add a redundant completion wait.
+
+### Storage module
+- Corrected the indentation of the **Unmount storage** and **Expand storage** menu entries.
+
+### Samba file server
+- Added dedicated `manage-samba-users.sh` ownership for standalone Samba user/group administration, separating identity management from share/directory management.
+- Added a single **Manage users and groups** entry beneath Samba Shares and removed standalone identity CRUD from the share manager.
+- Added a comprehensive standalone Samba identity overview including user group memberships.
+- Fixed **Add user(s) to local group** so the second selector lists Samba users rather than local groups.
+- Added the required datatable dependency to the standalone Samba user/group manager.
+- Verified fresh Active Directory mode end-to-end, including AD join, Samba preparation, share publication, access configuration, validation, and Windows client access.
+- Verified fresh standalone mode end-to-end and verified both standalone -> AD and AD -> standalone authentication-mode transitions.
+
+### Docker module
+- Fixed the malformed first line in `manage-docker-server.sh` so the script has a valid shebang/header boundary.
+
 
 ### Storage module
 - Added recovery for restored or reattached `SGND_STORAGE` volumes whose filesystem UUID no longer matches the SolidGroundUX-managed `/etc/fstab` entry; persistence reconciliation can identify an unambiguous managed volume, confirm the repair, update persistent configuration, and remount it without reprovisioning.

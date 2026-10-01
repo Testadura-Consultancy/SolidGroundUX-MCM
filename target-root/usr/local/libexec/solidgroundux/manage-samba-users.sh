@@ -4,16 +4,25 @@
 # -------------------------------------------------------------------------------------
 # Metadata:
 #   Version     : 2.1
-#   Build       : 2627322
+#   Build       : 2627412
+#   Shortname   : MANAGE_SAMBA_USERS
 #   Source      : manage-samba-users.sh
 #   Type        : script
 #   Group       : Role Managers
 #   Purpose     : Manage standalone Samba users, local access groups, and memberships
 #
+#   Checksum : cc27364a43c77a875f7f0206cf645a3b6729164318da61a7a969f9fd6b98e67e
 # Description:
 #   Provides interactive management for local Samba users and the local groups used for
 #   standalone Samba share access. The overview shows Samba users together with their
 #   local group memberships so identity configuration can be reviewed at a glance.
+#
+# Attribution:
+#   Developers    : Mark Fieten
+#   Company       : Testadura Consultancy
+#   Client        : -
+#   Copyright     : © 2025 - 2026 Testadura Consultancy
+#   License       : Licensed under the Testadura Non-Commercial License (TD-NC) v1.1.
 # =====================================================================================
 set -uo pipefail
 
@@ -25,15 +34,28 @@ set -uo pipefail
         #
         # . Behavior
         #   - Resolves the physical path of the executing script.
-        #   - Treats usr, etc, and var as canonical top-level SolidGroundUX tree roots.
-        #   - Uses the last occurrence of one of those components to resolve the active root.
-        #   - Falls back to the installed executable common library for staged/dev trees.
+        #   - Treats usr, etc, and var as the canonical top-level SolidGroundUX tree roots.
+        #   - Uses the last occurrence of one of those path components to determine the
+        #     active filesystem root.
+        #   - Resolves production scripts beneath /usr, /etc, or /var to root (/).
+        #   - Resolves staged/development trees to the path prefix preceding the detected
+        #     usr, etc, or var component.
+        #   - Loads sgnd-exe-common.sh from the resolved framework root when available.
+        #   - For staged/development trees where the executable common library is not
+        #     present, falls back to the installed framework copy without changing
+        #     SGND_FRAMEWORK_ROOT.
         #
         # . Globals (write)
         #   SGND_FRAMEWORK_ROOT
         #
+        # . Output
+        #   Writes fatal bootstrap errors to stderr using printf because framework UI
+        #   helpers are not available until sgnd-exe-common.sh has been loaded.
+        #
         # . Returns
-        #   0 when the framework runtime is loaded; 126 on bootstrap failure.
+        #   0 when the framework root was resolved and executable common library loaded.
+        #   126 when the script path cannot be resolved, no canonical root component can
+        #   be found, or the executable common library is unreadable.
         #
         # . Usage
         #   _framework_locator || return $?
@@ -58,7 +80,9 @@ set -uo pipefail
         for index in "${!path_parts[@]}"; do
             component="${path_parts[$index]}"
             case "$component" in
-                usr|etc|var) root_index=$index ;;
+                usr|etc|var)
+                    root_index=$index
+                    ;;
             esac
         done
 
@@ -82,7 +106,10 @@ set -uo pipefail
             exe_common="/usr/local/lib/solidgroundux/common/sgnd-exe-common.sh"
         else
             exe_common="${SGND_FRAMEWORK_ROOT%/}/usr/local/lib/solidgroundux/common/sgnd-exe-common.sh"
-            [[ -r "$exe_common" ]] || exe_common="/usr/local/lib/solidgroundux/common/sgnd-exe-common.sh"
+
+            if [[ ! -r "$exe_common" ]]; then
+                exe_common="/usr/local/lib/solidgroundux/common/sgnd-exe-common.sh"
+            fi
         fi
 
         [[ -r "$exe_common" ]] || {
@@ -99,15 +126,6 @@ set -uo pipefail
     SGND_SCRIPT_DIR="$(cd -- "$(dirname -- "$SGND_SCRIPT_FILE")" && pwd)"
     SGND_SCRIPT_BASE="$(basename -- "$SGND_SCRIPT_FILE")"
     SGND_SCRIPT_NAME="${SGND_SCRIPT_BASE%.sh}"
-    SGND_SCRIPT_TITLE="Manage Samba Users"
-    : "${SGND_SCRIPT_DESC:=Manage standalone Samba users, local groups, and group memberships.}"
-    : "${SGND_SCRIPT_VERSION:=2.1}"
-    : "${SGND_SCRIPT_BUILD:=2627322}"
-    : "${SGND_SCRIPT_DEVELOPERS:=Mark Fieten}"
-    : "${SGND_SCRIPT_COMPANY:=Testadura Consultancy}"
-    : "${SGND_SCRIPT_COPYRIGHT:=© 2025 - 2026 Testadura Consultancy}"
-    : "${SGND_SCRIPT_LICENSE:=Testadura Non-Commercial License (TD-NC) v1.1.}"
-
 # - Framework integration ----------------------------------------------------------
     SGND_USING=(
         sgnd-datatable.sh
@@ -749,13 +767,7 @@ set -uo pipefail
         fi
 
         while :; do
-            _build_menu || 
-            { 
-                printf 'FATAL: Failed to build the Samba user/group management menu.\n' >&2
-                sleep 5
-                return $?
-            }
-            printf 'Menu built successfully.\n' >&2
+            _build_menu || return $?
             sgnd_menu_show_menu
 
             choice=""

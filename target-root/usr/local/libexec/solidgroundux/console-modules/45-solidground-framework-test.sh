@@ -7,9 +7,9 @@
 #   Type        : module
 #   Group       : Module Registration
 #   Purpose     : Register SolidGroundUX framework test and validation actions
-#
-#   Build : 2626711
-#   Checksum : 520794f53b0e27761ab35ea73c91882fa64e86a2fa3421bb48364f1352572de1
+#   Build       : 2627412
+#   Shortname   : FRAMEWORK_TEST
+#   Checksum    : 51d4e586b7076e3c4ebd1b04d9875c22a38e3482df4c504b6813b2ab5ee7acc9
 # Description:
 #   Provides the Management Console presentation layer for framework testing.
 #   Framework smoke tests are owned by the SolidGroundUX framework. This module acts as
