@@ -7,9 +7,6 @@ practical framework development.
 
 ## Backlog
 
-### Storage module
-- When configuring multiple mount points, there's no "Configure another?" prompt; it just jumps into the next.
-
 ### AD Server module
 - Provision domain doesn't report the underlying menu actions as done or errored.
 - Add functionality to configure a second domain controller (after detecting one is present).
@@ -37,6 +34,7 @@ practical framework development.
 ## Unreleased
 
 ### Management Console
+- Made lazy module loading transactional so registrations created during a failed module load are rolled back before returning, preventing duplicate groups/items when the module is retried.
 - Added a loaded-module registry view under **SolidGroundUX -> Framework Diagnostics**, showing module Shortname, Title, Type, Version, Build, load timestamp, and source, with selectable detailed metadata including Description.
 - Expanded the loaded-module registry schema and registration flow to retain canonical header identity for modules loaded during the current console session.
 - Changed console navigation so `Esc` is the canonical return/exit key: `Esc` returns from a module page to the main index and, on the main index, asks for confirmation before exiting.
