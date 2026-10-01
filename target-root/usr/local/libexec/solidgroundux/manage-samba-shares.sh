@@ -13,8 +13,9 @@
 #
 # Description:
 #   Provides interactive management of SolidGroundUX Samba shares, including share
-#   lifecycle, validation, standalone identities, and AD/NSS group access synchronized
-#   through POSIX ACLs and Samba valid-users/write-list settings. Directory lifecycle and
+#   lifecycle, validation, and AD/NSS or standalone group access synchronized through
+#   POSIX ACLs and Samba valid-users/write-list settings. Standalone Samba user/group
+#   lifecycle is implemented by manage-samba-users.sh; directory lifecycle and
 #   directory-level ACL management are implemented by manage-samba-directories.sh.
 #
 # Design principles:
@@ -1582,7 +1583,7 @@ set -uo pipefail
         return "$validation_rc"
     }
 
-# - Authentication-aware identity management ---------------------------------------
+# - Authentication-aware access-group selection -----------------------------------
     # fn: _smb_runtime_auth_mode - Return the configured Samba authentication mode
         # . Returns
         #   Writes "ad" for ADS security and "standalone" otherwise.
@@ -1592,17 +1593,6 @@ set -uo pipefail
         local security=""
         security="$(sudo testparm -s --parameter-name security 2>/dev/null || true)"
         [[ "${security^^}" == "ADS" ]] && printf 'ad\n' || printf 'standalone\n'
-    }
-
-    # fn: _list_local_samba_users_raw - List enabled local Samba users
-        # . Output
-        #   Writes one Samba user name per line.
-        # . Returns
-        #   pdbedit status.
-        # . Usage
-        #   mapfile -t users < <(_list_local_samba_users_raw)
-    _list_local_samba_users_raw() {
-        sudo pdbedit -L 2>/dev/null | cut -d: -f1 | LC_ALL=C sort -fu
     }
 
     # fn: _list_local_groups_raw - List deliberate local access groups
@@ -1668,24 +1658,6 @@ set -uo pipefail
         fi
     }
 
-    # fn: _select_local_samba_user - Select one enabled local Samba user
-        # . Arguments
-        #   $1  Output variable name.
-        # . Returns
-        #   0 on selection; 1 on cancel or when no users exist.
-        # . Usage
-        #   _select_local_samba_user user || return 0
-    _select_local_samba_user() {
-        local output_var="${1:?missing output variable}"
-        local selected=""
-        local -a users=()
-
-        mapfile -t users < <(_list_local_samba_users_raw)
-        (( ${#users[@]} > 0 )) || { saywarning "No local Samba users are available."; return 1; }
-        _smb_ask_selection --label "Select local Samba user" --var selected --items "${users[@]}" || return 1
-        printf -v "$output_var" '%s' "$selected"
-    }
-
     # fn: _select_local_groups - Select one or more local groups
         # . Arguments
         #   $1  Output array variable name.
@@ -1722,28 +1694,6 @@ set -uo pipefail
         output_ref=("${resolved[@]}")
     }
 
-    # fn: _select_local_group - Select exactly one local group
-        # . Arguments
-        #   $1  Output variable name.
-        # . Returns
-        #   0 on selection; 1 on cancel or when no groups exist.
-        # . Usage
-        #   _select_local_group group || return 0
-    _select_local_group() {
-        local output_var="${1:?missing output variable}"
-        local -a groups=()
-
-        while :; do
-            groups=()
-            _select_local_groups groups || return 1
-            if (( ${#groups[@]} == 1 )); then
-                printf -v "$output_var" '%s' "${groups[0]}"
-                return 0
-            fi
-            saywarning "Select exactly one local group."
-        done
-    }
-
     # fn: _pause_return_to_share_manager - Keep terminal action results visible
         # . Arguments
         #   $1  Optional message.
@@ -1756,254 +1706,6 @@ set -uo pipefail
         sgnd_print_sectionheader ""
         ask_dlg_autocontinue --seconds 15 --message "$message" --pause || true
         return 0
-    }
-
-    # fn: _smb_manage_local_users - Manage local Linux/Samba accounts for standalone authentication
-        # . Purpose
-        #   List, create, update, and remove standalone Samba users with selection-first workflows.
-        # . Behavior
-        #   - Creating a Samba account creates the matching Linux account when absent.
-        #   - Password changes select an existing Samba account.
-        #   - Removal supports multi-selection and preserves Linux accounts/files.
-        #   - Terminal actions use the standard SolidGroundUX auto-continue pattern.
-        # . Returns
-        #   0 after the requested operation; non-zero on command failure.
-        # . Usage
-        #   _smb_manage_local_users
-    _smb_manage_local_users() {
-        local action=""
-        local user=""
-        local dlg_rc=0
-        local failures=0
-        local -a users=()
-        local -a selected_users=()
-
-        _smb_ask_selection --label "Manage local Samba users" --var action --items \
-            "List Samba users" "Create/enable Samba user" "Change Samba password" "Remove Samba user(s)" || return 0
-
-        case "$action" in
-            "List Samba users")
-                sgnd_print
-                sgnd_print_sectionheader --text "Local Samba users"
-                mapfile -t users < <(_list_local_samba_users_raw)
-                if (( ${#users[@]} == 0 )); then
-                    sgnd_print --text "No local Samba users found." --pad 2
-                else
-                    for user in "${users[@]}"; do
-                        sgnd_print_labeledvalue --label "User" --value "$user" --labelwidth 18
-                    done
-                fi
-                _pause_return_to_share_manager
-                ;;
-
-            "Create/enable Samba user")
-                while :; do
-                    user=""
-                    ask --label "Local user (Q=Back)" --var user --validate _validate_share_name --back || return 0
-                    if ! getent -s files passwd "$user" >/dev/null 2>&1; then
-                        sudo useradd -m -s /bin/bash "$user" || { sayfail "Local Linux user '$user' could not be created."; return 1; }
-                        sayok "Local Linux user '$user' created."
-                    fi
-                    sayinfo "Enter the Samba password for '$user'."
-                    sudo smbpasswd -a "$user" </dev/tty || { sayfail "Samba account '$user' could not be enabled."; return 1; }
-                    sayok "Local Samba user '$user' is enabled."
-
-                    dlg_rc=0
-                    sgnd_print_sectionheader ""
-                    ask_dlg_autocontinue \
-                        --seconds 5 \
-                        --again \
-                        --legend "Enter=return to manager; A=another; timeout=create/enable another Samba user" \
-                        || dlg_rc=$?
-                    case "$dlg_rc" in
-                        1|3) continue ;;
-                        *) return 0 ;;
-                    esac
-                done
-                ;;
-
-            "Change Samba password")
-                _select_local_samba_user user || return 0
-                sudo smbpasswd "$user" </dev/tty || { sayfail "Samba password for '$user' could not be changed."; return 1; }
-                sayok "Samba password for '$user' changed."
-                _pause_return_to_share_manager
-                ;;
-
-            "Remove Samba user(s)")
-                mapfile -t users < <(_list_local_samba_users_raw)
-                (( ${#users[@]} > 0 )) || { saywarning "No local Samba users are available."; _pause_return_to_share_manager; return 0; }
-                _smb_ask_selection --label "Select Samba user(s) to remove" --var selected_users --multi --items "${users[@]}" || return 0
-                failures=0
-                for user in "${selected_users[@]}"; do
-                    if sudo smbpasswd -x "$user" >/dev/null 2>&1; then
-                        sayok "Samba user '$user' removed; the Linux account was preserved."
-                    else
-                        failures=$((failures + 1))
-                        saywarning "Samba user '$user' could not be removed."
-                    fi
-                done
-                _pause_return_to_share_manager
-                (( failures == 0 ))
-                ;;
-        esac
-    }
-
-    # fn: _smb_manage_local_groups - Manage local groups used for standalone share access
-        # . Purpose
-        #   Provide selection-first local group and membership management for standalone Samba.
-        # . Behavior
-        #   - Lists local-file groups only and labels user-private groups explicitly.
-        #   - Adds multiple selected Samba users to one selected group.
-        #   - Removes multiple selected current members from one selected group.
-        #   - Removes multiple selected local groups.
-        # . Returns
-        #   0 after the requested operation; non-zero on command failure.
-        # . Usage
-        #   _smb_manage_local_groups
-    _smb_manage_local_groups() {
-        local action=""
-        local group=""
-        local user=""
-        local dlg_rc=0
-        local failures=0
-        local member=""
-        local -a groups=()
-        local -a users=()
-        local -a members=()
-        local -a selected_groups=()
-        local -a selected_users=()
-        local -a selected_members=()
-
-        _smb_ask_selection --label "Manage local Samba groups" --var action --items \
-            "List local groups" "Create local group" "Add user(s) to local group" "Remove user(s) from local group" "Remove local group(s)" || return 0
-
-        case "$action" in
-            "List local groups")
-                sgnd_print
-                sgnd_print_sectionheader --text "Local groups"
-                mapfile -t groups < <(_list_local_groups_raw)
-                if (( ${#groups[@]} == 0 )); then
-                    sgnd_print --text "No local groups found." --pad 2
-                else
-                    for group in "${groups[@]}"; do
-                        sgnd_print_labeledvalue --label "Group" --value "$(_local_group_display "$group")" --labelwidth 18
-                    done
-                fi
-                _pause_return_to_share_manager
-                ;;
-
-            "Create local group")
-                while :; do
-                    group=""
-                    ask --label "Group name (Q=Back)" --var group --validate _validate_share_name --back || return 0
-                    if getent -s files group "$group" >/dev/null 2>&1; then
-                        saywarning "Group '$group' already exists."
-                    else
-                        sudo groupadd "$group" || { sayfail "Local group '$group' could not be created."; return 1; }
-                        sayok "Local group '$group' created."
-                    fi
-
-                    dlg_rc=0
-                    sgnd_print_sectionheader ""
-                    ask_dlg_autocontinue \
-                        --seconds 5 \
-                        --again \
-                        --legend "Enter=return to manager; A=another; timeout=create another local group" \
-                        || dlg_rc=$?
-                    case "$dlg_rc" in
-                        1|3) continue ;;
-                        *) return 0 ;;
-                    esac
-                done
-                ;;
-
-            "Add user(s) to local group")
-                while :; do
-                    group=""
-                    users=()
-                    selected_users=()
-                    failures=0
-                    _select_local_group group || return 0
-                    mapfile -t users < <(_list_local_samba_users_raw)
-                    (( ${#users[@]} > 0 )) || { saywarning "No local Samba users are available."; return 0; }
-                    _smb_ask_selection --label "Add users to '$group'" --var selected_users --multi --items "${users[@]}" || return 0
-                    for user in "${selected_users[@]}"; do
-                        if sudo usermod -aG "$group" "$user"; then
-                            sayok "User '$user' added to '$group'."
-                        else
-                            failures=$((failures + 1))
-                            saywarning "User '$user' could not be added to '$group'."
-                        fi
-                    done
-                    (( failures == 0 )) || return 1
-
-                    dlg_rc=0
-                    sgnd_print_sectionheader ""
-                    ask_dlg_autocontinue \
-                        --seconds 5 \
-                        --again \
-                        --legend "Enter=return to manager; A=another; timeout=add users to another local group" \
-                        || dlg_rc=$?
-                    case "$dlg_rc" in
-                        1|3) continue ;;
-                        *) return 0 ;;
-                    esac
-                done
-                ;;
-
-            "Remove user(s) from local group")
-                while :; do
-                    group=""
-                    members=()
-                    selected_members=()
-                    failures=0
-                    _select_local_group group || return 0
-                    IFS=',' read -r -a members <<< "$(getent -s files group "$group" 2>/dev/null | cut -d: -f4)"
-                    local -a filtered_members=()
-                    for member in "${members[@]}"; do
-                        [[ -n "$member" ]] && filtered_members+=("$member")
-                    done
-                    (( ${#filtered_members[@]} > 0 )) || { sayinfo "'$group' has no supplementary members to remove."; _pause_return_to_share_manager; return 0; }
-                    _smb_ask_selection --label "Remove users from '$group'" --var selected_members --multi --items "${filtered_members[@]}" || return 0
-                    for user in "${selected_members[@]}"; do
-                        if sudo gpasswd -d "$user" "$group" >/dev/null 2>&1; then
-                            sayok "User '$user' removed from '$group'."
-                        else
-                            failures=$((failures + 1))
-                            saywarning "User '$user' could not be removed from '$group'."
-                        fi
-                    done
-                    (( failures == 0 )) || return 1
-
-                    dlg_rc=0
-                    sgnd_print_sectionheader ""
-                    ask_dlg_autocontinue \
-                        --seconds 5 \
-                        --again \
-                        --legend "Enter=return to manager; A=another; timeout=remove users from another local group" \
-                        || dlg_rc=$?
-                    case "$dlg_rc" in
-                        1|3) continue ;;
-                        *) return 0 ;;
-                    esac
-                done
-                ;;
-
-            "Remove local group(s)")
-                _select_local_groups selected_groups || return 0
-                failures=0
-                for group in "${selected_groups[@]}"; do
-                    if sudo groupdel "$group"; then
-                        sayok "Local group '$group' removed."
-                    else
-                        failures=$((failures + 1))
-                        saywarning "Local group '$group' could not be removed."
-                    fi
-                done
-                _pause_return_to_share_manager
-                (( failures == 0 ))
-                ;;
-        esac
     }
 
     # fn: _select_access_groups - Select one or more access groups appropriate to the active Samba mode
@@ -2157,8 +1859,6 @@ set -uo pipefail
 
     _smb_menu_create_share()        { _create_share; }
     _smb_menu_show_shares()          { _show_shares_overview; }
-    _smb_menu_local_users()          { _smb_manage_local_users; }
-    _smb_menu_local_groups()         { _smb_manage_local_groups; }
     _smb_menu_reconcile() {
         _reconcile_access_group || return $?
         _pause_return_to_share_manager
@@ -2187,10 +1887,7 @@ set -uo pipefail
 
     _smb_menu_build() {
         local selection_state=2
-        local standalone_identity_state=2
         local selected_text="None selected"
-
-        [[ "$(_smb_runtime_auth_mode)" == "standalone" ]] && standalone_identity_state=1
 
         (( ${#SELECTED_SHARES[@]} > 0 )) && {
             selection_state=1
@@ -2214,11 +1911,7 @@ set -uo pipefail
         sgnd_menu_register_item "remove-acl" "share-management" "Remove group access"                  "_smb_menu_remove_access"       "" 0 0 "$selection_state" 0
         sgnd_menu_register_item "reconcile"  "share-management" "Reconcile access identity"            "_smb_menu_reconcile"           "" 0 0 "$selection_state" 0
 
-        sgnd_menu_register_group "standalone-identities" "Standalone identities" "" 0 1 30
-        sgnd_menu_register_item "local-users"  "standalone-identities" "Manage local Samba users"           "_smb_menu_local_users"         "" 0 0 "$standalone_identity_state" 0
-        sgnd_menu_register_item "local-groups" "standalone-identities" "Manage local groups"                "_smb_menu_local_groups"        "" 0 0 "$standalone_identity_state" 0
-
-        sgnd_menu_register_group "share-validation" "Validation" "" 0 1 40
+        sgnd_menu_register_group "share-validation" "Validation" "" 0 1 30
         sgnd_menu_register_item "validate"   "share-validation" "Validate selected shares"             "_smb_menu_validate"            "" 0 0 "$selection_state" 0
     }
 

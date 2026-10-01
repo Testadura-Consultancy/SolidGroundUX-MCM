@@ -11,10 +11,11 @@
 #
 #   Checksum : 84f22d7cd30dbb7f35ae95c7b1f9dcd455df3ef3f22e0ea065c460d9f8724fd4
 # Description:
-#   Registers Samba file-server, share-management, and directory-management actions with
-#   the Management Console. Persistent server-management functionality is implemented by
-#   manage-samba-file-server.sh; share lifecycle/access is implemented by
-#   manage-samba-shares.sh; directory lifecycle/access is implemented by
+#   Registers Samba file-server, share-management, user/group-management, and directory-
+#   management actions with the Management Console. Persistent server-management
+#   functionality is implemented by manage-samba-file-server.sh; share lifecycle/access
+#   is implemented by manage-samba-shares.sh; standalone Samba users/groups are managed
+#   by manage-samba-users.sh; directory lifecycle/access is implemented by
 #   manage-samba-directories.sh.
 # ==================================================================================
 set -uo pipefail
@@ -205,6 +206,10 @@ set -uo pipefail
         _smb_run_project_script "manage-samba-directories.sh"
     }
 
+    _smb_manage_users() {
+        _smb_run_project_script "manage-samba-users.sh"
+    }
+
 # - Module validation contract ------------------------------------------------------
     # Return codes:
     #   0 = Passed
@@ -279,6 +284,11 @@ set -uo pipefail
     #   > Create, remove, inspect, and manage directory-level user/group access.
     #   > Handler: _smb_manage_directories
     #   > Script: /usr/local/libexec/solidgroundux/manage-samba-directories.sh
+    #
+    # ! Manage users and groups
+    #   > Manage standalone Samba users, local access groups, and group memberships.
+    #   > Handler: _smb_manage_users
+    #   > Script: /usr/local/libexec/solidgroundux/manage-samba-users.sh
     sgnd_menu_register_group \
         "$SGND_SAMBA_FILE_MODULE_ID" \
         "$SGND_SAMBA_FILE_MODULE_NAME" \
@@ -303,5 +313,6 @@ set -uo pipefail
 
     sgnd_menu_register_item "smb-share-manage" "samba-shares" "Manage shares" "_smb_manage_shares" "Create, remove, validate, and manage share-level access" 0 0 1 0
     sgnd_menu_register_item "smb-directory-manage" "samba-shares" "Manage directories" "_smb_manage_directories" "Create, remove, inspect, and manage directory-level access" 0 0 1 0
+    sgnd_menu_register_item "smb-user-manage" "samba-shares" "Manage users and groups" "_smb_manage_users" "Manage standalone Samba users, local groups, and group memberships" 0 0 1 0
 
     sayinfo "Samba File Server module registered with the console."
