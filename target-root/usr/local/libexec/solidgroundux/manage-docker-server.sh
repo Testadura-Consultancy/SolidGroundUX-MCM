@@ -4,14 +4,14 @@
 # ----------------------------------------------------------------------------------
 # Metadata:
 #   Version     : 2.1
-#   Build       : 2627412
+#   Build       : 2627515
 #   Shortname   : MANAGE_DOCKER
 #   Source      : manage-docker-server.sh
 #   Type        : script
 #   Group       : Role Managers
 #   Purpose     : Install, configure, validate, and inspect a Docker host
 #
-#   Checksum : b4a78d50d9a797c9109a05ab894f58649c01f066671ce170524a4abef2393aa9
+#   Checksum : 777e5dd508159e0feafce25036162592e6ce731c6a6784424c56967eb5b9da1b
 # Description:
 #   Provides first-version Docker host management for SolidGroundUX. The script
 #   deliberately avoids migrating an existing Docker data root automatically.
@@ -127,7 +127,7 @@ set -uo pipefail
 # - Framework integration -----------------------------------------------------------
     SGND_USING=()
     SGND_ARGS_SPEC=(
-        "action|a|enum|ACTION|Management action||prepare,install,storage,service,validate,status"
+        "action|a|enum|ACTION|Management action||prepare,install,storage,start,service,validate,status"
     )
     SGND_SCRIPT_EXAMPLES=(
         "  $SGND_SCRIPT_NAME --action status"
@@ -190,8 +190,8 @@ set -uo pipefail
 
     _docker_directory_nonempty() {
         local path="$1"
-        [[ -d "$path" ]] || return 1
-        find "$path" -mindepth 1 -maxdepth 1 -print -quit 2>/dev/null | grep -q .
+        sudo test -d "$path" || return 1
+        sudo find "$path" -mindepth 1 -maxdepth 1 -print -quit 2>/dev/null | grep -q .
     }
 
     _docker_write_data_root() {
@@ -316,9 +316,28 @@ print()
         sayok "Docker service is active."
     }
 
+    # fn: _docker_prepare - Run the complete Docker host preparation workflow
+        # . Purpose
+        #   Execute the same host preparation steps exposed by the management-console
+        #   module when this manager is invoked directly.
+        #
+        # . Behavior
+        #   - Installs Docker Engine packages.
+        #   - Configures the Docker data root using SolidGroundUX storage.
+        #   - Enables and starts docker.service.
+        #   - Validates the resulting Docker host.
+        #   - Stops at the first failing step.
+        #
+        # . Returns
+        #   0 when all preparation steps succeed; otherwise the first failing return code.
+        #
+        # . Usage
+        #   _docker_prepare
     _docker_prepare() {
         _docker_install || return $?
+        _docker_configure_storage || return $?
         _docker_start || return $?
+        _docker_validate || return $?
         sayok "Docker server preparation completed successfully."
     }
 
@@ -471,7 +490,7 @@ print()
         sgnd_print_labeledvalue --label "Daemon access" --value "$result" --labelwidth 24
 
         data_root="$(_docker_current_data_root)"
-        if [[ -d "$data_root" && -x "$data_root" ]]; then result="Passed ($data_root)"; else result="Failed ($data_root)"; failures=$((failures + 1)); fi
+        if sudo test -d "$data_root" && sudo test -x "$data_root"; then result="Passed ($data_root)"; else result="Failed ($data_root)"; failures=$((failures + 1)); fi
         sgnd_print_labeledvalue --label "Docker data root" --value "$result" --labelwidth 24
 
         sgnd_print
@@ -490,6 +509,7 @@ print()
             prepare)  _docker_prepare || rc=$? ;;
             install)  _docker_install || rc=$? ;;
             storage)  _docker_configure_storage || rc=$? ;;
+            start)    _docker_start || rc=$? ;;
             service)  _docker_manage_service || rc=$? ;;
             validate) _docker_validate || rc=$? ;;
             status)   _docker_status || rc=$? ;;

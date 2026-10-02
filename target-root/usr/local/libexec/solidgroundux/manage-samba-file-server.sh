@@ -4,7 +4,7 @@
 # -------------------------------------------------------------------------------------
 # Metadata:
 #   Version     : 2.1
-#   Build       : 2627412
+#   Build       : 2627501
 #   Shortname   : MANAGE_SAMBA_SERVER
 #   Source      : manage-samba-file-server.sh
 #   Type        : script

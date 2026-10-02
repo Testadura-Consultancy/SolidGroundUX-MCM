@@ -4,14 +4,14 @@
 # ----------------------------------------------------------------------------------
 # Metadata:
 #   Version     : 2.1
-#   Build       : 2627412
+#   Build       : 2627515
 #   Shortname   : MANAGE_SQLSERVER
 #   Source      : manage-sqlserver.sh
 #   Type        : script
 #   Group       : Role Managers
 #   Purpose     : Install, configure, manage, validate, and inspect Microsoft SQL Server
 #
-#   Checksum : 78817099f37654de8e389a18a804ea4679535eade2774e5675d80db4ba4d1c72
+#   Checksum : 3abb07a7182c6e3653857224a974d2b9b0a020b6d0f85d794ded9977767b1538
 # Description:
 #   Install, configure, manage, validate, and inspect Microsoft SQL Server.
 #
@@ -474,15 +474,30 @@ set -uo pipefail
     }
 
     # fn: _sqlserver_prepare - Run the tracked SQL Server preparation workflow
+        # . Purpose
+        #   Run the complete SQL Server preparation sequence while returning a distinct
+        #   workflow code for the child action that failed.
+        #
+        # . Behavior
+        #   - Configures the Microsoft repositories.
+        #   - Installs the SQL Server engine.
+        #   - Runs the canonical SQL Server configuration workflow.
+        #   - Installs the SQL Server command-line tools.
+        #
         # . Returns
-        #   0 on success; non-zero when the operation cannot be completed.
+        #   0 when all preparation steps succeed.
+        #   51 when repository configuration fails.
+        #   52 when engine installation fails.
+        #   53 when SQL Server configuration fails.
+        #   54 when tools installation fails.
+        #
         # . Usage
         #   _sqlserver_prepare
     _sqlserver_prepare() {
-        _sqlserver_step_repository || return $?
-        _sqlserver_step_install_engine || return $?
-        _sqlserver_step_configure || return $?
-        _sqlserver_step_install_tools || return $?
+        _sqlserver_step_repository || return 51
+        _sqlserver_step_install_engine || return 52
+        _sqlserver_step_configure || return 53
+        _sqlserver_step_install_tools || return 54
         sayok "SQL Server preparation completed successfully."
     }
 

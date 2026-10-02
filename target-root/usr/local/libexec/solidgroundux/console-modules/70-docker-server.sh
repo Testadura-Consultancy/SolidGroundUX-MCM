@@ -3,14 +3,14 @@
 # ----------------------------------------------------------------------------------
 # Metadata:
 #   Version     : 2.1
-#   Build       : 2627412
+#   Build       : 2627515
 #   Shortname   : DOCKER
 #   Source      : 70-docker-server.sh
 #   Type        : module
 #   Group       : Module Registration
 #   Purpose     : Install, configure, manage, validate, and inspect a Docker host and its containers
 #
-#   Checksum : ffeecaac4bc83b3e9ce58ba9dc2db9fe5e908ea2a009cd5770d86213ef07529f
+#   Checksum : a6c02d6c6088c3cf0dd2f47210d40a8d563fda00ae4d22c4b91bd06e31377bfc
 # Description:
 #   Registers Docker host and container-management actions with the SolidGround
 #   Management Console. Persistent host operations are implemented by
@@ -83,11 +83,64 @@ set -uo pipefail
         _sgnd_run_module_script "manage-docker-containers.sh" --action "$action"
     }
 
-    docker_prepare()             { _docker_run_host prepare; }
-    docker_install()             { _docker_run_host install; }
-    docker_storage()             { _docker_run_host storage; }
+    _docker_step_install()       { _docker_run_host install; }
+    _docker_step_storage()       { _docker_run_host storage; }
+    _docker_step_start()         { _docker_run_host start; }
+    _docker_step_validate()      { _docker_run_host validate; }
+
+    # fn: docker_prepare - Run and track the complete Docker host preparation sequence
+        # . Purpose
+        #   Execute the same registered child actions used by the individual Docker host
+        #   menu items so compound preparation keeps every child status synchronized.
+        #
+        # . Behavior
+        #   - Runs install, storage configuration, service start, and validation in order.
+        #   - Uses management-console action tracking when available so every child receives
+        #     the same persisted checkmark/cross status as an individually selected action.
+        #   - Stops at the first failing child action and preserves that child's failed status.
+        #   - Falls back to direct child execution when invoked outside management-console.
+        #
+        # . Returns
+        #   0 when all child actions succeed; otherwise the first failing child return code.
+        #
+        # . Usage
+        #   docker_prepare
+    docker_prepare() {
+        local rc=0
+
+        sgnd_print
+        sgnd_print_sectionheader --text "Prepare Docker Server"
+
+        if declare -F sgnd_console_run_tracked >/dev/null 2>&1; then
+            sgnd_print_labeledvalue --label "Step" --value "Install Docker" --labelwidth 18
+            sgnd_console_run_tracked "docker-install" _docker_step_install || return $?
+            sgnd_print_labeledvalue --label "Step" --value "Configure Docker storage" --labelwidth 18
+            sgnd_console_run_tracked "docker-storage" _docker_step_storage || return $?
+            sgnd_print_labeledvalue --label "Step" --value "Start Docker service" --labelwidth 18
+            sgnd_console_run_tracked "docker-start" _docker_step_start || return $?
+            sgnd_print_labeledvalue --label "Step" --value "Validate Docker server" --labelwidth 18
+            sgnd_console_run_tracked "docker-validate" _docker_step_validate || return $?
+            return 0
+        fi
+
+        sgnd_print_labeledvalue --label "Step" --value "Install Docker" --labelwidth 18
+        _docker_step_install || rc=$?
+        (( rc == 0 )) || return "$rc"
+        sgnd_print_labeledvalue --label "Step" --value "Configure Docker storage" --labelwidth 18
+        _docker_step_storage || rc=$?
+        (( rc == 0 )) || return "$rc"
+        sgnd_print_labeledvalue --label "Step" --value "Start Docker service" --labelwidth 18
+        _docker_step_start || rc=$?
+        (( rc == 0 )) || return "$rc"
+        sgnd_print_labeledvalue --label "Step" --value "Validate Docker server" --labelwidth 18
+        _docker_step_validate
+    }
+
+    docker_install()             { _docker_step_install; }
+    docker_storage()             { _docker_step_storage; }
+    docker_start()               { _docker_step_start; }
     docker_service()             { _docker_run_host service; }
-    docker_validate()            { _docker_run_host validate; }
+    docker_validate()            { _docker_step_validate; }
     docker_status()              { _docker_run_host status; }
 
     docker_container_list()      { _docker_run_containers list; }
@@ -95,6 +148,7 @@ set -uo pipefail
     docker_container_start()     { _docker_run_containers start; }
     docker_container_stop()      { _docker_run_containers stop; }
     docker_container_restart()   { _docker_run_containers restart; }
+    docker_container_shell()     { _docker_run_containers shell; }
     docker_container_remove()    { _docker_run_containers remove; }
     docker_container_inspect()   { _docker_run_containers inspect; }
     docker_container_logs()      { _docker_run_containers logs; }
@@ -130,11 +184,12 @@ set -uo pipefail
         "Install, configure, validate, and inspect the Docker host" \
         0 1 700
 
-    sgnd_menu_register_item "docker-prepare" "$SGND_DOCKER_MODULE_ID" "Prepare Docker server" "docker_prepare" "Install Docker, enable the service, and validate the host" 0 15 1 0
+    sgnd_menu_register_item "docker-prepare" "$SGND_DOCKER_MODULE_ID" "Prepare Docker server" "docker_prepare" "Install Docker, configure storage, start the service, and validate the host" 0 15 1 0
     sgnd_menu_register_item "docker-install" "$SGND_DOCKER_MODULE_ID" "Install Docker" "docker_install" "Install the Docker Engine packages" 0 15 1 1
-    sgnd_menu_register_item "docker-storage" "$SGND_DOCKER_MODULE_ID" "Configure Docker storage" "docker_storage" "Configure the Docker data root using SolidGroundUX storage" 0 15 1 0
+    sgnd_menu_register_item "docker-storage" "$SGND_DOCKER_MODULE_ID" "Configure Docker storage" "docker_storage" "Configure the Docker data root using SolidGroundUX storage" 0 15 1 1
+    sgnd_menu_register_item "docker-start" "$SGND_DOCKER_MODULE_ID" "Start Docker service" "docker_start" "Enable and start Docker, then verify that the service is active" 0 15 1 1
+    sgnd_menu_register_item "docker-validate" "$SGND_DOCKER_MODULE_ID" "Validate Docker server" "docker_validate" "Validate Docker installation, service, daemon access, and storage" 0 15 1 1
     sgnd_menu_register_item "docker-service" "$SGND_DOCKER_MODULE_ID" "Manage Docker service" "docker_service" "Start, stop, restart, enable, or disable Docker" 0 15 1 0
-    sgnd_menu_register_item "docker-validate" "$SGND_DOCKER_MODULE_ID" "Validate Docker server" "docker_validate" "Validate Docker installation, service, daemon access, and storage" 0 15 1 0
     sgnd_menu_register_item "docker-status" "$SGND_DOCKER_MODULE_ID" "Show Docker status" "docker_status" "Show Docker package, service, daemon, storage, image, and container status" 0 15 1 0
 
     sgnd_menu_register_group \
@@ -143,15 +198,18 @@ set -uo pipefail
         "Create and manage Docker containers and images" \
         0 1 710
 
-    sgnd_menu_register_item "docker-container-list" "docker-containers" "List containers" "docker_container_list" "List Docker containers and their current state" 0 15 1 0
-    sgnd_menu_register_item "docker-container-create" "docker-containers" "Create container" "docker_container_create" "Create a Docker container from an image" 0 15 1 0
-    sgnd_menu_register_item "docker-container-start" "docker-containers" "Start container" "docker_container_start" "Start an existing Docker container" 0 15 1 0
-    sgnd_menu_register_item "docker-container-stop" "docker-containers" "Stop container" "docker_container_stop" "Stop a running Docker container" 0 15 1 0
-    sgnd_menu_register_item "docker-container-restart" "docker-containers" "Restart container" "docker_container_restart" "Restart a Docker container" 0 15 1 0
-    sgnd_menu_register_item "docker-container-remove" "docker-containers" "Remove container" "docker_container_remove" "Remove a stopped Docker container" 0 15 1 0
-    sgnd_menu_register_item "docker-container-inspect" "docker-containers" "Inspect container" "docker_container_inspect" "Show Docker container configuration and runtime details" 0 15 1 0
-    sgnd_menu_register_item "docker-container-logs" "docker-containers" "Show container logs" "docker_container_logs" "Show recent Docker container logs" 0 15 1 0
-    sgnd_menu_register_item "docker-image-list" "docker-containers" "List images" "docker_image_list" "List locally available Docker images" 0 15 1 0
-    sgnd_menu_register_item "docker-image-pull" "docker-containers" "Pull image" "docker_image_pull" "Pull a Docker image from a registry" 0 15 1 0
+    # Container/image actions provide their own ask_dlg_autocontinue return flow in
+    # manage-docker-containers.sh, so the console must not add a second post-action wait.
+    sgnd_menu_register_item "docker-container-list" "docker-containers" "List containers" "docker_container_list" "List Docker containers and their current state" 0 0 1 0
+    sgnd_menu_register_item "docker-container-create" "docker-containers" "Create container" "docker_container_create" "Create a Docker container from an image" 0 0 1 0
+    sgnd_menu_register_item "docker-container-start" "docker-containers" "Start container" "docker_container_start" "Start an existing Docker container" 0 0 1 0
+    sgnd_menu_register_item "docker-container-stop" "docker-containers" "Stop container" "docker_container_stop" "Stop a running Docker container" 0 0 1 0
+    sgnd_menu_register_item "docker-container-restart" "docker-containers" "Restart container" "docker_container_restart" "Restart a Docker container" 0 0 1 0
+    sgnd_menu_register_item "docker-container-shell" "docker-containers" "Open container shell" "docker_container_shell" "Open an interactive shell in a running Docker container" 0 0 1 0
+    sgnd_menu_register_item "docker-container-remove" "docker-containers" "Remove container" "docker_container_remove" "Remove a stopped Docker container" 0 0 1 0
+    sgnd_menu_register_item "docker-container-inspect" "docker-containers" "Inspect container" "docker_container_inspect" "Show Docker container configuration and runtime details" 0 0 1 0
+    sgnd_menu_register_item "docker-container-logs" "docker-containers" "Show container logs" "docker_container_logs" "Show recent Docker container logs" 0 0 1 0
+    sgnd_menu_register_item "docker-image-list" "docker-containers" "List images" "docker_image_list" "List locally available Docker images" 0 0 1 0
+    sgnd_menu_register_item "docker-image-pull" "docker-containers" "Pull image" "docker_image_pull" "Pull a Docker image from a registry" 0 0 1 0
 
     sayinfo "Docker Server module registered with the console."

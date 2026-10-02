@@ -3,14 +3,14 @@
 # ----------------------------------------------------------------------------------
 # Metadata:
 #   Version     : 2.1
-#   Build       : 2627412
+#   Build       : 2627515
 #   Shortname   : STORAGE
 #   Source      : 15-storage.sh
 #   Type        : module
 #   Group       : Module Registration
-#   Purpose     : Configure and inspect local storage volumes
+#   Purpose     : Configure and inspect local storage volumes and directories
 #
-#   Checksum : 1aff021433ae0eda1136a18673ded4e172082064341941707cbfb1f930a0d34e
+#   Checksum : bcbd429937a05d126eb06babf74e0d344728fb38e2babbc36d9a551e8aa7e007
 # Description:
 #   Registers local-storage management actions with the SolidGround Management Console.
 #   Persistent storage operations are implemented by manage-storage.sh.
@@ -84,57 +84,56 @@ set -uo pipefail
         _sgnd_run_module_script "manage-storage.sh" --action "$action"
     }
 
-    # fn: storage_configure - Configure storage and synchronize completed child-action statuses
-        # . Purpose
-        #   Provision storage and reflect the mount and configuration-reconciliation work
-        #   already completed inside that workflow in the console action-status markers.
-        #
-        # . Behavior
-        #   - Runs the canonical configure action first.
-        #   - Verifies every persisted SolidGroundUX mount point is mounted afterward.
-        #   - Records Mount storage with the verified mount result.
-        #   - Records Reconcile storage configuration as successful because configure persists
-        #     the same canonical managed mount-point set through _storage_save_configuration.
-        #   - Does not mark unrelated actions such as unmount, expand, persistence repair, or validation.
-        #   - Uses the verified console result-recording API when available.
-        #
-        # . Returns
-        #   0 when configuration succeeds and all persisted mount points are mounted; otherwise non-zero.
-        #
-        # . Usage
-        #   storage_configure
-    storage_configure() {
-        local mountpoint=""
-        local mount_rc=0
-        local mount_count=0
+    _storage_run_compound_step() {
+        local action="${1:?missing action}"
 
-        _storage_run_action configure || return $?
-
-        while IFS= read -r mountpoint; do
-            [[ -n "$mountpoint" ]] || continue
-            mount_count=$((mount_count + 1))
-            mountpoint -q "$mountpoint" || mount_rc=1
-        done < <(awk -F= '
-            $1 == "SGND_STORAGE_MOUNTPOINTS" {
-                value=substr($0,index($0,"=")+1)
-                n=split(value,parts,":")
-                for(i=1;i<=n;i++) if(parts[i] != "") print parts[i]
-            }
-        ' /etc/solidgroundux/storage.cfg 2>/dev/null)
-
-        (( mount_count > 0 )) || mount_rc=1
-
-        if declare -F sgnd_console_record_action_result >/dev/null 2>&1; then
-            sgnd_console_record_action_result "storage-mount" "$mount_rc" || true
-            if (( mount_rc == 0 )); then
-                sgnd_console_record_action_result "storage-reconcile" 0 || true
-            fi
-        fi
-
-        (( mount_rc == 0 )) || return 1
-        return 0
+        (
+            export SGND_STORAGE_COMPOUND_STEP=1
+            _sgnd_run_module_script "manage-storage.sh" --action "$action"
+        )
     }
 
+    _storage_step_provision() { _storage_run_compound_step provision; }
+    _storage_step_validate()  { _storage_run_compound_step validate; }
+
+    # fn: storage_prepare - Provision and validate persistent SolidGroundUX storage
+        # . Purpose
+        #   Execute the registered happy-path storage actions as one compound workflow while
+        #   keeping the individual console action statuses synchronized.
+        #
+        # . Behavior
+        #   - Runs Provision storage first; provisioning performs the destructive disk setup,
+        #     persistence configuration, initial mount, and SolidGroundUX configuration save.
+        #   - Runs Validate storage provisioning after provisioning succeeds.
+        #   - Uses management-console action tracking when available so each child receives
+        #     the same persisted checkmark/cross status as an individually selected action.
+        #   - Suppresses each child script's normal end-of-action auto-continue dialog while
+        #     it is running as part of this compound workflow.
+        #   - Does not mark Mount storage or reconciliation actions as completed merely because
+        #     provisioning performed equivalent internal work.
+        #
+        # . Returns
+        #   0 when provisioning and validation both succeed; otherwise the first failing child code.
+        #
+        # . Usage
+        #   storage_prepare
+    storage_prepare() {
+        sgnd_print
+        sgnd_print_sectionheader --text "Prepare Storage"
+
+        if declare -F sgnd_console_run_tracked >/dev/null 2>&1; then
+            sgnd_print_labeledvalue --label "Step" --value "Provision storage" --labelwidth 18
+            sgnd_console_run_tracked "storage-provision" _storage_step_provision || return $?
+            sgnd_print_labeledvalue --label "Step" --value "Validate storage provisioning" --labelwidth 18
+            sgnd_console_run_tracked "storage-validate" _storage_step_validate || return $?
+            return 0
+        fi
+
+        _storage_step_provision || return $?
+        _storage_step_validate || return $?
+    }
+
+    storage_provision()                 { _storage_run_action provision; }
     storage_mount()                     { _storage_run_action mount; }
     storage_unmount()                   { _storage_run_action unmount; }
     storage_expand()                    { _storage_run_action expand; }
@@ -142,6 +141,23 @@ set -uo pipefail
     storage_reconcile_persistence()     { _storage_run_action reconcile-persistence; }
     storage_validate_provisioning()     { _storage_run_action validate; }
     storage_status()                    { _storage_run_action status; }
+
+    # fn: storage_manage_directories - Manage directories below a SolidGroundUX storage root
+        # . Purpose
+        #   Open the Storage-owned directory manager for simple filesystem directory lifecycle
+        #   operations beneath a configured SolidGroundUX storage mount point.
+        #
+        # . Behavior
+        #   - Delegates to manage-storage.sh; no Samba module or ACL tooling is required.
+        #   - Keeps Storage responsible only for filesystem directories, not share or identity policy.
+        #
+        # . Returns
+        #   The return code from the storage directory-management action.
+        #
+        # . Usage
+        #   storage_manage_directories
+    storage_manage_directories()          { _storage_run_action directories; }
+
     storage_access_status()             { _storage_run_action access-status; }
     storage_set_access()                 { _storage_run_action set-access; }
     storage_restore_access_defaults()   { _storage_run_action restore-defaults; }
@@ -170,7 +186,9 @@ set -uo pipefail
 
 # - Console registration ------------------------------------------------------------
     # . Storage
-    # ! Configure storage
+    # ! Prepare storage
+    #   > Provision and validate persistent local storage.
+    # ! Provision storage
     #   > Provision one or more unused disks as persistent local storage.
     # ! Mount storage
     #   > Mount a configured local storage filesystem.
@@ -186,20 +204,25 @@ set -uo pipefail
     #   > Run active checks including configuration reconciliation.
     # ! Show storage status
     #   > Show local disks and configured storage status.
+    # ! Manage directories
+    #   > Create, rename, list, or remove directories beneath managed storage roots.
     sgnd_menu_register_group \
         "$SGND_STORAGE_MODULE_ID" \
         "$SGND_STORAGE_MODULE_NAME" \
         "$(sgnd_header_get_field_value "${BASH_SOURCE[0]}" "Metadata" "Purpose")" \
         0 1 240
 
-    sgnd_menu_register_item "storage-configure" "$SGND_STORAGE_MODULE_ID" "Configure storage" "storage_configure" "Provision an unused disk as persistent local storage" 0 0 1 0
-    sgnd_menu_register_item "storage-mount" "$SGND_STORAGE_MODULE_ID" "Mount storage" "storage_mount" "Mount the configured local storage filesystem" 0 0 1 1
+    # Actions that own an auto-continue/end dialog use menu wait 0.
+    sgnd_menu_register_item "storage-prepare" "$SGND_STORAGE_MODULE_ID" "Prepare storage" "storage_prepare" "Provision and validate persistent local storage" 0 0 1 0
+    sgnd_menu_register_item "storage-provision" "$SGND_STORAGE_MODULE_ID" "Provision storage" "storage_provision" "Provision an unused disk as persistent local storage" 0 0 1 1
+    sgnd_menu_register_item "storage-validate" "$SGND_STORAGE_MODULE_ID" "Validate storage provisioning" "storage_validate_provisioning" "Validate configured SolidGroundUX storage" 0 0 1 1
+    sgnd_menu_register_item "storage-mount" "$SGND_STORAGE_MODULE_ID" "Mount storage" "storage_mount" "Mount the configured local storage filesystem" 0 0 1 0
     sgnd_menu_register_item "storage-unmount" "$SGND_STORAGE_MODULE_ID" "Unmount storage" "storage_unmount" "Unmount storage while keeping its persistent configuration" 0 0 1 0
     sgnd_menu_register_item "storage-expand" "$SGND_STORAGE_MODULE_ID" "Expand storage" "storage_expand" "Expand the partition and filesystem after enlarging its disk" 0 0 1 0
     sgnd_menu_register_item "storage-reconcile" "$SGND_STORAGE_MODULE_ID" "Reconcile storage configuration" "storage_reconcile" "Update SolidGroundUX storage configuration from the existing SGND_STORAGE volume" 0 0 1 0
     sgnd_menu_register_item "storage-reconcile-persistence" "$SGND_STORAGE_MODULE_ID" "Reconcile storage persistence" "storage_reconcile_persistence" "Repair stale SGND_STORAGE UUID mappings or explicitly remove stale managed entries" 0 0 1 0
-    sgnd_menu_register_item "storage-validate" "$SGND_STORAGE_MODULE_ID" "Validate storage provisioning" "storage_validate_provisioning" "Run active checks including configuration reconciliation" 0 0 1 0
     sgnd_menu_register_item "storage-status" "$SGND_STORAGE_MODULE_ID" "Show storage status" "storage_status" "Show local disks and configured storage status" 0 0 1 0
+    sgnd_menu_register_item "storage-directories" "$SGND_STORAGE_MODULE_ID" "Manage directories" "storage_manage_directories" "Create, rename, list, or remove directories beneath managed storage roots" 0 0 1 0
 
     # . Storage Access
     sgnd_menu_register_group \

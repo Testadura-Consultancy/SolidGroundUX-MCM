@@ -4,14 +4,14 @@
 # -------------------------------------------------------------------------------------
 # Metadata:
 #   Version     : 2.1
-#   Build       : 2627412
+#   Build       : 2627501
 #   Shortname   : MANAGE_AD_SERVER
 #   Source      : manage-active-directory-server.sh
 #   Type        : script
 #   Group       : Role Managers
 #   Purpose     : Provision, validate, and inspect a Samba Active Directory domain controller
 #
-#   Checksum : 18790d9c121a71f84a058d83aea1175cd0624b1faa66bc0d9ed4c230cc83c55b
+#   Checksum : 69a844e4e7408f7d90c7c3d2ef78260a19c624ab080c706fd16d593277df282f
 # Description:
 #   Implements persistent Active Directory server management actions exposed by the
 #   20-active-directory-server Management Console module.
@@ -576,24 +576,31 @@ set -uo pipefail
         #   Run the complete tracked Active Directory server provisioning sequence.
         #
         # . Returns
-        #   0 when provisioning completes or is cancelled before changes; non-zero on a failed step.
+        #   0 when provisioning completes successfully.
+        #   31-32 when prerequisite installation or preflight validation fails.
+        #   33 when the operator cancels after preflight and before provisioning changes.
+        #   34-40 when the corresponding provisioning step fails.
         #
         # . Usage
         #   _adsvr_provision_domain
     _adsvr_provision_domain() {
         local decision="No"
-        _adsvr_step_install_packages || return $?
-        _adsvr_step_preflight || return $?
+
+        # Return distinct workflow codes so the console module can preserve this
+        # single-process provisioning context while synchronizing child menu results.
+        _adsvr_step_install_packages || return 31
+        _adsvr_step_preflight || return 32
         ask_decision --label "Provision $SGND_AD_REALM on $SGND_AD_HOSTNAME_SHORT?" --choices "Yes|Y,No|N" --default "No" --var decision
-        [[ "${decision^^}" == "YES" ]] || { sayinfo "Domain provisioning cancelled."; return 0; }
-        _adsvr_step_identity || return $?
-        _adsvr_step_provision || return $?
-        _adsvr_step_domain_settings || return $?
-        _adsvr_step_kerberos || return $?
-        _adsvr_step_resolver || return $?
-        _adsvr_step_start || return $?
-        _adsvr_step_register_dns || return $?
+        [[ "${decision^^}" == "YES" ]] || { sayinfo "Domain provisioning cancelled."; return 33; }
+        _adsvr_step_identity || return 34
+        _adsvr_step_provision || return 35
+        _adsvr_step_domain_settings || return 36
+        _adsvr_step_kerberos || return 37
+        _adsvr_step_resolver || return 38
+        _adsvr_step_start || return 39
+        _adsvr_step_register_dns || return 40
         sayok "Active Directory domain provisioning sequence completed."
+        return 0
     }
 
 # - Validation/status -------------------------------------------------------------

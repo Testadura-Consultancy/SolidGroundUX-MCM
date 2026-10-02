@@ -3,14 +3,14 @@
 # ----------------------------------------------------------------------------------
 # Metadata:
 #   Version     : 2.1
-#   Build       : 2627412
+#   Build       : 2627501
 #   Shortname   : WEB_SERVER
 #   Source      : 50-web-server.sh
 #   Type        : module
 #   Group       : Module Registration
 #   Purpose     : Install, configure, manage, validate, and inspect an Nginx web server
 #
-#   Checksum : bd456f2de8f74719744e0e19ddd35fbc28a0c346d6d2f0e30cfd94ef303abf2d
+#   Checksum : 23aaaae951dafa10013c70b111884985c6f7d8e686883b91cdd073d5a37b8c78
 # Description:
 #   Registers Nginx host, site, publishing, documentation, service, validation, and
 #   status actions with the SolidGround Management Console. Persistent operations are
@@ -75,27 +75,66 @@ set -uo pipefail
     _web_run_manage() { local action="${1:?missing action}"; _sgnd_run_module_script "manage-web-server.sh" --action "$action"; }
     _web_run_publish() { local action="${1:?missing action}"; _sgnd_run_module_script "publish-web-content.sh" --action "$action"; }
 
+    # fn: _web_record_prepare_step - Persist one child-step result in the console tracker
+        # . Arguments
+        #   $1 ITEM_KEY
+        #   $2 RESULT_CODE
+        #
+        # . Returns
+        #   0 always; tracking is best-effort when the console tracker is unavailable.
+        #
+        # . Usage
+        #   _web_record_prepare_step "web-install" 0
+    _web_record_prepare_step() {
+        local item_key="${1:?missing item key}"
+        local result_code="${2:-0}"
+
+        if declare -F sgnd_console_record_action_result >/dev/null 2>&1; then
+            sgnd_console_record_action_result "$item_key" "$result_code" || true
+        fi
+        return 0
+    }
+
+    # fn: web_prepare - Run Web Server preparation and synchronize child menu statuses
+        # . Purpose
+        #   Keep the compound preparation workflow inside the management executable while
+        #   mapping its workflow return code onto the registered child actions.
+        #
+        # . Behavior
+        #   - Marks Install Nginx successful when installation completes.
+        #   - Marks Start web service successful when startup completes.
+        #   - Marks the failing child action failed and leaves later work untouched.
+        #
+        # . Returns
+        #   0 when preparation succeeds; otherwise the workflow failure code returned by
+        #   manage-web-server.sh.
+        #
+        # . Usage
+        #   web_prepare
     web_prepare() {
         local rc=0
 
-        if _web_run_manage install; then
-            sgnd_menu_set_item_status "web-install" "success"
-        else
-            rc=$?
-            sgnd_menu_set_item_status "web-install" "failed"
-            sgnd_menu_set_item_status "web-start" "never"
-            return "$rc"
-        fi
+        _web_run_manage prepare || rc=$?
 
-        if _web_run_manage start; then
-            sgnd_menu_set_item_status "web-start" "success"
-        else
-            rc=$?
-            sgnd_menu_set_item_status "web-start" "failed"
-            return "$rc"
-        fi
+        case "$rc" in
+            0)
+                _web_record_prepare_step "web-install" 0
+                _web_record_prepare_step "web-start" 0
+                return 0
+                ;;
+            41)
+                _web_record_prepare_step "web-install" 1
+                ;;
+            42)
+                _web_record_prepare_step "web-install" 0
+                _web_record_prepare_step "web-start" 1
+                ;;
+            *)
+                sayfail "Web Server preparation workflow returned unexpected status: $rc"
+                ;;
+        esac
 
-        return 0
+        return "$rc"
     }
     web_install()                 { _web_run_manage install; }
     web_start()                   { _web_run_manage start; }

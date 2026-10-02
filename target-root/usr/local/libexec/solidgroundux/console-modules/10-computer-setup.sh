@@ -3,7 +3,7 @@
 # ----------------------------------------------------------------------------------
 # Metadata:
 #   Version     : 2.1
-#   Build       : 2627412
+#   Build       : 2627501
 #   Shortname   : COMPUTER_SETUP
 #   Checksum    : d7cc87d1fa26423898d2e7497e16cc0d1a2d69a35729f4165579229d8323e436
 #   Source      : 10-computer-setup.sh

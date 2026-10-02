@@ -3,7 +3,7 @@
 # ----------------------------------------------------------------------------------
 # Metadata:
 #   Version     : 2.1
-#   Build       : 2627412
+#   Build       : 2627501
 #   Shortname   : SAMPLE_MODULE
 #   Checksum    : 681f813f4af09c0fb4247dd8a76b2527325a8461a0a02abe99363b786aa36b1c
 #   Source      : mod-template.sh

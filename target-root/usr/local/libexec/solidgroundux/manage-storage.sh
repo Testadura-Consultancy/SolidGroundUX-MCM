@@ -4,14 +4,14 @@
 # -------------------------------------------------------------------------------------
 # Metadata:
 #   Version     : 2.1
-#   Build       : 2627412
+#   Build       : 2627515
 #   Shortname   : MANAGE_STORAGE
 #   Source      : manage-storage.sh
 #   Type        : script
 #   Group       : Role Managers
-#   Purpose     : Configure, reconcile, validate, and inspect local storage volumes
+#   Purpose     : Configure, reconcile, validate, and manage local storage volumes and directories
 #
-#   Checksum : b4500451d6cb4970c1ec918d4006a7a24b21af35a8705671b3c9c861591288fb
+#   Checksum : 074c78a6e61ff9220b3fc21c404e9291b6da2611d44c7f1dca45cf72aea40b95
 # Description:
 #   Implements persistent local-storage management actions exposed by the
 #   15-storage Management Console module.
@@ -127,7 +127,7 @@ set -uo pipefail
 # - Framework integration -----------------------------------------------------------
     SGND_USING=()
     SGND_ARGS_SPEC=(
-        "action|a|enum|ACTION|Management action||configure,mount,unmount,expand,reconcile,reconcile-persistence,validate,status,access-status,set-access,restore-defaults"
+        "action|a|enum|ACTION|Management action||provision,configure,mount,unmount,expand,reconcile,reconcile-persistence,validate,status,directories,access-status,set-access,restore-defaults"
     )
     SGND_SCRIPT_EXAMPLES=(
         "  $SGND_SCRIPT_NAME --action status"
@@ -552,6 +552,85 @@ set -uo pipefail
         output_ref=("${selected_targets[@]}")
     }
 
+    # fn: _storage_validate_directory_name - Validate one direct child directory name
+        # . Purpose
+        #   Accept a simple directory name that can safely be joined below a managed storage root.
+        #
+        # . Behavior
+        #   - Rejects empty names, dot entries, path separators, and embedded newlines.
+        #   - Allows spaces and normal filesystem punctuation in the directory name.
+        #
+        # Arguments:
+        #   $1 - Proposed direct child directory name.
+        #
+        # . Returns
+        #   0 when the name is safe for a direct child path; otherwise 1.
+        #
+        # . Usage
+        #   _storage_validate_directory_name "application-data"
+    _storage_validate_directory_name() {
+        local directory_name="${1:-}"
+        [[ -n "$directory_name" ]] || return 1
+        [[ "$directory_name" != "." && "$directory_name" != ".." ]] || return 1
+        [[ "$directory_name" != */* ]] || return 1
+        [[ "$directory_name" != *$'\n'* ]] || return 1
+    }
+
+    # fn: _storage_list_child_directories - List direct child directories of one storage root
+        # . Purpose
+        #   Return only the first-level directories below a mounted SolidGroundUX storage root.
+        #
+        # Arguments:
+        #   $1 - Mounted managed storage root.
+        #
+        # Output:
+        #   One directory basename per line, sorted alphabetically.
+        #
+        # . Returns
+        #   0 after scanning the root; non-zero when the root cannot be scanned.
+        #
+        # . Usage
+        #   _storage_list_child_directories "/srv/storage"
+    _storage_list_child_directories() {
+        local storage_root="${1:?missing storage root}"
+        sudo find "$storage_root" -mindepth 1 -maxdepth 1 -type d -printf '%f\n' 2>/dev/null | LC_ALL=C sort
+    }
+
+    # fn: _storage_select_child_directory - Select one direct child directory
+        # . Purpose
+        #   Present the first-level directories below a managed storage root and return the selected name.
+        #
+        # Arguments:
+        #   $1 - Output variable name.
+        #   $2 - Mounted managed storage root.
+        #   $3 - Optional selector label.
+        #
+        # . Returns
+        #   0 when a directory is selected; non-zero when none exist or selection is cancelled.
+        #
+        # . Usage
+        #   _storage_select_child_directory selected_name "/srv/storage" "Directory"
+    _storage_select_child_directory() {
+        local output_var="${1:?missing output variable}"
+        local storage_root="${2:?missing storage root}"
+        local selector_label="${3:-Directory}"
+        local selected_child=""
+        local -a child_directories=()
+
+        mapfile -t child_directories < <(_storage_list_child_directories "$storage_root")
+        (( ${#child_directories[@]} > 0 )) || {
+            saywarning "No directories exist below $storage_root."
+            return 1
+        }
+
+        ask_selection \
+            --label "$selector_label" \
+            --var selected_child \
+            --items "${child_directories[@]}" || return $?
+
+        printf -v "$output_var" '%s' "$selected_child"
+    }
+
     # fn: _storage_action_again - Offer to repeat the completed storage action
     _storage_action_again() {
         local rc=0
@@ -571,16 +650,20 @@ set -uo pipefail
     }
 
 # - Public module actions --------------------------------------------------------
-    # fn$ storage_configure
+    # fn$ storage_provision
         # . Purpose
-        #   Provision an unused local disk as persistent SolidGroundUX storage.
+        #   Provision an unused local disk as persistent SolidGroundUX storage, including its
+        #   initial mount so the new filesystem is immediately usable.
         #
         # . Behavior
         #   - Detects and displays unused whole disks.
         #   - Asks for the target disk, filesystem, and mount point.
         #   - Requires explicit confirmation before destructive changes.
         #   - Creates one GPT partition and formats it as ext4 or XFS.
-        #   - Adds the filesystem UUID to /etc/fstab and mounts it.
+        #   - Adds the filesystem UUID to /etc/fstab, performs the initial mount, and saves the
+        #     managed SolidGroundUX storage configuration.
+        #   - The initial mount is part of provisioning; the standalone Mount storage action is
+        #     retained for later administrative remounts and is not a compound child action.
         #   - Honors console dry-run mode.
         #
         # Inputs (globals):
@@ -590,12 +673,12 @@ set -uo pipefail
         #   /etc/fstab
         #
         # . Returns
-        #   0 when storage is configured or the action is cancelled.
+        #   0 when storage is provisioned or the action is cancelled.
         #   Non-zero when validation, partitioning, formatting, or mounting fails.
         #
         # . Usage
-        #   storage_configure
-    storage_configure() {
+        #   storage_provision
+    storage_provision() {
         local devices=()
         local device=""
         local filesystem="EXT4"
@@ -640,7 +723,7 @@ set -uo pipefail
             --labelwidth 28 || return $?
 
         sgnd_print
-        sgnd_print_sectionheader "Configure storage"
+        sgnd_print_sectionheader "Provision storage"
         sgnd_print_labeledvalue --label "Device" --value "$device" --labelwidth 20
         sgnd_print_labeledvalue --label "Filesystem" --value "$filesystem" --labelwidth 20
         sgnd_print_labeledvalue --label "Mount point" --value "$mountpoint" --labelwidth 20
@@ -648,13 +731,13 @@ set -uo pipefail
         saywarning "All existing data on $device will be destroyed."
 
         ask_decision \
-            --label "Configure this disk?" \
+            --label "Provision this disk?" \
             --choices "Yes|Y,No|N" \
             --default "No" \
             --var decision || return $?
 
         [[ "${decision^^}" == "YES" ]] || {
-            sayinfo "Storage configuration cancelled."
+            sayinfo "Storage provisioning cancelled."
             return 0
         }
 
@@ -732,7 +815,7 @@ set -uo pipefail
             return 1
         }
 
-        sayok "Storage configured successfully at $mountpoint."
+        sayok "Storage provisioned and mounted successfully at $mountpoint."
 
         mapfile -t devices < <(_storage_list_unused_disks)
         if (( ${#devices[@]} > 0 )); then
@@ -742,7 +825,7 @@ set -uo pipefail
                 --choices "Yes|Y,No|N" \
                 --default "No" \
                 --var decision || return $?
-            [[ "${decision^^}" == "YES" ]] && storage_configure
+            [[ "${decision^^}" == "YES" ]] && storage_provision
         fi
     }
 
@@ -940,6 +1023,145 @@ set -uo pipefail
         esac
 
         sayok "Storage expansion completed successfully."
+    }
+
+    # fn$ storage_manage_directories
+        # . Purpose
+        #   Manage simple first-level filesystem directories below one SolidGroundUX storage root.
+        #
+        # . Behavior
+        #   - Selects one configured storage root and requires it to be mounted before changes are allowed.
+        #   - Lists only direct child directories; files are not included.
+        #   - Creates new directories as root:root mode 0755.
+        #   - Renames one direct child directory without crossing the selected storage-root boundary.
+        #   - Removes directories only when they are empty; recursive deletion is intentionally unsupported.
+        #   - Does not manage Samba shares, ACLs, AD identities, or standalone Samba identities.
+        #   - Owns its interactive submenu and returns directly to the Storage menu when the user backs out.
+        #   - Honors console dry-run mode for create, rename, and remove operations.
+        #
+        # Inputs (globals):
+        #   FLAG_DRYRUN
+        #
+        # . Returns
+        #   0 when the directory manager is exited normally; non-zero on an operation failure.
+        #
+        # . Usage
+        #   storage_manage_directories
+    storage_manage_directories() {
+        local storage_root=""
+        local directory_action=""
+        local directory_name=""
+        local selected_directory=""
+        local new_directory_name=""
+        local source_path=""
+        local target_path=""
+        local decision="No"
+        local -a child_directories=()
+
+        _storage_select_mountpoint storage_root "Storage root" || return $?
+
+        if ! mountpoint -q "$storage_root"; then
+            sayfail "Storage is not mounted at $storage_root. Mount it before managing directories."
+            return 1
+        fi
+
+        while :; do
+            mapfile -t child_directories < <(_storage_list_child_directories "$storage_root")
+
+            sgnd_print
+            sgnd_print_sectionheader "Storage directories"
+            sgnd_print_labeledvalue --label "Storage root" --value "$storage_root" --labelwidth 20
+            sgnd_print
+            if (( ${#child_directories[@]} == 0 )); then
+                sgnd_print --text "No directories." --pad 2
+            else
+                for directory_name in "${child_directories[@]}"; do
+                    sgnd_print --text "$directory_name" --pad 2
+                done
+            fi
+
+            directory_action=""
+            ask_selection \
+                --label "Action" \
+                --var directory_action \
+                --items "Create directory" "Rename directory" "Remove empty directory" "Refresh list" || return 0
+
+            case "$directory_action" in
+                "Create directory")
+                    directory_name=""
+                    ask \
+                        --label "Directory name" \
+                        --var directory_name \
+                        --validate _storage_validate_directory_name \
+                        --back || continue
+                    target_path="$storage_root/$directory_name"
+                    [[ ! -e "$target_path" ]] || {
+                        sayfail "Directory already exists: $target_path"
+                        continue
+                    }
+                    if (( ${FLAG_DRYRUN:-0} == 1 )); then
+                        sayinfo "DRYRUN: Would create directory $target_path as root:root mode 0755."
+                        continue
+                    fi
+                    sudo install -d -o root -g root -m 0755 "$target_path" || return 1
+                    sayok "Directory created: $target_path"
+                    ;;
+
+                "Rename directory")
+                    selected_directory=""
+                    _storage_select_child_directory selected_directory "$storage_root" "Directory to rename" || continue
+                    new_directory_name=""
+                    ask \
+                        --label "New directory name" \
+                        --var new_directory_name \
+                        --default "$selected_directory" \
+                        --validate _storage_validate_directory_name \
+                        --back || continue
+                    [[ "$new_directory_name" != "$selected_directory" ]] || {
+                        sayinfo "Directory name is unchanged."
+                        continue
+                    }
+                    source_path="$storage_root/$selected_directory"
+                    target_path="$storage_root/$new_directory_name"
+                    [[ ! -e "$target_path" ]] || {
+                        sayfail "Target already exists: $target_path"
+                        continue
+                    }
+                    if (( ${FLAG_DRYRUN:-0} == 1 )); then
+                        sayinfo "DRYRUN: Would rename $source_path to $target_path."
+                        continue
+                    fi
+                    sudo mv -- "$source_path" "$target_path" || return 1
+                    sayok "Directory renamed: $selected_directory -> $new_directory_name"
+                    ;;
+
+                "Remove empty directory")
+                    selected_directory=""
+                    _storage_select_child_directory selected_directory "$storage_root" "Directory to remove" || continue
+                    target_path="$storage_root/$selected_directory"
+                    if [[ -n "$(sudo find "$target_path" -mindepth 1 -maxdepth 1 -print -quit 2>/dev/null)" ]]; then
+                        sayfail "Directory is not empty: $target_path"
+                        continue
+                    fi
+                    decision="No"
+                    ask_decision \
+                        --label "Remove empty directory '$selected_directory'?" \
+                        --choices "Yes|Y,No|N" \
+                        --default "No" \
+                        --var decision || continue
+                    [[ "${decision^^}" == "YES" ]] || continue
+                    if (( ${FLAG_DRYRUN:-0} == 1 )); then
+                        sayinfo "DRYRUN: Would remove empty directory $target_path."
+                        continue
+                    fi
+                    sudo rmdir -- "$target_path" || return 1
+                    sayok "Directory removed: $target_path"
+                    ;;
+
+                "Refresh list")
+                    ;;
+            esac
+        done
     }
 
     # fn$ storage_access_status
@@ -1375,14 +1597,15 @@ set -uo pipefail
         local action="${1:?missing action}"
 
         case "$action" in
-            configure)       storage_configure ;;
-            mount)           storage_mount ;;
+            provision|configure) storage_provision ;;
+            mount)               storage_mount ;;
             unmount)         storage_unmount ;;
             expand)          storage_expand ;;
             reconcile)       storage_reconcile ;;
             reconcile-persistence) storage_reconcile_persistence ;;
             validate)        storage_validate_provisioning ;;
             status)          storage_status ;;
+            directories)     storage_manage_directories ;;
             access-status)    storage_access_status ;;
             set-access)       storage_set_access ;;
             restore-defaults) storage_restore_access_defaults ;;
@@ -1405,6 +1628,12 @@ set -uo pipefail
         while :; do
             _run_action "$action" || return $?
 
+            # Compound parent workflows own progress and completion UI; child actions must not
+            # add their normal auto-continue/do-another dialog in that context.
+            if [[ "${SGND_STORAGE_COMPOUND_STEP:-0}" == "1" ]]; then
+                break
+            fi
+
             case "$action" in
                 status|validate)
                     sgnd_print
@@ -1414,7 +1643,7 @@ set -uo pipefail
                         --legend "Enter=return to menu; P/Space=pause" || true
                     break
                     ;;
-                access-status)
+                directories|access-status)
                     break
                     ;;
                 *)

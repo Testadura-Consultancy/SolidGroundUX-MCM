@@ -3,9 +3,9 @@
 # ----------------------------------------------------------------------------------
 # Metadata:
 #   Version     : 2.1
-#   Build       : 2627412
+#   Build       : 2627501
 #   Shortname   : AD_SERVER
-#   Checksum    : bb7696204e4d104dfb2fa125e2c14f9b1f5ad765177341241e61d9f064029634
+#   Checksum    : 1348986b7e83d9a9f7770437f1af754f2a8c21c57a05c6489de897c13d979a11
 #   Source      : 20-active-directory-server.sh
 #   Type        : module
 #   Group       : Module Registration
@@ -77,7 +77,138 @@ set -uo pipefail
         _sgnd_run_module_script "manage-active-directory-server.sh" --action "$action"
     }
 
-    _adsvr_provision_domain()      { _adsvr_run_action provision-all; }
+    # fn: _adsvr_record_provision_step - Persist one child-step result in the console tracker
+        # . Arguments
+        #   $1 ITEM_KEY
+        #   $2 RESULT_CODE
+        #
+        # . Returns
+        #   0 always; tracking is best-effort when the console tracker is unavailable.
+        #
+        # . Usage
+        #   _adsvr_record_provision_step "adsvr-install" 0
+    _adsvr_record_provision_step() {
+        local item_key="${1:?missing item key}"
+        local result_code="${2:-0}"
+
+        if declare -F sgnd_console_record_action_result >/dev/null 2>&1; then
+            sgnd_console_record_action_result "$item_key" "$result_code" || true
+        fi
+        return 0
+    }
+
+    # fn: _adsvr_provision_domain - Run the composite provision and synchronize child menu statuses
+        # . Purpose
+        #   Keep the stateful provisioning workflow inside the management executable while
+        #   mapping its workflow return codes back onto the registered console child actions.
+        #
+        # . Behavior
+        #   - Preserves one-process provisioning context across all Active Directory steps.
+        #   - Marks every completed child action successful.
+        #   - Marks the failing child action failed.
+        #   - Leaves steps after a failure untouched.
+        #   - Treats operator cancellation after preflight as a successful parent action.
+        #
+        # . Returns
+        #   0 when provisioning succeeds or is cancelled after preflight.
+        #   Otherwise the workflow failure code returned by the management executable.
+        #
+        # . Usage
+        #   _adsvr_provision_domain
+    _adsvr_provision_domain() {
+        local rc=0
+
+        _adsvr_run_action provision-all || rc=$?
+
+        case "$rc" in
+            0)
+                _adsvr_record_provision_step "adsvr-install" 0
+                _adsvr_record_provision_step "adsvr-preflight" 0
+                _adsvr_record_provision_step "adsvr-identity" 0
+                _adsvr_record_provision_step "adsvr-domain" 0
+                _adsvr_record_provision_step "adsvr-settings" 0
+                _adsvr_record_provision_step "adsvr-krb" 0
+                _adsvr_record_provision_step "adsvr-resolver" 0
+                _adsvr_record_provision_step "adsvr-start" 0
+                _adsvr_record_provision_step "adsvr-dns" 0
+                return 0
+                ;;
+            31)
+                _adsvr_record_provision_step "adsvr-install" 1
+                ;;
+            32)
+                _adsvr_record_provision_step "adsvr-install" 0
+                _adsvr_record_provision_step "adsvr-preflight" 1
+                ;;
+            33)
+                _adsvr_record_provision_step "adsvr-install" 0
+                _adsvr_record_provision_step "adsvr-preflight" 0
+                return 0
+                ;;
+            34)
+                _adsvr_record_provision_step "adsvr-install" 0
+                _adsvr_record_provision_step "adsvr-preflight" 0
+                _adsvr_record_provision_step "adsvr-identity" 1
+                ;;
+            35)
+                _adsvr_record_provision_step "adsvr-install" 0
+                _adsvr_record_provision_step "adsvr-preflight" 0
+                _adsvr_record_provision_step "adsvr-identity" 0
+                _adsvr_record_provision_step "adsvr-domain" 1
+                ;;
+            36)
+                _adsvr_record_provision_step "adsvr-install" 0
+                _adsvr_record_provision_step "adsvr-preflight" 0
+                _adsvr_record_provision_step "adsvr-identity" 0
+                _adsvr_record_provision_step "adsvr-domain" 0
+                _adsvr_record_provision_step "adsvr-settings" 1
+                ;;
+            37)
+                _adsvr_record_provision_step "adsvr-install" 0
+                _adsvr_record_provision_step "adsvr-preflight" 0
+                _adsvr_record_provision_step "adsvr-identity" 0
+                _adsvr_record_provision_step "adsvr-domain" 0
+                _adsvr_record_provision_step "adsvr-settings" 0
+                _adsvr_record_provision_step "adsvr-krb" 1
+                ;;
+            38)
+                _adsvr_record_provision_step "adsvr-install" 0
+                _adsvr_record_provision_step "adsvr-preflight" 0
+                _adsvr_record_provision_step "adsvr-identity" 0
+                _adsvr_record_provision_step "adsvr-domain" 0
+                _adsvr_record_provision_step "adsvr-settings" 0
+                _adsvr_record_provision_step "adsvr-krb" 0
+                _adsvr_record_provision_step "adsvr-resolver" 1
+                ;;
+            39)
+                _adsvr_record_provision_step "adsvr-install" 0
+                _adsvr_record_provision_step "adsvr-preflight" 0
+                _adsvr_record_provision_step "adsvr-identity" 0
+                _adsvr_record_provision_step "adsvr-domain" 0
+                _adsvr_record_provision_step "adsvr-settings" 0
+                _adsvr_record_provision_step "adsvr-krb" 0
+                _adsvr_record_provision_step "adsvr-resolver" 0
+                _adsvr_record_provision_step "adsvr-start" 1
+                ;;
+            40)
+                _adsvr_record_provision_step "adsvr-install" 0
+                _adsvr_record_provision_step "adsvr-preflight" 0
+                _adsvr_record_provision_step "adsvr-identity" 0
+                _adsvr_record_provision_step "adsvr-domain" 0
+                _adsvr_record_provision_step "adsvr-settings" 0
+                _adsvr_record_provision_step "adsvr-krb" 0
+                _adsvr_record_provision_step "adsvr-resolver" 0
+                _adsvr_record_provision_step "adsvr-start" 0
+                _adsvr_record_provision_step "adsvr-dns" 1
+                ;;
+            *)
+                sayfail "Active Directory server provisioning workflow returned unexpected status: $rc"
+                ;;
+        esac
+
+        return "$rc"
+    }
+
     _adsvr_step_install_packages() { _adsvr_run_action install; }
     _adsvr_step_preflight()        { _adsvr_run_action preflight; }
     _adsvr_step_identity()         { _adsvr_run_action identity; }

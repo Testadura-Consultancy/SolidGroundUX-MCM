@@ -4,14 +4,14 @@
 # -------------------------------------------------------------------------------------
 # Metadata:
 #   Version     : 2.1
-#   Build       : 2627412
+#   Build       : 2627501
 #   Shortname   : MANAGE_WEB_SERVER
 #   Source      : manage-web-server.sh
 #   Type        : script
 #   Group       : Role Managers
 #   Purpose     : Configure, manage, validate, and inspect an Nginx web server
 #
-#   Checksum : d68e1655805b3769e1f1310a8ffbf8b2f5d49107a88cbf640405a5620f8fab95
+#   Checksum : cde48e944b38ef39923d6b97ee88e48ea120d9bd49d15f8563ed55db9f1ad09c
 # Description:
 #   Configure, manage, validate, and inspect an Nginx web server.
 #
@@ -552,14 +552,23 @@ set -uo pipefail
     }
 
     # fn: _web_server_prepare - Run the tracked web-server preparation workflow
+        # . Purpose
+        #   Run the complete Web Server preparation sequence in one management process.
+        #
         # . Returns
-        #   0 on success; non-zero when the operation cannot be completed.
+        #   0 when preparation completes successfully.
+        #   41 when prerequisite installation fails.
+        #   42 when enabling or starting Nginx fails.
+        #
         # . Usage
         #   _web_server_prepare
     _web_server_prepare() {
-        _web_server_step_install_packages || return $?
-        _web_server_step_start || return $?
+        # Distinct workflow codes let the console synchronize the child menu results
+        # while keeping the complete preparation workflow inside this executable.
+        _web_server_step_install_packages || return 41
+        _web_server_step_start || return 42
         sayok "Web-server preparation completed successfully."
+        return 0
     }
 
 # - Configuration ------------------------------------------------------------------

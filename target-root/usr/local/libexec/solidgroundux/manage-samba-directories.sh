@@ -4,14 +4,14 @@
 # -------------------------------------------------------------------------------------
 # Metadata:
 #   Version     : 2.1
-#   Build       : 2627412
+#   Build       : 2627501
 #   Shortname   : MANAGE_SAMBA_DIRECTORIES
 #   Source      : manage-samba-directories.sh
 #   Type        : script
 #   Group       : Role Managers
 #   Purpose     : Manage directories and directory-level access beneath Samba share storage
 #
-#   Checksum : 35f463ec92b268f75fd2889ef8002fc8cb3f9bdb4f3e2553c5743f8bab6f4b29
+#   Checksum : 30b638a94f491c0c1a6de2a594a1754505964b7559d90de07f1fa106868ff8d0
 # Description:
 #   Provides interactive directory lifecycle and POSIX ACL management beneath the
 #   SolidGroundUX Samba share root. Samba share roots are identified from the effective
@@ -509,6 +509,8 @@ set -uo pipefail
         local mode=""
         local realm=""
         local value=""
+        local qualified=""
+        local canonical=""
         local -a values=()
         local -a selected=()
         local -a resolved=()
@@ -519,7 +521,22 @@ set -uo pipefail
             ask_selection --label "Select Active Directory ${type}(s)" --var selected --multi --items "${values[@]}" || return 1
             realm="$(realm list --name-only 2>/dev/null | head -n 1 || true)"
             for value in "${selected[@]}"; do
-                resolved+=("${value}@${realm,,}")
+                if [[ "$value" == *"@"* ]]; then
+                    qualified="$value"
+                else
+                    qualified="${value}@${realm,,}"
+                fi
+
+                if [[ "$type" == "group" ]]; then
+                    canonical="$(getent group "$qualified" 2>/dev/null | cut -d: -f1)"
+                else
+                    canonical="$(getent passwd "$qualified" 2>/dev/null | cut -d: -f1)"
+                fi
+                [[ -n "$canonical" ]] || {
+                    sayfail "Active Directory $type cannot be resolved through NSS: $qualified"
+                    return 1
+                }
+                resolved+=("$canonical")
             done
         elif [[ "$type" == "user" ]]; then
             mapfile -t values < <(sudo pdbedit -L 2>/dev/null | cut -d: -f1 | LC_ALL=C sort -fu)
@@ -571,10 +588,13 @@ set -uo pipefail
         # . Arguments
         #   $1  Identity type: user or group.
         # . Behavior
-        #   Applies both immediate and default ACL entries. Share-root directories are skipped
-        #   because share-level access is owned by Manage shares.
+        #   - Resolves the selected principal through NSS before changing ACLs.
+        #   - Applies immediate and default ACL entries using the numeric UID/GID so AD names
+        #     containing spaces are not ambiguous to setfacl.
+        #   - Verifies both ACL entries after writing them and reports the failing principal/path.
+        #   - Skips Samba share roots because share-level access is owned by Manage shares.
         # . Returns
-        #   0 after updates; non-zero on ACL failure.
+        #   0 after all selected ACLs are applied and verified; non-zero on any ACL failure.
         # . Usage
         #   _grant_directory_access group
     _grant_directory_access() {
@@ -583,6 +603,8 @@ set -uo pipefail
         local path=""
         local perms=""
         local acl_prefix="u"
+        local acl_type="user"
+        local numeric_id=""
         local failures=0
         local -a identities=()
 
@@ -590,7 +612,10 @@ set -uo pipefail
         _select_identities "$type" identities || return $?
         (( ${#identities[@]} > 0 )) || { saywarning "No $type identities were selected."; return 1; }
         _select_permissions perms || return 0
-        [[ "$type" == "group" ]] && acl_prefix="g"
+        if [[ "$type" == "group" ]]; then
+            acl_prefix="g"
+            acl_type="group"
+        fi
 
         for path in "${SELECTED_DIRECTORIES[@]}"; do
             if _directory_is_share_root "$path"; then
@@ -598,12 +623,44 @@ set -uo pipefail
                 continue
             fi
             for identity in "${identities[@]}"; do
+                if [[ "$type" == "group" ]]; then
+                    numeric_id="$(getent group "$identity" 2>/dev/null | cut -d: -f3)"
+                else
+                    numeric_id="$(getent passwd "$identity" 2>/dev/null | cut -d: -f3)"
+                fi
+                if [[ ! "$numeric_id" =~ ^[0-9]+$ ]]; then
+                    sayfail "Cannot resolve $type '$identity' to a numeric ACL identity."
+                    failures=$((failures + 1))
+                    continue
+                fi
+
                 if (( ${FLAG_DRYRUN:-0} == 1 )); then
                     sayinfo "DRYRUN: Would grant $perms to $type '$identity' on '$path' and its default ACL."
                     continue
                 fi
-                sudo setfacl -m "$acl_prefix:$identity:$perms" -m "m::rwx" -- "$path" || { failures=$((failures + 1)); continue; }
-                sudo setfacl -m "d:$acl_prefix:$identity:$perms" -m "d:m::rwx" -- "$path" || { failures=$((failures + 1)); continue; }
+
+                if ! sudo setfacl -m "$acl_prefix:$numeric_id:$perms" -m "m::rwx" -- "$path"; then
+                    sayfail "Could not grant $perms to $type '$identity' on '${path#"$SGND_SAMBA_SHARE_ROOT"/}'."
+                    failures=$((failures + 1))
+                    continue
+                fi
+                if ! sudo setfacl -m "d:$acl_prefix:$numeric_id:$perms" -m "d:m::rwx" -- "$path"; then
+                    sayfail "Could not set default $perms ACL for $type '$identity' on '${path#"$SGND_SAMBA_SHARE_ROOT"/}'."
+                    failures=$((failures + 1))
+                    continue
+                fi
+
+                if ! sudo getfacl -cpn -- "$path" 2>/dev/null | awk -F: -v t="$acl_type" -v id="$numeric_id" -v p="$perms"                     '$1 == t && $2 == id && $3 == p { found=1 } END { exit(found ? 0 : 1) }'; then
+                    sayfail "ACL verification failed for $type '$identity' on '${path#"$SGND_SAMBA_SHARE_ROOT"/}'."
+                    failures=$((failures + 1))
+                    continue
+                fi
+                if ! sudo getfacl -cpn -- "$path" 2>/dev/null | awk -F: -v t="$acl_type" -v id="$numeric_id" -v p="$perms"                     '$1 == "default" && $2 == t && $3 == id && $4 == p { found=1 } END { exit(found ? 0 : 1) }'; then
+                    sayfail "Default ACL verification failed for $type '$identity' on '${path#"$SGND_SAMBA_SHARE_ROOT"/}'."
+                    failures=$((failures + 1))
+                    continue
+                fi
+
                 sayok "Granted $perms to $type '$identity' on '${path#"$SGND_SAMBA_SHARE_ROOT"/}'."
             done
         done
@@ -687,7 +744,40 @@ set -uo pipefail
         (( failures == 0 ))
     }
 
-    # fn: _show_directory_access - Display ownership and named ACLs for selected directories
+    # fn: _format_directory_permissions - Format an ACL permission mask for display
+        # . Arguments
+        #   $1  Three-character ACL permission mask.
+        # . Output
+        #   Writes a compact human-readable access description.
+        # . Returns
+        #   0 always.
+        # . Usage
+        #   access="$(_format_directory_permissions "rwx")"
+    _format_directory_permissions() {
+        local perms="${1:----}"
+        local access=""
+
+        [[ "${perms:0:1}" == "r" ]] && access="Read"
+        if [[ "${perms:1:1}" == "w" ]]; then
+            [[ -n "$access" ]] && access+=" / "
+            access+="write"
+        fi
+        if [[ "${perms:2:1}" == "x" ]]; then
+            [[ -n "$access" ]] && access+=" / "
+            access+="traverse"
+        fi
+        [[ -n "$access" ]] || access="No access"
+        printf '%s\n' "$access"
+    }
+
+    # fn: _show_directory_access - Display ownership and explicit ACL access for selected directories
+        # . Behavior
+        #   - Uses the compact principal-to-rights presentation used by Samba share management.
+        #   - Reads numeric ACL qualifiers and resolves them through NSS so local and Active
+        #     Directory principals, including names containing spaces, are displayed cleanly.
+        #   - Shows named user and group ACL entries together under Access.
+        #   - Shows named default user and group ACL entries together under Default access.
+        #   - Omits an access section when it contains no named entries.
         # . Returns
         #   0 after display.
         # . Usage
@@ -695,11 +785,12 @@ set -uo pipefail
     _show_directory_access() {
         local path=""
         local share=""
-        local record=""
         local type=""
         local id=""
+        local principal=""
         local perms=""
-        local name=""
+        local access=""
+        local count=0
 
         _require_directory_selection || return $?
         for path in "${SELECTED_DIRECTORIES[@]}"; do
@@ -708,30 +799,50 @@ set -uo pipefail
             sgnd_print_sectionheader --text "${path#"$SGND_SAMBA_SHARE_ROOT"/}"
             sgnd_print_labeledvalue --label "Path" --value "$path" --labelwidth 22
             sgnd_print_labeledvalue --label "Samba share" --value "${share:-No}" --labelwidth 22
-            sgnd_print_labeledvalue --label "Owner" --value "$(stat -c '%U' "$path" 2>/dev/null || printf 'Unavailable')" --labelwidth 22
-            sgnd_print_labeledvalue --label "Group" --value "$(stat -c '%G' "$path" 2>/dev/null || printf 'Unavailable')" --labelwidth 22
+            sgnd_print_labeledvalue --label "Owner" --value "$(sudo stat -c '%U' -- "$path" 2>/dev/null || printf 'Unavailable')" --labelwidth 22
+            sgnd_print_labeledvalue --label "Group" --value "$(sudo stat -c '%G' -- "$path" 2>/dev/null || printf 'Unavailable')" --labelwidth 22
 
+            count=0
             while IFS='|' read -r type id perms; do
                 [[ -n "$id" ]] || continue
-                if [[ "$type" == "user" ]]; then
-                    name="$(getent passwd "$id" 2>/dev/null | cut -d: -f1)"
+                if [[ "$type" == "group" ]]; then
+                    principal="$(getent group "$id" 2>/dev/null | cut -d: -f1)"
                 else
-                    name="$(getent group "$id" 2>/dev/null | cut -d: -f1)"
+                    principal="$(getent passwd "$id" 2>/dev/null | cut -d: -f1)"
                 fi
-                [[ -n "$name" ]] || name="${type}-id:$id"
-                sgnd_print_labeledvalue --label "${type^} $name" --value "$perms" --labelwidth 32
-            done < <(sudo getfacl -cpn -- "$path" 2>/dev/null | awk -F: '($1=="user" || $1=="group") && $2!="" { print $1 "|" $2 "|" $3 }')
+                [[ -n "$principal" ]] || principal="${type}-id:$id"
+                if (( count == 0 )); then
+                    sgnd_print
+                    sgnd_print_sectionheader --text "Access"
+                fi
+                access="$(_format_directory_permissions "$perms")"
+                sgnd_print_labeledvalue --label "$principal" --value "$access" --labelwidth 32
+                count=$((count + 1))
+            done < <(
+                sudo getfacl -cpn -- "$path" 2>/dev/null |
+                    awk -F: '($1=="user" || $1=="group") && $2!="" { print $1 "|" $2 "|" $3 }'
+            )
 
+            count=0
             while IFS='|' read -r type id perms; do
                 [[ -n "$id" ]] || continue
-                if [[ "$type" == "user" ]]; then
-                    name="$(getent passwd "$id" 2>/dev/null | cut -d: -f1)"
+                if [[ "$type" == "group" ]]; then
+                    principal="$(getent group "$id" 2>/dev/null | cut -d: -f1)"
                 else
-                    name="$(getent group "$id" 2>/dev/null | cut -d: -f1)"
+                    principal="$(getent passwd "$id" 2>/dev/null | cut -d: -f1)"
                 fi
-                [[ -n "$name" ]] || name="${type}-id:$id"
-                sgnd_print_labeledvalue --label "Default ${type} $name" --value "$perms" --labelwidth 32
-            done < <(sudo getfacl -cpn -- "$path" 2>/dev/null | awk -F: '$1=="default" && ($2=="user" || $2=="group") && $3!="" { print $2 "|" $3 "|" $4 }')
+                [[ -n "$principal" ]] || principal="${type}-id:$id"
+                if (( count == 0 )); then
+                    sgnd_print
+                    sgnd_print_sectionheader --text "Default access"
+                fi
+                access="$(_format_directory_permissions "$perms")"
+                sgnd_print_labeledvalue --label "$principal" --value "$access" --labelwidth 32
+                count=$((count + 1))
+            done < <(
+                sudo getfacl -cpn -- "$path" 2>/dev/null |
+                    awk -F: '$1=="default" && ($2=="user" || $2=="group") && $3!="" { print $2 "|" $3 "|" $4 }'
+            )
         done
         sgnd_print_sectionheader ""
         ask_dlg_autocontinue --seconds 15 --message "Press Enter to return to directory management." --pause || true

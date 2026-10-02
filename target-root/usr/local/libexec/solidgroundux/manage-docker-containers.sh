@@ -4,18 +4,19 @@
 # ----------------------------------------------------------------------------------
 # Metadata:
 #   Version     : 2.1
-#   Build       : 2627412
+#   Build       : 2627515
 #   Shortname   : MANAGE_DOCKER_CONTAINERS
 #   Source      : manage-docker-containers.sh
 #   Type        : script
 #   Group       : Role Managers
 #   Purpose     : Create and manage Docker containers and images
 #
-#   Checksum : a134e428271c076fe9fbfc6cd4ca8fc6545acc560227b26edab709f3518c4f16
+#   Checksum : 61d4d99666b4f81ba0af9e17c3c94d3f04d2ab6130fdde58fea53778b8df4b09
 # Description:
-#   Provides a deliberately small first-version Docker container manager. It covers
-#   the common lifecycle and creation options without attempting to replace Docker
-#   Compose or a full container-management product.
+#   Provides guided Docker image discovery, image pulling, container creation, and
+#   common lifecycle operations without attempting to replace Docker Compose or a
+#   full container-management product. Docker Hub search/tag discovery is offered
+#   as the friendly default, with manual image references retained as a fallback.
 #
 # Attribution:
 #   Developers    : Mark Fieten
@@ -128,7 +129,7 @@ set -uo pipefail
 # - Framework integration -----------------------------------------------------------
     SGND_USING=()
     SGND_ARGS_SPEC=(
-        "action|a|enum|ACTION|Management action||list,create,start,stop,restart,remove,inspect,logs,images,pull"
+        "action|a|enum|ACTION|Management action||list,create,start,stop,restart,shell,remove,inspect,logs,images,pull"
     )
     SGND_SCRIPT_EXAMPLES=(
         "  $SGND_SCRIPT_NAME --action list"
@@ -163,57 +164,329 @@ set -uo pipefail
 
     _docker_print_command() {
         local part=""
-        printf 'DRYRUN: Would run:'
-        for part in "$@"; do printf ' %q' "$part"; done
-        printf '\n'
+        local quoted=""
+        local rendered="DRYRUN: Would run:"
+        for part in "$@"; do
+            printf -v quoted '%q' "$part"
+            rendered+=" $quoted"
+        done
+        sayinfo "$rendered"
+    }
+
+    _docker_validate_port() {
+        local value="${1-}"
+        [[ "$value" =~ ^[0-9]+$ ]] && (( value >= 1 && value <= 65535 ))
+    }
+
+    _docker_validate_absolute_path() {
+        local value="${1-}"
+        [[ "$value" == /* && "$value" != "/" && "$value" != *$'\n'* ]]
+    }
+
+    _docker_validate_env_name() {
+        [[ "${1-}" =~ ^[A-Za-z_][A-Za-z0-9_]*$ ]]
+    }
+
+    # Select a value while presenting a richer display label for each choice.
+    # When a details array is supplied, render each choice as a labeled multi-value row so
+    # long descriptive text wraps in the value column instead of being clipped.
+    _docker_select_labeled_value() {
+        local output_var="${1:?missing output variable}"
+        local label="${2:-Select an option}"
+        local values_name="${3:?missing values array}"
+        local labels_name="${4:?missing labels array}"
+        local details_name="${5-}"
+        local input=""
+        local i=0
+        local -n values_ref="$values_name"
+        local -n labels_ref="$labels_name"
+
+        (( ${#values_ref[@]} > 0 && ${#values_ref[@]} == ${#labels_ref[@]} )) || return 2
+
+        sgnd_print
+        sgnd_print_sectionheader --text "$label"
+        if [[ -n "$details_name" ]]; then
+            local -n details_ref="$details_name"
+            (( ${#details_ref[@]} == ${#values_ref[@]} )) || return 2
+            for (( i=0; i<${#labels_ref[@]}; i++ )); do
+                sgnd_print_labeledmultivalue \
+                    --label "$((i + 1)). ${labels_ref[i]}" \
+                    --value "${details_ref[i]}" \
+                    --labelwidth 36 \
+                    --pad 2
+            done
+        else
+            for (( i=0; i<${#labels_ref[@]}; i++ )); do
+                sgnd_print --text "$((i + 1)). ${labels_ref[i]}" --pad 2
+            done
+        fi
+        sgnd_print --text "Q. Back" --pad 2
+        sgnd_print
+        sgnd_print_sectionheader ""
+
+        while :; do
+            input=""
+            ask --label "Selection" --var input
+            input="${input#"${input%%[![:space:]]*}"}"
+            input="${input%"${input##*[![:space:]]}"}"
+            [[ "${input^^}" == "Q" ]] && return 1
+            if [[ "$input" =~ ^[1-9][0-9]*$ ]] && (( input <= ${#values_ref[@]} )); then
+                printf -v "$output_var" '%s' "${values_ref[input - 1]}"
+                return 0
+            fi
+            saywarning "Select 1-${#values_ref[@]} or Q."
+        done
     }
 
     _docker_select_container() {
         local output_var="${1:?missing output variable}"
         local scope="${2:-all}"
         local label="${3:-Select Docker container}"
-        local selected=""
-        local -a containers=()
+        local name=""
+        local image=""
+        local status=""
+        local -a docker_args=(container ls -a)
+        local -a values=()
+        local -a labels=()
 
-        if [[ "$scope" == "running" ]]; then
-            mapfile -t containers < <(sudo docker container ls --format '{{.Names}}' 2>/dev/null | LC_ALL=C sort)
-        elif [[ "$scope" == "stopped" ]]; then
-            mapfile -t containers < <(sudo docker container ls -a --filter status=exited --filter status=created --format '{{.Names}}' 2>/dev/null | LC_ALL=C sort)
-        else
-            mapfile -t containers < <(sudo docker container ls -a --format '{{.Names}}' 2>/dev/null | LC_ALL=C sort)
+        case "$scope" in
+            running) docker_args+=(--filter status=running) ;;
+            stopped) docker_args+=(--filter status=exited --filter status=created) ;;
+        esac
+        docker_args+=(--format $'{{.Names}}\t{{.Image}}\t{{.Status}}')
+
+        while IFS=$'\t' read -r name image status; do
+            [[ -n "$name" ]] || continue
+            values+=("$name")
+            labels+=("$name  |  $image  |  $status")
+        done < <(sudo docker "${docker_args[@]}" 2>/dev/null | LC_ALL=C sort)
+
+        (( ${#values[@]} > 0 )) || { saywarning "No matching Docker containers were found."; return 1; }
+        _docker_select_labeled_value "$output_var" "$label" values labels
+    }
+
+    # Select a locally available image without reusing the caller's output variable name
+    # locally; Bash dynamic scoping would otherwise swallow the selected image value.
+    _docker_select_local_image() {
+        local output_var="${1:?missing output variable}"
+        local image_ref=""
+        local id=""
+        local size=""
+        local -a values=()
+        local -a labels=()
+
+        while IFS=$'\t' read -r image_ref id size; do
+            [[ -n "$image_ref" && "$image_ref" != *'<none>'* ]] || continue
+            values+=("$image_ref")
+            labels+=("$image_ref  |  ${id:0:12}  |  $size")
+        done < <(sudo docker image ls --format $'{{.Repository}}:{{.Tag}}\t{{.ID}}\t{{.Size}}' 2>/dev/null | LC_ALL=C sort -u)
+
+        if (( ${#values[@]} == 0 )); then
+            saywarning "No local Docker images are available. Pull an image before creating a container."
+            return 1
         fi
 
-        (( ${#containers[@]} > 0 )) || { saywarning "No matching Docker containers were found."; return 1; }
-        sgnd_print
-        sgnd_print_sectionheader "$label"
-        _docker_ask_selection --label "Container" --var selected --items "${containers[@]}" || return 1
-        printf -v "$output_var" '%s' "$selected"
+        _docker_select_labeled_value "$output_var" "Select Docker image" values labels
+    }
+
+    _docker_search_hub_repository() {
+        local output_var="${1:?missing output variable}"
+        local search_term=""
+        local name=""
+        local description=""
+        local stars=""
+        local official=""
+        local official_label=""
+        local -a values=()
+        local -a labels=()
+        local -a details=()
+
+        ask --label "Docker Hub search" --var search_term --back || return 1
+        search_term="$(_docker_trim "$search_term")"
+        [[ -n "$search_term" ]] || { saywarning "Enter a search term."; return 1; }
+
+        while IFS=$'\t' read -r name description stars official; do
+            [[ -n "$name" ]] || continue
+            official_label=""
+            case "${official,,}" in
+                true|yes|ok|"[ok]"|"[official]") official_label=" [Official]" ;;
+            esac
+            description="$(_docker_trim "$description")"
+            values+=("$name")
+            labels+=("$name$official_label")
+            details+=("${stars:-0} stars | $description")
+        done < <(sudo docker search --limit 25 --format $'{{.Name}}\t{{.Description}}\t{{.StarCount}}\t{{.IsOfficial}}' "$search_term" 2>/dev/null)
+
+        if (( ${#values[@]} == 0 )); then
+            saywarning "Docker Hub returned no repositories for '$search_term'."
+            return 1
+        fi
+
+        _docker_select_labeled_value "$output_var" "Select Docker Hub repository" values labels details
+    }
+
+    _docker_list_hub_tags() {
+        local repository="${1:?missing repository}"
+        command -v python3 >/dev/null 2>&1 || return 1
+
+        # Docker Hub's registry requires a repository-scoped bearer token even for
+        # public repositories. Obtain the anonymous pull token, then enumerate tags
+        # through the Registry HTTP API V2 rather than relying on undocumented Hub URLs.
+        python3 - "$repository" <<'PYTAG'
+import json
+import sys
+import urllib.parse
+import urllib.request
+
+repository = sys.argv[1]
+if "/" not in repository:
+    repository = "library/" + repository
+
+token_query = urllib.parse.urlencode({
+    "service": "registry.docker.io",
+    "scope": f"repository:{repository}:pull",
+})
+token_request = urllib.request.Request(
+    "https://auth.docker.io/token?" + token_query,
+    headers={"User-Agent": "SolidGroundUX/2.1"},
+)
+with urllib.request.urlopen(token_request, timeout=12) as response:
+    token_payload = json.load(response)
+token = token_payload.get("token") or token_payload.get("access_token")
+if not token:
+    raise SystemExit(1)
+
+tags_request = urllib.request.Request(
+    "https://registry-1.docker.io/v2/"
+    + urllib.parse.quote(repository, safe="/")
+    + "/tags/list?n=1000",
+    headers={
+        "Authorization": "Bearer " + token,
+        "User-Agent": "SolidGroundUX/2.1",
+    },
+)
+with urllib.request.urlopen(tags_request, timeout=12) as response:
+    payload = json.load(response)
+
+tags = sorted({str(tag).strip() for tag in (payload.get("tags") or []) if str(tag).strip()}, reverse=True)
+if "latest" in tags:
+    print("latest")
+    tags.remove("latest")
+for tag in tags[:49]:
+    print(tag)
+PYTAG
+    }
+
+    _docker_select_hub_tag() {
+        local output_var="${1:?missing output variable}"
+        local repository="${2:?missing repository}"
+        local selected_tag=""
+        local fallback="latest"
+        local -a tags=()
+        local -a labels=()
+
+        mapfile -t tags < <(_docker_list_hub_tags "$repository" 2>/dev/null || true)
+        if (( ${#tags[@]} > 0 )); then
+            labels=("${tags[@]}")
+            tags+=("__MANUAL__")
+            labels+=("Enter tag manually")
+            _docker_select_labeled_value selected_tag "Select image tag" tags labels || return 1
+            if [[ "$selected_tag" != "__MANUAL__" ]]; then
+                printf -v "$output_var" '%s' "$selected_tag"
+                return 0
+            fi
+        else
+            saywarning "Docker Hub tags could not be retrieved for $repository."
+        fi
+
+        ask --label "Image tag" --var fallback --default "$fallback" --back || return 1
+        fallback="$(_docker_trim "$fallback")"
+        [[ -n "$fallback" ]] || { sayfail "An image tag is required."; return 1; }
+        printf -v "$output_var" '%s' "$fallback"
     }
 
     _docker_select_restart_policy() {
         local output_var="${1:?missing output variable}"
         local selected=""
-        sgnd_print
-        sgnd_print_sectionheader "Container restart policy"
-        _docker_ask_selection --label "Policy" --var selected --items "no" "unless-stopped" "always" "on-failure" || return 1
+        _docker_ask_selection --label "Container restart policy" --var selected --items "no" "unless-stopped" "always" "on-failure" || return 1
         printf -v "$output_var" '%s' "$selected"
     }
 
-    _docker_append_csv_options() {
-        local option="$1"
-        local csv="$2"
-        local array_name="$3"
-        local item=""
-        local -a parts=()
-        local -n target="$array_name"
+    _docker_collect_port_mappings() {
+        local array_name="${1:?missing command array}"
+        local summary_var="${2:?missing summary variable}"
+        local decision="No"
+        local host_port=""
+        local container_port=""
+        local protocol="TCP"
+        local mapping=""
+        local summary=""
+        local -n command_ref="$array_name"
 
-        [[ -n "$csv" ]] || return 0
-        IFS=',' read -r -a parts <<< "$csv"
-        for item in "${parts[@]}"; do
-            item="$(_docker_trim "$item")"
-            [[ -n "$item" ]] || continue
-            target+=("$option" "$item")
+        ask_decision --label "Publish container ports" --choices "Yes|Y,No|N" --default "No" --var decision || return $?
+        while [[ "${decision^^}" == "YES" ]]; do
+            ask --label "Host port" --var host_port --validate _docker_validate_port --back || return 1
+            ask --label "Container port" --var container_port --validate _docker_validate_port --back || return 1
+            ask_decision --label "Protocol" --choices "TCP|T,UDP|U" --default "TCP" --var protocol || return $?
+            mapping="$host_port:$container_port/${protocol,,}"
+            command_ref+=(-p "$mapping")
+            [[ -z "$summary" ]] || summary+=", "
+            summary+="$mapping"
+            ask_decision --label "Add another port mapping" --choices "Yes|Y,No|N" --default "No" --var decision || return $?
         done
+        printf -v "$summary_var" '%s' "${summary:-None}"
+    }
+
+    _docker_collect_volume_mappings() {
+        local array_name="${1:?missing command array}"
+        local summary_var="${2:?missing summary variable}"
+        local decision="No"
+        local host_path=""
+        local container_path=""
+        local read_only="No"
+        local mapping=""
+        local summary=""
+        local -n command_ref="$array_name"
+
+        ask_decision --label "Add persistent host storage" --choices "Yes|Y,No|N" --default "No" --var decision || return $?
+        while [[ "${decision^^}" == "YES" ]]; do
+            ask --label "Host path" --var host_path --validate _docker_validate_absolute_path --back || return 1
+            ask --label "Container path" --var container_path --validate _docker_validate_absolute_path --back || return 1
+            ask_decision --label "Read-only inside container" --choices "Yes|Y,No|N" --default "No" --var read_only || return $?
+            mapping="$host_path:$container_path"
+            [[ "${read_only^^}" == "YES" ]] && mapping+=":ro"
+            command_ref+=(-v "$mapping")
+            [[ -z "$summary" ]] || summary+=", "
+            summary+="$mapping"
+            ask_decision --label "Add another persistent volume" --choices "Yes|Y,No|N" --default "No" --var decision || return $?
+        done
+        printf -v "$summary_var" '%s' "${summary:-None}"
+    }
+
+    # Collect one or more user-defined container environment variables.
+    # Keep the prompt receiver names distinct from generic framework-local names so
+    # Bash dynamic scoping cannot swallow values before they are added to docker -e.
+    _docker_collect_environment() {
+        local array_name="${1:?missing command array}"
+        local summary_var="${2:?missing summary variable}"
+        local decision="No"
+        local env_name=""
+        local env_value=""
+        local summary=""
+        local -n command_ref="$array_name"
+
+        ask_decision --label "Add environment variables" --choices "Yes|Y,No|N" --default "No" --var decision || return $?
+        while [[ "${decision^^}" == "YES" ]]; do
+            env_name=""
+            env_value=""
+            ask --label "Variable name" --var env_name --validate _docker_validate_env_name --back || return 1
+            ask --label "Variable value" --var env_value --default "" --back || return 1
+            command_ref+=(-e "$env_name=$env_value")
+            [[ -z "$summary" ]] || summary+=", "
+            summary+="$env_name=<set>"
+            ask_decision --label "Add another environment variable" --choices "Yes|Y,No|N" --default "No" --var decision || return $?
+        done
+        printf -v "$summary_var" '%s' "${summary:-None}"
     }
 
     # Render a local numbered selector using the Docker action layout.
@@ -294,71 +567,113 @@ set -uo pipefail
 
 # - Mutating actions ---------------------------------------------------------------
     _docker_pull_image() {
+        local mode=""
+        local repository=""
+        local tag=""
         local image=""
+
         _docker_require_daemon || return 1
-        ask --label "Docker image" --var image --default "ubuntu:latest" --back || return 0
-        [[ -n "$image" ]] || { sayfail "An image name is required."; return 1; }
+        _docker_ask_selection \
+            --label "Pull Docker image" \
+            --var mode \
+            --items "Search Docker Hub" "Enter image reference manually" || return 0
+
+        case "$mode" in
+            "Search Docker Hub")
+                _docker_search_hub_repository repository || return 0
+                _docker_select_hub_tag tag "$repository" || return 0
+                image="$repository:$tag"
+                ;;
+            "Enter image reference manually")
+                ask --label "Image reference" --var image --default "ubuntu:latest" --back || return 0
+                image="$(_docker_trim "$image")"
+                [[ -n "$image" ]] || { sayfail "An image reference is required."; return 1; }
+                ;;
+        esac
+
+        sgnd_print
+        sgnd_print_sectionheader "Pull Docker image"
+        sgnd_print_labeledvalue --label "Image" --value "$image" --labelwidth 20
 
         if (( ${FLAG_DRYRUN:-0} == 1 )); then
             _docker_print_command docker pull "$image"
             return 0
         fi
-        sudo docker pull "$image"
+        sudo docker pull "$image" || return 1
+        sayok "Docker image available locally: $image"
     }
 
     _docker_create_container() {
         local name=""
         local image=""
-        local ports=""
-        local volumes=""
-        local environment=""
+        local suggested_name=""
+        local ports_summary="None"
+        local volumes_summary="None"
+        local environment_summary="None"
         local restart_policy="no"
-        local start_now="YES"
-        local item=""
-        local -a command=(docker)
+        local start_now="Yes"
+        local decision="Yes"
+        local container_command=""
+        local -a command_args=()
+        local -a options=()
+        local -a command=()
 
         _docker_require_daemon || return 1
-        ask --label "Container name" --var name --validate _docker_validate_name --back || return 0
-        ask --label "Image" --var image --default "ubuntu:latest" --back || return 0
-        [[ -n "$image" ]] || { sayfail "An image name is required."; return 1; }
+        _docker_select_local_image image || return 0
 
+        suggested_name="${image##*/}"
+        suggested_name="${suggested_name%%:*}"
+        suggested_name="${suggested_name//[^A-Za-z0-9_.-]/-}"
+        [[ -n "$suggested_name" ]] || suggested_name="container"
+
+        ask --label "Container name" --var name --default "$suggested_name" --validate _docker_validate_name --back || return 0
         sudo docker container inspect "$name" >/dev/null 2>&1 && { sayfail "Container already exists: $name"; return 1; }
 
-        ask --label "Published ports (comma separated, e.g. 8080:80)" --var ports --default "" --back || return 0
-        ask --label "Volumes (comma separated, e.g. /srv/data:/data)" --var volumes --default "" --back || return 0
-        ask --label "Environment variables (comma separated, e.g. MODE=prod)" --var environment --default "" --back || return 0
+        options+=(--name "$name")
+        _docker_collect_port_mappings options ports_summary || return 0
+        _docker_collect_volume_mappings options volumes_summary || return 0
+        _docker_collect_environment options environment_summary || return 0
         _docker_select_restart_policy restart_policy || return 0
-        ask_decision --label "Start container after creation" --choices "YES|Y,NO|N" --default "YES" --var start_now
 
-        if [[ "$start_now" == "YES" ]]; then
-            command+=(run -d)
-        else
-            command+=(create)
+        # An image may define its own default command (for example nginx), while a
+        # general-purpose image such as Ubuntu normally needs an explicit long-running
+        # process when it is intended to remain active. Leave this empty to use the
+        # image default. Arguments are entered as a simple space-separated command.
+        ask --label "Container command (optional)" --var container_command --default "" --back || return 0
+        container_command="$(_docker_trim "$container_command")"
+        if [[ -n "$container_command" ]]; then
+            read -r -a command_args <<< "$container_command"
         fi
-        command+=(--name "$name" --restart "$restart_policy")
-        _docker_append_csv_options -p "$ports" command
-        _docker_append_csv_options -v "$volumes" command
-        _docker_append_csv_options -e "$environment" command
-        command+=("$image")
+
+        ask_decision --label "Start container after creation" --choices "Yes|Y,No|N" --default "Yes" --var start_now || return 0
+        options+=(--restart "$restart_policy")
+
+        if [[ "${start_now^^}" == "YES" ]]; then
+            command=(docker run -d "${options[@]}" "$image" "${command_args[@]}")
+        else
+            command=(docker create "${options[@]}" "$image" "${command_args[@]}")
+        fi
 
         sgnd_print
         sgnd_print_sectionheader "Create Docker container"
         sgnd_print_labeledvalue --label "Name" --value "$name" --labelwidth 22
         sgnd_print_labeledvalue --label "Image" --value "$image" --labelwidth 22
-        sgnd_print_labeledvalue --label "Ports" --value "${ports:-None}" --labelwidth 22
-        sgnd_print_labeledvalue --label "Volumes" --value "${volumes:-None}" --labelwidth 22
-        sgnd_print_labeledvalue --label "Environment" --value "${environment:-None}" --labelwidth 22
+        sgnd_print_labeledvalue --label "Ports" --value "$ports_summary" --labelwidth 22
+        sgnd_print_labeledvalue --label "Volumes" --value "$volumes_summary" --labelwidth 22
+        sgnd_print_labeledvalue --label "Environment" --value "$environment_summary" --labelwidth 22
         sgnd_print_labeledvalue --label "Restart policy" --value "$restart_policy" --labelwidth 22
+        sgnd_print_labeledvalue --label "Command" --value "${container_command:-Image default}" --labelwidth 22
         sgnd_print_labeledvalue --label "Start now" --value "$start_now" --labelwidth 22
 
-        ask_decision --label "Create container '$name'" --choices "YES|Y,NO|N" --default "YES" --var start_now
-        [[ "$start_now" == "YES" ]] || return 0
+        ask_decision --label "Create container '$name'" --choices "Yes|Y,No|N" --default "Yes" --var decision || return 0
+        [[ "${decision^^}" == "YES" ]] || return 0
 
         if (( ${FLAG_DRYRUN:-0} == 1 )); then
             _docker_print_command "${command[@]}"
             return 0
         fi
-        sudo "${command[@]}"
+        sudo "${command[@]}" || return 1
+        sayok "Container created: $name"
     }
 
     _docker_start_container() {
@@ -388,16 +703,94 @@ set -uo pipefail
         sayok "Container restarted: $container"
     }
 
+    # fn: _docker_open_container_shell - Open an interactive shell in a running container
+        # . Purpose
+        #   Let an operator enter a running container without having to remember docker exec syntax.
+        #
+        # . Behavior
+        #   - Selects only running containers.
+        #   - Prefers /bin/bash when present and falls back to /bin/sh.
+        #   - Reports a clear failure when the container image provides neither shell.
+        #   - Honors console dry-run mode.
+    _docker_open_container_shell() {
+        local container=""
+        local shell_path=""
+
+        _docker_require_daemon || return 1
+        _docker_select_container container running "Open Docker container shell" || return 0
+
+        if sudo docker exec "$container" /bin/bash -c 'exit 0' >/dev/null 2>&1; then
+            shell_path="/bin/bash"
+        elif sudo docker exec "$container" /bin/sh -c 'exit 0' >/dev/null 2>&1; then
+            shell_path="/bin/sh"
+        else
+            sayfail "Container '$container' does not provide /bin/bash or /bin/sh."
+            return 1
+        fi
+
+        if (( ${FLAG_DRYRUN:-0} == 1 )); then
+            _docker_print_command docker exec -it "$container" "$shell_path"
+            return 0
+        fi
+
+        sayinfo "Opening $shell_path in container: $container"
+        sudo docker exec -it "$container" "$shell_path"
+    }
+
     _docker_remove_container() {
         local container=""
-        local decision="NO"
+        local decision="No"
         _docker_require_daemon || return 1
         _docker_select_container container stopped "Remove Docker container" || return 0
-        ask_decision --label "Remove container '$container'" --choices "YES|Y,NO|N" --default "NO" --var decision
-        [[ "$decision" == "YES" ]] || return 0
+        ask_decision --label "Remove container '$container'" --choices "Yes|Y,No|N" --default "No" --var decision
+        [[ "${decision^^}" == "YES" ]] || return 0
         if (( ${FLAG_DRYRUN:-0} == 1 )); then _docker_print_command docker rm "$container"; return 0; fi
         sudo docker rm "$container" >/dev/null || return 1
         sayok "Container removed: $container"
+    }
+
+    # fn: _docker_action_again - Offer to repeat a completed interactive Docker action
+        # . Purpose
+        #   Give repeatable Docker management actions the standard SolidGroundUX
+        #   do-another/return interaction instead of ending at the generic executable pause.
+        #
+        # . Behavior
+        #   - Enter returns to the Management Console and is the automatic/default path.
+        #   - A repeats the same Docker action.
+        #   - P/Space pauses the automatic return countdown.
+        #
+        # . Returns
+        #   0 only when the operator selected A (do another); otherwise non-zero.
+    _docker_action_again() {
+        local rc=0
+
+        sgnd_print
+        sgnd_print_sectionheader "Do another"
+
+        ask_dlg_autocontinue \
+            --seconds 5 \
+            --message "Repeat this Docker action?" \
+            --again \
+            --pause \
+            --legend "Enter=return to menu; A=do another; P/Space=pause"
+        rc=$?
+
+        (( rc == 3 ))
+    }
+
+    # fn: _docker_return_to_menu - Offer the standard automatic return for read-only actions
+        # . Purpose
+        #   Let read-only Docker actions end naturally without offering a redundant repeat option.
+        #
+        # . Behavior
+        #   - Enter returns to the Management Console immediately.
+        #   - P/Space pauses the automatic return countdown.
+    _docker_return_to_menu() {
+        sgnd_print
+        ask_dlg_autocontinue \
+            --seconds 5 \
+            --pause \
+            --legend "Enter=return to menu; P/Space=pause" || true
     }
 
 # - Action dispatch ----------------------------------------------------------------
@@ -409,6 +802,7 @@ set -uo pipefail
             start)   _docker_start_container || rc=$? ;;
             stop)    _docker_stop_container || rc=$? ;;
             restart) _docker_restart_container || rc=$? ;;
+            shell)   _docker_open_container_shell || rc=$? ;;
             remove)  _docker_remove_container || rc=$? ;;
             inspect) _docker_inspect_container || rc=$? ;;
             logs)    _docker_show_logs || rc=$? ;;
@@ -428,10 +822,32 @@ set -uo pipefail
 # - Main ----------------------------------------------------------------------------
     main() {
         local action=""
+        local rc=0
+
         _framework_locator || return $?
         sgnd_exe_start "$@" || return $?
         action="${ACTION:-list}"
-        _run_action "$action"
+
+        while :; do
+            rc=0
+            _run_action "$action" || rc=$?
+            (( rc == 0 )) || return "$rc"
+
+            case "$action" in
+                list|images)
+                    _docker_return_to_menu
+                    break
+                    ;;
+                *)
+                    if _docker_action_again; then
+                        continue
+                    fi
+                    break
+                    ;;
+            esac
+        done
+
+        return 0
     }
 
     main "$@"
