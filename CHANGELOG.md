@@ -12,6 +12,8 @@ practical framework development.
 
 ## Unreleased
 
+## Release 2.1.2627700
+
 ### SolidGroundUX setup
 - Renamed the SolidGroundUX lifecycle entry in the Management Console from **Release manager** to **Setup** and switched it to the canonical `/var/lib/solidgroundux/sgnd-setup.sh` entry point, with the former release-manager path retained as a transition fallback.
 
