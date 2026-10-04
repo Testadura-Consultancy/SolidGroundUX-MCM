@@ -10,9 +10,6 @@ practical framework development.
 ### AD Server module
 - Add support for joining an existing Active Directory domain as an additional writable domain controller, including discovery/authentication, additional-DC provisioning, Kerberos/resolver/DNS configuration, replication validation, and compound subtask progress reporting. This is a post-2.1 feature.
 
-### Docker module
-- Complete an end-to-end container-management verification pass.
-
 ## Unreleased
 
 ### SolidGroundUX setup
@@ -40,7 +37,10 @@ practical framework development.
 
 ### Docker module
 - Fixed the malformed first line in `manage-docker-server.sh` so the script has a valid shebang/header boundary.
+- Completed the end-to-end Docker host/container-management verification pass for the current 2.1 cycle.
 
+### Development templates
+- Placed the MCM-owned `mod-template.sh` in the shared `/usr/local/share/solidgroundux/convenience-templates` library so `create-workspace` can discover it alongside the SDK-owned executable, library, documentation, and wrapper templates.
 
 ### Storage module
 - Added recovery for restored or reattached `SGND_STORAGE` volumes whose filesystem UUID no longer matches the SolidGroundUX-managed `/etc/fstab` entry; persistence reconciliation can identify an unambiguous managed volume, confirm the repair, update persistent configuration, and remount it without reprovisioning.

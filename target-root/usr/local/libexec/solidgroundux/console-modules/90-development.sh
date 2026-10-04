@@ -3,9 +3,9 @@
 # ----------------------------------------------------------------------------------
 # Metadata:
 #   Version     : 2.1
-#   Build       : 2627501
+#   Build       : 2627700
 #   Shortname   : DEVELOPMENT
-#   Checksum    : 8b12ee6f1502e15bf8e7a45951695f9cbb4bab475913874584dbd6e8e7da518c
+#   Checksum    : 199a18849f6a1b6d708b3eb7ff84d1c0d95df4a0a6be8b4aaa84411862d0e6f2
 #   Source      : 90-development.sh
 #   Type        : module
 #   Group       : Module Registration
@@ -189,9 +189,9 @@ set -uo pipefail
         0 1 900
 
     sgnd_menu_register_item "dev-createws" "$SGND_DEVELOPMENT_MODULE_ID" "Create workspace" "_dev_create_workspace" "Create a template workspace with target-root structure" 0 15 1 0
-    sgnd_menu_register_item "dev-deployws" "$SGND_DEVELOPMENT_MODULE_ID" "Deploy workspace" "_dev_deploy_workspace" "Select and deploy workspace files locally or remotely" 0 15 1 0
+    sgnd_menu_register_item "dev-deployws" "$SGND_DEVELOPMENT_MODULE_ID" "Deploy workspace" "_dev_deploy_workspace" "Select and deploy workspace files locally or remotely" 0 0 1 0
     sgnd_menu_register_item "dev-preprel" "$SGND_DEVELOPMENT_MODULE_ID" "Prepare release" "_dev_prepare_release" "Create a release archive with checksums and manifests" 0 15 1 0
     sgnd_menu_register_item "dev-wrappers" "$SGND_DEVELOPMENT_MODULE_ID" "Create wrappers" "_dev_create_wrappers" "Create root-aware bin or sbin wrappers for selected scripts" 0 20 1 0
-    sgnd_menu_register_item "dev-gendocs" "$SGND_DEVELOPMENT_MODULE_ID" "Generate documentation" "_dev_generate_docs" "Generate SolidGroundUX source documentation" 0 25 1 0
+    sgnd_menu_register_item "dev-gendocs" "$SGND_DEVELOPMENT_MODULE_ID" "Generate documentation" "_dev_generate_docs" "Generate SolidGroundUX source documentation" 0 0 1 0
 
     sayinfo "Development module registered with the console."

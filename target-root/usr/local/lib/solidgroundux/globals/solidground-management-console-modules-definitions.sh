@@ -4,8 +4,8 @@
 # -------------------------------------------------------------------------------------
 # Metadata:
 #   Version     : 2.1
-#   Build       : 2627515
-#   Checksum    : 1a6d3ffdd74e867254b75e8801c0812d9afb9056816c6e30ca45f0e5443e8685
+#   Build       : 2627700
+#   Checksum    : c9afa9cd11c201d4a3defdbdca9cb65ce934b370fcedcaadea467aa22dbd5cc9
 #   Source      : solidgroundux-management-modules-definitions.sh
 #   Type        : library
 #   Group       : Globals
@@ -13,7 +13,7 @@
 # =====================================================================================
 SGND_SOLIDGROUND_MANAGEMENT_CONSOLE_MODULES_PRODUCT="SolidGroundUX Management Console Modules"
 SGND_SOLIDGROUND_MANAGEMENT_CONSOLE_MODULES_VERSION=2.1
-SGND_SOLIDGROUND_MANAGEMENT_CONSOLE_MODULES_BUILD=2627515
+SGND_SOLIDGROUND_MANAGEMENT_CONSOLE_MODULES_BUILD=2627700
 
 SGND_SOLIDGROUND_MANAGEMENT_CONSOLE_MODULES_COMPANY="Testadura Consultancy"
 SGND_SOLIDGROUND_MANAGEMENT_CONSOLE_MODULES_COPYRIGHT="© 2025 - 2026 Testadura Consultancy"
