@@ -1,11 +1,11 @@
 # ==================================================================================
-# SolidGroundUX - Console Module Template
+# SolidGroundUX MCM - Console Module Template
 # ----------------------------------------------------------------------------------
 # Metadata:
 #   Version     : 2.1
-#   Build       : 2627501
+#   Build       : 2627808
 #   Shortname   : SAMPLE_MODULE
-#   Checksum    : 681f813f4af09c0fb4247dd8a76b2527325a8461a0a02abe99363b786aa36b1c
+#   Checksum    : 2f060264329e08c1f69a7b2a925d167031c1e02537648fc9f49eeb98bbbfc2a7
 #   Source      : mod-template.sh
 #   Type        : module
 #   Group       : SDK

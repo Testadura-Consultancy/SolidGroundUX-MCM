@@ -2,22 +2,28 @@
 
 All notable changes to SolidGroundUX Management Console Modules are documented in this file.
 
-The format is inspired by *Keep a Changelog* while remaining focused on
-practical framework development.
+The format is inspired by *Keep a Changelog* while remaining focused on practical framework development.
 
 ## Backlog
 
 ### AD Server module
+
 - Add support for joining an existing Active Directory domain as an additional writable domain controller, including discovery/authentication, additional-DC provisioning, Kerberos/resolver/DNS configuration, replication validation, and compound subtask progress reporting. This is a post-2.1 feature.
+
+### SolidGroundUX
+
+- Add a Management Console action to inspect and repair SolidGroundUX filesystem ownership/permissions by invoking the Framework-owned `sgnd-repair-permissions.sh` policy engine.
 
 ## Unreleased
 
-## Release 2.1.2627700
+## Release 2.1.2627801
 
 ### SolidGroundUX setup
+
 - Renamed the SolidGroundUX lifecycle entry in the Management Console from **Release manager** to **Setup** and switched it to the canonical `/var/lib/solidgroundux/sgnd-setup.sh` entry point, with the former release-manager path retained as a transition fallback.
 
 ### Management Console
+
 - Added a loaded-module registry view under **SolidGroundUX -> Framework Diagnostics**, showing module Shortname, Title, Type, Version, Build, load timestamp, and source, with selectable detailed metadata including Description.
 - Expanded the loaded-module registry schema and registration flow to retain canonical header identity for modules loaded during the current console session.
 - Changed console navigation so `Esc` is the canonical return/exit key: `Esc` returns from a module page to the main index and, on the main index, asks for confirmation before exiting.
@@ -26,9 +32,11 @@ practical framework development.
 - Made lazy module loading transactional so registrations created during a failed module load are rolled back before returning, preventing duplicate groups/items when the module is retried.
 
 ### Storage module
+
 - Corrected the indentation of the **Unmount storage** and **Expand storage** menu entries.
 
 ### Samba file server
+
 - Added dedicated `manage-samba-users.sh` ownership for standalone Samba user/group administration, separating identity management from share/directory management.
 - Added a single **Manage users and groups** entry beneath Samba Shares and removed standalone identity CRUD from the share manager.
 - Added a comprehensive standalone Samba identity overview including user group memberships.
@@ -38,24 +46,25 @@ practical framework development.
 - Verified fresh standalone mode end-to-end and verified both standalone -> AD and AD -> standalone authentication-mode transitions.
 
 ### Docker module
-- Fixed the malformed first line in `manage-docker-server.sh` so the script has a valid shebang/header boundary.
-- Completed the end-to-end Docker host/container-management verification pass for the current 2.1 cycle.
 
-### Development templates
-- Placed the MCM-owned `mod-template.sh` in the shared `/usr/local/share/solidgroundux/convenience-templates` library so `create-workspace` can discover it alongside the SDK-owned executable, library, documentation, and wrapper templates.
+- Fixed the malformed first line in `manage-docker-server.sh` so the script has a valid shebang/header boundary.
 
 ### Storage module
+
 - Added recovery for restored or reattached `SGND_STORAGE` volumes whose filesystem UUID no longer matches the SolidGroundUX-managed `/etc/fstab` entry; persistence reconciliation can identify an unambiguous managed volume, confirm the repair, update persistent configuration, and remount it without reprovisioning.
 - Added completion-status propagation for composite storage configuration so completed storage subtasks are reflected by their Management Console status icons.
 
 ### AD Server module
+
 - Added tracked subtask reporting for the composite domain-provisioning workflow so each underlying provisioning action is reflected in the Management Console after **Provision domain** completes.
 - Verified fresh Active Directory Domain Controller provisioning end-to-end, including DNS, Kerberos, LDAP, registration, validation, and status.
 
 ### AD Management
+
 - Added multi-select user/group management for bulk Active Directory actions and completed the current 2.1 management workflow validation.
 
 ### AD Client module
+
 - Added tracked subtask reporting for the composite domain-join workflow so completed, failed, warning, and unexecuted join steps are reflected correctly in Management Console status.
 - Changed an already-joined domain preflight result from failure to warning, preventing an existing membership from being presented as an error.
 - Added host Kerberos keytab validation to AD client join and validation.
@@ -63,6 +72,7 @@ practical framework development.
 - Fixed domain leave so a single leave operation immediately clears realm membership and deactivates SSSD; verified with repeated join/leave testing against `testadura2.hq`.
 
 ### Samba file server
+
 - Simplified Samba authentication preparation so the server derives its mode from host Active Directory membership: AD members are configured for ADS integration and non-members for standalone operation, leaving domain membership ownership with the AD Client module.
 - Completed Samba ADS integration and validation around Samba machine trust, Winbind domain state, NETLOGON connectivity, SSSD-backed host membership, and DNS verification.
 - Improved Samba share-root preparation and validation so managed share paths remain traversable by authorized identities.
@@ -86,6 +96,7 @@ practical framework development.
 - Verified Samba directory management and standalone <-> Active Directory transitions end-to-end.
 
 ### Webserver module
+
 - Added completion status reporting for web-server preparation steps, including separate status for Nginx installation and web-service startup.
 - Changed composite web-server preparation to persist child action results in the Management Console, matching the tracked workflow behavior used by other compound modules.
 - Standardized web-server action endings and removed redundant menu wait times for actions that handle their own continuation dialogs.
@@ -94,25 +105,30 @@ practical framework development.
 - Verified the Web Server and publishing workflows end-to-end, including site management, content publishing, documentation publishing, validation, and status.
 
 ### SQL Server module
+
 - Added persistent child-action progress reporting for **Prepare SQL Server**, covering repository configuration, engine installation, SQL Server setup, and SQL Server tools installation.
 - Reordered the SQL Server menu so **Install SQL Server tools** is grouped with the other **Prepare SQL Server** child actions, keeping menu order aligned with the compound workflow.
 
 ## Release 2.1.2626712
 
 ### Changed
+
 - Samba share creation now selects a storage location immediately below the configured SolidGroundUX storage root before asking for the share name; the share path is derived from that location and existing backing directories can be reused.
 - Standardized Management Console public management wrappers on the current canonical wrapper template rather than direct fixed `/usr/local/libexec` execution.
 
 ### Removed
+
 - Removed remaining references to the superseded `sgnd-framework-smoketest` command and stale `framework-smoketest.sh` implementation; Framework testing uses the Framework-owned `sgnd-smoketest` command.
 
 ### Fixed
+
 - Fixed Active Directory shared management code so it invokes the canonical identity-management executable directly instead of depending on the Management Console's private module-script runner.
 - Fixed Active Directory server provisioning so resolver handoff waits for IPv4 DNS port 53 to become available before starting Samba, preventing intermittent DNS-listener failures during fresh domain-controller provisioning.
 - Fixed Active Directory Management module metadata formatting that caused lazy-load metadata validation to fail and subsequent retries to produce duplicate menu registrations.
 - Fixed Samba managed-share discovery and validation so shares can reside beneath selected top-level storage locations rather than being restricted to `/srv/storage/shares`.
 
 ### Verified
+
 - Verified fresh Active Directory Domain Controller provisioning end-to-end on Ubuntu 24.04, with all provisioning, DNS, Kerberos, LDAP, registration, validation and status steps completing successfully.
 - Verified Active Directory Client workflow on a fresh Ubuntu system joining an existing known-good Active Directory domain.
 
@@ -209,4 +225,3 @@ practical framework development.
 - Fixed web publishing DRYRUN behavior so publishing state, SSH setup, Git checkout activity, and destination content are not persistently changed during preview.
 - Fixed malformed enum argument specifications in `framework-smoketest.sh`, `manage-solidgroundux.sh`, and `set-identity.sh` so allowed values are registered correctly.
 - Fixed a stray token in `framework-smoketest.sh` that prevented the script from parsing.
-
