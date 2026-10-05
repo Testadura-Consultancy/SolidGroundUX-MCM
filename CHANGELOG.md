@@ -6,6 +6,11 @@ The format is inspired by *Keep a Changelog* while remaining focused on practica
 
 ## Backlog
 
+- Fix the hardcoded legacy documentation path in both manage-web-server.sh and publish-web-content.sh.
+- When published documentation already exists and SolidGroundUX gets upgraded, the Web Server module should be able to show something like “Installed documentation newer than published documentation” and offer Update published documentation.
+- Add an option to completely remove a managed website, with separate handling of web-server configuration and optional document-root deletion.
+- Add favicon support for managed websites, allowing sites such as the SolidGroundUX documentation site to expose a recognizable browser/tab icon.
+
 ### AD Server module
 
 - Add support for joining an existing Active Directory domain as an additional writable domain controller, including discovery/authentication, additional-DC provisioning, Kerberos/resolver/DNS configuration, replication validation, and compound subtask progress reporting. This is a post-2.1 feature.
