@@ -1,0 +1,25 @@
+#!/usr/bin/env bash
+# Thin non-interactive wrapper around the MCM WebContent Python package.
+set -uo pipefail
+
+script_file="$(readlink -f "${BASH_SOURCE[0]}")" || exit 126
+path_without_root="${script_file#/}"
+IFS='/' read -r -a parts <<< "$path_without_root"
+root_index=-1
+for i in "${!parts[@]}"; do
+    case "${parts[$i]}" in usr|etc|var) root_index=$i ;; esac
+done
+(( root_index >= 0 )) || { printf 'FATAL: Cannot determine SolidGroundUX framework root.\n' >&2; exit 126; }
+if (( root_index == 0 )); then
+    framework_root="/"
+else
+    framework_root=""
+    for (( i=0; i<root_index; i++ )); do framework_root+="/${parts[$i]}"; done
+fi
+if [[ "$framework_root" == "/" ]]; then
+    python_root="/usr/local/lib/solidgroundux/py"
+else
+    python_root="${framework_root%/}/usr/local/lib/solidgroundux/py"
+fi
+[[ -d "$python_root/webcontent" ]] || { printf 'FATAL: WebContent Python package not found: %s\n' "$python_root/webcontent" >&2; exit 127; }
+exec env PYTHONPATH="$python_root${PYTHONPATH:+:$PYTHONPATH}" python3 -m webcontent.cli "$@"

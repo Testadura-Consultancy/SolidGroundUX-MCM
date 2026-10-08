@@ -1,1 +1,3 @@
-/srv/storage/development/SolidGroundUX/target-root/usr/local/bin/sgnd-console "$@" --appcfg /srv/storage/development/solidgrond-management-modules/target-root/usr/local/libexec/solidgroundux/console-modules/ 
+/srv/storage/development/SolidGroundUX-MCM/target-root/usr/local/libexec/solidgroundux/management-console.sh \
+ --appcfg /srv/storage/development/SolidGroundUX-MCM/target-root/usr/local/libexec/solidgroundux/console-modules
+    

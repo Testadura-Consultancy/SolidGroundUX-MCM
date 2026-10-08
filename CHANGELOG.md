@@ -21,6 +21,9 @@ The format is inspired by *Keep a Changelog* while remaining focused on practica
 
 ## Unreleased
 
+## Added
+- Added a new module **55-web-content-management**, it includes a directory with py modules in `/srv/storage/development/SolidGroundUX-MCM/target-root/usr/local/lib/solidgroundux/py/webcontent` and includes a bash executable script `manage-web-content.sh`
+
 ## Release 2.1.2627801
 
 ### SolidGroundUX setup
