@@ -104,3 +104,27 @@
 # > When a configured page has no translation in the language being generated, that
 # > Featured tile is omitted for that language until the translation exists.
 # ==================================================================================
+
+# -- Publishing: drafts, previews, SEO, feeds ---------------------------------------
+#
+# > Public is the default: only published pages are generated. Preview builds
+# > include `status: draft` and `status: preview` pages and must be written to a
+# > separate, access-controlled output directory. `noindex` is not access control.
+# > Use `status: published` or omit status for public pages. Legacy `draft: true`
+# > remains accepted. The public component showcase stays published; authors can
+# > set `status: preview` for material meant only for private preview builds.
+# >
+# >     python3 -m webcontent.cli generate --source ./www --output ./public
+# >     python3 -m webcontent.cli generate --source ./www --output ./private-preview --mode preview
+# >     python3 -m webcontent.cli generate --source ./www --output ./public --rss
+# >
+# > `published: YYYY-MM-DD` determines article date and chronological sorting;
+# > legacy `date:` remains a fallback. A filesystem creation date is not stable
+# > across Git clones and ingestion, so there is no automatic creation-date fallback.
+# >
+# > Public builds generate sitemap.xml and robots.txt from published routes only,
+# > plus canonical, Open Graph and social-card metadata. `description` overrides
+# > the summary for SEO. A hero image is used for sharing previews when present.
+# > Optional RSS produces rss.xml from dated, published articles only.
+# > The generation result includes skipped_pages, broken_links, sitemap_generated,
+# > rss_generated and non-fatal local link warnings.

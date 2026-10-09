@@ -932,9 +932,33 @@ PY
         local pages=""
         local articles=""
         local rc=0
+        local generation_mode="public"
+        local rss_mode="no"
+        local suggested_output=""
+        local -a extra_args=()
 
         _web_content_select_source || return 0
-        ask --label "Output directory" --var SGND_WEB_CONTENT_OUTPUT --default "$SGND_WEB_CONTENT_OUTPUT" --back || return 0
+        ask --label "Generation mode (public/preview)" --var generation_mode --default "public" --back || return 0
+        case "${generation_mode,,}" in
+            public) generation_mode="public" ;;
+            preview) generation_mode="preview" ;;
+            *) sayfail "Generation mode must be public or preview."; return 1 ;;
+        esac
+        if [[ "$generation_mode" == "preview" ]]; then
+            saywarn "Preview pages are not protected by noindex. Never deploy this output publicly."
+        else
+            ask --label "Generate RSS feed? (yes/no)" --var rss_mode --default "no" --back || return 0
+            case "${rss_mode,,}" in
+                yes|y) extra_args+=(--rss) ;;
+                no|n) ;;
+                *) sayfail "Enter yes or no for RSS."; return 1 ;;
+            esac
+        fi
+        suggested_output="$SGND_WEB_CONTENT_OUTPUT"
+        if [[ "$generation_mode" == "preview" ]]; then
+            suggested_output="${SGND_WEB_CONTENT_OUTPUT%/}-preview"
+        fi
+        ask --label "Output directory" --var SGND_WEB_CONTENT_OUTPUT --default "$suggested_output" --back || return 0
         _web_content_select_language || return 0
         _web_content_ensure_output_parent "$SGND_WEB_CONTENT_OUTPUT" || { sayfail "Cannot create output parent directory."; return 1; }
 
@@ -942,7 +966,8 @@ PY
         _web_content_run_engine "$result_file" generate \
             --source "$SGND_WEB_CONTENT_SOURCE" \
             --output "$SGND_WEB_CONTENT_OUTPUT" \
-            --language "$SGND_WEB_CONTENT_LANGUAGE" || rc=$?
+            --language "$SGND_WEB_CONTENT_LANGUAGE" \
+            --mode "$generation_mode" "${extra_args[@]}" || rc=$?
 
         _web_content_report_warnings "$result_file"
         if (( rc != 0 )); then
@@ -957,6 +982,9 @@ PY
         sgnd_print_labeledvalue --label "Output" --value "$SGND_WEB_CONTENT_OUTPUT" --labelwidth 20
         sgnd_print_labeledvalue --label "Pages" --value "$pages" --labelwidth 20
         sgnd_print_labeledvalue --label "Articles" --value "$articles" --labelwidth 20
+        sgnd_print_labeledvalue --label "Mode" --value "$generation_mode" --labelwidth 20
+        sgnd_print_labeledvalue --label "Skipped pages" --value "$(_web_content_result_value "$result_file" skipped_pages)" --labelwidth 20
+        sgnd_print_labeledvalue --label "Broken links" --value "$(_web_content_result_value "$result_file" broken_links)" --labelwidth 20
         rm -f "$result_file"
     }
 

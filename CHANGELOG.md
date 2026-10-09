@@ -21,8 +21,32 @@ The format is inspired by *Keep a Changelog* while remaining focused on practica
 
 ## Unreleased
 
-## Added
-- Added a new module **55-web-content-management**, it includes a directory with py modules in `/srv/storage/development/SolidGroundUX-MCM/target-root/usr/local/lib/solidgroundux/py/webcontent` and includes a bash executable script `manage-web-content.sh`
+### Added
+
+- Added the new **Web Content Management** module (`55-web-content-management`) with the `manage-web-content.sh` management executable and supporting Python package under `usr/local/lib/solidgroundux/py/webcontent`.
+- Added Markdown-based static-site generation from site configuration, content, templates, CSS, and assets, including multilingual routes and language-aware navigation.
+- Added content hierarchy support based on the website content tree, with section landing pages, nested subpages, breadcrumbs, and automatically generated **In deze sectie** child-page indexes.
+- Added interactive Markdown ingestion from the canonical site `incoming/` directory, with support for an operator-supplied directory or `--ingest-dir` override.
+- Added metadata-assisted ingestion that uses metadata already present in a Markdown file, derives safe defaults where possible, and interactively asks only for missing or ambiguous values.
+- Added batch ingestion with remembered defaults for repeated metadata such as language, content type, and parent section, allowing subsequent files to accept the previous choices with Enter.
+- Added archival of successfully ingested source Markdown under `ingested/YYYY-MM-DD/`, preserving the original input while writing normalized canonical content into the website content tree.
+- Added safe page deletion with multi-select support, translation-aware handling, recursive section deletion confirmation, protected section roots, and archival under `deleted/YYYY-MM-DD/` rather than immediate destruction.
+- Added Testadura Markdown component extensions, including nested `:::` component blocks, responsive `td-grid` / `td-tile` layouts, callouts, inline/image classes, and native scroll-snap image galleries.
+- Added configurable featured-content support through `featured.cfg`, allowing product pages or articles to be curated independently of the site navigation and resolved per language by the generator.
+- Added website-source validation for content metadata, duplicate generated routes, missing section indexes, component CSS references, featured-content targets, and other generation-time consistency checks.
+
+### Changed
+
+- Changed website generation so the filesystem content tree is authoritative for page hierarchy while `navigation.cfg` remains focused on the main site navigation.
+- Changed non-listing section child pages to render as normal pages by default while article/listing sections retain article behavior.
+- Changed multilingual generation so navigation and language-switch links are emitted only for translations that actually exist in the generated output.
+- Changed Web Content Management action status handling so a successful ingest or delete operation that changes website source marks **Generate website** as warning until the site is regenerated successfully.
+- Changed page-deletion UX to use multi-selection and the standard SolidGroundUX auto-continue flow, with **Enter** returning to the menu and **A** offering another deletion pass.
+
+### Fixed
+
+- Fixed language-switch generation that could previously expose links to untranslated pages when only a subset of configured languages was generated.
+- Fixed nested Testadura Markdown component parsing so nested `:::` blocks are handled correctly without being confused by fenced code blocks containing the same marker.
 
 ## Release 2.1.2627801
 

@@ -4,10 +4,16 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from datetime import datetime
+from email.utils import format_datetime
+from datetime import timezone
+from xml.etree import ElementTree as ET
+from urllib.parse import urljoin, unquote
 import html
 from pathlib import Path
 import shutil
 import re
+import hashlib
+from urllib.parse import urlsplit
 from typing import Iterable
 
 from .content import (
@@ -33,6 +39,10 @@ class GenerationResult:
     articles_generated: int = 0
     warnings: list[str] = field(default_factory=list)
     errors: list[str] = field(default_factory=list)
+    skipped_pages: int = 0
+    broken_links: int = 0
+    sitemap_generated: bool = False
+    rss_generated: bool = False
 
     def as_dict(self) -> dict[str, object]:
         return {
@@ -42,6 +52,10 @@ class GenerationResult:
             "articles_generated": self.articles_generated,
             "warnings": self.warnings,
             "errors": self.errors,
+            "skipped_pages": self.skipped_pages,
+            "broken_links": self.broken_links,
+            "sitemap_generated": self.sitemap_generated,
+            "rss_generated": self.rss_generated,
         }
 
 
@@ -123,7 +137,7 @@ def _render_navigation(
     available_paths = {
         _base_route_for_item(candidate, default_language)
         for candidate in items
-        if candidate.language == language and candidate.base_name == "index" and not candidate.draft
+        if candidate.language == language and candidate.base_name == "index" and candidate in items
     }
 
     links: list[str] = []
@@ -169,7 +183,7 @@ def _render_breadcrumb(items: list[ContentItem], item: ContentItem, default_lang
         for candidate in items
         if candidate.language == item.language
         and candidate.base_name == "index"
-        and not candidate.draft
+        and candidate in items
         and _base_route_for_item(candidate, default_language) in ancestor_routes
     ]
     ancestors.sort(key=lambda candidate: len(_base_route_for_item(candidate, default_language).strip("/").split("/")))
@@ -229,7 +243,7 @@ def _render_language_selector(
     available = {
         language: variant
         for language, variant in variants.get(item.logical_id, {}).items()
-        if language in selected_languages and not variant.draft
+        if language in selected_languages 
     }
     if len(available) <= 1:
         return ""
@@ -285,16 +299,100 @@ def _summary_fragment(item: ContentItem) -> str:
     return f'<p class="page-summary">{html.escape(item.summary)}</p>'
 
 
-def _card(item: ContentItem, heading_level: int = 2) -> str:
+def _image_for(item: ContentItem, config, output_path: Path) -> str:
+    """Prefer index art, then hero art; publish local assets safely."""
+    for key in ("index_image", "hero_image"):
+        reference = str(item.metadata.get(key) or "").strip()
+        if reference:
+            return _publish_image(reference, item, config, output_path)
+    return ""
+
+
+def _publish_image(reference: str, item: ContentItem, config, output_path: Path) -> str:
+    """Resolve relative author images beside Markdown, without escaping content root."""
+    parsed = urlsplit(reference)
+    if parsed.scheme in ("http", "https") or reference.startswith("//"):
+        return reference
+    if parsed.scheme or reference.startswith("#"):
+        return ""
+    if reference.startswith("/"):
+        return reference
+    candidate = (item.source_path.parent / parsed.path).resolve()
+    allowed = (config.content_dir.resolve(), config.images_dir.resolve())
+    if not candidate.is_file() or not any(candidate.is_relative_to(root) for root in allowed):
+        return ""
+    digest = hashlib.sha256(str(candidate).encode("utf-8")).hexdigest()[:12]
+    destination = output_path / "images" / "content" / f"{digest}-{candidate.name}"
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copy2(candidate, destination)
+    return "/images/content/" + destination.name + ("?" + parsed.query if parsed.query else "")
+
+
+def _resolve_body_images(body: str, item: ContentItem, config, output_path: Path) -> str:
+    """Rewrite local Markdown images before Markdown rendering; leave external URLs intact."""
+    pattern = re.compile(r'(!\[[^\]]*\]\()([^\)]+)(\))')
+    def replace(match: re.Match[str]) -> str:
+        reference = match.group(2)
+        resolved = _publish_image(reference, item, config, output_path)
+        return match.group(1) + (resolved or reference) + match.group(3)
+    return pattern.sub(replace, body)
+
+
+def _card(item: ContentItem, heading_level: int = 2, image: str = "") -> str:
+    """Render an existing section card, optionally with its identifying image."""
     heading_level = 2 if heading_level not in {2, 3} else heading_level
     summary = f"<p>{html.escape(item.summary)}</p>" if item.summary else ""
     date = f'<time datetime="{html.escape(item.date, quote=True)}">{html.escape(item.date)}</time>' if item.date else ""
-    return (
-        '<article class="article-card">'
-        f'<h{heading_level}><a href="{html.escape(item.route, quote=True)}">{html.escape(item.title)}</a></h{heading_level}>'
-        f"{date}{summary}"
-        "</article>"
-    )
+    media = (f'<a class="index-card-media" href="{html.escape(item.route, quote=True)}">'
+             f'<img src="{html.escape(image, quote=True)}" alt="" loading="lazy"></a>') if image else ""
+    return ('<article class="article-card">' + media
+            + f'<h{heading_level}><a href="{html.escape(item.route, quote=True)}">{html.escape(item.title)}</a></h{heading_level}>'
+            + date + summary + '</article>')
+
+
+def _index_row(item: ContentItem, image: str, *, article: bool) -> str:
+    media = (f'<img src="{html.escape(image, quote=True)}" alt="" loading="lazy">') if image else ""
+    date = (f'<time datetime="{html.escape(item.date, quote=True)}">{html.escape(item.date)}</time>'
+            if article and item.date else "")
+    summary = f'<p>{html.escape(item.summary)}</p>' if item.summary else ""
+    return (f'<a class="index-row" href="{html.escape(item.route, quote=True)}">'
+            + (f'<span class="index-row-image">{media}</span>' if media else '')
+            + f'<span class="index-row-content">{date}<strong>{html.escape(item.title)}</strong>{summary}'
+            + '</span><span class="index-row-arrow" aria-hidden="true">›</span></a>')
+
+
+def _render_index(item: ContentItem, items: list[ContentItem], default_language: str,
+                  config, output_path: Path, kind: str = "auto", sort: str = "") -> str:
+    children = _direct_children(item, items, default_language)
+    if not children:
+        return ""
+    kind = kind if kind in {"auto", "cards", "list", "articles"} else "auto"
+    if kind == "auto":
+        kind = "cards" if len(children) <= 4 else "list"
+    if sort == "newest" or (kind == "articles" and sort != "order"):
+        children.sort(key=lambda child: (child.date, child.title.lower()), reverse=True)
+    if kind == "cards":
+        content = '\n'.join(_card(child, 3, _image_for(child, config, output_path)) for child in children)
+        return f'<div class="article-list index-cards">{content}</div>'
+    content = '\n'.join(_index_row(child, _image_for(child, config, output_path), article=(kind == "articles")) for child in children)
+    return f'<div class="index-rows index-{kind}">{content}</div>'
+
+
+_INDEX_BLOCK_RE = re.compile(r'^\s*:::\s+(?:index|td-index)([^\n]*)\n\s*:::\s*$', re.MULTILINE)
+_INDEX_OPTION_RE = re.compile(r'(type|sort)\s*=\s*["\']?([A-Za-z]+)')
+
+
+def _explicit_indexes(body: str, item: ContentItem, items: list[ContentItem],
+                      default_language: str, config, output_path: Path) -> tuple[str, dict[str, str]]:
+    """Replace index blocks with inert markers restored after Markdown rendering."""
+    replacements: dict[str, str] = {}
+    def replace(match: re.Match[str]) -> str:
+        options = dict(_INDEX_OPTION_RE.findall(match.group(1)))
+        marker = f"WCINDEXPLACEHOLDER{len(replacements)}END"
+        replacements[marker] = _render_index(item, items, default_language, config, output_path,
+                                              options.get("type", "auto"), options.get("sort", ""))
+        return "\n\n" + marker + "\n\n"
+    return _INDEX_BLOCK_RE.sub(replace, body), replacements
 
 
 def _direct_children(item: ContentItem, items: list[ContentItem], default_language: str) -> list[ContentItem]:
@@ -311,7 +409,7 @@ def _direct_children(item: ContentItem, items: list[ContentItem], default_langua
     parent_parts = [part for part in parent_route.strip("/").split("/") if part]
     children: list[ContentItem] = []
     for child in items:
-        if child.language != item.language or child.draft or child.logical_id == item.logical_id:
+        if child.language != item.language or child not in items or child.logical_id == item.logical_id:
             continue
         child_route = _base_route_for_item(child, default_language)
         child_parts = [part for part in child_route.strip("/").split("/") if part]
@@ -331,7 +429,7 @@ def _listing_for(item: ContentItem, items: list[ContentItem], default_language: 
     return "\n".join(_card(child) for child in children)
 
 
-def _section_children_for(item: ContentItem, items: list[ContentItem], default_language: str) -> str:
+def _section_children_for(item: ContentItem, items: list[ContentItem], default_language: str, config, output_path: Path) -> str:
     """Render local navigation for static section index pages."""
     if item.template != "page" or item.base_name != "index":
         return ""
@@ -345,11 +443,11 @@ def _section_children_for(item: ContentItem, items: list[ContentItem], default_l
         "EN": "In this section",
     }
     heading = labels.get(item.language, "In this section")
-    cards = "\n".join(_card(child, 3) for child in children)
+    cards = _render_index(item, items, default_language, config, output_path)
     return (
         '<section class="section-children">'
         f'<h2>{html.escape(heading)}</h2>'
-        f'<div class="article-list">{cards}</div>'
+        f"{cards}"
         "</section>"
     )
 
@@ -408,7 +506,7 @@ def _featured_for(
         by_route = {
             _base_route_for_item(candidate, default_language): candidate
             for candidate in items
-            if candidate.language == item.language and not candidate.draft
+            if candidate.language == item.language and candidate in items
         }
         for featured in featured_items:
             target = by_route.get(featured.route)
@@ -421,7 +519,7 @@ def _featured_for(
             for child in items
             if child.language == item.language
             and child.featured
-            and not child.draft
+            and child in items
             and child.logical_id != item.logical_id
         ]
         legacy.sort(key=lambda child: (child.date, child.title.lower()), reverse=True)
@@ -439,10 +537,12 @@ def _featured_for(
     )
 
 
-def generate_site(source: str | Path, output: str | Path, languages: str | Iterable[str] = "ALL") -> GenerationResult:
+def generate_site(source: str | Path, output: str | Path, languages: str | Iterable[str] = "ALL", *, mode: str = "public", rss: bool = False) -> GenerationResult:
     source_path = Path(source).resolve()
     output_path = Path(output).expanduser().resolve()
 
+    if mode not in {"public", "preview"}:
+        return GenerationResult(False, str(output_path), errors=["mode must be public or preview"])
     validation = validate_site(source_path)
     if not validation.success:
         return GenerationResult(False, str(output_path), warnings=validation.warnings, errors=validation.errors)
@@ -451,13 +551,15 @@ def generate_site(source: str | Path, output: str | Path, languages: str | Itera
     navigation = load_navigation(source_path)
     featured_items = load_featured(source_path)
     featured_configured = (source_path / "config" / "featured.cfg").is_file()
-    items = discover_content(config, navigation)
+    all_items = discover_content(config, navigation)
+    items = [item for item in all_items if mode == "preview" or item.status == "published"]
+    skipped_count = len(all_items) - len(items)
     try:
         selected_languages = _normalize_languages(languages, config.supported_languages)
     except ValueError as exc:
         return GenerationResult(False, str(output_path), errors=[str(exc)])
 
-    if output_path == source_path or output_path == Path("/"):
+    if output_path == source_path or output_path == Path("/") or output_path == source_path.parent or source_path.is_relative_to(output_path) or output_path.is_relative_to(source_path):
         return GenerationResult(False, str(output_path), errors=["Refusing to generate into the source root or filesystem root."])
 
     if output_path.exists():
@@ -482,7 +584,7 @@ def generate_site(source: str | Path, output: str | Path, languages: str | Itera
     errors: list[str] = []
 
     for item in items:
-        if item.draft or item.language not in selected_languages:
+        if item.language not in selected_languages:
             continue
         template_path = config.templates_dir / f"{item.template}.html"
         if not template_path.is_file():
@@ -503,9 +605,14 @@ def generate_site(source: str | Path, output: str | Path, languages: str | Itera
             "description": html.escape(config.description),
             "logo": html.escape(config.logo, quote=True),
         }
+        absolute_url = config.base_url.rstrip("/") + item.route
+        description = str(item.metadata.get("description") or item.summary or config.description)
+        hero = _publish_image(str(item.metadata.get("hero_image") or item.metadata.get("index_image") or config.logo), item, config, output_path)
+        absolute_hero = urljoin(config.base_url.rstrip("/") + "/", hero.lstrip("/")) if hero and not hero.startswith(("https:", "http:")) else hero
+        meta_tags = _seo_tags(item, config, absolute_url, description, absolute_hero, mode)
         page_context = {
             "title": html.escape(item.title),
-            "summary": html.escape(item.summary, quote=True),
+            "summary": html.escape(description, quote=True),
             "language": item.language.lower(),
             "type": html.escape(item.template, quote=True),
         }
@@ -524,7 +631,12 @@ def generate_site(source: str | Path, output: str | Path, languages: str | Itera
             {"site": site_context, "current_year": str(datetime.now().year)},
         )
 
-        body_html = render_markdown(item.body)
+        body, index_replacements = _explicit_indexes(item.body, item, items, config.default_language, config, output_path)
+        body = _resolve_body_images(body, item, config, output_path)
+        body_html = render_markdown(body)
+        for marker, rendered_index in index_replacements.items():
+            body_html = body_html.replace(f"<p>{marker}</p>", rendered_index)
+        has_explicit_index = bool(index_replacements)
         inner_context = {
             "site": site_context,
             "page": page_context,
@@ -533,7 +645,7 @@ def generate_site(source: str | Path, output: str | Path, languages: str | Itera
             "article_meta": _article_meta(item),
             "article_footer": "",
             "listing": _listing_for(item, items, config.default_language) if item.template == "listing" else "",
-            "section_children": _section_children_for(item, items, config.default_language),
+            "section_children": "" if has_explicit_index else _section_children_for(item, items, config.default_language, config, output_path),
             "featured_content": (
                 _featured_for(
                     item,
@@ -561,6 +673,7 @@ def generate_site(source: str | Path, output: str | Path, languages: str | Itera
                 "context_header": context_header_html,
                 "content": inner_html,
                 "footer": footer_html,
+                "seo_tags": meta_tags,
             },
         )
         final_html = _make_output_relative_urls(final_html, item.route)
@@ -577,7 +690,94 @@ def generate_site(source: str | Path, output: str | Path, languages: str | Itera
         if item.template == "article":
             article_count += 1
 
-    if errors:
-        return GenerationResult(False, str(output_path), page_count, article_count, validation.warnings, errors)
+    warnings = list(validation.warnings)
+    broken = _check_internal_links(output_path, warnings)
+    sitemap_written = False
+    rss_written = False
+    if not errors and mode == "public":
+        _write_sitemap(output_path, config, items, selected_languages)
+        sitemap_written = True
+        if rss:
+            rss_written = _write_rss(output_path, config, items, selected_languages)
+    return GenerationResult(not errors, str(output_path), page_count, article_count, warnings, errors,
+                            skipped_count, broken, sitemap_written, rss_written)
 
-    return GenerationResult(True, str(output_path), page_count, article_count, validation.warnings, [])
+
+def _seo_tags(item: ContentItem, config, canonical: str, description: str, image: str, mode: str) -> str:
+    """Return escaped metadata; previews are excluded from indexing regardless of URL."""
+    def esc(value: str) -> str:
+        return html.escape(str(value), quote=True)
+    tags = [f'<link rel="canonical" href="{esc(canonical)}">',
+            f'<meta property="og:type" content="{"article" if item.template == "article" else "website"}">',
+            f'<meta property="og:title" content="{esc(item.title)}">',
+            f'<meta property="og:description" content="{esc(description)}">',
+            f'<meta property="og:url" content="{esc(canonical)}">',
+            f'<meta property="og:site_name" content="{esc(config.title)}">',
+            f'<meta name="twitter:card" content="{"summary_large_image" if image else "summary"}">']
+    if image:
+        tags.extend([f'<meta property="og:image" content="{esc(image)}">',
+                     f'<meta name="twitter:image" content="{esc(image)}">'])
+    if mode == "preview" or item.status != "published":
+        tags.append('<meta name="robots" content="noindex,nofollow">')
+    if item.date and item.template == "article":
+        tags.append(f'<meta property="article:published_time" content="{esc(item.date)}">')
+    return "\n    ".join(tags)
+
+
+def _write_sitemap(output: Path, config, items: list[ContentItem], langs: set[str]) -> None:
+    ns = "http://www.sitemaps.org/schemas/sitemap/0.9"
+    ET.register_namespace("", ns)
+    root = ET.Element(f"{{{ns}}}urlset")
+    for item in sorted(items, key=lambda value: value.route):
+        if item.language not in langs or item.status != "published":
+            continue
+        entry = ET.SubElement(root, f"{{{ns}}}url")
+        ET.SubElement(entry, f"{{{ns}}}loc").text = config.base_url.rstrip("/") + item.route
+        if item.date and re.fullmatch(r"\d{4}-\d{2}-\d{2}", item.date):
+            ET.SubElement(entry, f"{{{ns}}}lastmod").text = item.date
+    ET.ElementTree(root).write(output / "sitemap.xml", encoding="utf-8", xml_declaration=True)
+    (output / "robots.txt").write_text("User-agent: *\nAllow: /\nSitemap: " + config.base_url.rstrip("/") + "/sitemap.xml\n", encoding="utf-8")
+
+
+def _write_rss(output: Path, config, items: list[ContentItem], langs: set[str]) -> bool:
+    articles = sorted((i for i in items if i.template == "article" and i.date and i.language in langs and i.status == "published"), key=lambda i: i.date, reverse=True)
+    if not articles:
+        return False
+    rss = ET.Element("rss", version="2.0")
+    channel = ET.SubElement(rss, "channel")
+    for name, value in (("title", config.title), ("link", config.base_url), ("description", config.description)):
+        ET.SubElement(channel, name).text = value
+    for item in articles[:50]:
+        entry = ET.SubElement(channel, "item")
+        url = config.base_url.rstrip("/") + item.route
+        for key, value in (("title", item.title), ("link", url), ("guid", url), ("description", item.summary)):
+            ET.SubElement(entry, key).text = value
+        try:
+            dt = datetime.fromisoformat(item.date).replace(tzinfo=timezone.utc)
+            ET.SubElement(entry, "pubDate").text = format_datetime(dt)
+        except ValueError:
+            pass
+    ET.ElementTree(rss).write(output / "rss.xml", encoding="utf-8", xml_declaration=True)
+    return True
+
+
+def _check_internal_links(output: Path, warnings: list[str]) -> int:
+    """Inspect rendered href/src URLs against the generated output tree."""
+    count = 0
+    regex = re.compile(r'\b(?:href|src)=["\']([^"\']+)["\']', re.IGNORECASE)
+    for page in output.rglob("*.html"):
+        for reference in regex.findall(page.read_text(encoding="utf-8")):
+            reference = html.unescape(reference)
+            parsed = urlsplit(reference)
+            if parsed.scheme or reference.startswith(("//", "#", "mailto:", "tel:", "data:")):
+                continue
+            relative = unquote(parsed.path)
+            if not relative:
+                continue
+            target = (output / relative.lstrip("/")) if relative.startswith("/") else page.parent / relative
+            if target.is_dir():
+                target = target / "index.html"
+            if not target.exists() and not (target / "index.html").exists():
+                warnings.append(f"Broken local link in {page.relative_to(output)}: {reference}")
+                count += 1
+    return count

@@ -407,3 +407,76 @@
         grid-auto-columns: minmax(17rem, 88%);
     }
 }
+
+/* Index components share source images with page heroes and manual tiles. */
+.index-card-media { display: block; margin: -1rem -1rem 1rem; overflow: hidden; aspect-ratio: 16 / 9; }
+.index-card-media img { display: block; width: 100%; height: 100%; object-fit: cover; }
+.index-rows { display: grid; gap: 0; margin: 1.25rem 0 2rem; }
+.index-row { display: flex; align-items: center; gap: 1.15rem; padding: 1rem 0; border-bottom: 1px solid var(--td-border); text-decoration: none; color: inherit; }
+.index-row:hover strong, .index-row:focus-visible strong { text-decoration: underline; }
+.index-row-image { flex: 0 0 7.5rem; aspect-ratio: 4 / 3; overflow: hidden; border-radius: 4px; background: var(--td-surface); }
+.index-row-image img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.index-row-content { min-width: 0; flex: 1; display: grid; gap: .3rem; }
+.index-row-content strong { color: var(--td-blue); font-size: 1.08rem; }
+.index-row-content time { color: var(--td-text-muted); font-size: .82rem; }
+.index-row-content p { margin: 0; color: var(--td-text-muted); display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; }
+.index-row-arrow { color: var(--td-blue); font-size: 1.5rem; }
+/* An image in a manually curated tile requires no extra wrapper or metadata. */
+.td-tile > p > img, .td-imsd-card > p > img { width: 100%; max-height: 11rem; object-fit: cover; display: block; border-radius: 4px; }
+@media (max-width: 520px) { .index-row { gap: .75rem; } .index-row-image { flex-basis: 5.5rem; } }
+
+/*
+ * A horizontal container for reusable tiles, ordinary Markdown images, or both.
+ * The same td-tile markup works in td-grid and td-slider/td-gallery; scrolling
+ * stays native (keyboard, touch and trackpad) with no script dependency.
+ */
+.td-slider {
+    margin: 2rem 0;
+    padding: 0.25rem 0 0.75rem;
+    display: flex;
+    gap: 1rem;
+    overflow-x: auto;
+    overscroll-behavior-inline: contain;
+    scroll-snap-type: x mandatory;
+    scrollbar-width: thin;
+    align-items: stretch;
+}
+
+.td-slider > .td-tile,
+.td-gallery > .td-tile {
+    flex: 0 0 min(78%, 21rem);
+    scroll-snap-align: start;
+    scroll-snap-stop: always;
+    box-sizing: border-box;
+}
+
+.td-slider > p {
+    margin: 0;
+    flex: 0 0 min(78%, 21rem);
+    scroll-snap-align: start;
+    scroll-snap-stop: always;
+}
+
+.td-slider > p > img {
+    display: block;
+    width: 100%;
+    height: auto;
+    border: 1px solid var(--td-border);
+    border-radius: 6px;
+    background: var(--td-surface);
+}
+
+@media (max-width: 720px) {
+    .td-slider > .td-tile,
+    .td-gallery > .td-tile,
+    .td-slider > p {
+        flex-basis: min(88%, 19rem);
+    }
+}
+
+/* A live component demo and its single-source Markdown reference. */
+.td-example { margin: 1.5rem 0 2rem; }
+.td-example-source { margin-top: .8rem; border: 1px solid var(--td-border, #ccc); border-radius: 6px; overflow: hidden; }
+.td-example-source > summary { cursor: pointer; padding: .7rem 1rem; font-weight: 600; }
+.td-example-source > summary:hover { background: var(--td-surface, #f5f5f5); }
+.td-example-source > pre { margin: 0; padding: 1rem; overflow-x: auto; border-top: 1px solid var(--td-border, #ccc); }

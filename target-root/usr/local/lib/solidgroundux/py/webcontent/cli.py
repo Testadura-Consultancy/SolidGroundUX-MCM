@@ -49,6 +49,8 @@ def _parser() -> argparse.ArgumentParser:
     generate.add_argument("--source", required=True)
     generate.add_argument("--output", required=True)
     generate.add_argument("--language", default="ALL")
+    generate.add_argument("--mode", choices=["public", "preview"], default="public")
+    generate.add_argument("--rss", action="store_true", help="Generate an RSS feed for dated articles (public only).")
     generate.add_argument("--result-file")
 
     social = subparsers.add_parser("prepare-social", help="Prepare platform-specific social-media drafts.")
@@ -100,7 +102,7 @@ def main(argv: list[str] | None = None) -> int:
         if args.command == "validate":
             result = validate_site(args.source)
         elif args.command == "generate":
-            result = generate_site(args.source, args.output, args.language)
+            result = generate_site(args.source, args.output, args.language, mode=args.mode, rss=args.rss)
         elif args.command == "prepare-social":
             result = prepare_social(args.source, args.output, args.platform, args.language)
         elif args.command == "inspect-ingest":

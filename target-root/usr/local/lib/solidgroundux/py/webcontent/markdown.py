@@ -165,13 +165,28 @@ def _render_lines(
         if stripped.startswith(":::"):
             classes = " ".join(_CLASS_NAME_RE.findall(stripped[3:].strip()))
             index += 1
-            inner, index, _closed = _render_lines(
+            body_start = index
+            inner, index, closed = _render_lines(
                 lines,
                 index,
                 stop_at_component_end=True,
             )
             class_attr = f' class="{html.escape(classes, quote=True)}"' if classes else ""
-            output.append(f"<div{class_attr}>\n{inner}\n</div>")
+            if "td-example" in classes.split():
+                # The displayed Markdown is extracted from the actual example
+                # body, so examples cannot drift away from their source.
+                source_end = index - 1 if closed else index
+                source = "\n".join(lines[body_start:source_end]).strip("\n")
+                escaped_source = html.escape(source, quote=False)
+                output.append(
+                    f'<div{class_attr}>\n{inner}\n'
+                    '<details class="td-example-source">'
+                    '<summary>Bekijk Markdown</summary>'
+                    f'<pre><code class="language-markdown">{escaped_source}</code></pre>'
+                    '</details></div>'
+                )
+            else:
+                output.append(f"<div{class_attr}>\n{inner}\n</div>")
             continue
 
         heading = re.match(r"^(#{2,3})\s+(.+)$", stripped)

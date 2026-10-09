@@ -69,7 +69,7 @@ class ContentItem:
 
     @property
     def date(self) -> str:
-        return str(self.metadata.get("date", ""))
+        return str(self.metadata.get("published") or self.metadata.get("date") or "")
 
     @property
     def tags(self) -> list[str]:
@@ -82,7 +82,12 @@ class ContentItem:
 
     @property
     def draft(self) -> bool:
-        return bool(self.metadata.get("draft", False))
+        return self.status == "draft"
+
+    @property
+    def status(self) -> str:
+        value = str(self.metadata.get("status", "")).strip().lower()
+        return value if value in {"draft", "preview", "published"} else ("draft" if self.metadata.get("draft", False) else "published")
 
     @property
     def featured(self) -> bool:
