@@ -54,6 +54,7 @@ set -uo pipefail
     SGND_MODULE_NAME="$SGND_WEB_CONTENT_MODULE_NAME"
 
 # - Management dispatch -------------------------------------------------------------
+    # fn: _web_content_run_manage - Invoke the standalone Web Content Management script for a selected action.
     _web_content_run_manage() {
         local action="${1:?missing action}"
         _sgnd_run_module_script "manage-web-content.sh" --action "$action"
@@ -92,14 +93,25 @@ set -uo pipefail
         return "$rc"
     }
 
+    # fn: web_content_ingest - Run the ingest action through Web Content Management.
     web_content_ingest()          { _web_content_run_mutating_manage ingest; }
+    # fn: web_content_delete - Run the delete action through Web Content Management.
     web_content_delete()          { _web_content_run_mutating_manage delete; }
+    # fn: web_content_edit_metadata - Run the edit metadata action through Web Content Management.
+    web_content_edit_metadata()   { _web_content_run_mutating_manage edit-metadata; }
+    # fn: web_content_move_page - Run the move page action through Web Content Management.
+    web_content_move_page()       { _web_content_run_mutating_manage move-page; }
+    # fn: web_content_generate - Run the generate action through Web Content Management.
     web_content_generate()        { _web_content_run_manage generate; }
+    # fn: web_content_validate - Run the validate action through Web Content Management.
     web_content_validate()        { _web_content_run_manage validate; }
+    # fn: web_content_prepare_social - Run the prepare social action through Web Content Management.
     web_content_prepare_social()  { _web_content_run_manage prepare-social; }
+    # fn: web_content_status - Run the status action through Web Content Management.
     web_content_status()          { _web_content_run_manage status; }
 
 # - Module validation contract ------------------------------------------------------
+    # fn: validate_module_web_content_management - Check Web Content Management prerequisites and availability.
     validate_module_web_content_management() {
         local python_root=""
         if ! command -v python3 >/dev/null 2>&1; then
@@ -127,6 +139,8 @@ set -uo pipefail
         0 1 550
 
     sgnd_menu_register_item "web-content-ingest" "$SGND_WEB_CONTENT_MODULE_ID" "Ingest Markdown" "web_content_ingest" "Import one or more Markdown files, reuse remembered metadata defaults, and archive processed originals" 0 15 1
+    sgnd_menu_register_item "web-content-metadata" "$SGND_WEB_CONTENT_MODULE_ID" "Edit page metadata" "web_content_edit_metadata" "Browse pages and update a front matter field without changing the Markdown body" 0 0 1
+    sgnd_menu_register_item "web-content-move" "$SGND_WEB_CONTENT_MODULE_ID" "Move / rename page" "web_content_move_page" "Move one page to another existing section or change its URL slug" 0 0 1
     sgnd_menu_register_item "web-content-delete" "$SGND_WEB_CONTENT_MODULE_ID" "Delete page" "web_content_delete" "Remove one or more child pages or sections from active content and archive them for recovery" 0 0 1
     sgnd_menu_register_item "web-content-generate" "$SGND_WEB_CONTENT_MODULE_ID" "Generate website" "web_content_generate" "Generate a static website from Markdown, templates, CSS, and assets" 0 15 1
     sgnd_menu_register_item "web-content-validate" "$SGND_WEB_CONTENT_MODULE_ID" "Validate website source" "web_content_validate" "Validate configuration, content metadata, templates, and CSS content styles" 0 15 1

@@ -19,6 +19,14 @@ _CLASS_NAME_RE = re.compile(r"\.?([A-Za-z_][A-Za-z0-9_-]*)")
 
 
 def referenced_style_classes(markdown_text: str, prefix: str) -> set[str]:
+    """Handle referenced style classes for the web content workflow.
+    
+    Args:
+        markdown_text: Input used by this operation.
+        prefix: Input used by this operation.
+    
+    Returns:
+        Operation result or None, as defined by the implementation."""
     classes = {name for name in _STYLE_CLASS_RE.findall(markdown_text) if name.startswith(prefix)}
     for block_spec in _BLOCK_CLASS_RE.findall(markdown_text):
         classes.update(
@@ -29,6 +37,7 @@ def referenced_style_classes(markdown_text: str, prefix: str) -> set[str]:
 
 
 def _safe_url(value: str) -> str:
+    """Handle safe url for the web content workflow."""
     value = value.strip()
     parsed = urlparse(value)
     if parsed.scheme.lower() in {"javascript", "data"}:
@@ -37,15 +46,30 @@ def _safe_url(value: str) -> str:
 
 
 def _render_inline(text: str) -> str:
+    """Render inline Markdown constructs into HTML while escaping content."""
     escaped = html.escape(text, quote=False)
     tokens: dict[str, str] = {}
 
     def stash(fragment: str) -> str:
+        """Handle stash for the web content workflow.
+        
+        Args:
+            fragment: Input used by this operation.
+        
+        Returns:
+            Operation result or None, as defined by the implementation."""
         key = f"\x00WC{len(tokens)}\x00"
         tokens[key] = fragment
         return key
 
     def code_repl(match: re.Match[str]) -> str:
+        """Handle code repl for the web content workflow.
+        
+        Args:
+            match: Input used by this operation.
+        
+        Returns:
+            Operation result or None, as defined by the implementation."""
         return stash(f"<code>{html.escape(match.group(1), quote=False)}</code>")
 
     escaped = re.sub(r"`([^`]+)`", code_repl, escaped)
@@ -53,6 +77,13 @@ def _render_inline(text: str) -> str:
     image_pattern = re.compile(r"!\[([^\]]*)\]\(([^)]+)\)(?:\{([^}]+)\})?")
 
     def image_repl(match: re.Match[str]) -> str:
+        """Handle image repl for the web content workflow.
+        
+        Args:
+            match: Input used by this operation.
+        
+        Returns:
+            Operation result or None, as defined by the implementation."""
         alt = match.group(1)
         src = html.escape(_safe_url(html.unescape(match.group(2))), quote=True)
         classes = " ".join(_STYLE_CLASS_RE.findall(match.group(3) or ""))
@@ -61,18 +92,34 @@ def _render_inline(text: str) -> str:
 
     escaped = image_pattern.sub(image_repl, escaped)
 
-    link_pattern = re.compile(r"\[([^\]]+)\]\(([^)]+)\)")
+    # Optional {download} suffix forces a local link to download as a file.
+    link_pattern = re.compile(r"\[([^\]]+)\]\(([^)]+)\)(?:\{(download)\})?")
 
     def link_repl(match: re.Match[str]) -> str:
+        """Handle link repl for the web content workflow.
+        
+        Args:
+            match: Input used by this operation.
+        
+        Returns:
+            Operation result or None, as defined by the implementation."""
         label = match.group(1)
         href = html.escape(_safe_url(html.unescape(match.group(2))), quote=True)
-        return stash(f'<a href="{href}">{label}</a>')
+        download_attr = " download" if match.group(3) and href != "#" else ""
+        return stash(f'<a href="{href}"{download_attr}>{label}</a>')
 
     escaped = link_pattern.sub(link_repl, escaped)
 
     style_pattern = re.compile(r"\[([^\]]+)\]\{([^}]+)\}")
 
     def style_repl(match: re.Match[str]) -> str:
+        """Handle style repl for the web content workflow.
+        
+        Args:
+            match: Input used by this operation.
+        
+        Returns:
+            Operation result or None, as defined by the implementation."""
         label = match.group(1)
         classes = " ".join(_STYLE_CLASS_RE.findall(match.group(2)))
         if not classes:
@@ -90,15 +137,18 @@ def _render_inline(text: str) -> str:
 
 
 def _is_table_separator(line: str) -> bool:
+    """Handle is table separator for the web content workflow."""
     cells = [cell.strip() for cell in line.strip().strip("|").split("|")]
     return bool(cells) and all(re.fullmatch(r":?-{3,}:?", cell) for cell in cells)
 
 
 def _table_cells(line: str) -> list[str]:
+    """Handle table cells for the web content workflow."""
     return [cell.strip() for cell in line.strip().strip("|").split("|")]
 
 
 def _starts_block(lines: list[str], index: int) -> bool:
+    """Handle starts block for the web content workflow."""
     line = lines[index]
     stripped = line.strip()
     if not stripped:

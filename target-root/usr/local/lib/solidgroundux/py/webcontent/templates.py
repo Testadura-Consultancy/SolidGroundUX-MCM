@@ -31,6 +31,13 @@ def load_template(path: Path, templates_root: Path | None = None, _stack: tuple[
     stack = (*_stack, path)
 
     def replace_include(match: re.Match[str]) -> str:
+        """Handle replace include for the web content workflow.
+        
+        Args:
+            match: Input used by this operation.
+        
+        Returns:
+            Operation result or None, as defined by the implementation."""
         include_name = match.group(1).strip()
         include_path = (root / include_name).resolve()
         try:
@@ -43,6 +50,7 @@ def load_template(path: Path, templates_root: Path | None = None, _stack: tuple[
 
 
 def _resolve(context: dict[str, Any], key: str) -> str:
+    """Handle resolve for the web content workflow."""
     value: Any = context
     for part in key.split("."):
         if not isinstance(value, dict) or part not in value:
@@ -54,8 +62,23 @@ def _resolve(context: dict[str, Any], key: str) -> str:
 
 
 def render_template(template: str, context: dict[str, Any]) -> str:
+    """Render a website HTML template with supplied substitutions.
+    
+    Args:
+        template: Input used by this operation.
+        context: Input used by this operation.
+    
+    Returns:
+        Operation result or None, as defined by the implementation."""
     return _PLACEHOLDER_RE.sub(lambda match: _resolve(context, match.group(1)), template)
 
 
 def unresolved_placeholders(text: str) -> list[str]:
+    """Handle unresolved placeholders for the web content workflow.
+    
+    Args:
+        text: Input used by this operation.
+    
+    Returns:
+        Operation result or None, as defined by the implementation."""
     return sorted(set(_PLACEHOLDER_RE.findall(text)))

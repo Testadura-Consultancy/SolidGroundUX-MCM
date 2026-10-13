@@ -14,6 +14,7 @@ _CONTENT_FILE_RE = re.compile(r"^(?P<name>.+)_(?P<language>[A-Za-z]{2})\.md$")
 
 @dataclass(slots=True)
 class SiteConfig:
+    """Resolved website source paths and site configuration settings."""
     root: Path
     title: str
     description: str
@@ -31,6 +32,7 @@ class SiteConfig:
 
 @dataclass(slots=True)
 class NavigationItem:
+    """One configured navigation entry and its display information."""
     key: str
     order: int
     path: str
@@ -50,6 +52,7 @@ class FeaturedItem:
 
 @dataclass(slots=True)
 class ContentItem:
+    """Discovered Markdown page with route, language, and metadata."""
     source_path: Path
     logical_id: str
     base_name: str
@@ -61,18 +64,34 @@ class ContentItem:
 
     @property
     def title(self) -> str:
+        """Handle title for the web content workflow.
+        
+        Returns:
+            Operation result or None, as defined by the implementation."""
         return str(self.metadata.get("title", self.base_name))
 
     @property
     def summary(self) -> str:
+        """Handle summary for the web content workflow.
+        
+        Returns:
+            Operation result or None, as defined by the implementation."""
         return str(self.metadata.get("summary", ""))
 
     @property
     def date(self) -> str:
+        """Handle date for the web content workflow.
+        
+        Returns:
+            Operation result or None, as defined by the implementation."""
         return str(self.metadata.get("published") or self.metadata.get("date") or "")
 
     @property
     def tags(self) -> list[str]:
+        """Handle tags for the web content workflow.
+        
+        Returns:
+            Operation result or None, as defined by the implementation."""
         value = self.metadata.get("tags", [])
         if isinstance(value, list):
             return [str(v) for v in value]
@@ -82,15 +101,27 @@ class ContentItem:
 
     @property
     def draft(self) -> bool:
+        """Handle draft for the web content workflow.
+        
+        Returns:
+            Operation result or None, as defined by the implementation."""
         return self.status == "draft"
 
     @property
     def status(self) -> str:
+        """Handle status for the web content workflow.
+        
+        Returns:
+            Operation result or None, as defined by the implementation."""
         value = str(self.metadata.get("status", "")).strip().lower()
         return value if value in {"draft", "preview", "published"} else ("draft" if self.metadata.get("draft", False) else "published")
 
     @property
     def featured(self) -> bool:
+        """Handle featured for the web content workflow.
+        
+        Returns:
+            Operation result or None, as defined by the implementation."""
         return bool(self.metadata.get("featured", False))
 
     @property
@@ -104,6 +135,7 @@ class ContentItem:
 
 
 def _parse_scalar(value: str) -> Any:
+    """Handle parse scalar for the web content workflow."""
     value = value.strip()
     if len(value) >= 2 and value[0] == value[-1] and value[0] in {"'", '"'}:
         return value[1:-1]
@@ -123,10 +155,12 @@ def _parse_scalar(value: str) -> Any:
 
 
 def _indent_of(line: str) -> int:
+    """Handle indent of for the web content workflow."""
     return len(line) - len(line.lstrip(" "))
 
 
 def _parse_mapping(lines: list[str], start: int = 0, indent: int = 0) -> tuple[dict[str, Any], int]:
+    """Handle parse mapping for the web content workflow."""
     result: dict[str, Any] = {}
     index = start
 
@@ -210,6 +244,13 @@ def _parse_mapping(lines: list[str], start: int = 0, indent: int = 0) -> tuple[d
 
 
 def parse_front_matter(text: str) -> tuple[dict[str, Any], str]:
+    """Parse a Markdown document into front-matter metadata and body.
+    
+    Args:
+        text: Input used by this operation.
+    
+    Returns:
+        Operation result or None, as defined by the implementation."""
     normalized = text.replace("\r\n", "\n").replace("\r", "\n")
     lines = normalized.split("\n")
     if not lines or lines[0].strip() != "---":
@@ -229,6 +270,13 @@ def parse_front_matter(text: str) -> tuple[dict[str, Any], str]:
 
 
 def load_site_config(root: Path) -> SiteConfig:
+    """Read and resolve website configuration from a source repository.
+    
+    Args:
+        root: Input used by this operation.
+    
+    Returns:
+        Operation result or None, as defined by the implementation."""
     root = root.resolve()
     cfg_path = root / "config" / "site.cfg"
     if not cfg_path.is_file():
@@ -269,6 +317,13 @@ def load_site_config(root: Path) -> SiteConfig:
 
 
 def load_navigation(root: Path) -> list[NavigationItem]:
+    """Read the declared navigation structure for the website.
+    
+    Args:
+        root: Input used by this operation.
+    
+    Returns:
+        Operation result or None, as defined by the implementation."""
     cfg_path = root.resolve() / "config" / "navigation.cfg"
     if not cfg_path.is_file():
         return []
@@ -340,6 +395,7 @@ def load_featured(root: Path) -> list[FeaturedItem]:
 
 
 def _base_route(relative_path: Path, base_name: str) -> str:
+    """Handle base route for the web content workflow."""
     parent = relative_path.parent.as_posix()
     if parent == ".":
         parent = ""
@@ -353,6 +409,15 @@ def _base_route(relative_path: Path, base_name: str) -> str:
 
 
 def language_route(base_route: str, language: str, default_language: str) -> str:
+    """Handle language route for the web content workflow.
+    
+    Args:
+        base_route: Input used by this operation.
+        language: Input used by this operation.
+        default_language: Input used by this operation.
+    
+    Returns:
+        Operation result or None, as defined by the implementation."""
     if language.upper() == default_language.upper():
         return base_route
     if base_route == "/":
@@ -373,6 +438,14 @@ def _owning_navigation_item(base_route: str, navigation: list[NavigationItem]) -
 
 
 def discover_content(config: SiteConfig, navigation: list[NavigationItem]) -> list[ContentItem]:
+    """Discover content pages and resolve their routes and languages.
+    
+    Args:
+        config: Input used by this operation.
+        navigation: Input used by this operation.
+    
+    Returns:
+        Operation result or None, as defined by the implementation."""
     if not config.content_dir.is_dir():
         raise ValueError(f"Content directory not found: {config.content_dir}")
 

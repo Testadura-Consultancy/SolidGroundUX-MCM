@@ -8,6 +8,7 @@ from pathlib import Path
 import sys
 
 from .deletion import delete_content, inspect_delete
+from .management import list_pages, edit_metadata, move_page
 from .generator import generate_site
 from .ingestion import ingest_content, inspect_ingest
 from .social import prepare_social
@@ -15,6 +16,7 @@ from .validation import validate_site
 
 
 def _write_result(payload: dict[str, object], result_file: str | None) -> None:
+    """Write result to generated output."""
     encoded = json.dumps(payload, ensure_ascii=False, indent=2)
     if result_file:
         path = Path(result_file).expanduser()
@@ -38,6 +40,7 @@ def _add_ingest_fields(parser: argparse.ArgumentParser) -> None:
 
 
 def _parser() -> argparse.ArgumentParser:
+    """Handle parser for the web content workflow."""
     parser = argparse.ArgumentParser(prog="sgnd-webcontent", description="Generate, validate, ingest, and delete static web content repositories.")
     subparsers = parser.add_subparsers(dest="command", required=True)
 
@@ -57,7 +60,8 @@ def _parser() -> argparse.ArgumentParser:
     social.add_argument("--source", required=True)
     social.add_argument("--output", required=True)
     social.add_argument("--platform", default="linkedin")
-    social.add_argument("--language", default="ALL")
+    social.add_argument("--content-file", required=True)
+    social.add_argument("--excerpt-length", type=int, default=150)
     social.add_argument("--result-file")
 
     inspect = subparsers.add_parser("inspect-ingest", help="Inspect one loose Markdown file and return ingest defaults/options.")
@@ -93,18 +97,52 @@ def _parser() -> argparse.ArgumentParser:
         delete_parser.add_argument("--all-languages", action="store_true")
         delete_parser.add_argument("--result-file")
 
+    pages = subparsers.add_parser("list-pages", help="Browse canonical pages and their metadata.")
+    pages.add_argument("--source", required=True)
+    pages.add_argument("--result-file")
+    edit = subparsers.add_parser("edit-metadata", help="Change one front matter value without touching the body.")
+    edit.add_argument("--source", required=True)
+    edit.add_argument("--content-file", required=True)
+    edit.add_argument("--key", required=True)
+    edit.add_argument("--value", required=True)
+    edit.add_argument("--result-file")
+    move = subparsers.add_parser("move-page", help="Move or rename one article or page.")
+    move.add_argument("--source", required=True)
+    move.add_argument("--content-file", required=True)
+    move.add_argument("--parent", required=True)
+    move.add_argument("--slug", required=True)
+    move.add_argument("--result-file")
     return parser
 
 
 def main(argv: list[str] | None = None) -> int:
+    """Parse command-line arguments and dispatch the requested command.
+    
+    Args:
+        argv: Input used by this operation.
+    
+    Returns:
+        Operation result or None, as defined by the implementation."""
     args = _parser().parse_args(argv)
     try:
+        if args.command == "list-pages":
+            payload = list_pages(args.source)
+            _write_result(payload, args.result_file)
+            return 0
+        if args.command == "edit-metadata":
+            payload = edit_metadata(args.source, args.content_file, args.key, args.value)
+            _write_result(payload, args.result_file)
+            return 0
+        if args.command == "move-page":
+            payload = move_page(args.source, args.content_file, args.parent, args.slug)
+            _write_result(payload, args.result_file)
+            return 0
         if args.command == "validate":
             result = validate_site(args.source)
         elif args.command == "generate":
             result = generate_site(args.source, args.output, args.language, mode=args.mode, rss=args.rss)
         elif args.command == "prepare-social":
-            result = prepare_social(args.source, args.output, args.platform, args.language)
+            result = prepare_social(args.source, args.output, args.platform, args.content_file, args.excerpt_length)
         elif args.command == "inspect-ingest":
             result = inspect_ingest(args.source, args.input_file, args.language)
         elif args.command == "inspect-delete":

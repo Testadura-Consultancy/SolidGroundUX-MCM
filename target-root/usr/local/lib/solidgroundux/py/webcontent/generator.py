@@ -33,6 +33,7 @@ from .validation import validate_site
 
 @dataclass(slots=True)
 class GenerationResult:
+    """Outcome and diagnostics from a website generation run."""
     success: bool
     output: str
     pages_generated: int = 0
@@ -45,6 +46,10 @@ class GenerationResult:
     rss_generated: bool = False
 
     def as_dict(self) -> dict[str, object]:
+        """Serialize the result to a JSON-compatible mapping.
+        
+        Returns:
+            Operation result or None, as defined by the implementation."""
         return {
             "success": self.success,
             "output": self.output,
@@ -60,6 +65,7 @@ class GenerationResult:
 
 
 def _normalize_languages(value: str | Iterable[str], supported: list[str]) -> set[str]:
+    """Normalize languages to a canonical representation."""
     if isinstance(value, str):
         if value.upper() == "ALL":
             return set(supported)
@@ -74,6 +80,7 @@ def _normalize_languages(value: str | Iterable[str], supported: list[str]) -> se
 
 
 def _route_to_output(output_root: Path, route: str) -> Path:
+    """Handle route to output for the web content workflow."""
     clean = route.strip("/")
     if not clean:
         return output_root / "index.html"
@@ -99,6 +106,13 @@ def _make_output_relative_urls(document: str, route: str) -> str:
     root_prefix = "../" * depth
 
     def replace(match: re.Match[str]) -> str:
+        """Handle replace for the web content workflow.
+        
+        Args:
+            match: Input used by this operation.
+        
+        Returns:
+            Operation result or None, as defined by the implementation."""
         target = match.group("url")
         if target == "/":
             relative = root_prefix or "./"
@@ -110,6 +124,7 @@ def _make_output_relative_urls(document: str, route: str) -> str:
 
 
 def _base_route_for_item(item: ContentItem, default_language: str) -> str:
+    """Handle base route for item for the web content workflow."""
     route = item.route
     if item.language == default_language:
         return route
@@ -153,6 +168,7 @@ def _render_navigation(
 
 
 def _render_external_links(links: dict[str, str]) -> str:
+    """Render external links for website output."""
     result: list[str] = []
     labels = {"linkedin": "LinkedIn", "github": "GitHub"}
     for key, url in links.items():
@@ -209,9 +225,9 @@ def _render_breadcrumb(items: list[ContentItem], item: ContentItem, default_lang
 
 
 def _context_header(
-    breadcrumb_html: str, page_title: str, page_type: str, language_selector_html: str
+    breadcrumb_html: str, page_title: str, page_type: str
 ) -> str:
-    """Render the compact page title bar, ancestors, and available languages."""
+    """Render page context; language navigation lives in the persistent sidebar."""
     width_class = " context-header-inner-narrow" if page_type in {"page", "article"} else ""
     return (
         '<header class="context-header" id="contextHeader">'
@@ -220,7 +236,6 @@ def _context_header(
         + breadcrumb_html
         + f'<h1 class="context-title">{html.escape(page_title)}</h1>'
         + "</div>"
-        + language_selector_html
         + "</div></header>"
     )
 
@@ -283,6 +298,7 @@ def _render_language_selector(
 
 
 def _article_meta(item: ContentItem) -> str:
+    """Handle article meta for the web content workflow."""
     parts: list[str] = []
     if item.date:
         parts.append(f'<time datetime="{html.escape(item.date, quote=True)}">{html.escape(item.date)}</time>')
@@ -294,6 +310,7 @@ def _article_meta(item: ContentItem) -> str:
 
 
 def _summary_fragment(item: ContentItem) -> str:
+    """Handle summary fragment for the web content workflow."""
     if not item.summary:
         return ""
     return f'<p class="page-summary">{html.escape(item.summary)}</p>'
@@ -332,6 +349,13 @@ def _resolve_body_images(body: str, item: ContentItem, config, output_path: Path
     """Rewrite local Markdown images before Markdown rendering; leave external URLs intact."""
     pattern = re.compile(r'(!\[[^\]]*\]\()([^\)]+)(\))')
     def replace(match: re.Match[str]) -> str:
+        """Handle replace for the web content workflow.
+        
+        Args:
+            match: Input used by this operation.
+        
+        Returns:
+            Operation result or None, as defined by the implementation."""
         reference = match.group(2)
         resolved = _publish_image(reference, item, config, output_path)
         return match.group(1) + (resolved or reference) + match.group(3)
@@ -351,6 +375,7 @@ def _card(item: ContentItem, heading_level: int = 2, image: str = "") -> str:
 
 
 def _index_row(item: ContentItem, image: str, *, article: bool) -> str:
+    """Handle index row for the web content workflow."""
     media = (f'<img src="{html.escape(image, quote=True)}" alt="" loading="lazy">') if image else ""
     date = (f'<time datetime="{html.escape(item.date, quote=True)}">{html.escape(item.date)}</time>'
             if article and item.date else "")
@@ -363,6 +388,7 @@ def _index_row(item: ContentItem, image: str, *, article: bool) -> str:
 
 def _render_index(item: ContentItem, items: list[ContentItem], default_language: str,
                   config, output_path: Path, kind: str = "auto", sort: str = "") -> str:
+    """Render index for website output."""
     children = _direct_children(item, items, default_language)
     if not children:
         return ""
@@ -387,6 +413,13 @@ def _explicit_indexes(body: str, item: ContentItem, items: list[ContentItem],
     """Replace index blocks with inert markers restored after Markdown rendering."""
     replacements: dict[str, str] = {}
     def replace(match: re.Match[str]) -> str:
+        """Handle replace for the web content workflow.
+        
+        Args:
+            match: Input used by this operation.
+        
+        Returns:
+            Operation result or None, as defined by the implementation."""
         options = dict(_INDEX_OPTION_RE.findall(match.group(1)))
         marker = f"WCINDEXPLACEHOLDER{len(replacements)}END"
         replacements[marker] = _render_index(item, items, default_language, config, output_path,
@@ -424,6 +457,7 @@ def _direct_children(item: ContentItem, items: list[ContentItem], default_langua
 
 
 def _listing_for(item: ContentItem, items: list[ContentItem], default_language: str) -> str:
+    """Handle listing for for the web content workflow."""
     children = _direct_children(item, items, default_language)
     children.sort(key=lambda child: (child.date, child.title.lower()), reverse=True)
     return "\n".join(_card(child) for child in children)
@@ -454,6 +488,16 @@ def _section_children_for(item: ContentItem, items: list[ContentItem], default_l
 
 def _featured_card(item: ContentItem, image: str = "") -> str:
     """Render one curated Featured tile using target-page metadata."""
+    # Explicit curated image wins; otherwise use article metadata or a section default.
+    if not image:
+        image = str(item.metadata.get("featured_image") or item.metadata.get("image") or item.metadata.get("index_image") or "")
+    if not image:
+        if item.route.startswith("/tales/"):
+            image = "/images/trenchtales-default.jpg"
+        elif item.route.startswith("/overpeinzingen/"):
+            image = "/images/overpeinzingen-default.png"
+        elif item.route.startswith("/sages/"):
+            image = "/images/sageslegendes-default.png"
     image_html = ""
     if image:
         image_html = (
@@ -492,6 +536,7 @@ def _featured_for(
     featured_items: list[FeaturedItem],
     default_language: str,
     configured: bool,
+    autoplay_interval: int = 0,
 ) -> str:
     """Render the home-page Featured slider.
 
@@ -523,21 +568,91 @@ def _featured_for(
             and child.logical_id != item.logical_id
         ]
         legacy.sort(key=lambda child: (child.date, child.title.lower()), reverse=True)
-        cards.extend(_featured_card(child) for child in legacy[:3])
+        cards.extend(_featured_card(child) for child in legacy)
 
     if not cards:
         return ""
 
+    heading = "Uitgelicht" if item.language == "NL" else "Featured"
+    interval = max(0, autoplay_interval)
     return (
-        '<section class="featured-content" aria-labelledby="featured-title">'
-        '<h2 id="featured-title">Featured</h2>'
+        f'<section class="featured-content" aria-labelledby="featured-title" data-autoplay-interval="{interval}">'
+        '<div class="featured-heading">'
+        f'<h2 id="featured-title">{heading}</h2>'
+        '<div class="featured-controls">'
+        '<button type="button" class="featured-prev" aria-label="Previous featured items">‹</button>'
+        '<button type="button" class="featured-next" aria-label="Next featured items">›</button>'
+        '</div></div>'
         '<div class="featured-slider" role="list" aria-label="Featured content">'
         + "\n".join(cards)
         + "</div></section>"
+        + r'''<script>(function(){
+          const section=document.currentScript.previousElementSibling;
+          const slider=section.querySelector('.featured-slider');
+          const cards=Array.from(slider.querySelectorAll('.featured-card'));
+          const prev=section.querySelector('.featured-prev');
+          const next=section.querySelector('.featured-next');
+          const interval=Number(section.dataset.autoplayInterval)||0;
+          const reduced=window.matchMedia('(prefers-reduced-motion: reduce)');
+          let timer=null;
+          let hovering=false;
+          let focusWithin=false;
+          function step(direction){
+            if(!cards.length)return;
+            const positions=cards.map(card=>card.offsetLeft-cards[0].offsetLeft);
+            const position=slider.scrollLeft;
+            const maxScroll=Math.max(0,slider.scrollWidth-slider.clientWidth);
+            const tolerance=3;
+            let target;
+            // The viewport reaches its end before the last card's offset can
+            // reach the left edge when several cards are visible at once.
+            // Wrap at the actual scroll boundary instead of the final offset.
+            if(direction>0 && position>=maxScroll-tolerance){
+              target=0;
+            }else if(direction<0 && position<=tolerance){
+              target=maxScroll;
+            }else if(direction>0){
+              const index=positions.findIndex(x=>x>position+tolerance);
+              target=index<0?0:Math.min(positions[index],maxScroll);
+            }else{
+              let index=-1;
+              for(let i=positions.length-1;i>=0;i--){
+                if(positions[i]<position-tolerance){index=i;break;}
+              }
+              target=index<0?maxScroll:positions[index];
+            }
+            slider.scrollTo({left:target,behavior:reduced.matches?'instant':'smooth'});
+          }
+          function stop(){if(timer!==null){window.clearInterval(timer);timer=null;}}
+          function allowed(){return interval>0&&cards.length>1&&!reduced.matches&&!document.hidden&&!hovering&&!focusWithin;}
+          function start(){stop();if(allowed())timer=window.setInterval(()=>step(1),interval);}
+          function manual(direction){step(direction);start();}
+          prev.addEventListener('click',()=>manual(-1));
+          next.addEventListener('click',()=>manual(1));
+          section.addEventListener('mouseenter',()=>{hovering=true;stop();});
+          section.addEventListener('mouseleave',()=>{hovering=false;start();});
+          section.addEventListener('focusin',()=>{focusWithin=true;stop();});
+          section.addEventListener('focusout',event=>{if(!section.contains(event.relatedTarget)){focusWithin=false;start();}});
+          document.addEventListener('visibilitychange',start);
+          if(reduced.addEventListener)reduced.addEventListener('change',start);
+          else if(reduced.addListener)reduced.addListener(start);
+          start();
+        })();</script>''' 
     )
 
 
 def generate_site(source: str | Path, output: str | Path, languages: str | Iterable[str] = "ALL", *, mode: str = "public", rss: bool = False) -> GenerationResult:
+    """Generate static pages, assets, navigation, and discovery files.
+    
+    Args:
+        source: Input used by this operation.
+        output: Input used by this operation.
+        languages: Input used by this operation.
+        mode: Input used by this operation.
+        rss: Input used by this operation.
+    
+    Returns:
+        Operation result or None, as defined by the implementation."""
     source_path = Path(source).resolve()
     output_path = Path(output).expanduser().resolve()
 
@@ -551,6 +666,21 @@ def generate_site(source: str | Path, output: str | Path, languages: str | Itera
     navigation = load_navigation(source_path)
     featured_items = load_featured(source_path)
     featured_configured = (source_path / "config" / "featured.cfg").is_file()
+    # Presentation settings belong to the slider, not to individual articles.
+    slider_config = source_path / "config" / "featured-slider.cfg"
+    featured_autoplay_interval = 0
+    if slider_config.is_file():
+        for line in slider_config.read_text(encoding="utf-8").splitlines():
+            line = line.strip()
+            if not line or line.startswith("#"):
+                continue
+            key, separator, value = line.partition("=")
+            if separator and key.strip() == "autoplay_interval":
+                try:
+                    featured_autoplay_interval = max(0, int(value.strip()))
+                except ValueError:
+                    return GenerationResult(False, str(output_path), errors=["Invalid autoplay_interval in config/featured-slider.cfg (expected milliseconds as a non-negative integer)"])
+
     all_items = discover_content(config, navigation)
     items = [item for item in all_items if mode == "preview" or item.status == "published"]
     skipped_count = len(all_items) - len(items)
@@ -595,8 +725,11 @@ def generate_site(source: str | Path, output: str | Path, languages: str | Itera
         navigation_html = _render_navigation(navigation, items, item.language, config.default_language, current_base_route)
         breadcrumb_html = _render_breadcrumb(items, item, config.default_language)
         language_selector = _render_language_selector(config, item, variants, selected_languages)
-        context_header_html = _context_header(
-            breadcrumb_html, item.title, item.template, language_selector
+        # Landing pages can intentionally omit the contextual title bar.
+        # Default remains unchanged for existing content.
+        hide_title = item.metadata.get("hide_title", False) is True
+        context_header_html = "" if hide_title else _context_header(
+            breadcrumb_html, item.title, item.template
         )
         external_links = _render_external_links(config.links)
 
@@ -653,6 +786,7 @@ def generate_site(source: str | Path, output: str | Path, languages: str | Itera
                     featured_items,
                     config.default_language,
                     featured_configured,
+                    featured_autoplay_interval,
                 )
                 if item.template == "home"
                 else ""
@@ -706,6 +840,13 @@ def generate_site(source: str | Path, output: str | Path, languages: str | Itera
 def _seo_tags(item: ContentItem, config, canonical: str, description: str, image: str, mode: str) -> str:
     """Return escaped metadata; previews are excluded from indexing regardless of URL."""
     def esc(value: str) -> str:
+        """Handle esc for the web content workflow.
+        
+        Args:
+            value: Input used by this operation.
+        
+        Returns:
+            Operation result or None, as defined by the implementation."""
         return html.escape(str(value), quote=True)
     tags = [f'<link rel="canonical" href="{esc(canonical)}">',
             f'<meta property="og:type" content="{"article" if item.template == "article" else "website"}">',
@@ -725,6 +866,7 @@ def _seo_tags(item: ContentItem, config, canonical: str, description: str, image
 
 
 def _write_sitemap(output: Path, config, items: list[ContentItem], langs: set[str]) -> None:
+    """Write sitemap to generated output."""
     ns = "http://www.sitemaps.org/schemas/sitemap/0.9"
     ET.register_namespace("", ns)
     root = ET.Element(f"{{{ns}}}urlset")
@@ -740,6 +882,7 @@ def _write_sitemap(output: Path, config, items: list[ContentItem], langs: set[st
 
 
 def _write_rss(output: Path, config, items: list[ContentItem], langs: set[str]) -> bool:
+    """Write rss to generated output."""
     articles = sorted((i for i in items if i.template == "article" and i.date and i.language in langs and i.status == "published"), key=lambda i: i.date, reverse=True)
     if not articles:
         return False

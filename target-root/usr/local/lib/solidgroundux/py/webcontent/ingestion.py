@@ -20,6 +20,7 @@ _LANGUAGE_SUFFIX_RE = re.compile(r"_(?P<language>[A-Za-z]{2})\.md$")
 
 @dataclass(slots=True)
 class IngestInspection:
+    """Validation findings for a candidate incoming Markdown document."""
     success: bool
     input_file: str
     title: str = ""
@@ -35,6 +36,10 @@ class IngestInspection:
     errors: list[str] = field(default_factory=list)
 
     def as_dict(self) -> dict[str, object]:
+        """Serialize the result to a JSON-compatible mapping.
+        
+        Returns:
+            Operation result or None, as defined by the implementation."""
         return {
             "success": self.success,
             "input_file": self.input_file,
@@ -54,6 +59,7 @@ class IngestInspection:
 
 @dataclass(slots=True)
 class IngestResult:
+    """Outcome and diagnostics from a content ingestion run."""
     success: bool
     input_file: str
     destination: str = ""
@@ -65,6 +71,10 @@ class IngestResult:
     errors: list[str] = field(default_factory=list)
 
     def as_dict(self) -> dict[str, object]:
+        """Serialize the result to a JSON-compatible mapping.
+        
+        Returns:
+            Operation result or None, as defined by the implementation."""
         return {
             "success": self.success,
             "input_file": self.input_file,
@@ -79,6 +89,7 @@ class IngestResult:
 
 
 def _normalize_route(value: str) -> str:
+    """Normalize route to a canonical representation."""
     route = str(value or "").strip()
     if not route:
         return ""
@@ -91,6 +102,7 @@ def _normalize_route(value: str) -> str:
 
 
 def _base_route(route: str, language: str, default_language: str) -> str:
+    """Handle base route for the web content workflow."""
     if language.upper() == default_language.upper():
         return route
     prefix = f"/{language.lower()}"
@@ -102,6 +114,7 @@ def _base_route(route: str, language: str, default_language: str) -> str:
 
 
 def _route_parent_and_slug(route: str) -> tuple[str, str]:
+    """Handle route parent and slug for the web content workflow."""
     normalized = _normalize_route(route)
     parts = [part for part in normalized.strip("/").split("/") if part]
     if not parts:
@@ -121,6 +134,7 @@ def slugify(value: str) -> str:
 
 
 def _infer_language(path: Path, supported: list[str]) -> str:
+    """Infer language from source metadata or path."""
     match = _LANGUAGE_SUFFIX_RE.search(path.name)
     if not match:
         return ""
@@ -129,6 +143,7 @@ def _infer_language(path: Path, supported: list[str]) -> str:
 
 
 def _infer_kind(metadata: dict[str, Any], path: Path) -> str:
+    """Infer kind from source metadata or path."""
     value = str(metadata.get("kind", metadata.get("type", "")) or "").strip().lower()
     if value in _VALID_KINDS:
         return value
@@ -141,6 +156,7 @@ def _infer_kind(metadata: dict[str, Any], path: Path) -> str:
 
 
 def _index_options(source: Path, language: str) -> list[tuple[str, str]]:
+    """Handle index options for the web content workflow."""
     config = load_site_config(source)
     navigation = load_navigation(config.root)
     items = discover_content(config, navigation)
@@ -170,6 +186,15 @@ def _index_options(source: Path, language: str) -> list[tuple[str, str]]:
 
 
 def inspect_ingest(source: str | Path, input_file: str | Path, language_override: str = "") -> IngestInspection:
+    """Validate an incoming Markdown candidate before ingesting it.
+    
+    Args:
+        source: Input used by this operation.
+        input_file: Input used by this operation.
+        language_override: Input used by this operation.
+    
+    Returns:
+        Operation result or None, as defined by the implementation."""
     source_path = Path(source).expanduser().resolve()
     input_path = Path(input_file).expanduser().resolve()
     errors: list[str] = []
@@ -244,6 +269,7 @@ def inspect_ingest(source: str | Path, input_file: str | Path, language_override
 
 
 def _route_to_content_dir(content_dir: Path, parent_route: str) -> Path:
+    """Handle route to content dir for the web content workflow."""
     parts = [part for part in parent_route.strip("/").split("/") if part]
     return content_dir.joinpath(*parts) if parts else content_dir
 
@@ -266,6 +292,7 @@ def _archive_destination(source: Path, input_file: Path) -> Path:
 
 
 def _plain_scalar(value: Any) -> str:
+    """Handle plain scalar for the web content workflow."""
     if value is None:
         return "null"
     if isinstance(value, bool):
@@ -290,6 +317,7 @@ def _plain_scalar(value: Any) -> str:
 
 
 def _serialize_mapping(mapping: dict[str, Any], indent: int = 0) -> list[str]:
+    """Handle serialize mapping for the web content workflow."""
     lines: list[str] = []
     prefix = " " * indent
     for key, value in mapping.items():
@@ -358,6 +386,21 @@ def ingest_content(
     summary: str = "",
     commit: bool = True,
 ) -> IngestResult:
+    """Normalize and archive incoming Markdown into canonical source content.
+    
+    Args:
+        source: Input used by this operation.
+        input_file: Input used by this operation.
+        title: Input used by this operation.
+        language: Input used by this operation.
+        parent: Input used by this operation.
+        kind: Input used by this operation.
+        slug: Input used by this operation.
+        summary: Input used by this operation.
+        commit: Input used by this operation.
+    
+    Returns:
+        Operation result or None, as defined by the implementation."""
     source_path = Path(source).expanduser().resolve()
     input_path = Path(input_file).expanduser().resolve()
     config = load_site_config(source_path)

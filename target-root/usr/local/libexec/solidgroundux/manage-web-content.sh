@@ -89,7 +89,7 @@ set -uo pipefail
 # - Framework integration -----------------------------------------------------------
     SGND_USING=()
     SGND_ARGS_SPEC=(
-        "action|a|enum|ACTION|Management action||ingest,delete,generate,validate,prepare-social,status"
+        "action|a|enum|ACTION|Management action||ingest,delete,edit-metadata,move-page,generate,validate,prepare-social,status"
         "ingest-dir|i|value|INGEST_DIR|Override Markdown ingestion directory||"
     )
     SGND_SCRIPT_EXAMPLES=(
@@ -119,7 +119,7 @@ set -uo pipefail
 # - Local declarations --------------------------------------------------------------
     : "${SGND_WEB_CONTENT_SOURCE:=${PWD}}"
     : "${SGND_WEB_CONTENT_OUTPUT:=${PWD}/public}"
-    : "${SGND_WEB_CONTENT_SOCIAL_OUTPUT:=${PWD}/social-drafts}"
+    : "${SGND_WEB_CONTENT_SOCIAL_OUTPUT:=${SGND_SHARE_DIR:-${HOME}/.local/share/solidgroundux}/social-media-output}"
     : "${SGND_WEB_CONTENT_LANGUAGE:=ALL}"
     : "${SGND_WEB_CONTENT_PLATFORM:=linkedin}"
     : "${SGND_WEB_CONTENT_INGEST_DIR:=}"
@@ -128,6 +128,7 @@ set -uo pipefail
     : "${SGND_WEB_CONTENT_INGEST_PARENT:=}"
 
 # - Helpers -------------------------------------------------------------------------
+    # fn: _web_content_python_root - Run the python root action through Web Content Management.
     _web_content_python_root() {
         if [[ "$SGND_FRAMEWORK_ROOT" == "/" ]]; then
             printf '%s\n' "/usr/local/lib/solidgroundux/py"
@@ -136,21 +137,25 @@ set -uo pipefail
         fi
     }
 
+    # fn: _web_content_validate_source - Run the validate source action through Web Content Management.
     _web_content_validate_source() {
         local path="${1:-}"
         [[ -d "$path" && -r "$path/config/site.cfg" && -d "$path/content" && -d "$path/templates" && -d "$path/css" ]]
     }
 
+    # fn: _web_content_validate_language - Run the validate language action through Web Content Management.
     _web_content_validate_language() {
         local value="${1:-}"
         [[ "${value^^}" == "ALL" || "$value" =~ ^[A-Za-z]{2}([,][A-Za-z]{2})*$ ]]
     }
 
+    # fn: _web_content_validate_platform - Run the validate platform action through Web Content Management.
     _web_content_validate_platform() {
         local value="${1:-}"
         [[ "$value" =~ ^[A-Za-z0-9_-]+$ ]]
     }
 
+    # fn: _web_content_ensure_output_parent - Run the ensure output parent action through Web Content Management.
     _web_content_ensure_output_parent() {
         local path="${1:?missing output path}"
         local parent=""
@@ -158,6 +163,7 @@ set -uo pipefail
         [[ -d "$parent" ]] || mkdir -p -- "$parent" || return 1
     }
 
+    # fn: _web_content_result_value - Extract a requested field from the most recent engine result.
     _web_content_result_value() {
         local result_file="${1:?missing result file}"
         local key="${2:?missing key}"
@@ -176,6 +182,10 @@ else:
 PY
     }
 
+    # fn: _web_content_run_engine - Invoke the noninteractive Python engine and capture its structured result.
+        # . Behavior
+        #   - Coordinates the existing workflow without modifying article content directly.
+        #   - Propagates errors to the caller and uses the framework for user interaction.
     _web_content_run_engine() {
         local result_file="${1:?missing result file}"
         shift
@@ -215,6 +225,7 @@ PY
         printf '%s\n' "$count" > "$marker" 2>/dev/null || true
     }
 
+    # fn: _web_content_report_errors - Run the report errors action through Web Content Management.
     _web_content_report_errors() {
         local result_file="${1:?missing result file}"
         local errors=""
@@ -226,6 +237,7 @@ PY
         fi
     }
 
+    # fn: _web_content_report_warnings - Run the report warnings action through Web Content Management.
     _web_content_report_warnings() {
         local result_file="${1:?missing result file}"
         local warnings=""
@@ -237,43 +249,51 @@ PY
         fi
     }
 
+    # fn: _web_content_select_source - Run the select source action through Web Content Management.
     _web_content_select_source() {
         ask --label "Website repository" --var SGND_WEB_CONTENT_SOURCE --default "$SGND_WEB_CONTENT_SOURCE" --validate _web_content_validate_source --back
     }
 
+    # fn: _web_content_select_language - Run the select language action through Web Content Management.
     _web_content_select_language() {
         ask --label "Language (ALL or codes)" --var SGND_WEB_CONTENT_LANGUAGE --default "$SGND_WEB_CONTENT_LANGUAGE" --validate _web_content_validate_language --back
         SGND_WEB_CONTENT_LANGUAGE="${SGND_WEB_CONTENT_LANGUAGE^^}"
     }
 
+    # fn: _web_content_validate_ingest_dir - Run the validate ingest dir action through Web Content Management.
     _web_content_validate_ingest_dir() {
         local path="${1:-}"
         [[ -n "$path" ]]
     }
 
+    # fn: _web_content_validate_slug - Run the validate slug action through Web Content Management.
     _web_content_validate_slug() {
         local value="${1:-}"
         [[ "$value" =~ ^[a-z0-9][a-z0-9-]*$ ]]
     }
 
+    # fn: _web_content_canonical_ingest_dir - Run the canonical ingest dir action through Web Content Management.
     _web_content_canonical_ingest_dir() {
         # Incoming authoring files belong to the selected website repository but
         # stay outside content/ until their metadata has been resolved and confirmed.
         printf '%s\n' "${SGND_WEB_CONTENT_SOURCE%/}/incoming"
     }
 
+    # fn: _web_content_canonical_archive_dir - Run the canonical archive dir action through Web Content Management.
     _web_content_canonical_archive_dir() {
         # Successfully processed loose sources are retained outside content/ as a
         # date-grouped authoring archive; the website generator ignores this tree.
         printf '%s\n' "${SGND_WEB_CONTENT_SOURCE%/}/ingested"
     }
 
+    # fn: _web_content_canonical_delete_archive_dir - Run the canonical delete archive dir action through Web Content Management.
     _web_content_canonical_delete_archive_dir() {
         # Removed canonical pages are moved outside content/ into a date-grouped
         # recovery archive so deletion remains reversible and generator-safe.
         printf '%s\n' "${SGND_WEB_CONTENT_SOURCE%/}/deleted"
     }
 
+    # fn: _web_content_select_ingest_dir - Run the select ingest dir action through Web Content Management.
     _web_content_select_ingest_dir() {
         local canonical=""
         local selected=""
@@ -291,6 +311,7 @@ PY
         SGND_WEB_CONTENT_INGEST_DIR="$selected"
     }
 
+    # fn: _web_content_extract_parent_route - Run the extract parent route action through Web Content Management.
     _web_content_extract_parent_route() {
         local selection="${1:-}"
         local route="${selection##*[}"
@@ -298,6 +319,7 @@ PY
         printf '%s\n' "$route"
     }
 
+    # fn: _web_content_kind_label - Run the kind label action through Web Content Management.
     _web_content_kind_label() {
         local kind="${1:-}"
         case "$kind" in
@@ -308,6 +330,7 @@ PY
         esac
     }
 
+    # fn: _web_content_kind_value - Run the kind value action through Web Content Management.
     _web_content_kind_value() {
         local label="${1:-}"
         case "$label" in
@@ -318,6 +341,7 @@ PY
         esac
     }
 
+    # fn: _web_content_choose_language - Run the choose language action through Web Content Management.
     _web_content_choose_language() {
         local out_var="${1:?missing output variable}"
         shift
@@ -350,6 +374,7 @@ PY
         printf -v "$out_var" '%s' "$selected"
     }
 
+    # fn: _web_content_choose_kind - Run the choose kind action through Web Content Management.
     _web_content_choose_kind() {
         local out_var="${1:?missing output variable}"
         local remembered="${SGND_WEB_CONTENT_INGEST_KIND:-}"
@@ -375,6 +400,7 @@ PY
         printf -v "$out_var" '%s' "$selected"
     }
 
+    # fn: _web_content_choose_parent - Run the choose parent action through Web Content Management.
     _web_content_choose_parent() {
         local out_var="${1:?missing output variable}"
         shift
@@ -1012,36 +1038,72 @@ PY
         rm -f "$result_file"
     }
 
-    # fn: _web_content_prepare_social - Generate platform-specific social-media drafts
+    # fn: _web_content_prepare_social - Prepare a single article as a social-media draft.
+    # The output stays outside the repository and is never posted automatically.
     _web_content_prepare_social() {
-        local result_file=""
-        local drafts=""
-        local rc=0
-
+        local list_file="" result_file="" social_selected_page="" file="" rc=0
+        local -a options=()
         _web_content_select_source || return 0
-        ask --label "Draft output directory" --var SGND_WEB_CONTENT_SOCIAL_OUTPUT --default "$SGND_WEB_CONTENT_SOCIAL_OUTPUT" --back || return 0
-        ask --label "Platform" --var SGND_WEB_CONTENT_PLATFORM --default "$SGND_WEB_CONTENT_PLATFORM" --validate _web_content_validate_platform --back || return 0
-        _web_content_select_language || return 0
-        _web_content_ensure_output_parent "$SGND_WEB_CONTENT_SOCIAL_OUTPUT" || { sayfail "Cannot create draft-output parent directory."; return 1; }
-
-        result_file="$(mktemp)" || return 1
+        list_file="$(mktemp)" || return 1
+        result_file="$(mktemp)" || { rm -f -- "$list_file"; return 1; }
+        _web_content_run_engine "$list_file" list-pages --source "$SGND_WEB_CONTENT_SOURCE" || {
+            _web_content_report_errors "$list_file"
+            rm -f -- "$list_file" "$result_file"
+            return 1
+        }
+        mapfile -t options < <(python3 - "$list_file" <<'PYCODE'
+import json, sys
+with open(sys.argv[1], encoding='utf-8') as handle:
+    pages = json.load(handle).get('pages', [])
+for page in pages:
+    if page['file'].split('/')[-1].startswith('index_'):
+        continue
+    if str(page['metadata'].get('draft', 'false')).lower() == 'true':
+        continue
+    print('{} | {} | {} [{}]'.format(page['title'], page['language'], page['route'], page['file']))
+PYCODE
+)
+        if (( ${#options[@]} == 0 )); then
+            saywarning "No published articles available."
+            rm -f -- "$list_file" "$result_file"
+            return 0
+        fi
+        echo
+        ask_selection --label "Select article" --var social_selected_page --items "${options[@]}" || {
+            rm -f -- "$list_file" "$result_file"
+            return 0
+        }
+        [[ "$social_selected_page" =~ \[([^][]+)\]$ ]] || {
+            sayfail "Invalid article selection"
+            rm -f -- "$list_file" "$result_file"
+            return 1
+        }
+        file="${BASH_REMATCH[1]}"
+        ask --label "Draft output directory" --var SGND_WEB_CONTENT_SOCIAL_OUTPUT --default "$SGND_WEB_CONTENT_SOCIAL_OUTPUT" --back || {
+            rm -f -- "$list_file" "$result_file"; return 0;
+        }
+        ask --label "Platform" --var SGND_WEB_CONTENT_PLATFORM --default "$SGND_WEB_CONTENT_PLATFORM" --validate _web_content_validate_platform --back || {
+            rm -f -- "$list_file" "$result_file"; return 0;
+        }
+        _web_content_ensure_output_parent "$SGND_WEB_CONTENT_SOCIAL_OUTPUT" || {
+            sayfail "Cannot create draft-output parent directory."
+            rm -f -- "$list_file" "$result_file"; return 1;
+        }
         _web_content_run_engine "$result_file" prepare-social \
             --source "$SGND_WEB_CONTENT_SOURCE" \
             --output "$SGND_WEB_CONTENT_SOCIAL_OUTPUT" \
             --platform "$SGND_WEB_CONTENT_PLATFORM" \
-            --language "$SGND_WEB_CONTENT_LANGUAGE" || rc=$?
+            --content-file "$file" --excerpt-length 150 || rc=$?
         _web_content_report_warnings "$result_file"
         if (( rc != 0 )); then
             _web_content_report_errors "$result_file"
-            rm -f "$result_file"
-            return "$rc"
+        else
+            sayok "Social-media draft prepared; nothing has been posted."
+            sgnd_print_labeledvalue --label "Draft directory" --value "$(_web_content_result_value "$result_file" output)" --labelwidth 20
+            _web_content_record_activity 1
         fi
-        drafts="$(_web_content_result_value "$result_file" drafts_generated)"
-        sayok "Social-media drafts prepared successfully."
-        sgnd_print_labeledvalue --label "Platform" --value "$SGND_WEB_CONTENT_PLATFORM" --labelwidth 20
-        sgnd_print_labeledvalue --label "Drafts" --value "$drafts" --labelwidth 20
-        sgnd_print_labeledvalue --label "Output" --value "$SGND_WEB_CONTENT_SOCIAL_OUTPUT" --labelwidth 20
-        rm -f "$result_file"
+        rm -f -- "$list_file" "$result_file"
+        return "$rc"
     }
 
     # fn: _web_content_status - Show Web Content Management configuration and engine status
@@ -1072,11 +1134,195 @@ PY
         sgnd_print_labeledvalue --label "Ingest parent" --value "${SGND_WEB_CONTENT_INGEST_PARENT:-Not set}" --labelwidth 20
     }
 
+# fn: _web_content_manage_page - Browse existing content and edit metadata or move a page.
+    # Uses the shared Python content discovery logic; changes stay uncommitted in Git.
+    # Metadata editing stays on a page until Done; the wrapper offers another page afterward.
+    # fn: _web_content_manage_page_once - Select one page and edit metadata or move its canonical source file.
+        # . Behavior
+        #   - Coordinates the existing workflow without modifying article content directly.
+        #   - Propagates errors to the caller and uses the framework for user interaction.
+    _web_content_manage_page_once() {
+        local operation="${1:?missing operation}"
+        local list_file="" selected="" file="" field="" metadata_new_value="" parent="" slug="" result_file=""
+        local -a options=()
+        local row="" decision="" current_value=""
+        list_file="$(mktemp)" || return 1
+        result_file="$(mktemp)" || { rm -f -- "$list_file"; return 1; }
+        _web_content_run_engine "$list_file" list-pages --source "$SGND_WEB_CONTENT_SOURCE" || {
+            _web_content_report_errors "$list_file"
+            rm -f -- "$list_file" "$result_file"
+            return 1
+        }
+        mapfile -t options < <(python3 - "$list_file" <<'PYCODE'
+import json, sys
+with open(sys.argv[1], encoding='utf-8') as handle:
+    pages = json.load(handle).get('pages', [])
+for page in pages:
+    print('{} | {} | {} [{}]'.format(page['title'], page['language'], page['route'], page['file']))
+PYCODE
+)
+        if (( ${#options[@]} == 0 )); then
+            saywarning "No pages available."
+            rm -f -- "$list_file" "$result_file"
+            return 0
+        fi
+        ask_selection --label "Select page" --var selected --items "${options[@]}" || {
+            rm -f -- "$list_file" "$result_file"
+            return 0
+        }
+        [[ "$selected" =~ \[([^][]+)\]$ ]] || { sayfail "Invalid page selection"; return 1; }
+        file="${BASH_REMATCH[1]}"
+        if [[ "$operation" == "edit-metadata" ]]; then
+            # Remain on the chosen page until Done is selected. Refresh metadata
+            # after each save so defaults and the selection list stay current.
+            local selected_field="" edit_field="" edit_choice="" changed_count=0
+            local -a field_options=()
+            while true; do
+                _web_content_run_engine "$list_file" list-pages --source "$SGND_WEB_CONTENT_SOURCE" || {
+                    _web_content_report_errors "$list_file"
+                    rm -f -- "$list_file" "$result_file"
+                    return 1
+                }
+                sgnd_print
+                sgnd_print_sectionheader --text "Current metadata: $file"
+                mapfile -t field_options < <(python3 - "$list_file" "$file" <<'PYCODE'
+import json
+import sys
+with open(sys.argv[1], encoding='utf-8') as handle:
+    pages = json.load(handle).get('pages', [])
+page = next((page for page in pages if page['file'] == sys.argv[2]), None)
+if page is not None:
+    for key, val in page['metadata'].items():
+        shown = str(val).lower() if isinstance(val, bool) else str(val if val is not None else '')
+        print('{} = {}'.format(key, shown.replace('\n', ' ')))
+PYCODE
+)
+                if (( ${#field_options[@]} == 0 )); then
+                    saywarning "No editable metadata was found for this page."
+                else
+                    local metadata_line=""
+                    for metadata_line in "${field_options[@]}"; do
+                        sgnd_print_labeledvalue --label "${metadata_line%% = *}" --value "${metadata_line#* = }" --labelwidth 20
+                    done
+                fi
+                sgnd_print
+                sgnd_print_sectionheader --text "Edit metadata"
+                field_options+=("Add metadata field" "Done - finish this page")
+                selected_field=""
+                ask_selection --label "Choose a metadata field" --var selected_field --items "${field_options[@]}" || break
+                case "$selected_field" in
+                    "Done - finish this page") break ;;
+                    "Add metadata field")
+                        edit_field=""
+                        ask --label "New metadata field name" --var edit_field --back || continue
+                        [[ -n "$edit_field" ]] || { saywarning "Field name cannot be empty."; continue; }
+                        ;;
+                    *) edit_field="${selected_field%% = *}" ;;
+                esac
+                # Read the current value from the refreshed page data. This is
+                # also safe for newly-added fields (whose default is blank).
+                current_value="$(python3 - "$list_file" "$file" "$edit_field" <<'PYCODE'
+import json
+import sys
+with open(sys.argv[1], encoding='utf-8') as handle:
+    pages = json.load(handle).get('pages', [])
+for page in pages:
+    if page['file'] == sys.argv[2]:
+        value = page['metadata'].get(sys.argv[3], '')
+        if isinstance(value, bool):
+            print(str(value).lower())
+        elif value is not None:
+            print(str(value))
+        break
+PYCODE
+)"
+                metadata_new_value="$current_value"
+                ask --label "New value (:clear to empty)" --var metadata_new_value --default "$current_value" --back || continue
+                [[ -z "$metadata_new_value" ]] && metadata_new_value="$current_value"
+                [[ "$metadata_new_value" == ":clear" ]] && metadata_new_value=""
+                if [[ "$edit_field" == "featured" || "$edit_field" == "draft" || "$edit_field" == "hide_title" ]]; then
+                    metadata_new_value="$(python3 -c 'import sys; print(sys.argv[1].strip().lower())' "$metadata_new_value")"
+                fi
+                if [[ "$metadata_new_value" == "$current_value" ]]; then
+                    sayinfo "Metadata unchanged."
+                    continue
+                fi
+                if ! _web_content_run_engine "$result_file" edit-metadata --source "$SGND_WEB_CONTENT_SOURCE" --content-file "$file" --key "$edit_field" --value "$metadata_new_value"; then
+                    _web_content_report_errors "$result_file"
+                    continue
+                fi
+                ((changed_count+=1))
+                sayok "Updated: $edit_field"
+            done
+            if (( changed_count > 0 )); then
+                _web_content_record_activity "$changed_count"
+                sayok "Metadata updated. Git commit remains manual."
+            else
+                sayinfo "Finished editing this page. No changes saved."
+            fi
+            rm -f -- "$list_file" "$result_file"
+            return 0
+        else
+            saywarning "Moving a page changes its URL. Check references after regeneration."
+            parent="$(dirname -- "$file")"
+            [[ "$parent" == "." ]] && parent=""
+            slug="$(basename -- "$file")"; slug="${slug%_??.md}"
+            ask --label "Destination section (relative to content)" --var parent --default "$parent" --back || { rm -f -- "$list_file" "$result_file"; return 0; }
+            ask --label "New slug" --var slug --default "$slug" --back || { rm -f -- "$list_file" "$result_file"; return 0; }
+            sgnd_print_labeledvalue --label "From" --value "$file" --labelwidth 20
+            sgnd_print_labeledvalue --label "To" --value "${parent:+$parent/}${slug}" --labelwidth 20
+            ask_decision --label "Move this page and change its URL?" --choices "YES|Y,NO|N" --default "NO" --var decision || { rm -f -- "$list_file" "$result_file"; return 0; }
+            if [[ "$decision" != "YES" ]]; then
+                saycancel "Page move cancelled."
+                rm -f -- "$list_file" "$result_file"
+                return 0
+            fi
+            _web_content_run_engine "$result_file" move-page --source "$SGND_WEB_CONTENT_SOURCE" --content-file "$file" --parent "$parent" --slug "$slug" || {
+                _web_content_report_errors "$result_file"; rm -f -- "$list_file" "$result_file"; return 1;
+            }
+            saywarning "Update links referencing the previous URL, then regenerate and validate."
+        fi
+        _web_content_record_activity 1
+        sayok "Content updated. Git commit remains manual."
+        rm -f -- "$list_file" "$result_file"
+    }
+
+
+    # fn: _web_content_manage_page - Repeat content editing when requested.
+    # Enter or timeout returns to the console; only A starts another selection.
+    _web_content_manage_page() {
+        local operation="${1:?missing operation}"
+        local dlg_rc=0
+        local rc=0
+        while true; do
+            _web_content_manage_page_once "$operation" || rc=$?
+            (( rc == 0 )) || return "$rc"
+            sgnd_print
+            sgnd_print_sectionheader ""
+            dlg_rc=0
+            ask_dlg_autocontinue \
+                --seconds 5 \
+                --message "Manage another page?" \
+                --again \
+                --pause \
+                --legend "A=another page; Enter/timeout=return to menu; P/Space=pause" \
+                || dlg_rc=$?
+            # Framework returns 3 for 'again'; timeout and Enter return to menu.
+            case "$dlg_rc" in
+                3) continue ;;
+                *) return 0 ;;
+            esac
+        done
+    }
+
 # - Action dispatch -----------------------------------------------------------------
+    # fn: _run_action - Dispatch the requested command-line management action.
     _run_action() {
         local action="${1:?missing action}"
         case "$action" in
             ingest) _web_content_ingest ;;
+            edit-metadata) _web_content_manage_page edit-metadata ;;
+            move-page) _web_content_manage_page move-page ;;
             delete)
                 # Deletion owns its closing section line and repeat/return dialog.
                 _web_content_delete
@@ -1095,6 +1341,7 @@ PY
     }
 
 # - Main ----------------------------------------------------------------------------
+    # fn: main - Parse command-line arguments and dispatch the requested command.
     main() {
         local action=""
         _framework_locator || return $?

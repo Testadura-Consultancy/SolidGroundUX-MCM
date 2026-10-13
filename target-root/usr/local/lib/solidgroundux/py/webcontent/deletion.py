@@ -22,6 +22,10 @@ class DeleteInspection:
     errors: list[str] = field(default_factory=list)
 
     def as_dict(self) -> dict[str, Any]:
+        """Serialize the result to a JSON-compatible mapping.
+        
+        Returns:
+            Operation result or None, as defined by the implementation."""
         return {
             "success": self.success,
             "options": self.options,
@@ -53,6 +57,10 @@ class DeleteResult:
     errors: list[str] = field(default_factory=list)
 
     def as_dict(self) -> dict[str, Any]:
+        """Serialize the result to a JSON-compatible mapping.
+        
+        Returns:
+            Operation result or None, as defined by the implementation."""
         return {
             "success": self.success,
             "content_file": self.content_file,
@@ -86,10 +94,12 @@ def _base_route(item: ContentItem, default_language: str) -> str:
 
 
 def _relative_content_path(item: ContentItem, content_dir: Path) -> str:
+    """Handle relative content path for the web content workflow."""
     return item.source_path.relative_to(content_dir).as_posix()
 
 
 def _candidate_label(item: ContentItem, content_dir: Path) -> str:
+    """Handle candidate label for the web content workflow."""
     relative = _relative_content_path(item, content_dir)
     return f"{item.title} | {item.language} | {item.route} [{relative}]"
 
@@ -133,6 +143,7 @@ def inspect_delete(source: str | Path) -> DeleteInspection:
 
 
 def _resolve_item(source: Path, relative_path: str) -> tuple[Any, list[ContentItem], ContentItem]:
+    """Resolve item within the configured content tree."""
     config = load_site_config(source)
     navigation = load_navigation(config.root)
     items = discover_content(config, navigation)
