@@ -126,7 +126,11 @@ set -uo pipefail
 # - Framework integration -----------------------------------------------------------
     SGND_USING=()
     SGND_ARGS_SPEC=(
-        "action|a|enum|ACTION|Management action||prepare,install,start,configure-root,manage-sites,configure-documentation,documentation-status,service,firewall,validate,status"
+        "action|a|enum|ACTION|Management action||prepare,install,start,configure-root,manage-sites,ensure-site,ensure-directory,configure-dns,configure-documentation,documentation-status,update-documentation,service,firewall,validate,status"
+        "site-name||value|SITE_NAME|Nginx site identifier for ensure-site||"
+        "web-address||value|WEB_ADDRESS|Hostname for ensure-site||"
+        "document-root||value|DOCUMENT_ROOT|Absolute document root for ensure-site||"
+        "deployment-user||value|DEPLOYMENT_USER|Unprivileged SSH publishing account||"
     )
     SGND_SCRIPT_EXAMPLES=(
         "  $SGND_SCRIPT_NAME --action status"
@@ -166,7 +170,7 @@ set -uo pipefail
     : "${SGND_WEB_DOC_SOURCE_DIR:=}"
     : "${SGND_WEB_DOC_REPOSITORY:=}"
     : "${SGND_WEB_DOC_REF:=master}"
-    : "${SGND_WEB_DOC_REPO_PATH:=target-root/usr/local/share/testadura/solidgroundux/doc}"
+    : "${SGND_WEB_DOC_REPO_PATH:=target-root/usr/local/share/doc/solidgroundux-codex}"
 
     # Render a local numbered selector using the Web Server action layout.
     # The framework ask_selection API is intentionally left unchanged.
@@ -285,19 +289,25 @@ set -uo pipefail
         sudo chmod 0644 "$SGND_WEB_SERVER_CONFIG_FILE" || return 1
     }
 
-    # fn: _web_server_installed_docs_root - Resolve the installed SolidGroundUX documentation path
+    # fn: _web_server_installed_docs_root - Resolve installed documentation from configuration
+        # . Purpose
+        #   Use SGND_WEB_DOC_INSTALLED_ROOT from the environment or web-server.cfg;
+        #   otherwise use the supported installed documentation location. This replaces
+        #   the legacy /usr/local/share/testadura/solidgroundux/doc default.
         # . Output
-        #   Writes the documentation directory belonging to the active framework root.
-        # . Usage
-        #   _web_server_installed_docs_root
+        #   Prints an absolute path beneath the active framework root when staged.
     _web_server_installed_docs_root() {
+        local configured="${SGND_WEB_DOC_INSTALLED_ROOT:-}"
         local framework_root="${SGND_FRAMEWORK_ROOT:-/}"
-
-        if [[ "$framework_root" == "/" ]]; then
-            printf '/usr/local/share/testadura/solidgroundux/doc\n'
-        else
-            printf '%s/usr/local/share/testadura/solidgroundux/doc\n' "${framework_root%/}"
+        if [[ -z "$configured" && -r "$SGND_WEB_SERVER_CONFIG_FILE" ]]; then
+            configured="$(awk -F= '$1 == "SGND_WEB_DOC_INSTALLED_ROOT" {sub(/^[^=]*=/, ""); print; exit}' "$SGND_WEB_SERVER_CONFIG_FILE")"
         fi
+        [[ -n "$configured" ]] || configured="/usr/local/share/doc/solidgroundux-codex"
+        [[ "$configured" == /* ]] || { sayfail "Documentation source must be an absolute path." >&2; return 2; }
+        if [[ "$framework_root" != "/" && "$configured" == /usr/* ]]; then
+            configured="${framework_root%/}${configured}"
+        fi
+        printf '%s\n' "$configured"
     }
 
     # fn: _web_server_enabled_sites - List enabled Nginx sites
@@ -425,6 +435,81 @@ set -uo pipefail
         host -t A "${record_name}.${local_domain}" "$dns_server" 2>/dev/null | awk '/has address/ {print $NF}' | grep -Fxq "$local_ip" \
             && sayok "DNS record registered: ${record_name}.${local_domain} -> $local_ip" \
             || saywarning "DNS command completed, but the new record could not be verified."
+    }
+
+    # fn: _web_server_remove_dns_record - Offer deletion of a site's exact internal AD DNS A record
+        # . Purpose
+        #   During site removal, delete only a confirmed A record pointing at this host.
+        #   Never remove unrelated records, aliases, or a hostname with multiple A values.
+        # . Usage
+        #   _web_server_remove_dns_record "<saved site hostname>"
+    _web_server_remove_dns_record() {
+        local web_address="${1%.}"
+        local local_domain="" record_name="" dns_server="" local_ip=""
+        local account="Administrator" decision="NO" lookup="" resolved=""
+        local -a addresses=()
+
+        [[ -n "$web_address" && "$web_address" != "_" ]] || return 0
+        # A site can contain several server_name aliases; never guess which DNS record to delete.
+        [[ "$web_address" != *[[:space:]]* ]] || {
+            saywarning "Multiple web addresses configured; DNS cleanup skipped."
+            return 0
+        }
+        local_domain="$(hostname -d 2>/dev/null || true)"
+        local_domain="${local_domain,,}"
+        web_address="${web_address,,}"
+        [[ -n "$local_domain" ]] || { saywarning "Local DNS domain is unknown; DNS cleanup skipped."; return 0; }
+        if [[ "$web_address" == *.* ]]; then
+            [[ "$web_address" == *".$local_domain" ]] || {
+                sayinfo "Web address is outside the local DNS domain; DNS cleanup skipped."
+                return 0
+            }
+            record_name="${web_address%."$local_domain"}"
+        else
+            record_name="$web_address"
+        fi
+        [[ -n "$record_name" && "$record_name" != *[[:space:]]* ]] || return 0
+        dns_server="$(_web_server_current_dns)"
+        local_ip="$(_web_server_local_ipv4)"
+        [[ -n "$dns_server" && -n "$local_ip" ]] || {
+            saywarning "DNS server or local IPv4 unavailable; DNS cleanup skipped."
+            return 0
+        }
+
+        ask --label "DNS server" --var dns_server --default "$dns_server" --validate sgnd_validate_ipv4 --back || return 0
+        lookup="$(host -t A "${record_name}.${local_domain}" "$dns_server" 2>/dev/null)" || {
+            saywarning "Could not query the DNS server; no DNS record was removed."
+            return 0
+        }
+        while IFS= read -r resolved; do
+            [[ -n "$resolved" ]] && addresses+=("$resolved")
+        done < <(printf '%s\n' "$lookup" | awk '/ has address / {print $NF}')
+        if (( ${#addresses[@]} != 1 )) || [[ "${addresses[0]:-}" != "$local_ip" ]]; then
+            sayinfo "DNS A record is absent, ambiguous, or does not point to this web server; leaving DNS unchanged."
+            return 0
+        fi
+
+        sgnd_print_labeledvalue --label "DNS A record" --value "${record_name}.${local_domain} -> $local_ip" --labelwidth 22
+        ask_decision --label "Remove this DNS A record as well" --choices "YES|Y,NO|N" --default "NO" --var decision || return 0
+        [[ "$decision" == "YES" ]] || return 0
+        ask --label "DNS account" --var account --default "$account" --back || return 0
+        if (( ${FLAG_DRYRUN:-0} == 1 )); then
+            sayinfo "DRYRUN: Would remove ${record_name}.${local_domain} A $local_ip on $dns_server."
+            return 0
+        fi
+        command -v samba-tool >/dev/null 2>&1 || {
+            saywarning "samba-tool is unavailable; DNS record was not removed."
+            return 0
+        }
+        sudo samba-tool dns delete "$dns_server" "$local_domain" "$record_name" A "$local_ip" -U "$account" </dev/tty || {
+            saywarning "DNS deletion failed; the site was removed but the DNS record may remain."
+            return 0
+        }
+        if host -t A "${record_name}.${local_domain}" "$dns_server" 2>/dev/null | awk '/ has address / {print $NF}' | grep -Fxq "$local_ip"; then
+            saywarning "DNS deletion returned successfully, but the old A record still resolves. Check DNS replication/cache."
+        else
+            sayok "DNS A record removed: ${record_name}.${local_domain} -> $local_ip"
+        fi
     }
 
     # fn: _web_server_site_document_root - Resolve the document root for an Nginx site
@@ -735,6 +820,112 @@ EOF
         _web_server_offer_dns_record "$server_name"
     }
 
+    # fn: _web_server_ensure_site - Noninteractive, idempotent site provisioning for an approved remote deployment.
+        # . Behavior
+        #   - Only creates a dedicated site under the configured web root.
+        #   - Returns success for an existing identical configuration, without changing it.
+        #   - Rejects duplicate hostnames and conflicting sites; never rewrites existing sites.
+        #   - Runs as root via the authorized SolidGroundUX executable sudo rule.
+        #   - Preserves the explicitly supplied unprivileged publisher for directory ownership.
+        #   - Tests Nginx before reload and rolls back only newly created configuration.
+        #   - Does not register DNS; DNS changes are a separate management action.
+    _web_server_ensure_site() {
+        local name="${SITE_NAME:-}" address="${WEB_ADDRESS:-}" root="${DOCUMENT_ROOT:-}"
+        local base="" cfg="" linked="" other="" current_address="" current_root="" publisher="${DEPLOYMENT_USER:-}"
+        (( EUID == 0 )) || { sayfail "ensure-site must be invoked as root through authorized sudo."; return 1; }
+        [[ "$publisher" =~ ^[a-z_][a-z0-9_-]*[$]?$ ]] && id "$publisher" >/dev/null 2>&1 || { sayfail "Invalid deployment account: $publisher"; return 2; }
+        [[ "$name" =~ ^[A-Za-z0-9][A-Za-z0-9._-]*$ ]] || { sayfail "Invalid site name."; return 2; }
+        [[ "$address" =~ ^[A-Za-z0-9][A-Za-z0-9.-]*$ && "$address" == *.* ]] || { sayfail "Invalid web hostname."; return 2; }
+        [[ "$root" == /* && "$root" != *'..'* && "$root" != *[[:space:]]* && "$root" != *';'* && "$root" != *'$'* ]] || {
+            sayfail "Unsafe document root."; return 2;
+        }
+        base="$(_web_server_root)"
+        [[ "$root" == "$base/"* && "$root" != "$base/" ]] || {
+            sayfail "Document root must be a dedicated directory below $base."; return 2;
+        }
+        cfg="/etc/nginx/sites-available/$name"
+        linked="/etc/nginx/sites-enabled/$name"
+        if [[ -e "$cfg" || -L "$cfg" ]]; then
+            [[ -f "$cfg" && ! -L "$cfg" ]] || { sayfail "Unsafe existing site entry: $cfg"; return 1; }
+            current_address="$(awk '$1=="server_name" {gsub(/;/,"",$2); print $2;exit}' "$cfg")"
+            current_root="$(_web_server_site_document_root "$name" 2>/dev/null || true)"
+            if [[ "$current_address" == "$address" && "$current_root" == "$root" && -L "$linked" ]]; then
+                sayok "Nginx site already configured: $name ($address => $root)."
+                return 0
+            fi
+            sayfail "Site '$name' already exists with different settings or is disabled; no changes made."
+            return 3
+        fi
+        # Prevent a second site taking over an already configured virtual hostname.
+        for other in /etc/nginx/sites-available/*; do
+            [[ -f "$other" ]] || continue
+            if awk -v host="$address" '$1=="server_name" {for(i=2;i<=NF;i++){gsub(/;/,"",$i); if($i==host) found=1}} END {exit !found}' "$other"; then
+                sayfail "Hostname $address already appears in $(basename -- "$other"); no changes made."
+                return 3
+            fi
+        done
+        [[ ! -e "$linked" && ! -L "$linked" ]] || { sayfail "Site enable path is already occupied."; return 3; }
+        if (( ${FLAG_DRYRUN:-0} == 1 )); then
+            sayinfo "DRYRUN: Would create $name for $address at $root and enable Nginx."
+            return 0
+        fi
+        # Publishing must be possible as the SSH user; do not chown an existing site directory.
+        if [[ ! -d "$root" ]]; then
+            install -d -m 2755 -o "$publisher" -g www-data -- "$root" || { sayfail "Cannot create writable document root $root."; return 1; }
+        fi
+        runuser -u "$publisher" -- test -w "$root" || { sayfail "Deployment user $publisher cannot write to $root; no Nginx configuration created."; return 1; }
+        { printf 'server {\n    listen 80;\n    listen [::]:80;\n    server_name %s;\n    root %s;\n    index index.html;\n    location / {\n        try_files $uri $uri/ =404;\n    }\n}\n' "$address" "$root"; } | tee "$cfg" >/dev/null || { sayfail "Could not write Nginx site."; return 1; }
+        if ! ln -s "$cfg" "$linked"; then
+            rm -f -- "$cfg" || true
+            sayfail "Could not enable Nginx site."
+            return 1
+        fi
+        if ! nginx -t || ! systemctl reload nginx.service; then
+            rm -f -- "$linked" "$cfg" || true
+            nginx -t >/dev/null 2>&1 && systemctl reload nginx.service >/dev/null 2>&1 || true
+            sayfail "Nginx validation/reload failed; new site configuration rolled back."
+            return 1
+        fi
+        sayok "Nginx site created: $name ($address => $root)."
+    }
+
+    # fn: _web_server_ensure_directory_for_publish - Noninteractive preparation/repair of a dedicated publishing directory.
+    # Existing content is preserved; only the document root inode receives ownership/mode changes.
+    _web_server_ensure_directory_for_publish() {
+        local root="${DOCUMENT_ROOT:-}" base="" publisher="${DEPLOYMENT_USER:-}"
+        (( EUID == 0 )) || { sayfail "ensure-directory must be invoked as root through authorized sudo."; return 1; }
+        [[ "$publisher" =~ ^[a-z_][a-z0-9_-]*[$]?$ ]] && id "$publisher" >/dev/null 2>&1 || { sayfail "Invalid deployment account: $publisher"; return 2; }
+        [[ "$root" == /* && "$root" != *'..'* && "$root" != *[[:space:]]* && "$root" != *';'* && "$root" != *'$'* ]] || {
+            sayfail "Unsafe document root."; return 2;
+        }
+        base="$(_web_server_root)"
+        [[ "$root" == "$base/"* && "$root" != "$base/" ]] || {
+            sayfail "Document root is outside the configured web root: $base"; return 2;
+        }
+        [[ ! -L "$root" ]] || { sayfail "Symlink document roots cannot be repaired automatically."; return 2; }
+        if (( ${FLAG_DRYRUN:-0} == 1 )); then
+            sayinfo "DRYRUN: Would ensure $root owned by ${publisher}:www-data with mode 2755."
+            return 0
+        fi
+        if [[ ! -d "$root" ]]; then
+            install -d -m 2755 -o "$publisher" -g www-data -- "$root" || return 1
+        else
+            chown -- "${publisher}:www-data" "$root" || return 1
+            chmod -- 2755 "$root" || return 1
+        fi
+        runuser -u "$publisher" -- test -w "$root" || { sayfail "Deployment account $publisher still cannot write to $root."; return 1; }
+        sayok "Deployment directory ready: $root"
+    }
+
+    # fn: _web_server_configure_dns - Reuse existing interactive AD DNS setup via a direct action.
+    _web_server_configure_dns() {
+        local address="${WEB_ADDRESS:-}"
+        [[ "$address" =~ ^[A-Za-z0-9][A-Za-z0-9.-]*$ && "$address" == *.* ]] || {
+            sayfail "Invalid website hostname for DNS registration."; return 2;
+        }
+        _web_server_offer_dns_record "$address"
+    }
+
     # fn: _web_server_enable_site - Enable an available Nginx site
         # . Returns
         #   0 on success; non-zero when the operation cannot be completed.
@@ -850,12 +1041,15 @@ EOF
         local document_root=""
         local decision="NO"
         local remove_content="NO"
+        local web_address=""
         local -a sites=()
 
         mapfile -t sites < <(_web_server_available_sites 2>/dev/null || true)
         (( ${#sites[@]} > 0 )) || { saywarning "No Nginx sites are available."; return 0; }
         _web_ask_selection --label "Remove Nginx site configuration" --var site --items "${sites[@]}" || return 0
         document_root="$(_web_server_site_document_root "$site" 2>/dev/null || true)"
+        # Save the hostname before removing its Nginx configuration.
+        web_address="$(awk '$1 == "server_name" {for (i=2; i<=NF; i++) {gsub(/;/, "", $i); printf "%s%s", (i==2 ? "" : " "), $i}; exit}' "/etc/nginx/sites-available/$site" 2>/dev/null || true)"
 
         ask_decision --label "Remove site configuration '$site'" --choices "YES|Y,NO|N" --default "NO" --var decision
         [[ "$decision" == "YES" ]] || return 0
@@ -868,6 +1062,7 @@ EOF
         if (( ${FLAG_DRYRUN:-0} == 1 )); then
             sayinfo "DRYRUN: Would remove site configuration $site."
             [[ "$remove_content" == "YES" && -n "$document_root" ]] && _web_server_remove_document_content "$document_root"
+            [[ -n "$web_address" ]] && _web_server_remove_dns_record "$web_address"
             return 0
         fi
 
@@ -888,6 +1083,9 @@ EOF
         elif [[ -n "$document_root" ]]; then
             sayinfo "Document content retained: $document_root"
         fi
+        # Only offer DNS cleanup after the site configuration was removed successfully.
+        [[ -n "$web_address" ]] && _web_server_remove_dns_record "$web_address"
+        return 0
     }
 
     # fn: _web_server_remove_site_content - Remove the contents of a site's document root
@@ -1054,26 +1252,96 @@ EOF
         _web_server_save_state || return 1
         sayok "Documentation publishing target configured: $site"
     }
-    # fn: _web_server_documentation_status - Show documentation publishing status
+    # fn: _web_server_documentation_paths - Resolve and validate documentation sync endpoints
+        # . Purpose
+        #   Never sync a missing, nested, identical, or symlinked documentation root.
+        #   An installed source needs index.html; publishing never creates a new Nginx site.
         # . Usage
-        #   _web_server_documentation_status "<address>" "<address>"
+        #   _web_server_documentation_paths <source-var> <destination-var>
+    _web_server_documentation_paths() {
+        local source_var="$1" destination_var="$2" site="${SGND_WEB_DOC_SITE:-SolidGroundUX-Documentation}"
+        local src_inner="" dst_inner="" config_file="/etc/nginx/sites-available/$site"
+        [[ -r "$config_file" ]] || { saywarning "Documentation Nginx site not configured: $site"; return 1; }
+        src_inner="$(_web_server_installed_docs_root)" || return 1
+        dst_inner="$(_web_server_site_document_root "$site")" || return 1
+        [[ -d "$src_inner" && -f "$src_inner/index.html" ]] || { saywarning "Installed documentation missing or index.html absent: $src_inner"; return 1; }
+        [[ -d "$dst_inner" ]] || { saywarning "Published documentation directory missing: $dst_inner"; return 1; }
+        [[ ! -L "$src_inner" && ! -L "$dst_inner" ]] || { sayfail "Symlinked documentation roots are unsupported."; return 1; }
+        src_inner="$(realpath -e -- "$src_inner")" || return 1
+        dst_inner="$(realpath -e -- "$dst_inner")" || return 1
+        [[ "$src_inner" != "$dst_inner" && "$src_inner" != "$dst_inner"/* && "$dst_inner" != "$src_inner"/* ]] || {
+            sayfail "Documentation source and destination overlap; refusing synchronization."
+            return 1
+        }
+        [[ "$dst_inner" != / && "$src_inner" != / ]] || return 1
+        printf -v "$source_var" '%s' "$src_inner"
+        printf -v "$destination_var" '%s' "$dst_inner"
+    }
+
+    # fn: _web_server_documentation_changes - Check whether published documentation differs
+        # . Purpose
+        #   Compare the full tree with rsync's read-only itemized dry-run, including
+        #   removed files. Exit 0 when equal, 1 when different, 2 on comparison error.
+    _web_server_documentation_changes() {
+        local source="$1" destination="$2" output="" rc=0
+        command -v rsync >/dev/null 2>&1 || { saywarning "rsync is not installed."; return 2; }
+        output="$(rsync -rclni --delete --out-format='%i %n' -- "$source/" "$destination/" 2>&1)" || rc=$?
+        if (( rc != 0 )); then
+            saywarning "Documentation comparison failed (rsync exit $rc): $output"
+            return 2
+        fi
+        [[ -z "$output" ]] && return 0
+        return 1
+    }
+
+    # fn: _web_server_update_documentation - Preview and optionally publish installed docs
+        # . Purpose
+        #   This action only updates an EXISTING configured documentation site.
+        #   A mirrored update may remove obsolete files; explicit consent is required.
+    _web_server_update_documentation() {
+        local source="" destination="" decision="NO" rc=0
+        _web_server_documentation_paths source destination || return 1
+        _web_server_documentation_changes "$source" "$destination"; rc=$?
+        case "$rc" in
+            0) sayok "Published documentation is up to date."; return 0 ;;
+            1) ;;
+            *) return 1 ;;
+        esac
+        sgnd_print_labeledvalue --label "Installed docs" --value "$source" --labelwidth 24
+        sgnd_print_labeledvalue --label "Published docs" --value "$destination" --labelwidth 24
+        sayinfo "Installed and published documentation differ. A mirror update also deletes obsolete published files."
+        ask_decision --label "Update published documentation" --choices "YES|Y,NO|N" --default "NO" --var decision || return 0
+        [[ "$decision" == YES ]] || return 0
+        if (( ${FLAG_DRYRUN:-0} == 1 )); then
+            sayinfo "DRYRUN: Would mirror $source to $destination (including deletions)."
+            return 0
+        fi
+        # The existing site is owned by the web server; do not change its ownership.
+        sudo rsync -rlpt --delete -- "$source/" "$destination/" || {
+            sayfail "Documentation update failed; published files may be partially changed."
+            return 1
+        }
+        sayok "Published documentation updated: $destination"
+    }
+
+    # fn: _web_server_documentation_status - Show docs site and detect pending updates
+        # . Purpose
+        #   Only installed-documentation sources can be compared automatically;
+        #   remote and Git sources follow their separate publishing workflows.
     _web_server_documentation_status() {
         local site="${SGND_WEB_DOC_SITE:-SolidGroundUX-Documentation}"
         local config_file="/etc/nginx/sites-available/${SGND_WEB_DOC_SITE:-SolidGroundUX-Documentation}"
-        local state="Not configured"
-        local enabled="No"
+        local state="Not configured" enabled="No"
         local address="${SGND_WEB_DOC_ADDRESS:-Not configured}"
         local document_root="${SGND_WEB_DOC_ROOT:-Not configured}"
-        local installed_docs=""
-
-        installed_docs="$(_web_server_installed_docs_root)"
+        local installed_docs="" source="" destination="" compare_rc=0
+        installed_docs="$(_web_server_installed_docs_root)" || return 1
         if [[ -r "$config_file" ]]; then
             state="Configured"
             [[ -e "/etc/nginx/sites-enabled/$site" ]] && enabled="Yes"
             address="$(awk '$1 == "server_name" {gsub(/;/, "", $2); print $2; exit}' "$config_file" 2>/dev/null || printf '%s' "$address")"
             document_root="$(_web_server_site_document_root "$site" 2>/dev/null || printf '%s' "$document_root")"
         fi
-
         sgnd_print
         sgnd_print_sectionheader "SolidGroundUX Documentation"
         sgnd_print_labeledvalue --label "Site" --value "$site" --labelwidth 24
@@ -1088,6 +1356,20 @@ EOF
         sgnd_print_labeledvalue --label "Document root" --value "$document_root" --labelwidth 24
         sgnd_print_labeledvalue --label "Installed docs" --value "$installed_docs" --labelwidth 24
         sgnd_print_labeledvalue --label "Source type" --value "${SGND_WEB_DOC_SOURCE_TYPE:-Installed documentation}" --labelwidth 24
+        if [[ "${SGND_WEB_DOC_SOURCE_TYPE:-Installed documentation}" != "Installed documentation" ]]; then
+            sayinfo "Update comparison is available for installed documentation only."
+            return 0
+        fi
+        _web_server_documentation_paths source destination || return 0
+        _web_server_documentation_changes "$source" "$destination"; compare_rc=$?
+        case "$compare_rc" in
+            0) sayok "Published documentation matches installed documentation." ;;
+            1)
+                saywarning "Installed documentation differs from published documentation."
+                _web_server_update_documentation
+                ;;
+            *) saywarning "Documentation currency could not be determined." ;;
+        esac
     }
 
 # - Status / validation ------------------------------------------------------------
@@ -1183,8 +1465,12 @@ EOF
             start) _web_server_step_start || rc=$? ;;
             configure-root) _web_server_configure_root || rc=$? ;;
             manage-sites) _web_server_manage_sites || rc=$? ;;
+            ensure-site) _web_server_ensure_site || rc=$? ;;
+            ensure-directory) _web_server_ensure_directory_for_publish || rc=$? ;;
+            configure-dns) _web_server_configure_dns || rc=$? ;;
             configure-documentation) _web_server_configure_documentation_site || rc=$? ;;
             documentation-status) _web_server_documentation_status || rc=$? ;;
+            update-documentation) _web_server_update_documentation || rc=$? ;;
             service) _web_server_manage_service || rc=$? ;;
             firewall) _web_server_configure_firewall || rc=$? ;;
             validate) _web_server_validate || rc=$? ;;

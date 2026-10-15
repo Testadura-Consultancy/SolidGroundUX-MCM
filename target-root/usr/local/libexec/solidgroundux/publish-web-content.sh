@@ -166,7 +166,7 @@ set -uo pipefail
     : "${SGND_WEB_DOC_SOURCE_DIR:=}"
     : "${SGND_WEB_DOC_REPOSITORY:=}"
     : "${SGND_WEB_DOC_REF:=master}"
-    : "${SGND_WEB_DOC_REPO_PATH:=target-root/usr/local/share/testadura/solidgroundux/doc}"
+    : "${SGND_WEB_DOC_REPO_PATH:=target-root/usr/local/share/doc/solidgroundux-codex}"
 
     # Render a local numbered selector using the Web Server action layout.
     # The framework ask_selection API is intentionally left unchanged.
@@ -261,19 +261,26 @@ set -uo pipefail
         printf '%s\n' "$configured"
     }
 
-    # fn: _web_server_installed_docs_root - Resolve the installed SolidGroundUX documentation path
+    # fn: _web_server_installed_docs_root - Resolve installed documentation from configuration
+        # . Purpose
+        #   Read SGND_WEB_DOC_INSTALLED_ROOT from the environment or web-server.cfg;
+        #   use the canonical installed documentation directory if unset.
+        #   Support staged framework roots during development.
         # . Output
-        #   Writes the documentation directory belonging to the active framework root.
-        # . Usage
-        #   _web_server_installed_docs_root
+        #   Prints the configured absolute documentation path.
     _web_server_installed_docs_root() {
+        local configured="${SGND_WEB_DOC_INSTALLED_ROOT:-}"
         local framework_root="${SGND_FRAMEWORK_ROOT:-/}"
 
-        if [[ "$framework_root" == "/" ]]; then
-            printf '/usr/local/share/testadura/solidgroundux/doc\n'
-        else
-            printf '%s/usr/local/share/testadura/solidgroundux/doc\n' "${framework_root%/}"
+        if [[ -z "$configured" && -r "$SGND_WEB_SERVER_CONFIG_FILE" ]]; then
+            configured="$(awk -F= '$1 == "SGND_WEB_DOC_INSTALLED_ROOT" {sub(/^[^=]*=/, ""); print; exit}' "$SGND_WEB_SERVER_CONFIG_FILE")"
         fi
+        [[ -n "$configured" ]] || configured="/usr/local/share/doc/solidgroundux-codex"
+        [[ "$configured" == /* ]] || { sayfail "Documentation source must be an absolute path." >&2; return 2; }
+        if [[ "$framework_root" != "/" && "$configured" == /usr/* ]]; then
+            configured="${framework_root%/}${configured}"
+        fi
+        printf '%s\n' "$configured"
     }
 
     # fn: _web_server_site_document_root - Resolve the document root for an Nginx site
@@ -588,7 +595,7 @@ set -uo pipefail
         local source_dir="${SGND_WEB_DOC_SOURCE_DIR:-}"
         local repository="${SGND_WEB_DOC_REPOSITORY:-}"
         local repo_ref="${SGND_WEB_DOC_REF:-master}"
-        local repo_path="${SGND_WEB_DOC_REPO_PATH:-target-root/usr/local/share/testadura/solidgroundux/doc}"
+        local repo_path="${SGND_WEB_DOC_REPO_PATH:-target-root/usr/local/share/doc/solidgroundux-codex}"
         local installed_docs=""
         local document_root=""
         local source_spec=""
@@ -606,7 +613,7 @@ set -uo pipefail
 
         document_root="$(_web_server_site_document_root "$site" 2>/dev/null || true)"
         [[ -n "$document_root" ]] || { sayfail "Could not determine document root for documentation site $site."; return 1; }
-        installed_docs="$(_web_server_installed_docs_root)"
+        installed_docs="$(_web_server_installed_docs_root)" || return 1
 
         sgnd_print
         sgnd_print_sectionheader ""

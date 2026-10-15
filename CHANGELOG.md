@@ -6,11 +6,6 @@ The format is inspired by *Keep a Changelog* while remaining focused on practica
 
 ## Backlog
 
-- Fix the hardcoded legacy documentation path in both manage-web-server.sh and publish-web-content.sh.
-- When published documentation already exists and SolidGroundUX gets upgraded, the Web Server module should be able to show something like “Installed documentation newer than published documentation” and offer Update published documentation.
-- Add an option to completely remove a managed website, with separate handling of web-server configuration and optional document-root deletion.
-- Add favicon support for managed websites, allowing sites such as the SolidGroundUX documentation site to expose a recognizable browser/tab icon.
-
 ### AD Server module
 
 - Add support for joining an existing Active Directory domain as an additional writable domain controller, including discovery/authentication, additional-DC provisioning, Kerberos/resolver/DNS configuration, replication validation, and compound subtask progress reporting. This is a post-2.1 feature.
@@ -34,6 +29,16 @@ The format is inspired by *Keep a Changelog* while remaining focused on practica
 - Added Testadura Markdown component extensions, including nested `:::` component blocks, responsive `td-grid` / `td-tile` layouts, callouts, inline/image classes, and native scroll-snap image galleries.
 - Added configurable featured-content support through `featured.cfg`, allowing product pages or articles to be curated independently of the site navigation and resolved per language by the generator.
 - Added website-source validation for content metadata, duplicate generated routes, missing section indexes, component CSS references, featured-content targets, and other generation-time consistency checks.
+- Added section management for creating, renaming/moving, and removing website sections, including configurable section index pages and explicit choices for moving, archiving, or deleting contained content.
+- Added interactive page-metadata editing and management of publication status, with draft/preview output separated from the public website.
+- Added website publication destinations stored as reusable profiles, including SSH/rsync targets and **Update** versus **Mirror** synchronization previews with explicit confirmation.
+- Added remote Nginx-site provisioning from Web Content Management: check the destination host and document root, offer to create missing sites, and refuse silently changing conflicting existing site configurations.
+- Added assisted SSH authentication recovery for remote publication, including agent detection, fallback to the fixed SolidGroundUX socket, key unlocking, public-key installation, and retry.
+- Added remote publication-directory preparation and permission checks, with confirmed remediation for the publishing account while keeping the site readable by Nginx.
+- Added optional internal DNS A-record registration and post-publication DNS/HTTP verification as part of the website-deployment workflow.
+- Added optional DNS A-record cleanup to **Web Server Management → Manage Sites → Remove site**, limited to a record matching the local web-server address and requiring explicit confirmation.
+- Added a documentation content comparison to **Documentation status**, with a confirmed **Update published documentation** operation using an rsync checksum preview.
+- Added favicon rendering/support through the Python site renderer so published sites can serve `favicon.ico` as a static asset; no separate Nginx management action is required.
 
 ### Changed
 
@@ -42,11 +47,20 @@ The format is inspired by *Keep a Changelog* while remaining focused on practica
 - Changed multilingual generation so navigation and language-switch links are emitted only for translations that actually exist in the generated output.
 - Changed Web Content Management action status handling so a successful ingest or delete operation that changes website source marks **Generate website** as warning until the site is regenerated successfully.
 - Changed page-deletion UX to use multi-selection and the standard SolidGroundUX auto-continue flow, with **Enter** returning to the menu and **A** offering another deletion pass.
+- Changed Web Content Management publishing from a configuration-file-only operation into an interactive, destination-based deployment flow while retaining preview and cancellation controls.
+- Changed remote hosting operations to execute the canonical Web Server Management executable under the existing constrained SolidGroundUX sudo policy rather than assuming general passwordless sudo.
+- Changed SSH helper loading to use `SGND_USING=(sgnd-ssh-deployment.sh)` and its Framework-owned common library, rather than a hand-maintained set of library search paths.
+- Changed Computer Setup into a thin console orchestrator with separate computer/identity and SSH-access management executables; added per-user SSH key-generation, remote installation, agent-unlock, and authentication-test actions.
+- Changed the installed-documentation source path in Web Server Management to `/usr/local/share/doc/solidgroundux-codex`, with an override through `SGND_WEB_DOC_INSTALLED_ROOT` or `web-server.cfg`.
 
 ### Fixed
 
 - Fixed language-switch generation that could previously expose links to untranslated pages when only a subset of configured languages was generated.
 - Fixed nested Testadura Markdown component parsing so nested `:::` blocks are handled correctly without being confused by fenced code blocks containing the same marker.
+- Fixed reversed SSH username/hostname parameters during remote publishing authentication checks.
+- Fixed remote Web Server executable resolution to use the canonical MCM `libexec` path rather than nonexistent `mcm` subdirectories.
+- Fixed remote provisioning's incompatible `sudo -n true` precheck and aligned privileged site setup with the configured SolidGroundUX executable sudo rule.
+- Fixed a publishing-script regression that restored obsolete manual SSH-helper sourcing and argument ordering.
 
 ## Release 2.1.2627801
 
