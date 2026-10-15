@@ -117,6 +117,14 @@ class ContentItem:
         return value if value in {"draft", "preview", "published"} else ("draft" if self.metadata.get("draft", False) else "published")
 
     @property
+    def hidden(self) -> bool:
+        """Whether a published page is omitted from normal discovery/navigation.
+
+        Hidden is not an access-control mechanism: generated pages remain public.
+        """
+        return str(self.metadata.get("hidden", False)).strip().lower() in {"true", "yes", "1"}
+
+    @property
     def featured(self) -> bool:
         """Handle featured for the web content workflow.
         

@@ -156,14 +156,19 @@ def _render_navigation(
     }
 
     links: list[str] = []
+    hidden_routes = {_base_route_for_item(candidate, default_language) for candidate in items if candidate.hidden and candidate.language == language and candidate.base_name == "index"}
     for item in navigation:
         label = item.labels.get(language)
         if not label or item.path not in available_paths:
             continue
         href = language_route(item.path, language, default_language)
         active = current_base_route == item.path or (item.path != "/" and current_base_route.startswith(item.path))
-        class_attr = ' class="active" aria-current="page"' if active else ""
-        links.append(f'<a href="{html.escape(href, quote=True)}"{class_attr}>{html.escape(label)}</a>')
+        classes = ["active"] if active else []
+        if item.path in hidden_routes:
+            classes.append("wc-hidden-link")
+        class_attr = f' class="{" ".join(classes)}"' if classes else ""
+        current_attr = ' aria-current="page"' if active else ""
+        links.append(f'<a href="{html.escape(href, quote=True)}"{class_attr}{current_attr}>{html.escape(label)}</a>')
     return "\n".join(links)
 
 
@@ -389,7 +394,7 @@ def _index_row(item: ContentItem, image: str, *, article: bool) -> str:
 def _render_index(item: ContentItem, items: list[ContentItem], default_language: str,
                   config, output_path: Path, kind: str = "auto", sort: str = "") -> str:
     """Render index for website output."""
-    children = _direct_children(item, items, default_language)
+    children = [child for child in _direct_children(item, items, default_language) if not child.hidden]
     if not children:
         return ""
     kind = kind if kind in {"auto", "cards", "list", "articles"} else "auto"
@@ -458,7 +463,7 @@ def _direct_children(item: ContentItem, items: list[ContentItem], default_langua
 
 def _listing_for(item: ContentItem, items: list[ContentItem], default_language: str) -> str:
     """Handle listing for for the web content workflow."""
-    children = _direct_children(item, items, default_language)
+    children = [child for child in _direct_children(item, items, default_language) if not child.hidden]
     children.sort(key=lambda child: (child.date, child.title.lower()), reverse=True)
     return "\n".join(_card(child) for child in children)
 
@@ -468,7 +473,7 @@ def _section_children_for(item: ContentItem, items: list[ContentItem], default_l
     if item.template != "page" or item.base_name != "index":
         return ""
 
-    children = _direct_children(item, items, default_language)
+    children = [child for child in _direct_children(item, items, default_language) if not child.hidden]
     if not children:
         return ""
 
@@ -858,7 +863,7 @@ def _seo_tags(item: ContentItem, config, canonical: str, description: str, image
     if image:
         tags.extend([f'<meta property="og:image" content="{esc(image)}">',
                      f'<meta name="twitter:image" content="{esc(image)}">'])
-    if mode == "preview" or item.status != "published":
+    if mode == "preview" or item.status != "published" or item.hidden:
         tags.append('<meta name="robots" content="noindex,nofollow">')
     if item.date and item.template == "article":
         tags.append(f'<meta property="article:published_time" content="{esc(item.date)}">')
@@ -871,7 +876,7 @@ def _write_sitemap(output: Path, config, items: list[ContentItem], langs: set[st
     ET.register_namespace("", ns)
     root = ET.Element(f"{{{ns}}}urlset")
     for item in sorted(items, key=lambda value: value.route):
-        if item.language not in langs or item.status != "published":
+        if item.language not in langs or item.status != "published" or item.hidden:
             continue
         entry = ET.SubElement(root, f"{{{ns}}}url")
         ET.SubElement(entry, f"{{{ns}}}loc").text = config.base_url.rstrip("/") + item.route
@@ -883,7 +888,7 @@ def _write_sitemap(output: Path, config, items: list[ContentItem], langs: set[st
 
 def _write_rss(output: Path, config, items: list[ContentItem], langs: set[str]) -> bool:
     """Write rss to generated output."""
-    articles = sorted((i for i in items if i.template == "article" and i.date and i.language in langs and i.status == "published"), key=lambda i: i.date, reverse=True)
+    articles = sorted((i for i in items if i.template == "article" and i.date and i.language in langs and i.status == "published" and not i.hidden), key=lambda i: i.date, reverse=True)
     if not articles:
         return False
     rss = ET.Element("rss", version="2.0")
