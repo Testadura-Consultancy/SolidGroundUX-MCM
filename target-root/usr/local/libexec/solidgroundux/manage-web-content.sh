@@ -4,13 +4,14 @@
 # -------------------------------------------------------------------------------------
 # Metadata:
 #   Version     : 2.1
-#   Build       : -
+#   Build       : 2628700
 #   Shortname   : MANAGE_WEB_CONTENT
 #   Source      : manage-web-content.sh
 #   Type        : script
 #   Group       : Role Managers
 #   Purpose     : Ingest, delete, generate, validate, and prepare static website content
 #
+#   Checksum : af471b3b221c3efc220afff0193943bb3392e02fb7a3e865e233864f7ecebe48
 # Description:
 #   Provides the SolidGroundUX user-facing workflow for the reusable Python WebContent
 #   engine. All prompts, state, progress, and result reporting remain in this Bash layer;
@@ -31,6 +32,37 @@ set -uo pipefail
 
 # - Bootstrap ----------------------------------------------------------------------
     # fn$ _framework_locator - Resolve and load the active SolidGroundUX framework
+        # . Purpose
+        #   Determine the filesystem root of the currently executing SolidGroundUX tree
+        #   from the script's physical path, then load the executable runtime library.
+        #
+        # . Behavior
+        #   - Resolves the physical path of the executing script.
+        #   - Treats usr, etc, and var as the canonical top-level SolidGroundUX tree roots.
+        #   - Uses the last occurrence of one of those path components to determine the
+        #     active filesystem root.
+        #   - Resolves production scripts beneath /usr, /etc, or /var to root (/).
+        #   - Resolves staged/development trees to the path prefix preceding the detected
+        #     usr, etc, or var component.
+        #   - Loads sgnd-exe-common.sh from the resolved framework root when available.
+        #   - For staged/development trees where the executable common library is not
+        #     present, falls back to the installed framework copy without changing
+        #     SGND_FRAMEWORK_ROOT.
+        #
+        # . Globals (write)
+        #   SGND_FRAMEWORK_ROOT
+        #
+        # . Output
+        #   Writes fatal bootstrap errors to stderr using printf because framework UI
+        #   helpers are not available until sgnd-exe-common.sh has been loaded.
+        #
+        # . Returns
+        #   0 when the framework root was resolved and executable common library loaded.
+        #   126 when the script path cannot be resolved, no canonical root component can
+        #   be found, or the executable common library is unreadable.
+        #
+        # . Usage
+        #   _framework_locator || return $?
     _framework_locator() {
         local script_file=""
         local path_without_root=""
@@ -48,14 +80,21 @@ set -uo pipefail
 
         path_without_root="${script_file#/}"
         IFS='/' read -r -a path_parts <<< "$path_without_root"
+
         for index in "${!path_parts[@]}"; do
             component="${path_parts[$index]}"
-            case "$component" in usr|etc|var) root_index=$index ;; esac
+            case "$component" in
+                usr|etc|var)
+                    root_index=$index
+                    ;;
+            esac
         done
+
         if (( root_index < 0 )); then
             printf 'FATAL: Cannot determine SolidGroundUX framework root from: %s\n' "$script_file" >&2
             return 126
         fi
+
         if (( root_index == 0 )); then
             framework_root="/"
         else
@@ -64,18 +103,24 @@ set -uo pipefail
                 framework_root+="/${path_parts[$index]}"
             done
         fi
+
         SGND_FRAMEWORK_ROOT="$framework_root"
 
         if [[ "$SGND_FRAMEWORK_ROOT" == "/" ]]; then
             exe_common="/usr/local/lib/solidgroundux/common/sgnd-exe-common.sh"
         else
             exe_common="${SGND_FRAMEWORK_ROOT%/}/usr/local/lib/solidgroundux/common/sgnd-exe-common.sh"
-            [[ -r "$exe_common" ]] || exe_common="/usr/local/lib/solidgroundux/common/sgnd-exe-common.sh"
+
+            if [[ ! -r "$exe_common" ]]; then
+                exe_common="/usr/local/lib/solidgroundux/common/sgnd-exe-common.sh"
+            fi
         fi
+
         [[ -r "$exe_common" ]] || {
             printf 'FATAL: Cannot read executable common library: %s\n' "$exe_common" >&2
             return 126
         }
+
         # shellcheck source=/dev/null
         source "$exe_common"
     }
@@ -89,7 +134,7 @@ set -uo pipefail
 # - Framework integration -----------------------------------------------------------
     SGND_USING=()
     SGND_ARGS_SPEC=(
-        "action|a|enum|ACTION|Management action||ingest,delete,edit-metadata,move-page,manage-sections,generate,validate,prepare-social,status"
+        "action|a|enum|ACTION|Management action||ingest,delete,edit-metadata,move-page,manage-sections,manage-config,generate,publish,validate,prepare-social,status"
         "ingest-dir|i|value|INGEST_DIR|Override Markdown ingestion directory||"
     )
     SGND_SCRIPT_EXAMPLES=(
@@ -97,6 +142,8 @@ set -uo pipefail
         "  $SGND_SCRIPT_NAME --action ingest --ingest-dir /path/to/incoming"
         "  $SGND_SCRIPT_NAME --action delete"
         "  $SGND_SCRIPT_NAME --action generate"
+        "  $SGND_SCRIPT_NAME --action publish"
+        "  $SGND_SCRIPT_NAME --action manage-config"
         "  $SGND_SCRIPT_NAME --action validate"
         "  $SGND_SCRIPT_NAME --action prepare-social"
         "  $SGND_SCRIPT_NAME --action status"
@@ -1432,6 +1479,284 @@ PYCODE
         done
     }
 
+    # fn: _web_content_manage_config - Select an existing .cfg file and open it in nano.
+        # . Behavior
+        #   - Uses the currently selected website repository and its config/ directory.
+        #   - Lists only regular .cfg files found directly under config/.
+        #   - Uses the framework selection dialogue; cancellation changes nothing.
+        #   - Reports editor failures and marks website generation pending only on changes.
+        #   - Does not create arbitrary files or execute paths entered by the user.
+    _web_content_manage_config() {
+        local config_dir="" selected="" target="" before="" after="" rc=0
+        local -a files=()
+
+        _web_content_select_source || return 0
+        config_dir="${SGND_WEB_CONTENT_SOURCE%/}/config"
+        if [[ ! -d "$config_dir" ]]; then
+            sayfail "Website configuration directory not found: $config_dir"
+            return 1
+        fi
+        if ! command -v nano >/dev/null 2>&1; then
+            sayfail "nano is not installed. Install nano to edit website configuration."
+            return 127
+        fi
+
+        while IFS= read -r -d '' target; do
+            files+=("${target##*/}")
+        done < <(find "$config_dir" -maxdepth 1 -type f -name '*.cfg' -print0 | sort -z)
+        if (( ${#files[@]} == 0 )); then
+            saywarning "No .cfg files found in: $config_dir"
+            return 0
+        fi
+
+        ask_selection --label "Configuration file" --var selected --items "${files[@]}" || return 0
+        # Never accept a path from the selection result, even when the menu is modified.
+        [[ -n "$selected" && "$selected" == "${selected##*/}" && "$selected" == *.cfg ]] || {
+            sayfail "Invalid configuration selection."
+            return 1
+        }
+        target="$config_dir/$selected"
+        [[ -f "$target" && ! -L "$target" ]] || {
+            sayfail "Configuration file is unavailable or is a symbolic link: $target"
+            return 1
+        }
+        [[ -r "$target" && -w "$target" ]] || {
+            sayfail "Configuration file is not readable and writable: $target"
+            return 1
+        }
+
+        before="$(sha256sum -- "$target" | cut -d ' ' -f 1)" || return 1
+        sgnd_print
+        sgnd_print_sectionheader --text "Edit website configuration"
+        sgnd_print_labeledvalue --label "File" --value "$target" --labelwidth 20
+        nano -- "$target" || rc=$?
+        if (( rc != 0 )); then
+            sayfail "nano exited with status $rc."
+            return "$rc"
+        fi
+        after="$(sha256sum -- "$target" | cut -d ' ' -f 1)" || return 1
+        if [[ "$before" != "$after" ]]; then
+            _web_content_record_activity 1
+            sayok "Configuration updated: $selected. Regenerate and validate the website."
+        else
+            sayinfo "Configuration unchanged: $selected"
+        fi
+    }
+
+# - Website publication -------------------------------------------------------------
+    # fn: _web_content_publish_profiles - Read a website-local publishing.cfg file.
+        # . Behavior
+        #   - Uses Python's INI parser rather than evaluating configuration as shell code.
+        #   - Emits profile names or one selected profile as NUL-delimited fields.
+        #   - Never stores passwords in the website repository.
+    _web_content_publish_profiles() {
+        local config_file="${SGND_WEB_CONTENT_SOURCE%/}/config/publishing.cfg"
+        local profile="${1:-}"
+        python3 - "$config_file" "$profile" <<'PYCODE'
+import configparser
+import sys
+
+config = configparser.ConfigParser(interpolation=None)
+try:
+    with open(sys.argv[1], encoding="utf-8") as stream:
+        config.read_file(stream)
+except (OSError, configparser.Error) as exc:
+    print("Invalid publishing configuration: {}".format(exc), file=sys.stderr)
+    sys.exit(1)
+
+profile = sys.argv[2]
+if not profile:
+    for name in config.sections():
+        print(name)
+else:
+    if profile not in config:
+        print("Unknown publishing profile: {}".format(profile), file=sys.stderr)
+        sys.exit(1)
+    values = config[profile]
+    keys = ("type", "path", "host", "user", "port", "identity_file")
+    for key in keys:
+        value = values.get(key, "").strip()
+        if "\x00" in value or "\n" in value or "\r" in value:
+            print("Invalid value for {}".format(key), file=sys.stderr)
+            sys.exit(1)
+        sys.stdout.buffer.write(value.encode("utf-8") + b"\x00")
+PYCODE
+    }
+
+    # fn: _web_content_publish_create_config - Create an editable example configuration when absent.
+        # . Behavior
+        #   - Never overwrites existing publication profiles.
+        #   - Profile paths must point to a dedicated website directory, never a filesystem root.
+        #   - SFTP needs lftp and an SSH key/agent configured outside the repository.
+    _web_content_publish_create_config() {
+        local config_file="${SGND_WEB_CONTENT_SOURCE%/}/config/publishing.cfg"
+        local decision="NO"
+        [[ ! -e "$config_file" ]] || return 0
+        ask_decision --label "Create config/publishing.cfg with example profiles?" --choices "YES|Y,NO|N" --default "YES" --var decision || return 1
+        [[ "$decision" == YES ]] || return 1
+        cat > "$config_file" <<'CFG'
+# Publishing profiles. Choose a dedicated destination directory.
+# Credentials and private keys must NOT be put in this file.
+# Supported types: local, rsync, sftp.
+# Edit the placeholders before using the example profiles.
+# For rsync: host, user, path and optionally port and identity_file.
+# For sftp: host, user, path and optionally port; authenticate via SSH agent/config.
+
+[local-example]
+type = local
+path = /srv/www/testadura
+
+# [hostnet]
+# type = sftp
+# host = your-sftp-host.example
+# user = your-username
+# port = 22
+# path = /remote/website/directory
+
+# [remote-server]
+# type = rsync
+# host = webserver.example
+# user = sysadmin
+# port = 22
+# path = /var/www/testadura
+# identity_file = ~/.ssh/id_ed25519
+CFG
+        sayok "Created $config_file. Edit it using Manage Config before publishing."
+    }
+
+    # fn: _web_content_publish_safe_path - Reject dangerous destination paths before any transfer.
+    _web_content_publish_safe_path() {
+        local path="${1:-}"
+        [[ "$path" == /* && "$path" != "/" && "$path" != *".."* && "$path" != *$'\n'* && "$path" != *$'\r'* ]] || return 1
+        # Ban shell/lftp metacharacters in user-controlled remote paths; spaces are accepted.
+        [[ "$path" != *'"'* && "$path" != *"'"* && "$path" != *\* && "$path" != *';'* && "$path" != *'$'* && "$path" != *'`'* && "$path" != *'!'* ]] || return 1
+        [[ "${path#/}" == */* ]] || return 1
+    }
+
+    # fn: _web_content_publish - Preview and upload a generated site to a chosen destination.
+        # . Behavior
+        #   - Offers website-specific profiles in config/publishing.cfg.
+        #   - Previews synchronization before requesting explicit confirmation.
+        #   - Never deletes remote files; safe incremental publishing is the default.
+        #   - For SFTP, requires lftp and SSH authentication configured on the host.
+        #   - Only the generated output is transferred; repository metadata is never uploaded.
+    _web_content_publish() {
+        local selected="" config_file="" source="" type="" target="" host="" user="" port="" identity=""
+        local decision="NO" rc=0 preview="" destination="" ssh_transport="" ssh_identity=""
+        local -a profiles=() values=() command_args=() extra=()
+
+        _web_content_select_source || return 0
+        config_file="${SGND_WEB_CONTENT_SOURCE%/}/config/publishing.cfg"
+        if [[ ! -e "$config_file" ]]; then
+            _web_content_publish_create_config || return 0
+            sayinfo "Configure a real destination in publishing.cfg, then select Publish website again."
+            return 0
+        fi
+        [[ -f "$config_file" && ! -L "$config_file" ]] || { sayfail "Unsafe publishing configuration file: $config_file"; return 1; }
+        local profile_file=""
+        profile_file="$(mktemp)" || return 1
+        if ! _web_content_publish_profiles > "$profile_file"; then rm -f "$profile_file"; return 1; fi
+        mapfile -t profiles < "$profile_file"
+        rm -f "$profile_file"
+        (( ${#profiles[@]} > 0 )) || { saywarning "No profiles found in $config_file"; return 0; }
+        ask_selection --label "Publishing destination" --var selected --items "${profiles[@]}" || return 0
+        profile_file="$(mktemp)" || return 1
+        if ! _web_content_publish_profiles "$selected" > "$profile_file"; then rm -f "$profile_file"; return 1; fi
+        mapfile -d '' -t values < "$profile_file"
+        rm -f "$profile_file"
+        (( ${#values[@]} == 6 )) || { sayfail "Invalid publishing profile: $selected"; return 1; }
+        type="${values[0],,}"; target="${values[1]}"; host="${values[2]}"; user="${values[3]}"
+        port="${values[4]:-22}"; identity="${values[5]}"
+        _web_content_publish_safe_path "$target" || { sayfail "Unsafe destination directory: $target"; return 1; }
+        [[ "$port" =~ ^[0-9]+$ ]] && (( port > 0 && port <= 65535 )) || { sayfail "Invalid port: $port"; return 1; }
+        source="${SGND_WEB_CONTENT_OUTPUT%/}"
+        [[ -d "$source" && -f "$source/index.html" ]] || {
+            sayfail "Generated output is missing (index.html required): $source. Run Generate website first."
+            return 1
+        }
+        source="$(realpath -e -- "$source")" || return 1
+        [[ "$source" != / && "$source" != "${SGND_WEB_CONTENT_SOURCE%/}" ]] || { sayfail "Unsafe generation output directory."; return 1; }
+        if [[ -n "$(find "$source" -type l -print -quit)" ]]; then
+            sayfail "Generated output contains symbolic links; refusing to publish them."
+            return 1
+        fi
+        # Exclude previews only by intent: users must point SGND_WEB_CONTENT_OUTPUT at their public output.
+        if [[ "$source" == *-preview ]]; then
+            sayfail "Refusing to publish a preview output directory. Generate a public website first."
+            return 1
+        fi
+        sgnd_print
+        sgnd_print_sectionheader --text "Publication preview: $selected"
+        sgnd_print_labeledvalue --label "Local output" --value "$source" --labelwidth 20
+        sgnd_print_labeledvalue --label "Transport" --value "$type" --labelwidth 20
+        sgnd_print_labeledvalue --label "Remote path" --value "$target" --labelwidth 20
+        preview="$(mktemp)" || return 1
+        case "$type" in
+            local)
+                command -v rsync >/dev/null 2>&1 || { sayfail "rsync is required for local publishing."; rm -f "$preview"; return 127; }
+                destination="$(realpath -m -- "$target")"
+                [[ "$destination" != "$source" && "$destination" != "$source/"* && "$source" != "$destination/"* ]] || {
+                    sayfail "Source and destination must not overlap."; rm -f "$preview"; return 1;
+                }
+                # Do not create a destination until the user confirms the preview.
+                command_args=(rsync -rltvi --dry-run -- "$source/" "$destination/")
+                ;;
+            rsync)
+                command -v rsync >/dev/null 2>&1 || { sayfail "rsync is not installed."; rm -f "$preview"; return 127; }
+                [[ "$host" =~ ^[a-zA-Z0-9._-]+$ && "$user" =~ ^[a-zA-Z_][a-zA-Z0-9_.-]*$ ]] || {
+                    sayfail "Invalid remote host or user."; rm -f "$preview"; return 1;
+                }
+                ssh_transport="ssh -o BatchMode=yes -p $port"
+                if [[ -n "$identity" ]]; then
+                    ssh_identity="${identity/#\~\//$HOME/}"
+                    [[ -r "$ssh_identity" && "$ssh_identity" != *' '* ]] || { sayfail "Identity file must exist and contain no spaces."; rm -f "$preview"; return 1; }
+                    ssh_transport+=" -i $ssh_identity"
+                fi
+                [[ "$target" != *[[:space:]]* ]] || { sayfail "rsync remote path must not contain spaces."; rm -f "$preview"; return 1; }
+                destination="${user}@${host}:${target}/"
+                command_args=(rsync -rltvi --dry-run -e "$ssh_transport" -- "$source/" "$destination")
+                ;;
+            sftp)
+                command -v lftp >/dev/null 2>&1 || { sayfail "lftp is required for SFTP publishing (install: sudo apt install lftp)."; rm -f "$preview"; return 127; }
+                [[ "$host" =~ ^[a-zA-Z0-9._-]+$ && "$user" =~ ^[a-zA-Z_][a-zA-Z0-9_.-]*$ ]] || {
+                    sayfail "Invalid SFTP host or user."; rm -f "$preview"; return 1;
+                }
+                [[ -z "$identity" ]] || { sayfail "For SFTP configure your identity in ~/.ssh/config or SSH agent, not identity_file."; rm -f "$preview"; return 1; }
+                _web_content_publish_safe_path "$source" || { sayfail "SFTP source directory has unsupported special characters."; rm -f "$preview"; return 1; }
+                # Input restrictions above prevent command injection into the lftp script.
+                extra=("set cmd:fail-exit true" "set net:max-retries 1" "open -u \"$user\" sftp://$host:$port" "mirror --reverse --verbose --dry-run --no-perms \"$source\" \"$target\"" "bye")
+                command_args=(lftp -e "$(printf '%s; ' "${extra[@]}")")
+                ;;
+            *) sayfail "Unsupported publication transport: $type"; rm -f "$preview"; return 1 ;;
+        esac
+        sayinfo "Checking publication changes (no files are written)..."
+        "${command_args[@]}" > "$preview" 2>&1 || rc=$?
+        if (( rc != 0 )); then
+            sayfail "Publication preview failed; no files uploaded."
+            while IFS= read -r line; do [[ -n "$line" ]] && sgnd_print --text "$line"; done < "$preview"
+            rm -f "$preview"; return "$rc"
+        fi
+        while IFS= read -r line; do [[ -n "$line" ]] && sgnd_print --text "$line"; done < "$preview"
+        rm -f "$preview"
+        saywarning "Publishing adds or updates files only; it does NOT remove obsolete files on the destination."
+        ask_decision --label "Publish generated files to $selected?" --choices "YES|Y,NO|N" --default "NO" --var decision || return 0
+        [[ "$decision" == YES ]] || { saycancel "Publication cancelled."; return 0; }
+        rc=0
+        case "$type" in
+            local)
+                mkdir -p -- "$destination" || return 1
+                rsync -rltvi -- "$source/" "$destination/" || rc=$?
+                ;;
+            rsync) rsync -rltvi -e "$ssh_transport" -- "$source/" "$destination" || rc=$? ;;
+            sftp)
+                extra=("set cmd:fail-exit true" "set net:max-retries 1" "open -u \"$user\" sftp://$host:$port" "mirror --reverse --verbose --no-perms \"$source\" \"$target\"" "bye")
+                lftp -e "$(printf '%s; ' "${extra[@]}")" || rc=$?
+                ;;
+        esac
+        if (( rc != 0 )); then sayfail "Publication failed (exit $rc)."; return "$rc"; fi
+        sayok "Website published to $selected. Files on the destination have not been deleted."
+    }
+
 # - Action dispatch -----------------------------------------------------------------
     # fn: _run_action - Dispatch the requested command-line management action.
     _run_action() {
@@ -1441,12 +1766,14 @@ PYCODE
             edit-metadata) _web_content_manage_page edit-metadata ;;
             move-page) _web_content_manage_page move-page ;;
             manage-sections) _web_content_manage_sections ;;
+            manage-config) _web_content_manage_config ;;
             delete)
                 # Deletion owns its closing section line and repeat/return dialog.
                 _web_content_delete
                 return $?
                 ;;
             generate) _web_content_generate ;;
+            publish) _web_content_publish ;;
             validate) _web_content_validate ;;
             prepare-social) _web_content_prepare_social ;;
             status) _web_content_status ;;

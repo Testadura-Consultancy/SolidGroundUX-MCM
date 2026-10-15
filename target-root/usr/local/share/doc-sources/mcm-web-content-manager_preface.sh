@@ -3,8 +3,8 @@
 # ----------------------------------------------------------------------------------
 # Metadata:
 #   Version     : 2.1
-#   Build       : 0
-#   Checksum    : -
+#   Build       : 2628700
+#   Checksum    : 8d8bc05bce81119cbf956b9d88c4a560bd44b657dfa95b808975c2327734916a
 #   Source      : web-content-manager_preface.sh
 #   Type        : documentation
 #   Group       : Web Content Manager
