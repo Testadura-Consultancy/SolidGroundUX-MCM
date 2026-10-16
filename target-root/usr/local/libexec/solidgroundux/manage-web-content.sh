@@ -134,7 +134,7 @@ set -uo pipefail
 # - Framework integration -----------------------------------------------------------
     SGND_USING=(sgnd-ssh-deployment.sh)
     SGND_ARGS_SPEC=(
-        "action|a|enum|ACTION|Management action||ingest,delete,edit-metadata,move-page,manage-sections,manage-config,generate,publish,validate,prepare-social,status"
+        "action|a|enum|ACTION|Management action||ingest,delete,edit-metadata,move-page,manage-sections,manage-config,configure-source,retrieve-incoming,generate,publish,validate,prepare-social,status"
         "ingest-dir|i|value|INGEST_DIR|Override Markdown ingestion directory||"
     )
     SGND_SCRIPT_EXAMPLES=(
@@ -163,6 +163,10 @@ set -uo pipefail
         SGND_WEB_PUBLISH_LAST
         SGND_WEB_PUBLISH_STRATEGY
         SGND_WEB_PUBLISH_HOSTNAME
+        SGND_WEB_INCOMING_HOST
+        SGND_WEB_INCOMING_USER
+        SGND_WEB_INCOMING_PORT
+        SGND_WEB_INCOMING_REMOTE_DIR
     )
     SGND_ON_EXIT_HANDLERS=()
     SGND_STATE_SAVE=1
@@ -181,6 +185,10 @@ set -uo pipefail
     : "${SGND_WEB_PUBLISH_LAST:=}"
     : "${SGND_WEB_PUBLISH_STRATEGY:=Update}"
     : "${SGND_WEB_PUBLISH_HOSTNAME:=}"
+    : "${SGND_WEB_INCOMING_HOST:=td-web}"
+    : "${SGND_WEB_INCOMING_USER:=sysadmin}"
+    : "${SGND_WEB_INCOMING_PORT:=22}"
+    : "${SGND_WEB_INCOMING_REMOTE_DIR:=/srv/storage/webcontent-incoming}"
 
 # - Helpers -------------------------------------------------------------------------
     # fn: _web_content_python_root - Run the python root action through Web Content Management.
@@ -658,6 +666,86 @@ PY
         return 0
     }
 
+    # fn: _web_content_valid_incoming_config - Validate saved source settings before network access
+    _web_content_valid_incoming_config() {
+        [[ "$SGND_WEB_INCOMING_HOST" =~ ^[A-Za-z0-9][A-Za-z0-9._-]*$ ]] &&
+        [[ "$SGND_WEB_INCOMING_USER" =~ ^[a-z_][a-zA-Z0-9_.-]*$ ]] &&
+        [[ "$SGND_WEB_INCOMING_PORT" =~ ^[0-9]{1,5}$ ]] &&
+        (( 10#$SGND_WEB_INCOMING_PORT >= 1 && 10#$SGND_WEB_INCOMING_PORT <= 65535 )) &&
+        [[ "$SGND_WEB_INCOMING_REMOTE_DIR" == /* && "$SGND_WEB_INCOMING_REMOTE_DIR" != *".."* && "$SGND_WEB_INCOMING_REMOTE_DIR" =~ ^/[a-zA-Z0-9/_-]+$ ]]
+    }
+
+    # fn: _web_content_configure_incoming - Save SSH source settings through the framework state registry
+    _web_content_configure_incoming() {
+        local host="$SGND_WEB_INCOMING_HOST" user="$SGND_WEB_INCOMING_USER" port="$SGND_WEB_INCOMING_PORT" remote="$SGND_WEB_INCOMING_REMOTE_DIR"
+        ask --label "Incoming SSH server" --var host --default "$host" --back || return 0
+        ask --label "Incoming SSH user" --var user --default "$user" --back || return 0
+        ask --label "Incoming SSH port" --var port --default "$port" --back || return 0
+        ask --label "Remote incoming directory" --var remote --default "$remote" --back || return 0
+        local old_host="$SGND_WEB_INCOMING_HOST" old_user="$SGND_WEB_INCOMING_USER" old_port="$SGND_WEB_INCOMING_PORT" old_remote="$SGND_WEB_INCOMING_REMOTE_DIR"
+        SGND_WEB_INCOMING_HOST="$host" SGND_WEB_INCOMING_USER="$user" SGND_WEB_INCOMING_PORT="$port" SGND_WEB_INCOMING_REMOTE_DIR="$remote"
+        if ! _web_content_valid_incoming_config; then
+            SGND_WEB_INCOMING_HOST="$old_host" SGND_WEB_INCOMING_USER="$old_user" SGND_WEB_INCOMING_PORT="$old_port" SGND_WEB_INCOMING_REMOTE_DIR="$old_remote"
+            sayfail "Invalid SSH source settings; previous settings retained."
+            return 2
+        fi
+        sayok "Incoming source saved in SolidGroundUX state."
+    }
+
+    # fn: _web_content_retrieve_incoming - Pull selected remote Markdown sources safely via SSH
+    _web_content_retrieve_incoming() {
+        local remote="$SGND_WEB_INCOMING_REMOTE_DIR" host="$SGND_WEB_INCOMING_HOST" user="$SGND_WEB_INCOMING_USER" port="$SGND_WEB_INCOMING_PORT"
+        local file="" temp="" transferred=0 skipped=0 failed=0
+        local -a files=() targets=()
+        _web_content_valid_incoming_config || { sayfail "Configure a valid incoming source first."; return 2; }
+        command -v ssh >/dev/null && command -v scp >/dev/null || { sayfail "OpenSSH client tools are required."; return 127; }
+        _web_content_select_source || return 0
+        _web_content_select_ingest_dir || return 0
+        sgnd_print_labeledvalue --label "Incoming source" --value "${user}@${host}:${remote}" --labelwidth 20
+        sgnd_ssh_ensure_access "$user" "$host" "$port" "" || return 1
+        # Only a constrained filename character set is accepted. The remote path
+        # was validated earlier; untrusted SSH output never becomes shell syntax.
+        local listing=""
+        listing="$(ssh -o BatchMode=yes -p "$port" -- "${user}@${host}" "find '$remote' -maxdepth 1 -type f -name '*.md' -printf '%f\n'" 2>/dev/null)" || {
+            sayfail "Could not list incoming files on the remote server."; return 1;
+        }
+        while IFS= read -r file; do
+            [[ "$file" =~ ^[A-Za-z0-9][A-Za-z0-9_.-]*\.md$ ]] && files+=("$file")
+        done <<< "$listing"
+        if (( ${#files[@]} == 0 )); then sayinfo "No Markdown files available on source server."; return 0; fi
+        ask_selection --label "Remote Markdown files to retrieve" --var targets --multi --items "${files[@]}" || return 0
+        (( ${#targets[@]} > 0 )) || return 0
+        for file in "${targets[@]}"; do
+            [[ "$file" =~ ^[A-Za-z0-9][A-Za-z0-9_.-]*\.md$ ]] || { ((failed+=1)); continue; }
+            if [[ -e "$SGND_WEB_CONTENT_INGEST_DIR/$file" ]]; then
+                saywarning "Already exists locally (not overwritten): $file"; ((skipped+=1)); continue
+            fi
+            temp="$(mktemp "$SGND_WEB_CONTENT_INGEST_DIR/.incoming.XXXXXXXX")" || { ((failed+=1)); continue; }
+            if ! scp -q -P "$port" -o BatchMode=yes -- "${user}@${host}:${remote}/${file}" "$temp"; then
+                rm -f -- "$temp"; sayfail "Download failed: $file"; ((failed+=1)); continue
+            fi
+            if ! [[ -f "$temp" && -s "$temp" ]]; then
+                rm -f -- "$temp"; sayfail "Empty or invalid transfer: $file"; ((failed+=1)); continue
+            fi
+            if ! ln -- "$temp" "$SGND_WEB_CONTENT_INGEST_DIR/$file"; then
+                rm -f -- "$temp"; saywarning "Could not safely place local file: $file"; ((failed+=1)); continue
+            fi
+            rm -f -- "$temp"
+            ((transferred+=1))
+            # Archive only after successful local placement. Existing archive names
+            # are never overwritten, and unarchived sources can be retried later.
+            if ! ssh -o BatchMode=yes -p "$port" -- "${user}@${host}" "mkdir -p '$remote/archived' && if test ! -e '$remote/archived/$file'; then mv -- '$remote/$file' '$remote/archived/$file'; else exit 8; fi"; then
+                saywarning "Retrieved $file, but remote archiving failed; source retained."
+            else
+                sayok "Retrieved and archived $file"
+            fi
+        done
+        sgnd_print_labeledvalue --label "Retrieved" --value "$transferred" --labelwidth 20
+        sgnd_print_labeledvalue --label "Skipped" --value "$skipped" --labelwidth 20
+        sgnd_print_labeledvalue --label "Failed" --value "$failed" --labelwidth 20
+        (( failed == 0 ))
+    }
+
     # fn: _web_content_ingest - Ingest one or more loose Markdown files into a website repository
     _web_content_ingest() {
         local mode=""
@@ -684,10 +772,11 @@ PY
             targets=("${files[0]}")
             sayinfo "Using ingestion file: ${files[0]}"
         else
-            ask_selection --label "Ingestion mode" --var mode --items "Ingest all (${#files[@]} files)" "Select one file" || return 0
-            if [[ "$mode" == "Select one file" ]]; then
-                ask_selection --label "Markdown file to ingest" --var selected --items "${files[@]}" || return 0
-                targets=("$selected")
+            ask_selection --label "Ingestion mode" --var mode --items "Ingest all (${#files[@]} files)" "Select files" || return 0
+            if [[ "$mode" == "Select files" ]]; then
+                ask_selection --label "Markdown files to ingest" --var targets --multi --items "${files[@]}" || return 0
+                (( ${#targets[@]} > 0 )) || return 0
+                (( ${#targets[@]} > 1 )) && batch_mode="Yes"
             else
                 targets=("${files[@]}")
                 batch_mode="Yes"
@@ -1181,6 +1270,7 @@ PYCODE
         sgnd_print_labeledvalue --label "Output" --value "$SGND_WEB_CONTENT_OUTPUT" --labelwidth 20
         sgnd_print_labeledvalue --label "Language" --value "$SGND_WEB_CONTENT_LANGUAGE" --labelwidth 20
         sgnd_print_labeledvalue --label "Social platform" --value "$SGND_WEB_CONTENT_PLATFORM" --labelwidth 20
+        sgnd_print_labeledvalue --label "Incoming source" --value "${SGND_WEB_INCOMING_USER}@${SGND_WEB_INCOMING_HOST}:${SGND_WEB_INCOMING_REMOTE_DIR}" --labelwidth 20
         sgnd_print_labeledvalue --label "Ingestion directory" --value "${SGND_WEB_CONTENT_INGEST_DIR:-$(_web_content_canonical_ingest_dir)}" --labelwidth 20
         sgnd_print_labeledvalue --label "Ingestion archive" --value "$(_web_content_canonical_archive_dir)" --labelwidth 20
         sgnd_print_labeledvalue --label "Deletion archive" --value "$(_web_content_canonical_delete_archive_dir)" --labelwidth 20
@@ -2048,6 +2138,8 @@ $existing_names
         local action="${1:?missing action}" rc=0
         case "$action" in
             ingest) _web_content_ingest ;;
+            configure-source) _web_content_configure_incoming ;;
+            retrieve-incoming) _web_content_retrieve_incoming ;;
             edit-metadata) _web_content_manage_page edit-metadata ;;
             move-page) _web_content_manage_page move-page ;;
             manage-sections) _web_content_manage_sections ;;

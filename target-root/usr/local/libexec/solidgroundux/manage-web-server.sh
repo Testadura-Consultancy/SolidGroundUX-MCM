@@ -1144,7 +1144,434 @@ EOF
             sgnd_print_labeledvalue --label "$site" --value "$state" --labelwidth 24
             sgnd_print_labeledvalue --label "  Web address" --value "${address:-Not configured}" --labelwidth 24
             sgnd_print_labeledvalue --label "  Document root" --value "${root:-Not configured}" --labelwidth 24
+            if grep -Eq '^[[:space:]]*listen[[:space:]]+.*443[[:space:]]+ssl' "/etc/nginx/sites-available/$site"; then
+                sgnd_print_labeledvalue --label "  HTTPS" --value "Configured" --labelwidth 24
+            else
+                sgnd_print_labeledvalue --label "  HTTPS" --value "Not configured" --labelwidth 24
+            fi
         done
+    }
+
+    # fn: _web_server_configure_https - Configure optional TLS for one managed Nginx site
+    # . Purpose
+    #   Enable HTTPS using an existing certificate or a locally generated self-signed
+    #   certificate. Keep other sites untouched and roll back on Nginx failure.
+    #   A self-signed certificate is for testing only until trusted by clients.
+    _web_server_configure_https() {
+        local site="" cfg="" address="" root="" option="" cert="" key="" redirect="NO"
+        local backup="" staged="" host="" answer="" tls_dir="" cert_tmp="" key_tmp=""
+        local -a sites=()
+        command -v openssl >/dev/null 2>&1 || { sayfail "openssl is required for HTTPS setup."; return 1; }
+        mapfile -t sites < <(_web_server_available_sites 2>/dev/null || true)
+        (( ${#sites[@]} > 0 )) || { saywarning "No Nginx sites are available."; return 0; }
+        _web_ask_selection --label "Configure HTTPS for site" --var site --items "${sites[@]}" || return 0
+        [[ "$site" =~ ^[A-Za-z0-9][A-Za-z0-9._-]*$ ]] || { sayfail "Invalid site identifier."; return 2; }
+        cfg="/etc/nginx/sites-available/$site"
+        [[ -f "$cfg" && ! -L "$cfg" ]] || { sayfail "Unsupported site configuration: $cfg"; return 1; }
+        [[ -L "/etc/nginx/sites-enabled/$site" ]] || { sayfail "Enable the site before configuring HTTPS."; return 1; }
+        address="$(awk '$1=="server_name" {print $2;exit}' "$cfg" | tr -d ';')"
+        root="$(_web_server_site_document_root "$site" 2>/dev/null || true)"
+        [[ "$address" =~ ^[A-Za-z0-9][A-Za-z0-9.-]*$ && "$address" == *.* && -n "$root" ]] || {
+            sayfail "Site must have one valid hostname and a document root."; return 1;
+        }
+        # Existing HTTPS configurations must not be rewritten. This is particularly
+        # important once another managed feature (Basic Auth or uploads) has been added.
+        if grep -Eq '^[[:space:]]*listen[[:space:]]+(\[::\]:)?443[[:space:]]+ssl;' "$cfg"; then
+            sayok "HTTPS is already configured for $site; existing directives preserved."
+            return 0
+        fi
+        # Manage only our own simple site templates; refuse custom or already TLS-enabled configs.
+        # Whitelist the directives produced by the MCM site creator to avoid dropping
+        # unrelated configuration when rewriting the site's server blocks.
+        if awk '''
+            /^[[:space:]]*($|#|server[[:space:]]*\{|\}|location[[:space:]]+\/[[:space:]]*\{|listen[[:space:]]+80;|listen[[:space:]]+\[::\]:80;|server_name[[:space:]]+[^;]+;|root[[:space:]]+[^;]+;|index[[:space:]]+index.html([[:space:]]+index.htm)?;|try_files[[:space:]]+\$uri[[:space:]]+\$uri\/[[:space:]]+=404;)$/ { next }
+            { bad=1 }
+            END { exit !bad }
+        ''' "$cfg"; then
+            saywarning "Custom Nginx directives detected; refusing to replace site configuration."
+            return 1
+        fi
+        if grep -Eq '^[[:space:]]*(ssl_certificate|listen[[:space:]].*443|include[[:space:]]|proxy_pass|return[[:space:]]|rewrite[[:space:]])' "$cfg"; then
+            saywarning "Existing TLS or customized Nginx directives detected. HTTPS settings were left unchanged."
+            return 1
+        fi
+        sgnd_print_labeledvalue --label "Site" --value "$site" --labelwidth 22
+        sgnd_print_labeledvalue --label "Hostname" --value "$address" --labelwidth 22
+        _web_ask_selection --label "Certificate source" --var option --items "Existing certificate and key" "Generate self-signed test certificate" || return 0
+        case "$option" in
+            "Existing certificate and key")
+                ask --label "Certificate PEM file (full chain)" --var cert --back || return 0
+                ask --label "Private key PEM file" --var key --back || return 0
+                [[ "$cert" == /* && "$key" == /* && "$cert" != *[[:space:]]* && "$key" != *[[:space:]]* && "$cert" != *\;* && "$key" != *\;* && -r "$cert" && -r "$key" ]] || {
+                    sayfail "Certificate and key must be readable absolute paths."; return 1;
+                }
+                ;;
+            "Generate self-signed test certificate")
+                tls_dir="/etc/nginx/solidgroundux-certs"
+                cert="$tls_dir/$site.crt"
+                key="$tls_dir/$site.key"
+                [[ ! -e "$cert" && ! -e "$key" ]] || {
+                    sayfail "Certificate already exists for $site. Use the existing-certificate option instead."; return 1;
+                }
+                ;;
+        esac
+        ask_decision --label "Redirect HTTP to HTTPS" --choices "YES|Y,NO|N" --default "YES" --var redirect || return 0
+        sgnd_print_labeledvalue --label "TLS certificate" --value "$cert" --labelwidth 22
+        sgnd_print_labeledvalue --label "Redirect HTTP" --value "$redirect" --labelwidth 22
+        answer="NO"
+        ask_decision --label "Enable HTTPS for $site" --choices "YES|Y,NO|N" --default "NO" --var answer || return 0
+        [[ "$answer" == "YES" ]] || return 0
+        if (( ${FLAG_DRYRUN:-0} == 1 )); then
+            sayinfo "DRYRUN: Would configure HTTPS on $address and redirect=$redirect; no changes written."
+            return 0
+        fi
+        # This interactive MCM action requires admin access to Nginx configuration.
+        sudo -v || { sayfail "Administrator authorization is required."; return 1; }
+        backup="$(mktemp)" || return 1
+        staged="$(mktemp)" || { rm -f -- "$backup"; return 1; }
+        sudo cp -- "$cfg" "$backup" || { rm -f -- "$backup" "$staged"; return 1; }
+        if [[ "$option" == "Generate self-signed test certificate" ]]; then
+            sudo install -d -m 0700 -- "$tls_dir" || { rm -f -- "$backup" "$staged"; return 1; }
+            cert_tmp="$tls_dir/.${site}.$$.crt"
+            key_tmp="$tls_dir/.${site}.$$.key"
+            if ! sudo openssl req -x509 -newkey rsa:3072 -sha256 -nodes -days 365 \
+                -keyout "$key_tmp" -out "$cert_tmp" -subj "/CN=$address" \
+                -addext "subjectAltName=DNS:$address" >/dev/null 2>&1; then
+                sudo rm -f -- "$cert_tmp" "$key_tmp"
+                rm -f -- "$backup" "$staged"
+                sayfail "Certificate generation failed."
+                return 1
+            fi
+            sudo chmod 0600 "$key_tmp" || return 1
+            sudo mv -- "$key_tmp" "$key" || return 1
+            sudo mv -- "$cert_tmp" "$cert" || return 1
+        fi
+        # Ensure the selected key matches the certificate; reject accidental mismatches.
+        if ! sudo openssl x509 -in "$cert" -noout >/dev/null 2>&1 ||
+           ! sudo openssl pkey -in "$key" -noout >/dev/null 2>&1 ||
+           [[ "$(sudo openssl x509 -in "$cert" -pubkey -noout | openssl sha256)" != "$(sudo openssl pkey -in "$key" -pubout | openssl sha256)" ]]; then
+            sayfail "Invalid certificate/key pair; Nginx configuration unchanged."
+            rm -f -- "$backup" "$staged"
+            return 1
+        fi
+        {
+            printf 'server {\n    listen 80;\n    listen [::]:80;\n    server_name %s;\n' "$address"
+            if [[ "$redirect" == "YES" ]]; then
+                printf '    return 301 https://$host$request_uri;\n'
+            else
+                printf '    root %s;\n    index index.html index.htm;\n    location / { try_files $uri $uri/ =404; }\n' "$root"
+            fi
+            printf '}\nserver {\n    listen 443 ssl;\n    listen [::]:443 ssl;\n    server_name %s;\n' "$address"
+            printf '    ssl_certificate %s;\n    ssl_certificate_key %s;\n' "$cert" "$key"
+            printf '    ssl_protocols TLSv1.2 TLSv1.3;\n    root %s;\n    index index.html index.htm;\n    location / { try_files $uri $uri/ =404; }\n}\n' "$root"
+        } > "$staged"
+        if ! sudo cp -- "$staged" "$cfg" || ! sudo nginx -t || ! sudo systemctl reload nginx.service; then
+            sudo cp -- "$backup" "$cfg" || true
+            sudo nginx -t >/dev/null 2>&1 && sudo systemctl reload nginx.service >/dev/null 2>&1 || true
+            sayfail "HTTPS setup failed; previous site configuration restored."
+            rm -f -- "$backup" "$staged"
+            return 1
+        fi
+        rm -f -- "$backup" "$staged"
+        sayok "HTTPS enabled for $address."
+        if [[ "$option" == "Generate self-signed test certificate" ]]; then
+            saywarning "Self-signed certificate: browsers will not trust this until its certificate is explicitly trusted. Do not use for public uploads."
+        fi
+    }
+
+    # fn: _web_server_configure_basic_auth - Protect one HTTPS URL prefix with Nginx Basic Auth
+    # . Purpose
+    #   Add or remove password protection without changing the public site or TLS setup.
+    #   HTTP must already redirect to HTTPS. Passwords use bcrypt in a file outside
+    #   the document root; custom Nginx configurations are never rewritten.
+    # . Behavior
+    #   Supports one managed protected URL prefix per site. A second prefix, existing
+    #   custom auth configuration, or unexpected site layout requires manual review.
+    #   Keep password files after disabling protection to avoid deleting credentials
+    #   that might be used elsewhere; only the Nginx guard is removed.
+    _web_server_configure_basic_auth() {
+        local site="" cfg="" action="" prefix="" username="" decision="NO"
+        local host="" marker_start="# SGND_BASIC_AUTH_BEGIN" marker_end="# SGND_BASIC_AUTH_END"
+        local auth_dir="/etc/nginx/solidgroundux-auth" auth_file="" temp_pass=""
+        local staged="" backup="" config_copy="" rc=0
+        local -a sites=()
+        mapfile -t sites < <(_web_server_available_sites 2>/dev/null || true)
+        (( ${#sites[@]} > 0 )) || { saywarning "No Nginx sites available."; return 0; }
+        _web_ask_selection --label "Configure private URL section" --var site --items "${sites[@]}" || return 0
+        [[ "$site" =~ ^[A-Za-z0-9][A-Za-z0-9._-]*$ ]] || { sayfail "Invalid site identifier."; return 2; }
+        cfg="/etc/nginx/sites-available/$site"
+        [[ -f "$cfg" && ! -L "$cfg" && -L "/etc/nginx/sites-enabled/$site" ]] || {
+            sayfail "Site must be a regular, enabled Nginx configuration."; return 1;
+        }
+        # Only the MCM-generated HTTPS layout is supported. This also excludes a
+        # separate HTTP content site that could bypass the password protection.
+        grep -Eq '^[[:space:]]*listen[[:space:]]+443[[:space:]]+ssl;' "$cfg" || {
+            sayfail "Enable HTTPS for this site before configuring private pages."; return 1;
+        }
+        grep -Fq 'return 301 https://$host$request_uri;' "$cfg" || {
+            sayfail "HTTP must redirect to HTTPS before private pages can be enabled."; return 1;
+        }
+        if grep -Eq '^[[:space:]]*(auth_basic|auth_basic_user_file)' "$cfg" && ! grep -Fq "$marker_start" "$cfg"; then
+            sayfail "Existing unmanaged Basic Auth directives detected; no changes made."; return 1;
+        fi
+        if grep -Fq "$marker_start" "$cfg"; then
+            _web_ask_selection --label "Private section" --var action --items "Disable existing protection" "Replace credentials and protected path" || return 0
+        else
+            action="Enable protection"
+        fi
+        if [[ "$action" != "Disable existing protection" ]]; then
+            ask --label "Protected URL prefix (for example /over-deze-website/)" --var prefix --default "/over-deze-website/" --back || return 0
+            [[ "$prefix" =~ ^/[a-zA-Z0-9/_-]+/$ && "$prefix" != "//" && "$prefix" != *"//"* && "$prefix" != *".."* ]] || {
+                sayfail "Use an absolute directory URL ending in /, without spaces or traversal."; return 2;
+            }
+            ask --label "Authentication user" --var username --default "editor" --back || return 0
+            [[ "$username" =~ ^[a-zA-Z][a-zA-Z0-9_.-]{0,63}$ ]] || { sayfail "Invalid authentication username."; return 2; }
+            if ! command -v htpasswd >/dev/null 2>&1; then
+                local install_answer="NO"
+                saywarning "Basic Authentication requires apache2-utils (htpasswd)."
+                ask_decision --label "Install apache2-utils now" --choices "YES|Y,NO|N" --default "NO" --var install_answer || return 0
+                [[ "$install_answer" == YES ]] || { saywarning "Dependency was not installed."; return 127; }
+                if (( ${FLAG_DRYRUN:-0} == 1 )); then
+                    sayinfo "DRYRUN: Would install apache2-utils."
+                    return 0
+                fi
+                sudo -v || { sayfail "Administrator authorization is required."; return 1; }
+                sudo apt-get update && sudo env DEBIAN_FRONTEND=noninteractive apt-get install -y apache2-utils || {
+                    sayfail "Could not install apache2-utils."; return 1;
+                }
+                command -v htpasswd >/dev/null 2>&1 || { sayfail "htpasswd unavailable after installation."; return 127; }
+            fi
+        fi
+        decision="NO"
+        ask_decision --label "Apply private-section change to $site" --choices "YES|Y,NO|N" --default "NO" --var decision || return 0
+        [[ "$decision" == YES ]] || return 0
+        if (( ${FLAG_DRYRUN:-0} == 1 )); then
+            sayinfo "DRYRUN: Would modify Basic Auth for $site ($action)."
+            return 0
+        fi
+        sudo -v || { sayfail "Administrator authorization is required."; return 1; }
+        backup="$(mktemp)" || return 1
+        staged="$(mktemp)" || { rm -f -- "$backup"; return 1; }
+        sudo cp -- "$cfg" "$backup" || { rm -f -- "$backup" "$staged"; return 1; }
+        config_copy="$(mktemp)" || { rm -f -- "$backup" "$staged"; return 1; }
+        # Strip only a fully delimited block previously written by this function.
+        # Preserve the rest of the existing HTTPS configuration byte-for-byte.
+        awk -v b="$marker_start" -v e="$marker_end" '
+            index($0,b) { if (inside) exit 2; inside=1; begin_count++; next }
+            index($0,e) { if (!inside) exit 2; inside=0; end_count++; next }
+            !inside { print }
+            END { if (inside || begin_count!=end_count || begin_count>1) exit 2 }
+        ' "$cfg" > "$config_copy" || {
+            sayfail "Malformed existing managed Basic Auth block; no changes made."
+            rm -f -- "$backup" "$staged" "$config_copy"; return 1;
+        }
+        if [[ "$action" == "Disable existing protection" ]]; then
+            cp -- "$config_copy" "$staged" || rc=1
+        else
+            auth_file="$auth_dir/$site.htpasswd"
+            # Do not overwrite existing credentials unless they belong to an
+            # already managed block for this same site.
+            if [[ -e "$auth_file" ]] && ! grep -Fq "$marker_start" "$cfg"; then
+                sayfail "Credential file already exists; refusing to overwrite $auth_file."
+                rm -f -- "$backup" "$staged" "$config_copy"; return 1
+            fi
+            # Use an unguessable temp path for new credentials; no plaintext password
+            # appears in the command line or environment. htpasswd prompts securely.
+            sudo install -d -m 0750 -o root -g www-data -- "$auth_dir" || rc=1
+            temp_pass="$auth_dir/.${site}.$$.new"
+            if (( rc == 0 )); then
+                sudo htpasswd -cB "$temp_pass" "$username" || rc=1
+                (( rc == 0 )) && sudo chown root:www-data "$temp_pass" && sudo chmod 0640 "$temp_pass" || true
+            fi
+            if (( rc == 0 )); then
+                # Require exactly one expected HTTPS location; fail closed on
+                # unexpected/custom templates instead of inserting arbitrarily.
+                awk -v b="$marker_start" -v e="$marker_end" -v path="$prefix" -v file="$auth_file" '
+                    /^[[:space:]]*listen[[:space:]]+443[[:space:]]+ssl;/ { tls=1 }
+                    tls && /^[[:space:]]*location \/ \{ try_files \$uri \$uri\/ =404; \}$/ {
+                        print "    " b
+                        print "    location ^~ " path " {"
+                        print "        auth_basic \"Restricted\";"
+                        print "        auth_basic_user_file " file ";"
+                        print "        try_files $uri $uri/ =404;"
+                        print "    }"
+                        print "    " e
+                        inserted++
+                    }
+                    { print }
+                    END { if (inserted!=1) exit 3 }
+                ' "$config_copy" > "$staged" || rc=1
+            fi
+        fi
+        rm -f -- "$config_copy"
+        if (( rc != 0 )); then
+            [[ -n "$temp_pass" ]] && sudo rm -f -- "$temp_pass"
+            rm -f -- "$backup" "$staged"
+            sayfail "Could not prepare Basic Auth configuration; site unchanged."
+            return 1
+        fi
+        # Nginx needs the password file in place for nginx -t. Preserve an old file
+        # for rollback when replacing credentials.
+        local old_pass=""
+        if [[ -n "$temp_pass" ]]; then
+            if [[ -e "$auth_file" ]]; then
+                old_pass="$auth_dir/.${site}.$$.old"
+                sudo cp -p -- "$auth_file" "$old_pass" || rc=1
+            fi
+            (( rc == 0 )) && sudo mv -- "$temp_pass" "$auth_file" || rc=1
+        fi
+        if (( rc == 0 )) && sudo cp -- "$staged" "$cfg" && sudo nginx -t && sudo systemctl reload nginx.service; then
+            [[ -n "$old_pass" ]] && sudo rm -f -- "$old_pass"
+            rm -f -- "$backup" "$staged"
+            sayok "Private-section authentication updated for $site."
+            [[ "$action" == "Disable existing protection" ]] && sayinfo "Credential file retained outside the web root; remove separately if no longer needed."
+            return 0
+        fi
+        sudo cp -- "$backup" "$cfg" || true
+        if [[ -n "$old_pass" ]]; then
+            sudo mv -- "$old_pass" "$auth_file" || true
+        elif [[ -n "$temp_pass" ]]; then
+            sudo rm -f -- "$auth_file" "$temp_pass" || true
+        fi
+        sudo nginx -t >/dev/null 2>&1 && sudo systemctl reload nginx.service >/dev/null 2>&1 || true
+        rm -f -- "$backup" "$staged"
+        sayfail "Basic Auth configuration failed; restored the previous site settings."
+        return 1
+    }
+
+    # fn: _web_server_configure_markdown_upload - Install and protect the optional Markdown receiver
+    # . Purpose
+    #   Bind the upload service to localhost, outside the document root, with
+    #   Basic Authentication on its Nginx endpoint. Roll back Nginx on failure.
+    #   Currently supports one upload service per host; never expose it without auth.
+    _web_server_configure_markdown_upload() {
+        local site="" cfg="" host="" root="" publisher="" source="" directory="/srv/storage/webcontent-incoming"
+        local backup="" staged="" unit_tmp="" decision="NO" auth_file="" rc=0
+        local -a sites=()
+        mapfile -t sites < <(_web_server_available_sites 2>/dev/null || true)
+        (( ${#sites[@]} > 0 )) || { saywarning "No managed site available."; return 0; }
+        _web_ask_selection --label "Install Markdown upload for HTTPS site" --var site --items "${sites[@]}" || return 0
+        [[ "$site" =~ ^[A-Za-z0-9][A-Za-z0-9._-]*$ ]] || { sayfail "Invalid site name."; return 2; }
+        cfg="/etc/nginx/sites-available/$site"
+        source="${SGND_SCRIPT_DIR}/webcontent-upload-service.py"
+        [[ -f "$cfg" && ! -L "$cfg" && -L "/etc/nginx/sites-enabled/$site" ]] || { sayfail "Site must be enabled and managed."; return 1; }
+        [[ -r "$source" ]] || { sayfail "Missing companion file: $source"; return 1; }
+        # Resolve the *effective managed* password file from the Nginx configuration.
+        # Never guess its name: pre-existing deployments may use another path.
+        # Require exactly one managed block containing Basic Auth directives.
+        if ! grep -Fq '# SGND_BASIC_AUTH_BEGIN' "$cfg" ||
+           ! grep -Fq '# SGND_BASIC_AUTH_END' "$cfg"; then
+            sayfail "No managed private section found for $site; upload remains disabled."
+            return 1
+        fi
+        auth_file="$(awk '
+            /# SGND_BASIC_AUTH_BEGIN/ { if (inside || found) exit 3; inside=1; next }
+            /# SGND_BASIC_AUTH_END/ { if (!inside) exit 3; inside=0; found=1; next }
+            inside && $1 == "auth_basic_user_file" { gsub(/;$/, "", $2); file=$2; count++ }
+            END { if (inside || !found || count != 1) exit 3; print file }
+        ' "$cfg")" || {
+            sayfail "Cannot resolve a unique managed Basic Auth password file; upload remains disabled."
+            return 1
+        }
+        [[ "$auth_file" == /* && "$auth_file" != *[[:space:]]* && "$auth_file" != *\;* ]] || {
+            sayfail "Unsafe Basic Auth password file path; upload remains disabled."; return 1;
+        }
+        if ! sudo test -f "$auth_file"; then
+            sayfail "Configured Basic Auth password file is missing: $auth_file"
+            return 1
+        fi
+        grep -Eq '^[[:space:]]*listen[[:space:]]+443[[:space:]]+ssl;' "$cfg" &&
+        grep -Fq 'return 301 https://$host$request_uri;' "$cfg" || { sayfail "HTTPS with redirect is required."; return 1; }
+        if grep -Fq '# SGND_UPLOAD_BEGIN' "$cfg" || grep -Eq 'location[[:space:]]+=[[:space:]]+/api/markdown-upload' "$cfg"; then
+            saywarning "Upload is already configured; refusing to overwrite it."; return 1
+        fi
+        host="$(awk '$1=="server_name" {print $2;exit}' "$cfg" | tr -d ';')"
+        root="$(_web_server_site_document_root "$site" 2>/dev/null || true)"
+        publisher="$(stat -c %U -- "$root" 2>/dev/null || true)"
+        [[ "$host" =~ ^[A-Za-z0-9][A-Za-z0-9.-]*$ && "$publisher" =~ ^[a-z_][a-zA-Z0-9_-]*$ && "$publisher" != root ]] || {
+            sayfail "Site needs a valid hostname and a non-root document root owner."; return 1;
+        }
+        if [[ -e /etc/systemd/system/solidgroundux-markdown-upload.service ]] || systemctl is-active --quiet solidgroundux-markdown-upload.service; then
+            saywarning "An upload service is already configured on this host; one upload site is supported."; return 1
+        fi
+        ask --label "Non-public upload directory" --var directory --default "$directory" --back || return 0
+        [[ "$directory" =~ ^/[a-zA-Z0-9/_-]+$ && "$directory" != *".."* && "$directory" != "$root"* ]] || {
+            sayfail "Choose a safe absolute path outside the site document root."; return 2;
+        }
+        ask_decision --label "Install protected upload endpoint for $host" --choices "YES|Y,NO|N" --default "NO" --var decision || return 0
+        [[ "$decision" == YES ]] || return 0
+        if (( ${FLAG_DRYRUN:-0} == 1 )); then sayinfo "DRYRUN: Would configure protected Markdown upload."; return 0; fi
+        sudo -v || return 1
+        command -v python3 >/dev/null 2>&1 || { sayfail "Python 3 is required."; return 127; }
+        backup="$(mktemp)" || return 1
+        staged="$(mktemp)" || { rm -f "$backup"; return 1; }
+        sudo cp -- "$cfg" "$backup" || { rm -f "$backup" "$staged"; return 1; }
+        # Fail unless the expected managed HTTPS location can be identified exactly.
+        awk -v file="$auth_file" '
+            /^[[:space:]]*listen[[:space:]]+443[[:space:]]+ssl;/ { tls=1 }
+            tls && /^[[:space:]]*location \/ \{ try_files \$uri \$uri\/ =404; \}$/ {
+                print "    # SGND_UPLOAD_BEGIN"
+                print "    location = /api/markdown-upload {"
+                print "        auth_basic \"Restricted\";"
+                print "        auth_basic_user_file " file ";"
+                print "        client_max_body_size 22m;"
+                print "        proxy_request_buffering on;"
+                print "        proxy_set_header Host $host;"
+                print "        proxy_set_header X-Forwarded-Proto https;"
+                print "        proxy_pass http://127.0.0.1:18765;"
+                print "    }"
+                print "    # SGND_UPLOAD_END"
+                inserted++
+            }
+            { print }
+            END { if (inserted != 1) exit 3 }
+        ' "$cfg" > "$staged" || {
+            sayfail "Unexpected Nginx template; no upload changes made."; rm -f "$backup" "$staged"; return 1;
+        }
+        # A working Basic Auth setup is an input, not something upload setup owns.
+        # Check effective www-data access without changing existing ownership or modes.
+        if ! sudo -u www-data test -r "$auth_file"; then
+            sayfail "Nginx worker cannot read Basic Auth password file: $auth_file"
+            sayinfo "Correct its group/directory permissions before enabling uploads."
+            rc=1
+        fi
+        (( rc == 0 )) && sudo install -d -m 0750 -o "$publisher" -g "$publisher" -- "$directory" || rc=1
+        unit_tmp="$(mktemp)" || rc=1
+        if (( rc == 0 )); then
+            cat > "$unit_tmp" <<UNIT
+[Unit]
+Description=SolidGroundUX Markdown upload receiver
+After=network.target
+[Service]
+Type=simple
+User=$publisher
+Group=$publisher
+ExecStart=/usr/bin/python3 $source --hostname $host --directory $directory
+Restart=on-failure
+RestartSec=3
+NoNewPrivileges=true
+ProtectSystem=strict
+ReadWritePaths=$directory
+PrivateTmp=true
+[Install]
+WantedBy=multi-user.target
+UNIT
+            sudo install -m 0644 -o root -g root "$unit_tmp" /etc/systemd/system/solidgroundux-markdown-upload.service || rc=1
+            (( rc == 0 )) && sudo systemctl daemon-reload && sudo systemctl enable --now solidgroundux-markdown-upload.service && sudo systemctl is-active --quiet solidgroundux-markdown-upload.service || rc=1
+        fi
+        if (( rc == 0 )) && sudo cp -- "$staged" "$cfg" && sudo nginx -t && sudo systemctl reload nginx.service; then
+            sayok "Protected upload service enabled for $host. Files: $directory"
+            rm -f -- "$backup" "$staged" "$unit_tmp"
+            return 0
+        fi
+        sudo cp -- "$backup" "$cfg" || true
+        sudo nginx -t >/dev/null 2>&1 && sudo systemctl reload nginx.service >/dev/null 2>&1 || true
+        sudo systemctl disable --now solidgroundux-markdown-upload.service >/dev/null 2>&1 || true
+        sudo rm -f /etc/systemd/system/solidgroundux-markdown-upload.service
+        sudo systemctl daemon-reload >/dev/null 2>&1 || true
+        rm -f -- "$backup" "$staged" "$unit_tmp"
+        sayfail "Upload installation failed; Nginx configuration restored."
+        return 1
     }
 
     # fn: _web_server_manage_sites - Open the site-management workflow
@@ -1154,12 +1581,15 @@ EOF
         #   _web_server_manage_sites
     _web_server_manage_sites() {
         local action=""
-        _web_ask_selection --label "Site management" --var action --items "Create site" "Enable site" "Disable site" "Change document root" "Remove site" "Remove site content" "List sites" || return 0
+        _web_ask_selection --label "Site management" --var action --items "Create site" "Enable site" "Disable site" "Change document root" "Configure HTTPS" "Configure private section" "Configure Markdown upload" "Remove site" "Remove site content" "List sites" || return 0
         case "$action" in
             "Create site") _web_server_create_site ;;
             "Enable site") _web_server_enable_site ;;
             "Disable site") _web_server_disable_site ;;
             "Change document root") _web_server_change_document_root ;;
+            "Configure HTTPS") _web_server_configure_https ;;
+            "Configure private section") _web_server_configure_basic_auth ;;
+            "Configure Markdown upload") _web_server_configure_markdown_upload ;;
             "Remove site") _web_server_remove_site ;;
             "Remove site content") _web_server_remove_site_content ;;
             "List sites") _web_server_list_sites ;;

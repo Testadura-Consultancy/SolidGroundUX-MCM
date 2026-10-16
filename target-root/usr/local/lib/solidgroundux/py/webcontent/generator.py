@@ -123,6 +123,43 @@ def _make_output_relative_urls(document: str, route: str) -> str:
     return _ROOT_RELATIVE_URL_RE.sub(replace, document)
 
 
+# Fingerprint local CSS/JS assets by their *content* so unchanged resources keep
+# a stable URL, while changed resources bypass stale browser cache entries.
+_VERSIONED_ASSET_RE = re.compile(
+    r'(?P<prefix>\b(?:href|src)\s*=\s*["\'])(?P<url>/(?!/)[^"\']+)(?P<suffix>["\'])',
+    re.IGNORECASE,
+)
+
+
+def _version_local_assets(document: str, output_root: Path) -> str:
+    """Append a content hash to root-relative local .css/.js href/src links.
+
+    Existing query parameters and fragments are preserved. Paths are restricted
+    to files inside the generated output root (never arbitrary filesystem paths).
+    This is applied before URLs are made relative for file:// preview support.
+    """
+    resolved_root = output_root.resolve()
+    digests: dict[Path, str] = {}
+
+    def replace(match: re.Match[str]) -> str:
+        url = match.group("url")
+        parsed = urlsplit(url)
+        if parsed.path.lower().endswith((".css", ".js")):
+            target = (resolved_root / unquote(parsed.path).lstrip("/")).resolve()
+            if target.is_relative_to(resolved_root) and target.is_file():
+                if target not in digests:
+                    digests[target] = hashlib.sha256(target.read_bytes()).hexdigest()[:12]
+                # Replace any previously generated v= parameter, keeping other
+                # query fields. In normal authored assets, v is generator-owned.
+                from urllib.parse import parse_qsl, urlencode, urlunsplit
+                params = [(k, v) for k, v in parse_qsl(parsed.query, keep_blank_values=True) if k != "v"]
+                params.append(("v", digests[target]))
+                url = urlunsplit(("", "", parsed.path, urlencode(params), parsed.fragment))
+        return match.group("prefix") + url + match.group("suffix")
+
+    return _VERSIONED_ASSET_RE.sub(replace, document)
+
+
 def _base_route_for_item(item: ContentItem, default_language: str) -> str:
     """Handle base route for item for the web content workflow."""
     route = item.route
@@ -143,33 +180,88 @@ def _render_navigation(
     default_language: str,
     current_base_route: str,
 ) -> str:
-    """Render main navigation entries that exist in the current language.
+    """Build a recursive sidebar from translated page titles and content routes.
 
-    Translations may be introduced section by section. A navigation label alone
-    must therefore never create a link to a route that has no translated section
-    index page yet.
+    The configured navigation supplies only root ordering. Directories are
+    navigation groups even when there is no index page. Hidden index pages
+    conceal their entire subtree by CSS until ShowHidden is present; hidden
+    ordinary pages conceal only themselves. Private pages require server auth
+    and are not protected by navigation metadata.
     """
-    available_paths = {
-        _base_route_for_item(candidate, default_language)
-        for candidate in items
-        if candidate.language == language and candidate.base_name == "index" and candidate in items
+    # Keep hidden pages in the generated navigation. The existing ShowHidden
+    # CSS/JavaScript toggles their visibility at runtime. A hidden index marks
+    # its entire folder node as hidden, so all descendants are concealed too.
+    # This is presentation only; private access remains enforced by Nginx.
+    pages = {
+        _base_route_for_item(page, default_language): page
+        for page in items
+        if page.language == language
     }
+    # Folder nodes keyed by directory route, with optional index-page content.
+    nodes: dict[str, dict] = {"/": {"children": set(), "page": pages.get("/")}}
+    for route, page in pages.items():
+        pieces = [p for p in route.strip("/").split("/") if p]
+        # A non-index Markdown file lives below its containing folder.
+        folders = pieces if page.base_name == "index" else pieces[:-1]
+        parent = "/"
+        for depth in range(len(folders)):
+            folder = "/" + "/".join(folders[:depth + 1]) + "/"
+            nodes.setdefault(folder, {"children": set(), "page": None})
+            nodes[parent]["children"].add(folder)
+            parent = folder
+        if page.base_name == "index":
+            nodes.setdefault(route, {"children": set(), "page": None})["page"] = page
+        else:
+            nodes.setdefault(parent, {"children": set(), "page": None})["children"].add(route)
+            nodes[route] = {"children": set(), "page": page}
 
-    links: list[str] = []
-    hidden_routes = {_base_route_for_item(candidate, default_language) for candidate in items if candidate.hidden and candidate.language == language and candidate.base_name == "index"}
-    for item in navigation:
-        label = item.labels.get(language)
-        if not label or item.path not in available_paths:
-            continue
-        href = language_route(item.path, language, default_language)
-        active = current_base_route == item.path or (item.path != "/" and current_base_route.startswith(item.path))
-        classes = ["active"] if active else []
-        if item.path in hidden_routes:
-            classes.append("wc-hidden-link")
-        class_attr = f' class="{" ".join(classes)}"' if classes else ""
-        current_attr = ' aria-current="page"' if active else ""
-        links.append(f'<a href="{html.escape(href, quote=True)}"{class_attr}{current_attr}>{html.escape(label)}</a>')
-    return "\n".join(links)
+    top = sorted(navigation, key=lambda n: n.order)
+    roots = [n.path for n in top if n.path in nodes and n.labels.get(language)]
+    # Root entries still follow navigation.cfg; their visibility follows metadata.
+    top_by_path = {n.path: n for n in top}
+
+    def label_for(route: str) -> str:
+        page = nodes[route]["page"]
+        # Root groups keep their explicitly authored navigation labels, even
+        # when a translated index page has a different title.
+        nav = top_by_path.get(route)
+        if nav and nav.labels.get(language):
+            return nav.labels[language]
+        if page:
+            return page.title
+        return route.strip("/").split("/")[-1].replace("-", " ").capitalize()
+
+    def render(route: str, ancestors: set[str]) -> str:
+        if route in ancestors:
+            return ""
+        node = nodes[route]
+        # Home is its own navigation entry, not a container for every section.
+        child_routes = () if route == "/" else node["children"]
+        children = sorted(child_routes, key=lambda r: (
+            nodes[r]["page"].order if nodes[r]["page"] else 1000,
+            label_for(r).casefold(), r,
+        ))
+        active = current_base_route == route
+        expanded = active or (route.endswith("/") and current_base_route.startswith(route))
+        classes = ' class="active"' if active else ""
+        current = ' aria-current="page"' if active else ""
+        label = html.escape(label_for(route))
+        page = node["page"]
+        link = (f'<a href="{html.escape(page.route, quote=True)}"{classes}{current}>{label}</a>'
+                if page else f'<span class="wc-nav-label">{label}</span>')
+        # A hidden section index conceals this node and all descendants in
+        # normal navigation; ShowHidden reveals the complete subtree. Ordinary
+        # hidden pages conceal their own leaf only.
+        hidden_class = ' wc-hidden-link' if page is not None and page.hidden else ''
+        if not children:
+            return '<div class="wc-nav-leaf' + hidden_class + '">' + link + '</div>'
+        child_html = "".join(render(child, ancestors | {route}) for child in children)
+        return ('<details class="wc-nav-group' + hidden_class + '"' + (' open' if expanded else '') + '>'
+                '<summary><span class="wc-nav-arrow" aria-hidden="true"></span>'
+                + link + '</summary><div class="wc-nav-children">' + child_html + '</div></details>')
+
+    # Root navigation remains explicitly ordered; nested navigation is automatic.
+    return "\n".join(render(route, set()) for route in roots)
 
 
 def _render_external_links(links: dict[str, str]) -> str:
@@ -687,6 +779,19 @@ def generate_site(source: str | Path, output: str | Path, languages: str | Itera
                     return GenerationResult(False, str(output_path), errors=["Invalid autoplay_interval in config/featured-slider.cfg (expected milliseconds as a non-negative integer)"])
 
     all_items = discover_content(config, navigation)
+    # A private page must live below an explicitly configured server-protected
+    # route. This is a publication guard, NOT evidence that Nginx is configured.
+    import configparser
+    security_cfg = configparser.ConfigParser(interpolation=None)
+    security_cfg.read(source_path / "config" / "site.cfg", encoding="utf-8")
+    protected = [part.strip() for part in security_cfg.get("security", "protected_prefixes", fallback="").split(",") if part.strip()]
+    protected = [part for part in protected if part.startswith("/") and part.endswith("/") and ".." not in part]
+    unprotected = [page.route for page in all_items if page.private and not any(page.route.startswith(prefix) for prefix in protected)]
+    if unprotected and mode == "public":
+        return GenerationResult(False, str(output_path), errors=[
+            "Private page outside configured protected_prefixes: " + ", ".join(unprotected)
+            + ". Configure server-side authentication before publishing."
+        ])
     items = [item for item in all_items if mode == "preview" or item.status == "published"]
     skipped_count = len(all_items) - len(items)
     try:
@@ -705,6 +810,10 @@ def generate_site(source: str | Path, output: str | Path, languages: str | Itera
         shutil.copytree(config.css_dir, output_path / "css")
     if config.images_dir.is_dir():
         shutil.copytree(config.images_dir, output_path / "images")
+    # JavaScript is a first-class site resource, copied before content hashes are computed.
+    js_dir = source_path / "js"
+    if js_dir.is_dir():
+        shutil.copytree(js_dir, output_path / "js")
 
     variants: dict[str, dict[str, ContentItem]] = {}
     for content_item in items:
@@ -815,6 +924,27 @@ def generate_site(source: str | Path, output: str | Path, languages: str | Itera
                 "seo_tags": meta_tags,
             },
         )
+        # The uploader is a page-specific enhancement, not a Markdown feature.
+        # Inject its existing script only on the upload route, including translated
+        # variants. Fail generation if the asset is absent instead of publishing
+        # an apparently functional page without its upload controls.
+        if current_base_route == "/over-deze-website/upload/":
+            uploader = output_path / "js" / "markdown-upload.js"
+            if not uploader.is_file():
+                errors.append(f"Required upload script missing: {uploader}")
+                continue
+            if "</body>" not in final_html:
+                errors.append(f"Missing </body> for upload page: {item.source_path}")
+                continue
+            final_html = final_html.replace(
+                "</body>",
+                '<script src="/js/markdown-upload.js" defer></script>\n</body>',
+                1,
+            )
+
+        # Version assets after rendering (including the upload script),
+        # before rewriting root-relative URLs for local file previews.
+        final_html = _version_local_assets(final_html, output_path)
         final_html = _make_output_relative_urls(final_html, item.route)
 
         unresolved = unresolved_placeholders(final_html)
@@ -863,7 +993,7 @@ def _seo_tags(item: ContentItem, config, canonical: str, description: str, image
     if image:
         tags.extend([f'<meta property="og:image" content="{esc(image)}">',
                      f'<meta name="twitter:image" content="{esc(image)}">'])
-    if mode == "preview" or item.status != "published" or item.hidden:
+    if mode == "preview" or item.status != "published" or item.hidden or item.private:
         tags.append('<meta name="robots" content="noindex,nofollow">')
     if item.date and item.template == "article":
         tags.append(f'<meta property="article:published_time" content="{esc(item.date)}">')
@@ -876,7 +1006,7 @@ def _write_sitemap(output: Path, config, items: list[ContentItem], langs: set[st
     ET.register_namespace("", ns)
     root = ET.Element(f"{{{ns}}}urlset")
     for item in sorted(items, key=lambda value: value.route):
-        if item.language not in langs or item.status != "published" or item.hidden:
+        if item.language not in langs or item.status != "published" or item.hidden or item.private:
             continue
         entry = ET.SubElement(root, f"{{{ns}}}url")
         ET.SubElement(entry, f"{{{ns}}}loc").text = config.base_url.rstrip("/") + item.route
@@ -888,7 +1018,7 @@ def _write_sitemap(output: Path, config, items: list[ContentItem], langs: set[st
 
 def _write_rss(output: Path, config, items: list[ContentItem], langs: set[str]) -> bool:
     """Write rss to generated output."""
-    articles = sorted((i for i in items if i.template == "article" and i.date and i.language in langs and i.status == "published" and not i.hidden), key=lambda i: i.date, reverse=True)
+    articles = sorted((i for i in items if i.template == "article" and i.date and i.language in langs and i.status == "published" and not i.hidden and not i.private), key=lambda i: i.date, reverse=True)
     if not articles:
         return False
     rss = ET.Element("rss", version="2.0")

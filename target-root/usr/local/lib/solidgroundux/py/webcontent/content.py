@@ -125,6 +125,15 @@ class ContentItem:
         return str(self.metadata.get("hidden", False)).strip().lower() in {"true", "yes", "1"}
 
     @property
+    def private(self) -> bool:
+        """Declare a URL requiring server-side access control.
+
+        Metadata alone never creates authentication; the generator checks
+        protected URL placement, and the web server must enforce the guard.
+        """
+        return str(self.metadata.get("private", False)).strip().lower() in {"true", "yes", "1"}
+
+    @property
     def featured(self) -> bool:
         """Handle featured for the web content workflow.
         

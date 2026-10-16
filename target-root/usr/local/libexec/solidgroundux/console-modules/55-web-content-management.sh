@@ -118,6 +118,8 @@ set -uo pipefail
         return "$rc"
     }
 
+    web_content_retrieve_incoming()  { _web_content_run_manage retrieve-incoming; }
+    web_content_configure_source()  { _web_content_run_manage configure-source; }
     web_content_ingest()          { _web_content_run_mutating_manage ingest; }
     web_content_delete()          { _web_content_run_mutating_manage delete; }
     web_content_edit_metadata()   { _web_content_run_mutating_manage edit-metadata; }
@@ -164,6 +166,7 @@ set -uo pipefail
     # Publish: content creation and site generation.
     sgnd_menu_register_item "web-content-generate" "web-content-publish" "Generate website" "web_content_generate" "Generate a static website from Markdown, templates, CSS, and assets" 0 15 1
     sgnd_menu_register_item "web-content-publish-site" "web-content-publish" "Publish website" "web_content_publish" "Preview and upload generated files using a configured publishing profile" 0 0 1
+    sgnd_menu_register_item "web-content-retrieve" "web-content-publish" "Retrieve Incoming" "web_content_retrieve_incoming" "Select Markdown files on a saved SSH source server and retrieve them for ingestion" 0 15 1
     sgnd_menu_register_item "web-content-ingest" "web-content-publish" "Ingest Markdown" "web_content_ingest" "Import one or more Markdown files, reuse remembered metadata defaults, and archive processed originals" 0 15 1
     sgnd_menu_register_item "web-content-metadata" "web-content-publish" "Edit page metadata" "web_content_edit_metadata" "Browse pages and update a front matter field without changing the Markdown body" 0 0 1
 
@@ -171,6 +174,7 @@ set -uo pipefail
     sgnd_menu_register_item "web-content-move" "web-content-manage" "Move / rename" "web_content_move_page" "Move one page to another existing section or change its URL slug" 0 0 1
     sgnd_menu_register_item "web-content-delete" "web-content-manage" "Delete page" "web_content_delete" "Remove one or more child pages or sections from active content and archive them for recovery" 0 0 1
     sgnd_menu_register_item "web-content-sections" "web-content-manage" "Manage sections" "web_content_manage_sections" "Create indexed sections and choose how to move, archive or remove section contents" 0 0 1
+    sgnd_menu_register_item "web-content-source-config" "web-content-manage" "Configure source server" "web_content_configure_source" "Persist SSH host, user, port and remote incoming directory" 0 0 1
     sgnd_menu_register_item "web-content-config" "web-content-manage" "Manage Config" "web_content_manage_config" "Select an existing website .cfg file and edit it with nano" 0 0 1
 
     # Validation: source checks and current configuration/status information.

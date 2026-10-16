@@ -28,7 +28,7 @@ The format is inspired by *Keep a Changelog* while remaining focused on practica
 - Added safe page deletion with multi-select support, translation-aware handling, recursive section deletion confirmation, protected section roots, and archival under `deleted/YYYY-MM-DD/` rather than immediate destruction.
 - Added Testadura Markdown component extensions, including nested `:::` component blocks, responsive `td-grid` / `td-tile` layouts, callouts, inline/image classes, and native scroll-snap image galleries.
 - Added configurable featured-content support through `featured.cfg`, allowing product pages or articles to be curated independently of the site navigation and resolved per language by the generator.
-- Added website-source validation for content metadata, duplicate generated routes, missing section indexes, component CSS references, featured-content targets, and other generation-time consistency checks.
+- Added website-source validation for content metadata, duplicate generated routes, optional section-index structure, component CSS references, featured-content targets, and other generation-time consistency checks.
 - Added section management for creating, renaming/moving, and removing website sections, including configurable section index pages and explicit choices for moving, archiving, or deleting contained content.
 - Added interactive page-metadata editing and management of publication status, with draft/preview output separated from the public website.
 - Added website publication destinations stored as reusable profiles, including SSH/rsync targets and **Update** versus **Mirror** synchronization previews with explicit confirmation.
@@ -39,6 +39,16 @@ The format is inspired by *Keep a Changelog* while remaining focused on practica
 - Added optional DNS A-record cleanup to **Web Server Management → Manage Sites → Remove site**, limited to a record matching the local web-server address and requiring explicit confirmation.
 - Added a documentation content comparison to **Documentation status**, with a confirmed **Update published documentation** operation using an rsync checksum preview.
 - Added favicon rendering/support through the Python site renderer so published sites can serve `favicon.ico` as a static asset; no separate Nginx management action is required.
+
+- Added optional per-site HTTPS configuration in **Web Server Management → Manage Sites**, supporting existing certificates or self-signed test certificates and optional HTTP-to-HTTPS redirection, with Nginx configuration validation and rollback.
+- Added per-site private URL-section management using Nginx HTTP Basic Authentication, bcrypt password hashes stored outside the document root, and optional on-demand installation of `apache2-utils` (`htpasswd`).
+- Added an HTTPS-only Markdown upload receiver behind Nginx Basic Authentication, accepting up to ten `.md` files per request, with per-file limits and storage outside the public document root.
+- Added a drag-and-drop Markdown upload page and a separate authenticated upload endpoint; the website can publish the upload page without exposing the receiver publicly.
+- Added **Retrieve Incoming** in Web Content Management, with persistently configurable SSH source host, account, port, and remote incoming directory, selection of multiple files, and post-transfer remote archiving of successfully retrieved files.
+- Added multi-file selection to **Ingest**, alongside the existing ingest-all workflow.
+- Added automatically generated, expandable sidebar navigation for nested sections and subpages, using configured main-section labels and Markdown page titles, with support for sections without index pages.
+- Added `hidden` navigation behavior and `ShowHidden`/`HideHidden` browsing controls, including preservation across internal navigation; private-page metadata is checked against configured protected URL prefixes at generation time.
+- Added content-hash versioning of local CSS and JavaScript asset references to reduce stale browser asset caching.
 
 ### Changed
 
@@ -53,6 +63,11 @@ The format is inspired by *Keep a Changelog* while remaining focused on practica
 - Changed Computer Setup into a thin console orchestrator with separate computer/identity and SSH-access management executables; added per-user SSH key-generation, remote installation, agent-unlock, and authentication-test actions.
 - Changed the installed-documentation source path in Web Server Management to `/usr/local/share/doc/solidgroundux-codex`, with an override through `SGND_WEB_DOC_INSTALLED_ROOT` or `web-server.cfg`.
 
+- Changed content validation to permit missing language variants and optional section index pages; an untranslated or index-less intermediate directory no longer blocks generation solely because its index is absent.
+- Changed the site navigation from flat top-level links to a recursive hierarchy; hidden section nodes suppress their descendants in ordinary navigation but can be revealed with `ShowHidden`.
+- Changed the upload-page generation to include the required JavaScript explicitly and fail if the expected upload script is unavailable; the script and other JavaScript assets now publish from `www/js/` rather than `www/images/`.
+- Changed the web-content publishing flow to distinguish successful rsync publication from subsequent HTTP verification warnings; an HTTP-to-HTTPS `301` is still reported as a pending verification rather than a publishing failure.
+
 ### Fixed
 
 - Fixed language-switch generation that could previously expose links to untranslated pages when only a subset of configured languages was generated.
@@ -61,6 +76,17 @@ The format is inspired by *Keep a Changelog* while remaining focused on practica
 - Fixed remote Web Server executable resolution to use the canonical MCM `libexec` path rather than nonexistent `mcm` subdirectories.
 - Fixed remote provisioning's incompatible `sudo -n true` precheck and aligned privileged site setup with the configured SolidGroundUX executable sudo rule.
 - Fixed a publishing-script regression that restored obsolete manual SSH-helper sourcing and argument ordering.
+
+- Fixed managed Basic Auth password-file directory and file permissions so the Nginx worker can read credentials without exposing them publicly.
+- Fixed Markdown upload setup to recognize existing managed HTTPS and Basic Auth configuration and avoid rewriting a functioning TLS-protected site.
+- Fixed `ShowHidden` behavior across page navigation, including support for hidden subsection navigation in the generated HTML.
+- Fixed the upload page silently losing its drag-and-drop interface when the external JavaScript reference was missing from generated HTML.
+- Fixed upload-script path handling after relocating `markdown-upload.js` from `images/` to `js/`.
+
+### Known limitations
+
+- HTTP verification after publication still reports an intentional `301` redirect to HTTPS as pending; follow the redirect and validate HTTPS with an appropriate certificate trust policy in a future refinement.
+- `private: true` is publication metadata, not access control: server-side Nginx authentication must be configured and tested independently for each protected URL and upload endpoint.
 
 ## Release 2.1.2627801
 

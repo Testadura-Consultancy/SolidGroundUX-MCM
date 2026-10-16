@@ -107,19 +107,24 @@ def validate_site(source: str | Path) -> ValidationResult:
             else:
                 live_routes[item.route] = item.source_path
 
-    # Main navigation points at section roots. Each section root must therefore
-    # be backed by an index page in the default language; child-page hierarchy
-    # and breadcrumbs are derived from these index pages rather than navigation.cfg.
-    default_index_routes = {
-        item.route
-        for item in items
-        if item.language == config.default_language and item.base_name == "index" and not item.draft
+    # Navigation entries can be folders without index_<language>.md. Require
+    # actual published content under the configured root in the default language,
+    # but do not require a dedicated landing page or translated index. This
+    # matches the recursive sidebar, which supports index-less folder nodes.
+    default_live_routes = {
+        item.route for item in items
+        if item.language == config.default_language and not item.draft
     }
     for nav_item in navigation:
-        if nav_item.path not in default_index_routes:
+        if not any(
+            route == nav_item.path or (
+                nav_item.path == "/" or route.startswith(nav_item.path)
+            )
+            for route in default_live_routes
+        ):
             errors.append(
-                f"Navigation section '{nav_item.key}' has no {config.default_language} index page "
-                f"for route {nav_item.path}"
+                f"Navigation section '{nav_item.key}' has no live "
+                f"{config.default_language} content under {nav_item.path}"
             )
 
     # Featured content is a curated list of language-neutral routes. Require
@@ -146,25 +151,9 @@ def validate_site(source: str | Path) -> ValidationResult:
             if not image_path.is_file():
                 errors.append(f"Featured image not found for '{featured.key}': {image_path}")
 
-    # Content folders are sections. Every live page must therefore have a live
-    # index page for its language at each folder level up to the content root.
-    # This keeps local navigation and breadcrumb ancestry complete and explicit.
-    live_source_paths = {item.source_path for item in items if not item.draft}
-    missing_section_indexes: set[Path] = set()
-    for item in items:
-        if item.draft:
-            continue
-        directory = item.source_path.parent
-        while True:
-            expected_index = directory / f"index_{item.language}.md"
-            if expected_index not in live_source_paths:
-                missing_section_indexes.add(expected_index)
-            if directory == config.content_dir:
-                break
-            directory = directory.parent
-
-    for path in sorted(missing_section_indexes):
-        errors.append(f"Content section has no live index page: {path}")
+    # A content directory is a navigation group, not necessarily a page.
+    # Missing index pages, including translations, are intentional and valid.
+    # Actual page routes and duplicate live routes are still checked above.
 
     missing_styles = sorted(used_styles - available_styles)
     for name in missing_styles:
