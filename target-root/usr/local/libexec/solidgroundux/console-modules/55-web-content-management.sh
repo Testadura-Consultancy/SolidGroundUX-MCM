@@ -124,8 +124,6 @@ set -uo pipefail
     web_content_delete()          { _web_content_run_mutating_manage delete; }
     web_content_edit_metadata()   { _web_content_run_mutating_manage edit-metadata; }
     web_content_move_page()       { _web_content_run_mutating_manage move-page; }
-    # fn: web_content_manage_sections - Open safe section creation and removal workflows.
-    web_content_manage_sections() { _web_content_run_mutating_manage manage-sections; }
     web_content_generate()        { _web_content_run_manage generate; }
     # fn: web_content_publish - Preview and synchronize generated website files to a configured destination.
     web_content_publish()         { _web_content_run_manage publish; }
@@ -160,7 +158,7 @@ set -uo pipefail
     # numbers all visible actions consecutively within the active module chapter.
     # Keep registration order aligned with the requested Publish/Manage/Validation flow.
     sgnd_menu_register_group "web-content-publish" "Publish" "Website publication and authoring" 0 1 550
-    sgnd_menu_register_group "web-content-manage" "Manage" "Pages, sections, and configuration" 0 1 551
+    sgnd_menu_register_group "web-content-manage" "Manage" "Pages and repository configuration" 0 1 551
     sgnd_menu_register_group "web-content-validation" "Validation" "Source validation and status" 0 1 552
 
     # Publish: content creation and site generation.
@@ -170,10 +168,9 @@ set -uo pipefail
     sgnd_menu_register_item "web-content-ingest" "web-content-publish" "Ingest Markdown" "web_content_ingest" "Import one or more Markdown files, reuse remembered metadata defaults, and archive processed originals" 0 15 1
     sgnd_menu_register_item "web-content-metadata" "web-content-publish" "Edit page metadata" "web_content_edit_metadata" "Browse pages and update a front matter field without changing the Markdown body" 0 0 1
 
-    # Manage: existing pages, section hierarchy, and repository configuration.
+    # Manage: existing pages and repository configuration; sections follow the content tree.
     sgnd_menu_register_item "web-content-move" "web-content-manage" "Move / rename" "web_content_move_page" "Move one page to another existing section or change its URL slug" 0 0 1
     sgnd_menu_register_item "web-content-delete" "web-content-manage" "Delete page" "web_content_delete" "Remove one or more child pages or sections from active content and archive them for recovery" 0 0 1
-    sgnd_menu_register_item "web-content-sections" "web-content-manage" "Manage sections" "web_content_manage_sections" "Create indexed sections and choose how to move, archive or remove section contents" 0 0 1
     sgnd_menu_register_item "web-content-source-config" "web-content-manage" "Configure source server" "web_content_configure_source" "Persist SSH host, user, port and remote incoming directory" 0 0 1
     sgnd_menu_register_item "web-content-config" "web-content-manage" "Manage Config" "web_content_manage_config" "Select an existing website .cfg file and edit it with nano" 0 0 1
 

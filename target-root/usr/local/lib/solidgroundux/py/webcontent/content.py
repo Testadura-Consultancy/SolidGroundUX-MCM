@@ -312,9 +312,23 @@ def load_site_config(root: Path) -> SiteConfig:
     links_section = parser["links"] if "links" in parser else {}
 
     default_language = site.get("default_language", "NL").strip().upper()
-    supported = [part.strip().upper() for part in site.get("supported_languages", default_language).split(",") if part.strip()]
+    # Root index files are the authoritative language registry. Other Markdown
+    # files do not enable languages, and site.cfg does not duplicate this list.
+    content_dir = root / paths.get("content", "content").strip()
+    supported = sorted({
+        match.group("language").upper()
+        for path in content_dir.glob("index_*.md")
+        if (match := _CONTENT_FILE_RE.fullmatch(path.name))
+        and match.group("name") == "index"
+    })
+    if not supported:
+        raise ValueError(f"No root index_XX.md language files found in {content_dir}")
     if default_language not in supported:
-        supported.insert(0, default_language)
+        raise ValueError(
+            f"Default language {default_language} has no root index_{default_language}.md in {content_dir}"
+        )
+    supported.remove(default_language)
+    supported.insert(0, default_language)
 
     return SiteConfig(
         root=root,
@@ -333,41 +347,74 @@ def load_site_config(root: Path) -> SiteConfig:
     )
 
 
-def load_navigation(root: Path) -> list[NavigationItem]:
-    """Read the declared navigation structure for the website.
-    
-    Args:
-        root: Input used by this operation.
-    
-    Returns:
-        Operation result or None, as defined by the implementation."""
-    cfg_path = root.resolve() / "config" / "navigation.cfg"
-    if not cfg_path.is_file():
-        return []
+def is_ignored(path: Path, boundary: Path) -> bool:
+    """Whether a source path is beneath a directory containing `.ignore`.
 
-    parser = configparser.ConfigParser(interpolation=None)
-    parser.optionxform = str
-    parser.read(cfg_path, encoding="utf-8")
+    The boundary is included, but ancestors outside it are never inspected.
+    """
+    boundary = boundary.resolve()
+    current = path.resolve() if path.is_dir() else path.resolve().parent
+    if not current.is_relative_to(boundary):
+        raise ValueError(f"Source path outside ignore boundary: {path}")
+    while True:
+        if (current / ".ignore").is_file():
+            return True
+        if current == boundary:
+            return False
+        current = current.parent
 
-    items: list[NavigationItem] = []
-    for section in parser.sections():
-        values = parser[section]
-        labels = {key.upper(): value.strip() for key, value in values.items() if re.fullmatch(r"[A-Za-z]{2}", key)}
-        path = values.get("path", "/").strip() or "/"
-        if not path.startswith("/"):
-            path = "/" + path
-        if path != "/" and not path.endswith("/"):
-            path += "/"
-        items.append(
-            NavigationItem(
-                key=section,
-                order=int(values.get("order", "1000")),
-                path=path,
-                template=values.get("template", "page").strip() or "page",
-                labels=labels,
-            )
-        )
-    return sorted(items, key=lambda item: (item.order, item.key))
+
+def load_navigation(root: Path, *, include_drafts: bool = False) -> list[NavigationItem]:
+    """Discover root navigation from section indexes, never navigation.cfg.
+
+    Dutch index metadata provides structural defaults; translated indexes
+    supply translated labels. A section without an index is not navigation.
+    Preview mode includes draft-only sections; public mode excludes them.
+    """
+    config = load_site_config(root)
+    entries: list[NavigationItem] = []
+    index_dirs = [config.content_dir] + sorted(
+        path for path in config.content_dir.iterdir() if path.is_dir() and not is_ignored(path, config.content_dir)
+    )
+    for directory in index_dirs:
+        variants = {}
+        for language in config.supported_languages:
+            path = directory / f"index_{language}.md"
+            if path.is_file():
+                metadata, _ = parse_front_matter(path.read_text(encoding="utf-8"))
+                variants[language] = metadata
+        if not variants:
+            continue
+        # Draft-only section indexes do not establish public navigation roots.
+        if not include_drafts and not any(
+            str(meta.get("status", "")).lower() == "published" or (
+                not meta.get("draft", False) and str(meta.get("status", "")).lower() not in {"draft", "preview"}
+            ) for meta in variants.values()
+        ):
+            continue
+        defaults = variants.get(config.default_language, {})
+        primary = defaults or next(iter(variants.values()))
+        relative = directory.relative_to(config.content_dir).as_posix()
+        route = "/" if relative == "." else f"/{relative}/"
+        labels = {
+            lang: str(meta.get("nav_title") or meta.get("title") or relative)
+            for lang, meta in variants.items()
+        }
+        for lang in config.supported_languages:
+            if lang not in labels and config.default_language in labels:
+                labels[lang] = labels[config.default_language]
+        try:
+            order = int(primary.get("nav_order", primary.get("order", 1000)))
+        except (TypeError, ValueError) as exc:
+            raise ValueError(f"Invalid nav_order in {directory}") from exc
+        entries.append(NavigationItem(
+            key=relative if relative != "." else "home",
+            order=order,
+            path=route,
+            template=str(primary.get("template") or ("home" if route == "/" else "page")),
+            labels=labels,
+        ))
+    return sorted(entries, key=lambda item: (item.order, item.key))
 
 
 def load_featured(root: Path) -> list[FeaturedItem]:
@@ -466,10 +513,39 @@ def discover_content(config: SiteConfig, navigation: list[NavigationItem]) -> li
     if not config.content_dir.is_dir():
         raise ValueError(f"Content directory not found: {config.content_dir}")
 
+    # Every directory containing publishable Markdown must be a section with
+    # an index for at least one enabled language. Ancestor directories must
+    # likewise be sections, so navigation cannot contain index-less gaps.
+    # Root content is exempt because the root index is handled separately.
+    indexed_dirs = {
+        path.parent
+        for path in config.content_dir.rglob("index_*.md")
+        if not is_ignored(path, config.content_dir)
+        and (match := _CONTENT_FILE_RE.match(path.name)) is not None
+        and match.group("name") == "index"
+        and match.group("language").upper() in config.supported_languages
+    }
+    for path in sorted(config.content_dir.rglob("*.md")):
+        if is_ignored(path, config.content_dir):
+            continue
+        match = _CONTENT_FILE_RE.match(path.name)
+        if match is None or match.group("language").upper() not in config.supported_languages:
+            continue
+        current = path.parent
+        while current != config.content_dir:
+            if current not in indexed_dirs:
+                raise ValueError(
+                    f"Missing section index_XX.md in '{current.relative_to(config.content_dir)}' "
+                    f"(required by '{path.relative_to(config.content_dir)}')"
+                )
+            current = current.parent
+
     nav_by_path = {item.path: item for item in navigation}
     items: list[ContentItem] = []
 
     for path in sorted(config.content_dir.rglob("*.md")):
+        if is_ignored(path, config.content_dir):
+            continue
         match = _CONTENT_FILE_RE.match(path.name)
         if not match:
             continue

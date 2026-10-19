@@ -173,6 +173,14 @@ def _base_route_for_item(item: ContentItem, default_language: str) -> str:
     return route
 
 
+def _ignore_marked_directories(directory: str, names: list[str]) -> set[str]:
+    """Exclude marked asset subtrees and the marker itself during copying."""
+    root = Path(directory)
+    ignored = {".ignore"} if ".ignore" in names else set()
+    ignored.update(name for name in names if (root / name).is_dir() and (root / name / ".ignore").is_file())
+    return ignored
+
+
 def _render_navigation(
     navigation: list[NavigationItem],
     items: list[ContentItem],
@@ -182,8 +190,9 @@ def _render_navigation(
 ) -> str:
     """Build a recursive sidebar from translated page titles and content routes.
 
-    The configured navigation supplies only root ordering. Directories are
-    navigation groups even when there is no index page. Hidden index pages
+    Section indexes supply navigation labels and ordering at every depth.
+    Existing intermediate folders can still group ordinary pages until the
+    index-only section migration is complete. Hidden index pages
     conceal their entire subtree by CSS until ShowHidden is present; hidden
     ordinary pages conceal only themselves. Private pages require server auth
     and are not protected by navigation metadata.
@@ -192,11 +201,19 @@ def _render_navigation(
     # CSS/JavaScript toggles their visibility at runtime. A hidden index marks
     # its entire folder node as hidden, so all descendants are concealed too.
     # This is presentation only; private access remains enforced by Nginx.
+    # Navigation is built from actual published pages. If a page has no
+    # translation in the selected language, retain the Dutch page as a
+    # navigable fallback; never manufacture a translated URL or hreflang.
     pages = {
         _base_route_for_item(page, default_language): page
         for page in items
-        if page.language == language
+        if page.language == default_language
     }
+    pages.update({
+        _base_route_for_item(page, default_language): page
+        for page in items
+        if page.language == language
+    })
     # Folder nodes keyed by directory route, with optional index-page content.
     nodes: dict[str, dict] = {"/": {"children": set(), "page": pages.get("/")}}
     for route, page in pages.items():
@@ -217,7 +234,7 @@ def _render_navigation(
 
     top = sorted(navigation, key=lambda n: n.order)
     roots = [n.path for n in top if n.path in nodes and n.labels.get(language)]
-    # Root entries still follow navigation.cfg; their visibility follows metadata.
+    # Root entries are discovered from section indexes, not navigation.cfg.
     top_by_path = {n.path: n for n in top}
 
     def label_for(route: str) -> str:
@@ -228,7 +245,7 @@ def _render_navigation(
         if nav and nav.labels.get(language):
             return nav.labels[language]
         if page:
-            return page.title
+            return str(page.metadata.get("nav_title") or page.title)
         return route.strip("/").split("/")[-1].replace("-", " ").capitalize()
 
     def render(route: str, ancestors: set[str]) -> str:
@@ -237,9 +254,19 @@ def _render_navigation(
         node = nodes[route]
         # Home is its own navigation entry, not a container for every section.
         child_routes = () if route == "/" else node["children"]
+        def child_order(child_route: str) -> int:
+            """Prefer section navigation order over ordinary page ordering."""
+            child_page = nodes[child_route]["page"]
+            if child_page is None:
+                return 1000
+            raw_order = child_page.metadata.get("nav_order", child_page.order)
+            try:
+                return int(raw_order)
+            except (TypeError, ValueError):
+                return 1000
+
         children = sorted(child_routes, key=lambda r: (
-            nodes[r]["page"].order if nodes[r]["page"] else 1000,
-            label_for(r).casefold(), r,
+            child_order(r), label_for(r).casefold(), r,
         ))
         active = current_base_route == route
         expanded = active or (route.endswith("/") and current_base_route.startswith(route))
@@ -260,7 +287,7 @@ def _render_navigation(
                 '<summary><span class="wc-nav-arrow" aria-hidden="true"></span>'
                 + link + '</summary><div class="wc-nav-children">' + child_html + '</div></details>')
 
-    # Root navigation remains explicitly ordered; nested navigation is automatic.
+    # Root and nested navigation are both derived from index/page metadata.
     return "\n".join(render(route, set()) for route in roots)
 
 
@@ -278,42 +305,38 @@ def _render_external_links(links: dict[str, str]) -> str:
 
 
 def _render_breadcrumb(items: list[ContentItem], item: ContentItem, default_language: str) -> str:
-    """Render links to existing ancestor index pages in the content hierarchy.
+    """Link to real ancestor indexes, preferring the page language over Dutch.
 
-    Folder structure defines page hierarchy. Each ancestor is included only when
-    that folder has an ``index_<language>.md`` page. The current page is omitted
-    because its h1 is already rendered in the title bar.
+    Missing translated ancestors use their published default-language index.
+    Never create synthetic translated URLs or language annotations for fallback.
+    The current page is omitted because its title is already in the header.
     """
     current_base_route = _base_route_for_item(item, default_language)
     current_parts = [part for part in current_base_route.strip("/").split("/") if part]
-
-    ancestor_routes = {
+    ancestor_routes = [
         "/" + "/".join(current_parts[:depth]) + "/"
         for depth in range(1, len(current_parts))
-    }
-    ancestors = [
-        candidate
-        for candidate in items
-        if candidate.language == item.language
-        and candidate.base_name == "index"
-        and candidate in items
-        and _base_route_for_item(candidate, default_language) in ancestor_routes
     ]
-    ancestors.sort(key=lambda candidate: len(_base_route_for_item(candidate, default_language).strip("/").split("/")))
-
+    indexes: dict[tuple[str, str], ContentItem] = {
+        (_base_route_for_item(candidate, default_language), candidate.language): candidate
+        for candidate in items
+        if candidate.base_name == "index"
+    }
     parts: list[str] = []
-    for ancestor in ancestors:
+    for route in ancestor_routes:
+        ancestor = (indexes.get((route, item.language))
+                    or indexes.get((route, default_language)))
+        if ancestor is None:
+            continue
         parts.append(
             '<li><a href="'
             + html.escape(ancestor.route, quote=True)
             + '">'
-            + html.escape(ancestor.title)
+            + html.escape(str(ancestor.metadata.get("nav_title") or ancestor.title))
             + "</a></li>"
         )
-
     if not parts:
         return ""
-
     return (
         '<nav class="context-breadcrumb" aria-label="Breadcrumb"><ol>'
         + "".join(parts)
@@ -351,26 +374,36 @@ def _render_language_selector(
     variants: dict[str, dict[str, ContentItem]],
     selected_languages: set[str],
 ) -> str:
-    """Render links only to translation variants present in this output build."""
+    """Show enabled languages, linking missing translations to the real Dutch page.
+
+    A fallback link is navigation, not a translation: do not mark it hreflang.
+    Only published/preview-visible variants supplied by the caller are eligible.
+    """
     available = {
         language: variant
         for language, variant in variants.get(item.logical_id, {}).items()
-        if language in selected_languages 
+        if language in selected_languages
     }
-    if len(available) <= 1:
+    fallback = available.get(config.default_language)
+    if not available:
         return ""
 
     links: list[str] = []
     for language in config.supported_languages:
+        if language not in selected_languages:
+            continue
         variant = available.get(language)
-        if variant is None:
+        target = variant or fallback
+        if target is None:
+            # No translated page and no default-language page to link to.
             continue
 
         label = _LANGUAGE_NAMES.get(language, language)
-        flag_path = config.images_dir / "flags" / f"{language.lower()}.svg"
-        if flag_path.is_file():
+        png_name = f"flag_{language.upper()}.png"
+        flag_url = f"/images/{png_name}" if (config.images_dir / png_name).is_file() else ""
+        if flag_url:
             content = (
-                f'<img class="language-flag" src="/images/flags/{language.lower()}.svg" '
+                f'<img class="language-flag" src="{html.escape(flag_url, quote=True)}" '
                 f'alt="" aria-hidden="true">'
             )
         else:
@@ -382,10 +415,16 @@ def _render_language_selector(
         )
         if language == item.language:
             links.append(f'<span {common} aria-current="page">{content}</span>')
-        else:
+        elif variant is not None:
             links.append(
                 f'<a {common} hreflang="{html.escape(language.lower(), quote=True)}" '
-                f'href="{html.escape(variant.route, quote=True)}">{content}</a>'
+                f'href="{html.escape(target.route, quote=True)}">{content}</a>'
+            )
+        else:
+            # Missing translation: link to Dutch content without claiming that
+            # it is a page in the requested language.
+            links.append(
+                f'<a {common} href="{html.escape(target.route, quote=True)}">{content}</a>'
             )
 
     partial_path = config.templates_dir / "partials" / "language-selector.html"
@@ -526,29 +565,32 @@ def _explicit_indexes(body: str, item: ContentItem, items: list[ContentItem],
 
 
 def _direct_children(item: ContentItem, items: list[ContentItem], default_language: str) -> list[ContentItem]:
-    """Return the immediate child pages below an index page.
+    """Find immediate children, preferring the page language and then Dutch.
 
-    A child may be either a sibling Markdown file such as ``installation_NL.md``
-    or a nested folder index such as ``documentation/index_NL.md``. Both map to
-    exactly one route segment below the parent section.
+    A language-specific listing may reference a Dutch-only child directly.
+    Resolve each logical page once so translations never create duplicate cards
+    or links to pages that were not generated.
     """
     if item.base_name != "index":
         return []
 
     parent_route = _base_route_for_item(item, default_language)
     parent_parts = [part for part in parent_route.strip("/").split("/") if part]
-    children: list[ContentItem] = []
+    variants: dict[str, dict[str, ContentItem]] = {}
     for child in items:
-        if child.language != item.language or child not in items or child.logical_id == item.logical_id:
+        if child.logical_id == item.logical_id:
             continue
         child_route = _base_route_for_item(child, default_language)
         child_parts = [part for part in child_route.strip("/").split("/") if part]
-        if len(child_parts) != len(parent_parts) + 1:
+        if len(child_parts) != len(parent_parts) + 1 or child_parts[:len(parent_parts)] != parent_parts:
             continue
-        if child_parts[: len(parent_parts)] != parent_parts:
-            continue
-        children.append(child)
+        variants.setdefault(child.logical_id, {})[child.language] = child
 
+    children = []
+    for available in variants.values():
+        chosen = available.get(item.language) or available.get(default_language)
+        if chosen is not None:
+            children.append(chosen)
     children.sort(key=lambda child: (child.order, child.title.lower()))
     return children
 
@@ -760,7 +802,8 @@ def generate_site(source: str | Path, output: str | Path, languages: str | Itera
         return GenerationResult(False, str(output_path), warnings=validation.warnings, errors=validation.errors)
 
     config = load_site_config(source_path)
-    navigation = load_navigation(source_path)
+    # Preview includes draft-only section indexes in its navigation.
+    navigation = load_navigation(source_path, include_drafts=(mode == "preview"))
     featured_items = load_featured(source_path)
     featured_configured = (source_path / "config" / "featured.cfg").is_file()
     # Presentation settings belong to the slider, not to individual articles.
@@ -809,7 +852,7 @@ def generate_site(source: str | Path, output: str | Path, languages: str | Itera
     if config.css_dir.is_dir():
         shutil.copytree(config.css_dir, output_path / "css")
     if config.images_dir.is_dir():
-        shutil.copytree(config.images_dir, output_path / "images")
+        shutil.copytree(config.images_dir, output_path / "images", ignore=_ignore_marked_directories)
     # JavaScript is a first-class site resource, copied before content hashes are computed.
     js_dir = source_path / "js"
     if js_dir.is_dir():
@@ -856,7 +899,16 @@ def generate_site(source: str | Path, output: str | Path, languages: str | Itera
         description = str(item.metadata.get("description") or item.summary or config.description)
         hero = _publish_image(str(item.metadata.get("hero_image") or item.metadata.get("index_image") or config.logo), item, config, output_path)
         absolute_hero = urljoin(config.base_url.rstrip("/") + "/", hero.lstrip("/")) if hero and not hero.startswith(("https:", "http:")) else hero
-        meta_tags = _seo_tags(item, config, absolute_url, description, absolute_hero, mode)
+        # Only actual, generated translations qualify for hreflang. A Dutch
+        # fallback navigation target is not an alternate-language document.
+        actual_variants = {
+            language: variant
+            for language, variant in variants.get(item.logical_id, {}).items()
+            if language in selected_languages
+            and (mode == "preview" or variant.status == "published")
+            and not variant.private and not variant.hidden
+        }
+        meta_tags = _seo_tags(item, config, absolute_url, description, absolute_hero, mode, actual_variants)
         page_context = {
             "title": html.escape(item.title),
             "summary": html.escape(description, quote=True),
@@ -972,7 +1024,7 @@ def generate_site(source: str | Path, output: str | Path, languages: str | Itera
                             skipped_count, broken, sitemap_written, rss_written)
 
 
-def _seo_tags(item: ContentItem, config, canonical: str, description: str, image: str, mode: str) -> str:
+def _seo_tags(item: ContentItem, config, canonical: str, description: str, image: str, mode: str, actual_variants: dict[str, ContentItem] | None = None) -> str:
     """Return escaped metadata; previews are excluded from indexing regardless of URL."""
     def esc(value: str) -> str:
         """Handle esc for the web content workflow.
@@ -990,6 +1042,12 @@ def _seo_tags(item: ContentItem, config, canonical: str, description: str, image
             f'<meta property="og:url" content="{esc(canonical)}">',
             f'<meta property="og:site_name" content="{esc(config.title)}">',
             f'<meta name="twitter:card" content="{"summary_large_image" if image else "summary"}">']
+    # Emit alternate links only for real language versions, not fallback
+    # navigation links. Require two variants to avoid redundant self-links.
+    if actual_variants and len(actual_variants) > 1:
+        for language, variant in sorted(actual_variants.items()):
+            alternate_url = config.base_url.rstrip("/") + variant.route
+            tags.append(f'<link rel="alternate" hreflang="{esc(language.lower())}" href="{esc(alternate_url)}">')
     if image:
         tags.extend([f'<meta property="og:image" content="{esc(image)}">',
                      f'<meta name="twitter:image" content="{esc(image)}">'])

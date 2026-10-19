@@ -107,10 +107,9 @@ def validate_site(source: str | Path) -> ValidationResult:
             else:
                 live_routes[item.route] = item.source_path
 
-    # Navigation entries can be folders without index_<language>.md. Require
-    # actual published content under the configured root in the default language,
-    # but do not require a dedicated landing page or translated index. This
-    # matches the recursive sidebar, which supports index-less folder nodes.
+    # Navigation entries are section indexes, never index-less folder nodes.
+    # A public section must have reachable published content in the default
+    # language; preview-only sections are handled by the generator separately.
     default_live_routes = {
         item.route for item in items
         if item.language == config.default_language and not item.draft

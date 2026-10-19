@@ -134,7 +134,7 @@ set -uo pipefail
 # - Framework integration -----------------------------------------------------------
     SGND_USING=(sgnd-ssh-deployment.sh)
     SGND_ARGS_SPEC=(
-        "action|a|enum|ACTION|Management action||ingest,delete,edit-metadata,move-page,manage-sections,manage-config,configure-source,retrieve-incoming,generate,publish,validate,prepare-social,status"
+        "action|a|enum|ACTION|Management action||ingest,delete,edit-metadata,move-page,manage-config,configure-source,retrieve-incoming,generate,publish,validate,prepare-social,status"
         "ingest-dir|i|value|INGEST_DIR|Override Markdown ingestion directory||"
     )
     SGND_SCRIPT_EXAMPLES=(
@@ -1318,93 +1318,145 @@ PYCODE
         [[ "$selected" =~ \[([^][]+)\]$ ]] || { sayfail "Invalid page selection"; return 1; }
         file="${BASH_REMATCH[1]}"
         if [[ "$operation" == "edit-metadata" ]]; then
-            # Remain on the chosen page until Done is selected. Refresh metadata
-            # after each save so defaults and the selection list stay current.
-            local selected_field="" edit_field="" edit_choice="" changed_count=0
-            local -a field_options=()
+            # Stage multiple front-matter edits in memory, then commit them
+            # through one atomic Python operation. Cancel discards the batch.
+            local selected_field="" edit_field="" current_value="" metadata_new_value=""
+            local staged_file="" staged_count=0
+            local -a field_options=() resolved_lines=()
+            staged_file="$(mktemp)" || { rm -f -- "$list_file" "$result_file"; return 1; }
+            printf '{}\n' > "$staged_file"
             while true; do
-                _web_content_run_engine "$list_file" list-pages --source "$SGND_WEB_CONTENT_SOURCE" || {
+                _web_content_run_engine "$list_file" inspect-metadata --source "$SGND_WEB_CONTENT_SOURCE" --content-file "$file" || {
                     _web_content_report_errors "$list_file"
-                    rm -f -- "$list_file" "$result_file"
+                    rm -f -- "$list_file" "$result_file" "$staged_file"
                     return 1
                 }
                 sgnd_print
-                sgnd_print_sectionheader --text "Current metadata: $file"
-                mapfile -t field_options < <(python3 - "$list_file" "$file" <<'PYCODE'
-import json
-import sys
+                sgnd_print_sectionheader --text "Metadata: $file"
+                local derived_language=""
+                derived_language="$(python3 - "$list_file" <<'PYCODE'
+import json, sys
 with open(sys.argv[1], encoding='utf-8') as handle:
-    pages = json.load(handle).get('pages', [])
-page = next((page for page in pages if page['file'] == sys.argv[2]), None)
-if page is not None:
-    for key, val in page['metadata'].items():
-        shown = str(val).lower() if isinstance(val, bool) else str(val if val is not None else '')
-        print('{} = {}'.format(key, shown.replace('\n', ' ')))
+    print(json.load(handle).get('language_from_filename', ''))
+PYCODE
+)"
+                sgnd_print_labeledvalue --label "Language (filename)" --value "$derived_language" --labelwidth 20
+                mapfile -t field_options < <(python3 - "$list_file" "$staged_file" <<'PYCODE'
+import json, sys
+with open(sys.argv[1], encoding='utf-8') as handle:
+    metadata = json.load(handle).get('metadata', {})
+with open(sys.argv[2], encoding='utf-8') as handle:
+    metadata.update(json.load(handle))
+for key, value in metadata.items():
+    shown = str(value).lower() if isinstance(value, bool) else str(value if value is not None else '')
+    print('{} = {}'.format(key, shown.replace('\n', ' ')))
 PYCODE
 )
-                if (( ${#field_options[@]} == 0 )); then
-                    saywarning "No editable metadata was found for this page."
-                else
-                    local metadata_line=""
-                    for metadata_line in "${field_options[@]}"; do
-                        sgnd_print_labeledvalue --label "${metadata_line%% = *}" --value "${metadata_line#* = }" --labelwidth 20
-                    done
-                fi
+                local metadata_line=""
+                for metadata_line in "${field_options[@]}"; do
+                    sgnd_print_labeledvalue --label "${metadata_line%% = *}" --value "${metadata_line#* = }" --labelwidth 20
+                done
                 sgnd_print
-                sgnd_print_sectionheader --text "Edit metadata"
-                field_options+=("Add metadata field" "Done - finish this page")
+                sgnd_print_sectionheader --text "Resolved values (read-only; not staged)"
+                mapfile -t resolved_lines < <(python3 - "$list_file" <<'PYCODE'
+import json, sys
+with open(sys.argv[1], encoding='utf-8') as handle:
+    values = json.load(handle).get('resolved', {})
+for key, entry in values.items():
+    value = entry.get('value', '')
+    if isinstance(value, bool):
+        value = str(value).lower()
+    print('{} = {} ({})'.format(key, str(value).replace('\n', ' '), entry.get('origin', 'unknown')))
+PYCODE
+)
+                local resolved_line=""
+                for resolved_line in "${resolved_lines[@]}"; do
+                    sgnd_print_labeledvalue --label "${resolved_line%% = *}" --value "${resolved_line#* = }" --labelwidth 20
+                done
+                staged_count="$(python3 - "$staged_file" <<'PYCODE'
+import json, sys
+with open(sys.argv[1], encoding='utf-8') as handle:
+    print(len(json.load(handle)))
+PYCODE
+)"
+                sgnd_print_sectionheader --text "Staged changes: $staged_count"
+                field_options+=("Add metadata field" "Save all staged changes" "Discard changes and finish")
                 selected_field=""
-                ask_selection --label "Choose a metadata field" --var selected_field --items "${field_options[@]}" || break
+                ask_selection --label "Choose a metadata field or action" --var selected_field --items "${field_options[@]}" || break
                 case "$selected_field" in
-                    "Done - finish this page") break ;;
+                    "Discard changes and finish") break ;;
+                    "Save all staged changes")
+                        if (( staged_count == 0 )); then
+                            sayinfo "No changes to save."
+                            continue
+                        fi
+                        if _web_content_run_engine "$result_file" edit-metadata-fields --source "$SGND_WEB_CONTENT_SOURCE" --content-file "$file" --changes-file "$staged_file"; then
+                            _web_content_record_activity "$staged_count"
+                            sayok "Saved $staged_count metadata fields. Git commit remains manual."
+                            printf '{}\n' > "$staged_file"
+                            break
+                        else
+                            _web_content_report_errors "$result_file"
+                            continue
+                        fi
+                        ;;
                     "Add metadata field")
                         edit_field=""
                         ask --label "New metadata field name" --var edit_field --back || continue
-                        [[ -n "$edit_field" ]] || { saywarning "Field name cannot be empty."; continue; }
+                        [[ "$edit_field" =~ ^[A-Za-z][A-Za-z0-9_-]*$ ]] || { saywarning "Invalid field name."; continue; }
+                        case "$edit_field" in parent|slug|language) saywarning "Location-dependent field cannot be edited here."; continue ;; esac
                         ;;
                     *) edit_field="${selected_field%% = *}" ;;
                 esac
-                # Read the current value from the refreshed page data. This is
-                # also safe for newly-added fields (whose default is blank).
-                current_value="$(python3 - "$list_file" "$file" "$edit_field" <<'PYCODE'
-import json
-import sys
+                current_value="$(python3 - "$list_file" "$staged_file" "$edit_field" <<'PYCODE'
+import json, sys
 with open(sys.argv[1], encoding='utf-8') as handle:
-    pages = json.load(handle).get('pages', [])
-for page in pages:
-    if page['file'] == sys.argv[2]:
-        value = page['metadata'].get(sys.argv[3], '')
-        if isinstance(value, bool):
-            print(str(value).lower())
-        elif value is not None:
-            print(str(value))
-        break
+    metadata = json.load(handle).get('metadata', {})
+with open(sys.argv[2], encoding='utf-8') as handle:
+    metadata.update(json.load(handle))
+value = metadata.get(sys.argv[3], '')
+if isinstance(value, bool):
+    print(str(value).lower())
+elif value is not None:
+    print(str(value))
 PYCODE
 )"
                 metadata_new_value="$current_value"
                 ask --label "New value (:clear to empty)" --var metadata_new_value --default "$current_value" --back || continue
                 [[ -z "$metadata_new_value" ]] && metadata_new_value="$current_value"
                 [[ "$metadata_new_value" == ":clear" ]] && metadata_new_value=""
-                if [[ "$edit_field" == "featured" || "$edit_field" == "draft" || "$edit_field" == "hide_title" ]]; then
-                    metadata_new_value="$(python3 -c 'import sys; print(sys.argv[1].strip().lower())' "$metadata_new_value")"
-                fi
                 if [[ "$metadata_new_value" == "$current_value" ]]; then
                     sayinfo "Metadata unchanged."
                     continue
                 fi
-                if ! _web_content_run_engine "$result_file" edit-metadata --source "$SGND_WEB_CONTENT_SOURCE" --content-file "$file" --key "$edit_field" --value "$metadata_new_value"; then
-                    _web_content_report_errors "$result_file"
+                # A single JSON staging file is used for the whole batch. No
+                # Markdown is written until the user selects Save.
+                if ! python3 - "$staged_file" "$edit_field" "$metadata_new_value" <<'PYCODE'
+import json, os, sys, tempfile
+path, key, value = sys.argv[1:]
+if key in {'featured', 'draft', 'hide_title', 'nav_hidden', 'hidden', 'private'}:
+    value = value.strip().lower()
+    if value not in {'true', 'false'}:
+        raise SystemExit('Boolean fields require true or false')
+with open(path, encoding='utf-8') as handle:
+    staged = json.load(handle)
+staged[key] = value
+fd, temp = tempfile.mkstemp(prefix='.wcm-stage-', dir=os.path.dirname(path))
+try:
+    with os.fdopen(fd, 'w', encoding='utf-8') as handle:
+        json.dump(staged, handle, ensure_ascii=False)
+    os.replace(temp, path)
+finally:
+    if os.path.exists(temp):
+        os.unlink(temp)
+PYCODE
+                then
+                    saywarning "Invalid value; change not staged."
                     continue
                 fi
-                ((changed_count+=1))
-                sayok "Updated: $edit_field"
+                sayinfo "Staged: $edit_field (not yet saved)"
             done
-            if (( changed_count > 0 )); then
-                _web_content_record_activity "$changed_count"
-                sayok "Metadata updated. Git commit remains manual."
-            else
-                sayinfo "Finished editing this page. No changes saved."
-            fi
+            rm -f -- "$staged_file"
             rm -f -- "$list_file" "$result_file"
             return 0
         else
@@ -1457,123 +1509,6 @@ PYCODE
                 3) continue ;;
                 *) return 0 ;;
             esac
-        done
-    }
-
-    # fn: _web_content_manage_sections_once - Create or remove an indexed section tree.
-    # Parent and section choices come from the engine, not manually typed paths.
-    # Destructive actions require a preview followed by explicit confirmation.
-    _web_content_manage_sections_once() {
-        local result_file="" selected="" operation="" section="" parent="" slug="" title_nl="" title_en="" languages="" policy="" destination="" archive_dir="" decision=""
-        local -a options=() section_options=()
-        result_file="$(mktemp)" || return 1
-        if ! _web_content_run_engine "$result_file" list-sections --source "$SGND_WEB_CONTENT_SOURCE"; then
-            _web_content_report_errors "$result_file"; rm -f -- "$result_file"; return 1
-        fi
-        mapfile -t section_options < <(python3 - "$result_file" <<'PYCODE'
-import json, sys
-for section in json.load(open(sys.argv[1], encoding='utf-8'))['sections']:
-    print(section['path'] if section['path'] else '(Website root)')
-PYCODE
-)
-        sgnd_print
-        sgnd_print_sectionheader --text "Manage sections"
-        ask_selection --label "Action" --var operation --items "Add section / subsection" "Remove section" || { rm -f -- "$result_file"; return 0; }
-        if [[ "$operation" == "Add section / subsection" ]]; then
-            ask_selection --label "Parent section" --var selected --items "${section_options[@]}" || { rm -f -- "$result_file"; return 0; }
-            parent="$selected"; [[ "$parent" == '(Website root)' ]] && parent=""
-            ask --label "New section slug" --var slug --back || { rm -f -- "$result_file"; return 0; }
-            ask_selection --label "Languages" --var languages --items "NL and EN" "NL only" "EN only" || { rm -f -- "$result_file"; return 0; }
-            case "$languages" in "NL and EN") languages="NL,EN";; "NL only") languages="NL";; *) languages="EN";; esac
-            if [[ "$languages" == *NL* ]]; then
-                ask --label "Dutch section title" --var title_nl --back || { rm -f -- "$result_file"; return 0; }
-            fi
-            if [[ "$languages" == *EN* ]]; then
-                ask --label "English section title" --var title_en --back || { rm -f -- "$result_file"; return 0; }
-            fi
-            sgnd_print
-            sgnd_print_labeledvalue --label "Create section" --value "${parent:+$parent/}$slug" --labelwidth 20
-            ask_decision --label "Create draft section index pages?" --choices "YES|Y,NO|N" --default "NO" --var decision || { rm -f -- "$result_file"; return 0; }
-            if [[ "$decision" == "YES" ]]; then
-                if _web_content_run_engine "$result_file" create-section --source "$SGND_WEB_CONTENT_SOURCE" --parent "$parent" --slug "$slug" --title-nl "$title_nl" --title-en "$title_en" --languages "$languages"; then
-                    _web_content_record_activity 1
-                    sayok "Section created. Add navigation separately if desired; Git commit remains manual."
-                else _web_content_report_errors "$result_file"; fi
-            fi
-        else
-            options=()
-            for section in "${section_options[@]}"; do
-                [[ "$section" != '(Website root)' ]] && options+=("$section")
-            done
-            if (( ${#options[@]} == 0 )); then saywarning "No sections to manage."; rm -f -- "$result_file"; return 0; fi
-            ask_selection --label "Section to remove" --var section --items "${options[@]}" || { rm -f -- "$result_file"; return 0; }
-            if ! _web_content_run_engine "$result_file" inspect-section --source "$SGND_WEB_CONTENT_SOURCE" --section "$section"; then
-                _web_content_report_errors "$result_file"; rm -f -- "$result_file"; return 1
-            fi
-            local protected="" files="" subsections=""
-            protected="$(python3 - "$result_file" <<'PYCODE'
-import json,sys
-r=json.load(open(sys.argv[1])); print('yes' if r['protected'] else 'no')
-PYCODE
-)"
-            files="$(_web_content_result_value "$result_file" files)"
-            subsections="$(_web_content_result_value "$result_file" subsections)"
-            sgnd_print
-            sgnd_print_sectionheader --text "Removal preview"
-            sgnd_print_labeledvalue --label "Section" --value "$section" --labelwidth 20
-            sgnd_print_labeledvalue --label "Files" --value "$files" --labelwidth 20
-            sgnd_print_labeledvalue --label "Subsections" --value "$subsections" --labelwidth 20
-            if [[ "$protected" == yes ]]; then
-                sayfail "This section is in navigation. Remove its navigation entry before deleting it."
-                rm -f -- "$result_file"; return 0
-            fi
-            ask_selection --label "What to do with contained files?" --var policy --items "Move contents" "Archive entire section" "Permanently delete everything" "Cancel" || { rm -f -- "$result_file"; return 0; }
-            case "$policy" in
-                "Move contents")
-                    local -a targets=()
-                    for selected in "${section_options[@]}"; do
-                        [[ "$selected" == '(Website root)' ]] && targets+=("$selected")
-                        [[ "$selected" != "$section" && "$selected" != "$section/"* && "$selected" != '(Website root)' ]] && targets+=("$selected")
-                    done
-                    ask_selection --label "Move contents to" --var destination --items "${targets[@]}" || { rm -f -- "$result_file"; return 0; }
-                    [[ "$destination" == '(Website root)' ]] && destination=""
-                    policy="move" ;;
-                "Archive entire section")
-                    archive_dir="${SGND_SHARE_DIR:-${HOME}/.local/share/solidgroundux}/web-content-section-archive"
-                    ask --label "Archive directory" --var archive_dir --default "$archive_dir" --back || { rm -f -- "$result_file"; return 0; }
-                    policy="archive" ;;
-                "Permanently delete everything") policy="delete" ;;
-                *) rm -f -- "$result_file"; return 0 ;;
-            esac
-            sgnd_print
-            saywarning "This affects $files file(s). References to old URLs will not be rewritten."
-            if [[ "$policy" == delete ]]; then
-                local confirmation=""
-                ask --label "Type the full section path to PERMANENTLY DELETE" --var confirmation --back || { rm -f -- "$result_file"; return 0; }
-                if [[ "$confirmation" != "$section" ]]; then saycancel "Section path mismatch. Nothing deleted."; rm -f -- "$result_file"; return 0; fi
-            fi
-            ask_decision --label "Confirm $policy of $section?" --choices "YES|Y,NO|N" --default "NO" --var decision || { rm -f -- "$result_file"; return 0; }
-            if [[ "$decision" == "YES" ]]; then
-                if _web_content_run_engine "$result_file" remove-section --source "$SGND_WEB_CONTENT_SOURCE" --section "$section" --mode "$policy" --destination "$destination" --archive-root "$archive_dir"; then
-                    _web_content_record_activity "$files"
-                    sayok "Section operation completed. Regenerate and validate links; commit manually."
-                    [[ "$policy" == archive ]] && sayinfo "Archive: $(_web_content_result_value "$result_file" archive)"
-                else _web_content_report_errors "$result_file"; fi
-            fi
-        fi
-        rm -f -- "$result_file"
-    }
-
-    # fn: _web_content_manage_sections - Repeat section operations on explicit request.
-    _web_content_manage_sections() {
-        local rc=0
-        while true; do
-            _web_content_manage_sections_once || return $?
-            sgnd_print
-            sgnd_print_sectionheader ""
-            rc=0
-            ask_dlg_autocontinue --seconds 5 --message "Manage another section?" --again --pause --legend "A=another; Enter/timeout=menu; P/Space=pause" || rc=$?
-            [[ "$rc" == 3 ]] || return 0
         done
     }
 
@@ -2142,7 +2077,6 @@ $existing_names
             retrieve-incoming) _web_content_retrieve_incoming ;;
             edit-metadata) _web_content_manage_page edit-metadata ;;
             move-page) _web_content_manage_page move-page ;;
-            manage-sections) _web_content_manage_sections ;;
             manage-config) _web_content_manage_config ;;
             delete)
                 # Deletion owns its closing section line and repeat/return dialog.

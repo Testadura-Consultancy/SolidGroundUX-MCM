@@ -2,6 +2,9 @@
 from __future__ import annotations
 from pathlib import Path
 import re
+import json
+import os
+import tempfile
 from .content import discover_content, load_navigation, load_site_config, parse_front_matter
 
 SAFE_KEY = re.compile(r"^[A-Za-z][A-Za-z0-9_-]*$")
@@ -109,3 +112,109 @@ def move_page(source, path, parent, slug):
     if file != target: file.rename(target)
     return {'success': True,'from':path,'to':target.relative_to(config.content_dir).as_posix(),
             'old_route':original_route,'warnings':['Check and update links pointing to the former URL; no links were rewritten automatically.']}
+
+
+# Bulk edits preserve all untouched front-matter lines, including custom fields.
+_BOOLEAN_FIELDS = {'featured', 'draft', 'hide_title', 'nav_hidden', 'hidden', 'private'}
+_RESERVED_FIELDS = {'parent', 'slug', 'language'}
+
+def inspect_metadata(source, path):
+    """Inspect source metadata and selected resolved values without modifying the file.
+
+    Explicit fields are never confused with defaults. Computed fields are
+    reported separately, and only defaults actually supported by ContentItem
+    are exposed here; this is not a general inheritance engine.
+    """
+    config = load_site_config(Path(source).expanduser().resolve())
+    file = _resolve(config, path)
+    raw = file.read_text(encoding='utf-8')
+    metadata, _ = parse_front_matter(raw)
+    if not raw.startswith('---\n'):
+        raise ValueError('Valid front matter required')
+    language = file.stem.rsplit('_', 1)[-1].upper()
+    discovered = discover_content(config, load_navigation(config.root))
+    item = next((entry for entry in discovered if entry.source_path.resolve() == file), None)
+    if item is None:
+        raise ValueError('Page is not discoverable (possibly excluded by .ignore)')
+    defaults = {
+        'title': item.base_name,
+        'summary': '',
+        'status': 'draft' if metadata.get('draft', False) else 'published',
+        'nav_title': item.title,
+        'nav_order': item.order,
+        'nav_hidden': False,
+        'template': item.template,
+    }
+    resolved = {}
+    for key, fallback in defaults.items():
+        if key == 'status':
+            value = item.status
+        elif key == 'title':
+            value = item.title
+        elif key == 'summary':
+            value = item.summary
+        elif key == 'nav_order':
+            value = metadata.get('nav_order', item.order)
+        elif key == 'nav_title':
+            value = metadata.get('nav_title', item.title)
+        elif key == 'nav_hidden':
+            value = metadata.get('nav_hidden', False)
+        elif key == 'template':
+            value = item.template
+        else:
+            value = metadata.get(key, fallback)
+        resolved[key] = {'value': value, 'origin': 'explicit' if key in metadata else 'derived/default'}
+    return {'success': True, 'file': file.relative_to(config.content_dir).as_posix(),
+            'language_from_filename': language, 'metadata': metadata,
+            'resolved': resolved}
+
+def edit_metadata_fields(source, path, changes):
+    """Apply multiple validated scalar updates atomically, without changing body text."""
+    if not isinstance(changes, dict) or not changes:
+        raise ValueError('Changes must be a nonempty JSON object')
+    config = load_site_config(Path(source).expanduser().resolve())
+    file = _resolve(config, path)
+    raw = file.read_text(encoding='utf-8')
+    if not raw.startswith('---\n'):
+        raise ValueError('Valid front matter required')
+    lines = raw.splitlines(keepends=True)
+    close = next((i for i in range(1, len(lines)) if lines[i].strip() == '---'), None)
+    if close is None:
+        raise ValueError('Missing front matter terminator')
+    for key, value in changes.items():
+        if not isinstance(key, str) or not SAFE_KEY.fullmatch(key) or key in _RESERVED_FIELDS:
+            raise ValueError(f'Invalid or location-dependent metadata field: {key}')
+        if not isinstance(value, (str, bool, int, float)) or value is None:
+            raise ValueError(f'Field {key} requires a scalar value')
+        if key in _BOOLEAN_FIELDS:
+            normalized = str(value).strip().lower()
+            if normalized not in {'true', 'false'}:
+                raise ValueError(f'{key} requires true or false')
+            encoded = normalized
+        else:
+            value = str(value)
+            if '\n' in value or '\r' in value:
+                raise ValueError(f'Multiline field not supported: {key}')
+            encoded = json.dumps(value, ensure_ascii=False)
+        pattern = re.compile(r'^' + re.escape(key) + r'\s*:')
+        found = [i for i in range(1, close) if pattern.match(lines[i])]
+        if len(found) > 1:
+            raise ValueError(f'Duplicate metadata key: {key}')
+        if found:
+            lines[found[0]] = f'{key}: {encoded}\n'
+        else:
+            lines.insert(close, f'{key}: {encoded}\n')
+            close += 1
+    updated = ''.join(lines)
+    # Parse before touching the source file; preserve unrelated metadata and body.
+    parse_front_matter(updated)
+    fd, temporary = tempfile.mkstemp(prefix='.wcm-meta-', dir=file.parent)
+    try:
+        with os.fdopen(fd, 'w', encoding='utf-8', newline='') as handle:
+            handle.write(updated)
+        os.chmod(temporary, file.stat().st_mode)
+        os.replace(temporary, file)
+    finally:
+        if os.path.exists(temporary):
+            os.unlink(temporary)
+    return {'success': True, 'file': path, 'updated_fields': list(changes)}

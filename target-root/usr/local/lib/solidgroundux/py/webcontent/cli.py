@@ -8,8 +8,7 @@ from pathlib import Path
 import sys
 
 from .deletion import delete_content, inspect_delete
-from .sections import list_sections, create_section, inspect_section, remove_section
-from .management import list_pages, edit_metadata, move_page
+from .management import list_pages, edit_metadata, move_page, inspect_metadata, edit_metadata_fields
 from .generator import generate_site
 from .ingestion import ingest_content, inspect_ingest
 from .social import prepare_social
@@ -107,34 +106,21 @@ def _parser() -> argparse.ArgumentParser:
     edit.add_argument("--key", required=True)
     edit.add_argument("--value", required=True)
     edit.add_argument("--result-file")
+    inspect = subparsers.add_parser("inspect-metadata", help="Show explicit metadata and filename-derived language.")
+    inspect.add_argument("--source", required=True)
+    inspect.add_argument("--content-file", required=True)
+    inspect.add_argument("--result-file")
+    bulk = subparsers.add_parser("edit-metadata-fields", help="Apply multiple metadata fields from a JSON object file.")
+    bulk.add_argument("--source", required=True)
+    bulk.add_argument("--content-file", required=True)
+    bulk.add_argument("--changes-file", required=True)
+    bulk.add_argument("--result-file")
     move = subparsers.add_parser("move-page", help="Move or rename one article or page.")
     move.add_argument("--source", required=True)
     move.add_argument("--content-file", required=True)
     move.add_argument("--parent", required=True)
     move.add_argument("--slug", required=True)
     move.add_argument("--result-file")
-    sections = subparsers.add_parser("list-sections", help="List existing sections and parents.")
-    sections.add_argument("--source", required=True)
-    sections.add_argument("--result-file")
-    create = subparsers.add_parser("create-section", help="Create draft section indexes.")
-    create.add_argument("--source", required=True)
-    create.add_argument("--parent", default="")
-    create.add_argument("--slug", required=True)
-    create.add_argument("--title-nl", default="")
-    create.add_argument("--title-en", default="")
-    create.add_argument("--languages", default="NL,EN")
-    create.add_argument("--result-file")
-    inspect_section_parser = subparsers.add_parser("inspect-section", help="Inspect section subtree before removal.")
-    inspect_section_parser.add_argument("--source", required=True)
-    inspect_section_parser.add_argument("--section", required=True)
-    inspect_section_parser.add_argument("--result-file")
-    remove = subparsers.add_parser("remove-section", help="Move, archive or permanently delete a section tree.")
-    remove.add_argument("--source", required=True)
-    remove.add_argument("--section", required=True)
-    remove.add_argument("--mode", required=True, choices=["move", "archive", "delete"])
-    remove.add_argument("--destination", default="")
-    remove.add_argument("--archive-root", default="")
-    remove.add_argument("--result-file")
     return parser
 
 
@@ -148,23 +134,21 @@ def main(argv: list[str] | None = None) -> int:
         Operation result or None, as defined by the implementation."""
     args = _parser().parse_args(argv)
     try:
-        if args.command in {"list-sections", "create-section", "inspect-section", "remove-section"}:
-            if args.command == "list-sections":
-                payload = list_sections(args.source)
-            elif args.command == "create-section":
-                payload = create_section(args.source, args.parent, args.slug, args.title_nl, args.title_en, args.languages)
-            elif args.command == "inspect-section":
-                payload = inspect_section(args.source, args.section)
-            else:
-                payload = remove_section(args.source, args.section, args.mode, args.destination, args.archive_root)
-            _write_result(payload, args.result_file)
-            return 0
         if args.command == "list-pages":
             payload = list_pages(args.source)
             _write_result(payload, args.result_file)
             return 0
         if args.command == "edit-metadata":
             payload = edit_metadata(args.source, args.content_file, args.key, args.value)
+            _write_result(payload, args.result_file)
+            return 0
+        if args.command == "inspect-metadata":
+            payload = inspect_metadata(args.source, args.content_file)
+            _write_result(payload, args.result_file)
+            return 0
+        if args.command == "edit-metadata-fields":
+            payload = edit_metadata_fields(args.source, args.content_file,
+                                           json.loads(Path(args.changes_file).read_text(encoding="utf-8")))
             _write_result(payload, args.result_file)
             return 0
         if args.command == "move-page":
