@@ -16,6 +16,14 @@ The format is inspired by *Keep a Changelog* while remaining focused on practica
 
 ## Unreleased
 
+### Web Content Management 2.1 — final workflow and authoring updates
+
+- Consolidated the Incoming workflow around **Retrieve Incoming**, **Import local files to Incoming**, and **Review and ingest Incoming package**, including ZIP packages with Markdown and local resources.
+- Added automatic movement of successfully ingested packages to `incoming/archive/`; failed or conflicting packages remain available for review.
+- Added `featured_order` front-matter ordering for the homepage Featured slider: numbered items first (ascending), followed by unnumbered items alphabetically; `nav_order` remains independent.
+- Documented the front-matter Featured workflow, the remaining legacy `featured.cfg` override, and the separate `featured-slider.cfg` autoplay setting.
+- Updated the Web Content Manager preface and repository authoring instructions to reflect the current Incoming and Featured workflows.
+
 ### Added
 
 - Added the new **Web Content Management** module (`55-web-content-management`) with the `manage-web-content.sh` management executable and supporting Python package under `usr/local/lib/solidgroundux/py/webcontent`.

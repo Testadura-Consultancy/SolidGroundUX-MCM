@@ -91,19 +91,24 @@
 #
 # -- Featured Content ---------------------------------------------------------------
 #
-# > The home-page Featured slider is configured in `www/config/featured.cfg` when
-# > that file exists; its entries are authoritative. Without it, pages marked
-# > `featured: true` in front matter are selected. Titles and summaries come from
-# > the page metadata, not duplicated in the slider configuration.
+# > The homepage Featured slider is driven by Markdown front matter when the
+# > legacy `www/config/featured.cfg` is absent:
+# >
+# >     ---
+# >     title: SolidGround IV
+# >     featured: true
+# >     featured_order: 10
+# >     featured_image: /images/solidgroundiv-logo.png
+# >     ---
+# >
+# > `featured: true` includes a page; `featured: false` (or omission) excludes it.
+# > Pages with `featured_order` appear first, ascending by number. Unnumbered
+# > featured pages follow alphabetically by title; ties are alphabetical too.
+# > `nav_order` is independent and controls navigation, not Featured ordering.
+# > The slider's `autoplay_interval` is configured in `featured-slider.cfg`.
+# > Legacy `featured.cfg`, when present, remains authoritative; remove it to use
+# > front-matter selection.
 #
-# >     [solidgroundux]
-# >     order = 10
-# >     route = /solidgroundux/
-# >     image = /images/solidgroundux-logo.png
-#
-# > Add, remove, or reorder entries to change the configured slider. Routes are language-neutral.
-# > When a configured page has no translation in the language being generated, that
-# > Featured tile is omitted for that language until the translation exists.
 # ==================================================================================
 
 # -- Publishing: drafts, previews, SEO, feeds ---------------------------------------
@@ -139,7 +144,7 @@
 # >
 # > Daily authoring sequence:
 # >
-# >     Write Markdown -> Incoming -> Ingest Markdown -> Generate website
+# >     Write Markdown -> Incoming -> Review & Ingest Incoming -> Generate website
 # >         -> Preview/review -> Publish -> Commit to Git when ready
 # >
 # > Keep an offline or Git-backed copy of the source before bulk operations.
@@ -167,11 +172,13 @@
 # >
 # >     De tekst van het verhaal begint hier.
 # >
-# > 3. Save the file in the configured Incoming directory, then choose **Ingest
-# >    Markdown** in Web Content Management. Inspect and confirm the detected
-# >    section, language and filename. The target section must already exist.
-# > 4. Successful ingest places the canonical Markdown in `content/` and archives
-# >    the incoming original. It does not generate or publish the website.
+# > 3. Upload Markdown or a ZIP package into Incoming, or use **Retrieve Incoming**
+# >    / **Import local files to Incoming**. Choose **Review and ingest Incoming
+# >    package**, inspect the proposed destinations and confirm. The target
+# >    section must already exist, or the package must contain its section index.
+# > 4. Successful ingest places the canonical content under `content/` and moves
+# >    the processed package into `incoming/archive/`. Conflicting or failed
+# >    packages remain in Incoming. Ingest does not generate or publish the site.
 # > 5. Generate a preview, inspect the page, and publish only when ready.
 # >
 # > `kind`, `parent`, `slug` and `language` are placement hints for Incoming;
@@ -229,9 +236,10 @@
 # > generating the public site. The renderer supports metadata such as `title`,
 # > `summary`, `featured`, `featured_image`, and `teaser`.
 # >
-# > Featured selection depends on site configuration: `featured.cfg` takes priority
-# > when present; otherwise `featured: true` is used. The Featured carousel's
-# > autoplay interval is a slider setting, not article metadata.
+# > Use `featured: true` and optional `featured_order` in the page front matter.
+# > Numbered featured pages sort first, then unnumbered pages alphabetically.
+# > A legacy `featured.cfg`, if present, still overrides the Markdown selection.
+# > The Featured carousel's autoplay interval is a slider setting, not metadata.
 # >
 # > **Prepare social media drafts** selects one existing published article from
 # > the repository and writes an editable file to the configured social output

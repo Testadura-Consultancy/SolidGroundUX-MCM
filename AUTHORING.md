@@ -77,7 +77,18 @@ report a referenced `td-` class that does not exist in the site CSS.
 Set `hide_title: true` in front matter to suppress the compact context/title bar (most useful on home pages).
 The regular title bar remains the default. The home page illustration is inserted as a standard Markdown image; use a wide image with its entire embedded composition preserved.
 
-Set `featured: true` in a page's front matter to place it in the homepage slider when `config/featured.cfg` is absent. Use optional `featured_image: /images/your-image.png`; otherwise `image` or `index_image` is used, followed by a section-specific default illustration when applicable. If `config/featured.cfg` exists, it remains authoritative for selection and ordering.
+The homepage Featured slider selects pages using `featured: true` in their Markdown front matter. `featured: false` (or omitting the field) excludes the page. `featured_order` optionally controls the slider order: numbered items come first in ascending order, followed by unnumbered items alphabetically by title. Equal numbers are resolved alphabetically by title. This is separate from `nav_order`, which controls navigation.
+
+```yaml
+---
+title: SolidGround IV
+featured: true
+featured_order: 10
+featured_image: /images/solidgroundiv-logo.png
+---
+```
+
+The optional `featured_image` overrides `image` or `index_image`, followed by section-specific defaults when applicable. `config/featured-slider.cfg` controls presentation (such as `autoplay_interval`), not item selection or ordering. Legacy `config/featured.cfg`, if present, still takes precedence in the current generator and should be removed when using front-matter selection.
 
 ## Download links
 
