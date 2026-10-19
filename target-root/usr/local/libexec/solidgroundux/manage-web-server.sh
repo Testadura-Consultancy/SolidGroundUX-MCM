@@ -1439,6 +1439,55 @@ EOF
         return 1
     }
 
+    # fn: _web_server_update_markdown_upload - Migrate a configured upload service to the canonical library implementation.
+    # . Purpose
+    #   Keep Python implementation in lib/solidgroundux/py, not a duplicate
+    #   libexec copy. Preserve site-specific hostname, upload directory and
+    #   systemd sandbox settings; restart only after validating the new unit.
+    _web_server_update_markdown_upload() {
+        local unit="/etc/systemd/system/solidgroundux-markdown-upload.service"
+        local canonical="/usr/local/lib/solidgroundux/py/webcontent/webcontent-upload-service.py"
+        local old="/usr/local/libexec/solidgroundux/webcontent-upload-service.py"
+        local current="" staged="" backup="" decision="NO"
+        [[ -r "$canonical" ]] || { sayfail "Upload receiver library missing: $canonical"; return 1; }
+        sudo test -f "$unit" || { saywarning "Upload service is not installed on this host."; return 1; }
+        current="$(sudo sed -n 's/^ExecStart=\/usr\/bin\/python3 \([^ ]*\) .*/\1/p' "$unit")"
+        [[ "$current" == "$old" || "$current" == "$canonical" ]] || {
+            sayfail "Unknown upload service entry point; refusing to modify: $current"; return 1;
+        }
+        if [[ "$current" == "$canonical" ]]; then
+            sayinfo "Upload service already uses the canonical library implementation."
+            return 0
+        fi
+        ask_decision --label "Switch upload service to canonical Python library and restart it" --choices "YES|Y,NO|N" --default "NO" --var decision || return 0
+        [[ "$decision" == YES ]] || return 0
+        if (( ${FLAG_DRYRUN:-0} == 1 )); then sayinfo "DRYRUN: Would migrate upload receiver service."; return 0; fi
+        sudo -v || return 1
+        sudo python3 -m py_compile "$canonical" || { sayfail "Upload receiver failed Python syntax check."; return 1; }
+        staged="$(mktemp)" || return 1
+        backup="$(mktemp)" || { rm -f "$staged"; return 1; }
+        sudo cp -- "$unit" "$backup" || { rm -f "$staged" "$backup"; return 1; }
+        sed "s|^ExecStart=/usr/bin/python3 $old |ExecStart=/usr/bin/python3 $canonical |" "$backup" > "$staged" || {
+            rm -f "$staged" "$backup"; return 1;
+        }
+        if ! grep -Fq "ExecStart=/usr/bin/python3 $canonical " "$staged"; then
+            sayfail "Could not update ExecStart safely."; rm -f "$staged" "$backup"; return 1
+        fi
+        if sudo install -m 0644 -o root -g root "$staged" "$unit" &&
+           sudo systemctl daemon-reload &&
+           sudo systemctl restart solidgroundux-markdown-upload.service &&
+           sudo systemctl is-active --quiet solidgroundux-markdown-upload.service; then
+            sayok "Upload receiver now runs the canonical Python library file."
+            rm -f "$staged" "$backup"; return 0
+        fi
+        sayfail "Upload service update failed; restoring previous unit."
+        sudo install -m 0644 -o root -g root "$backup" "$unit" || true
+        sudo systemctl daemon-reload || true
+        sudo systemctl restart solidgroundux-markdown-upload.service || true
+        rm -f "$staged" "$backup"
+        return 1
+    }
+
     # fn: _web_server_configure_markdown_upload - Install and protect the optional Markdown receiver
     # . Purpose
     #   Bind the upload service to localhost, outside the document root, with
@@ -1453,7 +1502,7 @@ EOF
         _web_ask_selection --label "Install Markdown upload for HTTPS site" --var site --items "${sites[@]}" || return 0
         [[ "$site" =~ ^[A-Za-z0-9][A-Za-z0-9._-]*$ ]] || { sayfail "Invalid site name."; return 2; }
         cfg="/etc/nginx/sites-available/$site"
-        source="${SGND_SCRIPT_DIR}/webcontent-upload-service.py"
+        source="/usr/local/lib/solidgroundux/py/webcontent/webcontent-upload-service.py"
         [[ -f "$cfg" && ! -L "$cfg" && -L "/etc/nginx/sites-enabled/$site" ]] || { sayfail "Site must be enabled and managed."; return 1; }
         [[ -r "$source" ]] || { sayfail "Missing companion file: $source"; return 1; }
         # Resolve the *effective managed* password file from the Nginx configuration.
@@ -1514,7 +1563,7 @@ EOF
                 print "    location = /api/markdown-upload {"
                 print "        auth_basic \"Restricted\";"
                 print "        auth_basic_user_file " file ";"
-                print "        client_max_body_size 22m;"
+                print "        client_max_body_size 105m;"
                 print "        proxy_request_buffering on;"
                 print "        proxy_set_header Host $host;"
                 print "        proxy_set_header X-Forwarded-Proto https;"
@@ -1581,7 +1630,7 @@ UNIT
         #   _web_server_manage_sites
     _web_server_manage_sites() {
         local action=""
-        _web_ask_selection --label "Site management" --var action --items "Create site" "Enable site" "Disable site" "Change document root" "Configure HTTPS" "Configure private section" "Configure Markdown upload" "Remove site" "Remove site content" "List sites" || return 0
+        _web_ask_selection --label "Site management" --var action --items "Create site" "Enable site" "Disable site" "Change document root" "Configure HTTPS" "Configure private section" "Configure Markdown upload" "Update Markdown upload receiver" "Remove site" "Remove site content" "List sites" || return 0
         case "$action" in
             "Create site") _web_server_create_site ;;
             "Enable site") _web_server_enable_site ;;
@@ -1590,6 +1639,7 @@ UNIT
             "Configure HTTPS") _web_server_configure_https ;;
             "Configure private section") _web_server_configure_basic_auth ;;
             "Configure Markdown upload") _web_server_configure_markdown_upload ;;
+            "Update Markdown upload receiver") _web_server_update_markdown_upload ;;
             "Remove site") _web_server_remove_site ;;
             "Remove site content") _web_server_remove_site_content ;;
             "List sites") _web_server_list_sites ;;

@@ -134,12 +134,13 @@ set -uo pipefail
 # - Framework integration -----------------------------------------------------------
     SGND_USING=(sgnd-ssh-deployment.sh)
     SGND_ARGS_SPEC=(
-        "action|a|enum|ACTION|Management action||ingest,delete,edit-metadata,move-page,manage-config,configure-source,retrieve-incoming,generate,publish,validate,prepare-social,status"
+        "action|a|enum|ACTION|Management action||ingest,delete,edit-metadata,move-page,manage-config,configure-source,retrieve-incoming,import-local,ingest-incoming,generate,publish,validate,prepare-social,status"
         "ingest-dir|i|value|INGEST_DIR|Override Markdown ingestion directory||"
     )
     SGND_SCRIPT_EXAMPLES=(
         "  $SGND_SCRIPT_NAME --action ingest"
         "  $SGND_SCRIPT_NAME --action ingest --ingest-dir /path/to/incoming"
+        "  $SGND_SCRIPT_NAME --action ingest-incoming"
         "  $SGND_SCRIPT_NAME --action delete"
         "  $SGND_SCRIPT_NAME --action generate"
         "  $SGND_SCRIPT_NAME --action publish"
@@ -692,7 +693,7 @@ PY
         sayok "Incoming source saved in SolidGroundUX state."
     }
 
-    # fn: _web_content_retrieve_incoming - Pull selected remote Markdown sources safely via SSH
+    # fn: _web_content_retrieve_incoming - Pull selected remote incoming packages safely via SSH
     _web_content_retrieve_incoming() {
         local remote="$SGND_WEB_INCOMING_REMOTE_DIR" host="$SGND_WEB_INCOMING_HOST" user="$SGND_WEB_INCOMING_USER" port="$SGND_WEB_INCOMING_PORT"
         local file="" temp="" transferred=0 skipped=0 failed=0
@@ -706,17 +707,17 @@ PY
         # Only a constrained filename character set is accepted. The remote path
         # was validated earlier; untrusted SSH output never becomes shell syntax.
         local listing=""
-        listing="$(ssh -o BatchMode=yes -p "$port" -- "${user}@${host}" "find '$remote' -maxdepth 1 -type f -name '*.md' -printf '%f\n'" 2>/dev/null)" || {
+        listing="$(ssh -o BatchMode=yes -p "$port" -- "${user}@${host}" "find '$remote' -maxdepth 1 -type f -printf '%f\n'" 2>/dev/null)" || {
             sayfail "Could not list incoming files on the remote server."; return 1;
         }
         while IFS= read -r file; do
-            [[ "$file" =~ ^[A-Za-z0-9][A-Za-z0-9_.-]*\.md$ ]] && files+=("$file")
+            [[ "$file" =~ ^[A-Za-z0-9][A-Za-z0-9_.-]*\.(md|zip|png|jpg|jpeg|gif|webp|svg|pdf|txt)$ ]] && files+=("$file")
         done <<< "$listing"
-        if (( ${#files[@]} == 0 )); then sayinfo "No Markdown files available on source server."; return 0; fi
-        ask_selection --label "Remote Markdown files to retrieve" --var targets --multi --items "${files[@]}" || return 0
+        if (( ${#files[@]} == 0 )); then sayinfo "No supported files available on source server."; return 0; fi
+        ask_selection --label "Remote incoming files to retrieve" --var targets --multi --items "${files[@]}" || return 0
         (( ${#targets[@]} > 0 )) || return 0
         for file in "${targets[@]}"; do
-            [[ "$file" =~ ^[A-Za-z0-9][A-Za-z0-9_.-]*\.md$ ]] || { ((failed+=1)); continue; }
+            [[ "$file" =~ ^[A-Za-z0-9][A-Za-z0-9_.-]*\.(md|zip|png|jpg|jpeg|gif|webp|svg|pdf|txt)$ ]] || { ((failed+=1)); continue; }
             if [[ -e "$SGND_WEB_CONTENT_INGEST_DIR/$file" ]]; then
                 saywarning "Already exists locally (not overwritten): $file"; ((skipped+=1)); continue
             fi
@@ -2062,6 +2063,170 @@ $existing_names
         fi
     }
 
+# - Local import into staging -------------------------------------------------------
+    # fn: _web_content_import_local - Review server-local files before copying to incoming.
+        # . Behavior
+        #   - Previews every destination and conflict through the Python transfer planner.
+        #   - Requires an explicit decision before copying, and leaves source files intact.
+        #   - Does not ingest content or mark website generation pending.
+    _web_content_import_local() {
+        local input_path="" incoming="" policy="abort" decision="NO"
+        local result_file="" rc=0 count="0" conflicts="" errors=""
+        _web_content_select_source || return 0
+        incoming="${SGND_WEB_CONTENT_SOURCE%/}/incoming"
+        ask --label "Local file, ZIP or directory to copy" --var input_path --default "/tmp" --back || return 0
+        [[ -n "$input_path" ]] || return 0
+        ask --label "Incoming staging directory" --var incoming --default "$incoming" --back || return 0
+        [[ -n "$incoming" ]] || return 0
+        result_file="$(mktemp)" || { sayfail "Could not create import preview file."; return 1; }
+        if ! _web_content_run_engine "$result_file" preview-local-import --input-path "$input_path" --incoming "$incoming" --conflict-policy abort; then
+            conflicts="$(_web_content_result_value "$result_file" conflicts 2>/dev/null || true)"
+            errors="$(_web_content_result_value "$result_file" errors 2>/dev/null || true)"
+            if [[ -n "$errors" ]]; then
+                _web_content_report_errors "$result_file"
+                rm -f -- "$result_file"
+                return 1
+            fi
+            if [[ -n "$conflicts" ]]; then
+                saywarning "Existing incoming files detected:"
+                while IFS= read -r line; do [[ -n "$line" ]] && sgnd_print --text "$line"; done <<< "$conflicts"
+                ask_decision --label "Skip existing files and copy only new files?" --choices "YES|Y,NO|N" --default "NO" --var decision || { rm -f -- "$result_file"; return 0; }
+                [[ "$decision" == "YES" || "$decision" == "Y" ]] || { rm -f -- "$result_file"; return 0; }
+                policy="skip"
+                _web_content_run_engine "$result_file" preview-local-import --input-path "$input_path" --incoming "$incoming" --conflict-policy "$policy" || {
+                    _web_content_report_errors "$result_file"
+                    rm -f -- "$result_file"
+                    return 1
+                }
+            else
+                sayfail "Could not prepare local import preview."
+                rm -f -- "$result_file"
+                return 1
+            fi
+        fi
+        count="$(_web_content_result_value "$result_file" copy_count 2>/dev/null || printf '0')"
+        sayinfo "Import preview: $count new file(s) to $incoming (policy: $policy)."
+        local planned=""
+        planned="$(python3 - "$result_file" <<'PYCODE'
+import json, sys
+with open(sys.argv[1], encoding='utf-8') as f:
+    data=json.load(f)
+conflicts=set(data.get('conflicts', [])) if data.get('conflict_policy') == 'skip' else set()
+from pathlib import Path
+for item in data.get('files', []):
+    destination=item['destination']
+    if Path(destination).relative_to(data['incoming']).as_posix() not in conflicts:
+        print(destination)
+PYCODE
+)" || { rm -f -- "$result_file"; return 1; }
+        while IFS= read -r line; do [[ -n "$line" ]] && sgnd_print --text "$line"; done <<< "$planned"
+        if [[ "$count" == "0" ]]; then
+            sayinfo "Nothing new to copy."
+            rm -f -- "$result_file"
+            return 0
+        fi
+        decision="NO"
+        ask_decision --label "Copy these files into Incoming?" --choices "YES|Y,NO|N" --default "NO" --var decision || { rm -f -- "$result_file"; return 0; }
+        if [[ "$decision" != "YES" && "$decision" != "Y" ]]; then
+            sayinfo "Local import cancelled; no files copied."
+            rm -f -- "$result_file"
+            return 0
+        fi
+        if _web_content_run_engine "$result_file" import-to-incoming --input-path "$input_path" --incoming "$incoming" --conflict-policy "$policy" --confirm; then
+            sayok "Local files copied to Incoming. Use Ingest to accept content into the website."
+        else
+            rc=$?
+            _web_content_report_errors "$result_file"
+        fi
+        rm -f -- "$result_file"
+        return "$rc"
+    }
+
+# - Safe staged package ingestion ---------------------------------------------------
+    # fn: _web_content_ingest_incoming - Preview and confirm ingestion of one staged package.
+    # . Behavior
+    #   - Only accepts a path inside the selected website's incoming directory.
+    #   - Reports every destination and conflict; never overwrites existing files.
+    #   - Preserves the staged originals and requires explicit confirmation.
+    _web_content_ingest_incoming() {
+        local incoming="" input_path="" result_file="" policy="abort" decision="NO"
+        local conflicts="" errors="" files="" rc=0
+        _web_content_select_source || return 0
+        incoming="${SGND_WEB_CONTENT_SOURCE%/}/incoming"
+        # Select ONE staged package. The incoming root is an inbox, not a package:
+        # treating it as a directory previously copied ZIPs and .gitignore into content.
+        local -a packages=() choices=()
+        local candidate="" selected=""
+        [[ -d "$incoming" ]] || { saywarning "Incoming directory not found: $incoming"; return 0; }
+        shopt -s nullglob
+        for candidate in "$incoming"/*; do
+            # Successfully committed packages are kept under archive/, which
+            # must never be offered again as an active incoming package.
+            [[ "${candidate##*/}" == "archive" ]] && continue
+            [[ -f "$candidate" || -d "$candidate" ]] || continue
+            [[ -L "$candidate" ]] && continue
+            packages+=("${candidate##*/}")
+        done
+        shopt -u nullglob
+        if (( ${#packages[@]} == 0 )); then
+            sayinfo "No staged packages in $incoming"
+            return 0
+        fi
+        ask_selection --label "Select one incoming package" --var selected --items "${packages[@]}" || return 0
+        [[ -n "$selected" ]] || return 0
+        # Reject paths and control files even if the selection API changes.
+        [[ "$selected" != .* && "$selected" != */* && "$selected" != *'..'* ]] || {
+            sayfail "Invalid incoming package selection"; return 1;
+        }
+        input_path="$incoming/$selected"
+        result_file="$(mktemp)" || return 1
+        if ! _web_content_run_engine "$result_file" preview-incoming-ingest --input-path "$input_path" --source "$SGND_WEB_CONTENT_SOURCE" --conflict-policy abort; then
+            errors="$(_web_content_result_value "$result_file" errors 2>/dev/null || true)"
+            conflicts="$(_web_content_result_value "$result_file" conflicts 2>/dev/null || true)"
+            if [[ -n "$errors" ]]; then
+                _web_content_report_errors "$result_file"
+                rm -f -- "$result_file"
+                return 1
+            fi
+            if [[ -n "$conflicts" ]]; then
+                saywarning "Existing content files detected:"
+                while IFS= read -r line; do [[ -n "$line" ]] && sgnd_print --text "$line"; done <<< "$conflicts"
+                ask_decision --label "Skip existing files and ingest only new files?" --choices "YES|Y,NO|N" --default "NO" --var decision || { rm -f -- "$result_file"; return 0; }
+                [[ "$decision" == "YES" || "$decision" == "Y" ]] || { rm -f -- "$result_file"; return 0; }
+                policy="skip"
+                _web_content_run_engine "$result_file" preview-incoming-ingest --input-path "$input_path" --source "$SGND_WEB_CONTENT_SOURCE" --conflict-policy skip || {
+                    _web_content_report_errors "$result_file"; rm -f -- "$result_file"; return 1;
+                }
+            else
+                _web_content_report_errors "$result_file"
+                rm -f -- "$result_file"
+                return 1
+            fi
+        fi
+        files="$(_web_content_result_value "$result_file" files 2>/dev/null || true)"
+        sayinfo "Content ingestion preview (policy: $policy):"
+        while IFS= read -r line; do [[ -n "$line" ]] && sgnd_print --text "$line"; done <<< "$files"
+        decision="NO"
+        ask_decision --label "Accept this package into website content?" --choices "YES|Y,NO|N" --default "NO" --var decision || { rm -f -- "$result_file"; return 0; }
+        if [[ "$decision" == "YES" || "$decision" == "Y" ]]; then
+            if _web_content_run_engine "$result_file" ingest-incoming --input-path "$input_path" --source "$SGND_WEB_CONTENT_SOURCE" --conflict-policy "$policy" --confirm; then
+                sayok "Package ingestion completed. Validate and generate the website before publishing."
+                local archived_to="" archive_warning=""
+                archived_to="$(_web_content_result_value "$result_file" archived_to 2>/dev/null || true)"
+                archive_warning="$(_web_content_result_value "$result_file" archive_warning 2>/dev/null || true)"
+                [[ -z "$archived_to" ]] || sayinfo "Incoming package archived to: $archived_to"
+                [[ -z "$archive_warning" ]] || saywarning "$archive_warning"
+            else
+                rc=$?
+                _web_content_report_errors "$result_file"
+            fi
+        else
+            sayinfo "Ingestion cancelled; content unchanged."
+        fi
+        rm -f -- "$result_file"
+        return "$rc"
+    }
+
 # - Action dispatch -----------------------------------------------------------------
     # fn: _run_action - Dispatch the requested command-line management action.
         # . Behavior
@@ -2075,6 +2240,8 @@ $existing_names
             ingest) _web_content_ingest ;;
             configure-source) _web_content_configure_incoming ;;
             retrieve-incoming) _web_content_retrieve_incoming ;;
+            import-local) _web_content_import_local ;;
+            ingest-incoming) _web_content_ingest_incoming ;;
             edit-metadata) _web_content_manage_page edit-metadata ;;
             move-page) _web_content_manage_page move-page ;;
             manage-config) _web_content_manage_config ;;

@@ -119,7 +119,10 @@ set -uo pipefail
     }
 
     web_content_retrieve_incoming()  { _web_content_run_manage retrieve-incoming; }
+    # fn: web_content_import_local - Review and explicitly copy local files into incoming.
+    web_content_import_local()     { _web_content_run_manage import-local; }
     web_content_configure_source()  { _web_content_run_manage configure-source; }
+    web_content_ingest_incoming() { _web_content_run_manage ingest-incoming; }
     web_content_ingest()          { _web_content_run_mutating_manage ingest; }
     web_content_delete()          { _web_content_run_mutating_manage delete; }
     web_content_edit_metadata()   { _web_content_run_mutating_manage edit-metadata; }
@@ -154,28 +157,32 @@ set -uo pipefail
     }
 
 # - Console registration ------------------------------------------------------------
-    # The existing SolidGroundUX menu renderer displays real group headings and
-    # numbers all visible actions consecutively within the active module chapter.
-    # Keep registration order aligned with the requested Publish/Manage/Validation flow.
-    sgnd_menu_register_group "web-content-publish" "Publish" "Website publication and authoring" 0 1 550
+    # Workflow order: stage and ingest, manage content, validate, then generate/publish.
+    # Keep the legacy ingest action callable for compatibility, but do not expose a
+    # second ingest path in the menu: all new content goes through Incoming review.
+    sgnd_menu_register_group "web-content-ingestion" "Ingestion" "Acquire and review staged content" 0 1 550
     sgnd_menu_register_group "web-content-manage" "Manage" "Pages and repository configuration" 0 1 551
     sgnd_menu_register_group "web-content-validation" "Validation" "Source validation and status" 0 1 552
+    sgnd_menu_register_group "web-content-publish" "Publish" "Website generation and publication" 0 1 553
 
-    # Publish: content creation and site generation.
+    # Ingestion: staging does not modify canonical content until review confirms it.
+    sgnd_menu_register_item "web-content-retrieve" "web-content-ingestion" "Retrieve Incoming" "web_content_retrieve_incoming" "Retrieve staged files from the configured SSH source server" 0 15 1
+    sgnd_menu_register_item "web-content-import-local" "web-content-ingestion" "Import local files to Incoming" "web_content_import_local" "Copy local files, directories or ZIP archives to Incoming without changing content" 0 0 1
+    sgnd_menu_register_item "web-content-ingest-incoming" "web-content-ingestion" "Review and ingest Incoming package" "web_content_ingest_incoming" "Preview and explicitly accept staged files, directories or ZIP contents" 0 0 1
+
+    # Manage: page metadata and structure; sections are derived from content folders.
+    sgnd_menu_register_item "web-content-metadata" "web-content-manage" "Edit page metadata" "web_content_edit_metadata" "Browse pages and update front matter without changing Markdown body" 0 0 1
+    sgnd_menu_register_item "web-content-move" "web-content-manage" "Move / rename" "web_content_move_page" "Move a page to another existing section or change its URL slug" 0 0 1
+    sgnd_menu_register_item "web-content-delete" "web-content-manage" "Delete page" "web_content_delete" "Remove pages or sections from active content and archive them for recovery" 0 0 1
+    sgnd_menu_register_item "web-content-source-config" "web-content-manage" "Configure source server" "web_content_configure_source" "Persist SSH host, user, port and remote incoming directory" 0 0 1
+    sgnd_menu_register_item "web-content-config" "web-content-manage" "Manage Config" "web_content_manage_config" "Select and edit an existing website configuration file" 0 0 1
+
+    # Validate before generating and publishing the website.
+    sgnd_menu_register_item "web-content-validate" "web-content-validation" "Validate website source" "web_content_validate" "Validate configuration, content metadata, templates, and CSS styles" 0 15 1
+    sgnd_menu_register_item "web-content-status" "web-content-validation" "Show web-content status" "web_content_status" "Show engine availability and remembered source/output settings" 0 15 1
+
+    # Publication is explicit: ingestion never automatically publishes content.
     sgnd_menu_register_item "web-content-generate" "web-content-publish" "Generate website" "web_content_generate" "Generate a static website from Markdown, templates, CSS, and assets" 0 15 1
     sgnd_menu_register_item "web-content-publish-site" "web-content-publish" "Publish website" "web_content_publish" "Preview and upload generated files using a configured publishing profile" 0 0 1
-    sgnd_menu_register_item "web-content-retrieve" "web-content-publish" "Retrieve Incoming" "web_content_retrieve_incoming" "Select Markdown files on a saved SSH source server and retrieve them for ingestion" 0 15 1
-    sgnd_menu_register_item "web-content-ingest" "web-content-publish" "Ingest Markdown" "web_content_ingest" "Import one or more Markdown files, reuse remembered metadata defaults, and archive processed originals" 0 15 1
-    sgnd_menu_register_item "web-content-metadata" "web-content-publish" "Edit page metadata" "web_content_edit_metadata" "Browse pages and update a front matter field without changing the Markdown body" 0 0 1
-
-    # Manage: existing pages and repository configuration; sections follow the content tree.
-    sgnd_menu_register_item "web-content-move" "web-content-manage" "Move / rename" "web_content_move_page" "Move one page to another existing section or change its URL slug" 0 0 1
-    sgnd_menu_register_item "web-content-delete" "web-content-manage" "Delete page" "web_content_delete" "Remove one or more child pages or sections from active content and archive them for recovery" 0 0 1
-    sgnd_menu_register_item "web-content-source-config" "web-content-manage" "Configure source server" "web_content_configure_source" "Persist SSH host, user, port and remote incoming directory" 0 0 1
-    sgnd_menu_register_item "web-content-config" "web-content-manage" "Manage Config" "web_content_manage_config" "Select an existing website .cfg file and edit it with nano" 0 0 1
-
-    # Validation: source checks and current configuration/status information.
-    sgnd_menu_register_item "web-content-validate" "web-content-validation" "Validate website source" "web_content_validate" "Validate configuration, content metadata, templates, and CSS content styles" 0 15 1
-    sgnd_menu_register_item "web-content-status" "web-content-validation" "Show web-content status" "web_content_status" "Show engine availability and remembered source/output settings" 0 15 1
 
     sayinfo "Web Content Management module registered with the console."

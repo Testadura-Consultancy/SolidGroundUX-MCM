@@ -155,7 +155,7 @@ def _starts_block(lines: list[str], index: int) -> bool:
         return True
     if stripped.startswith("```") or stripped.startswith(":::"):
         return True
-    if re.match(r"^#{2,3}\s+", stripped):
+    if re.match(r"^#{1,6}\s+", stripped):
         return True
     if re.fullmatch(r"-{3,}", stripped):
         return True
@@ -239,7 +239,7 @@ def _render_lines(
                 output.append(f"<div{class_attr}>\n{inner}\n</div>")
             continue
 
-        heading = re.match(r"^(#{2,3})\s+(.+)$", stripped)
+        heading = re.match(r"^(#{1,6})\s+(.+)$", stripped)
         if heading:
             level = len(heading.group(1))
             output.append(f"<h{level}>{_render_inline(heading.group(2))}</h{level}>")

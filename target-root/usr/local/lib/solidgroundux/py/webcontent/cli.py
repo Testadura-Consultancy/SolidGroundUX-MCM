@@ -11,6 +11,9 @@ from .deletion import delete_content, inspect_delete
 from .management import list_pages, edit_metadata, move_page, inspect_metadata, edit_metadata_fields
 from .generator import generate_site
 from .ingestion import ingest_content, inspect_ingest
+from .incoming_transfer import plan_local_import, copy_local_to_incoming
+from .incoming_commit import plan_content_ingest, commit_content_ingest
+from .incoming_archive import archive_ingested_package
 from .social import prepare_social
 from .validation import validate_site
 
@@ -43,6 +46,29 @@ def _parser() -> argparse.ArgumentParser:
     """Handle parser for the web content workflow."""
     parser = argparse.ArgumentParser(prog="sgnd-webcontent", description="Generate, validate, ingest, and delete static web content repositories.")
     subparsers = parser.add_subparsers(dest="command", required=True)
+
+    # Staging is independent of ingestion into the website content tree.
+    for command, description in (
+        ("preview-local-import", "Review local files before copying to incoming."),
+        ("import-to-incoming", "Copy reviewed local files into incoming after explicit confirmation."),
+    ):
+        transfer = subparsers.add_parser(command, help=description)
+        transfer.add_argument("--input-path", required=True)
+        transfer.add_argument("--incoming", required=True)
+        transfer.add_argument("--conflict-policy", choices=("abort", "skip"), default="abort")
+        if command == "import-to-incoming":
+            transfer.add_argument("--confirm", action="store_true", help="Explicitly authorize copying staged files.")
+        transfer.add_argument("--result-file")
+
+    # Staged package ingestion is separate from copying local files into Incoming.
+    for command in ("preview-incoming-ingest", "ingest-incoming"):
+        staged = subparsers.add_parser(command, help="Review or commit a staged package into content.")
+        staged.add_argument("--input-path", required=True)
+        staged.add_argument("--source", required=True, help="Website source root containing content/ and incoming/.")
+        staged.add_argument("--conflict-policy", choices=("abort", "skip"), default="abort")
+        if command == "ingest-incoming":
+            staged.add_argument("--confirm", action="store_true")
+        staged.add_argument("--result-file")
 
     validate = subparsers.add_parser("validate", help="Validate a web content repository.")
     validate.add_argument("--source", required=True)
@@ -134,6 +160,64 @@ def main(argv: list[str] | None = None) -> int:
         Operation result or None, as defined by the implementation."""
     args = _parser().parse_args(argv)
     try:
+        if args.command in ("preview-local-import", "import-to-incoming"):
+            plan = plan_local_import(args.input_path, args.incoming, args.conflict_policy)
+            payload = {
+                "success": plan.valid,
+                "source": plan.source,
+                "incoming": plan.incoming,
+                "conflict_policy": plan.conflict_policy,
+                "files": [{"source": src, "destination": dst} for src, dst in plan.files],
+                "conflicts": plan.conflicts,
+                "copy_count": plan.copy_count,
+                "errors": list(plan.errors),
+                "committed": False,
+            }
+            if args.command == "import-to-incoming":
+                if not args.confirm:
+                    payload["success"] = False
+                    payload["errors"].append("Explicit --confirm required")
+                elif plan.valid:
+                    copied = copy_local_to_incoming(plan)
+                    payload["copied"] = copied
+                    payload["committed"] = True
+            _write_result(payload, args.result_file)
+            return 0 if payload["success"] else 1
+        if args.command in ("preview-incoming-ingest", "ingest-incoming"):
+            root = Path(args.source).expanduser().resolve()
+            incoming = root / "incoming"
+            requested = Path(args.input_path).expanduser().resolve()
+            # Only staged packages may be accepted into the canonical content tree.
+            if requested == incoming or incoming not in requested.parents:
+                payload = {"success": False, "errors": ["Select one package inside incoming; the inbox directory itself cannot be ingested"], "committed": False}
+            elif any(part.startswith('.') for part in requested.relative_to(incoming).parts):
+                payload = {"success": False, "errors": ["Incoming control or hidden files cannot be ingested"], "committed": False}
+            else:
+                plan = plan_content_ingest(requested, root / "content", args.conflict_policy)
+                payload = {"success": plan.valid, "source": plan.source,
+                           "content": plan.content, "files": plan.files,
+                           "conflicts": plan.conflicts, "errors": list(plan.errors),
+                           "conflict_policy": plan.policy, "committed": False}
+                if args.command == "ingest-incoming":
+                    if not args.confirm:
+                        payload["success"] = False
+                        payload["errors"].append("Explicit --confirm required")
+                    elif plan.valid:
+                        payload["created"] = commit_content_ingest(plan)
+                        payload["committed"] = True
+                        # Never archive a partially accepted package: skipped
+                        # conflicts must remain available for later resolution.
+                        if payload["created"] and not plan.conflicts:
+                            try:
+                                payload["archived_to"] = str(archive_ingested_package(requested, incoming))
+                            except (OSError, ValueError, RuntimeError) as exc:
+                                # Content is already committed. Report archival
+                                # failure without falsely claiming rollback.
+                                payload["archive_warning"] = f"Content committed; incoming archive failed: {exc}"
+                        else:
+                            payload["archive_warning"] = "Package retained in Incoming (no new files or unresolved conflicts)"
+            _write_result(payload, args.result_file)
+            return 0 if payload["success"] else 1
         if args.command == "list-pages":
             payload = list_pages(args.source)
             _write_result(payload, args.result_file)

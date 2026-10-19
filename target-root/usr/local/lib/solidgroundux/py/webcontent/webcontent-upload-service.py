@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Loopback-only Markdown upload receiver; Nginx MUST apply HTTPS and Basic Auth.
+"""Loopback-only staged file upload receiver; Nginx MUST apply HTTPS and Basic Auth.
 
 Install as a systemd service with a dedicated non-public writable directory.
 This service does not implement authentication: direct network access is prohibited.
@@ -12,11 +12,65 @@ import json
 import os
 from pathlib import Path
 import re
+from io import BytesIO
+from zipfile import ZipFile, BadZipFile
 
 MAX_FILES = 10
-MAX_FILE_BYTES = 2 * 1024 * 1024
-MAX_REQUEST_BYTES = 21 * 1024 * 1024
-SAFE_NAME = re.compile(r"[A-Za-z0-9][A-Za-z0-9_.-]*\.md\Z")
+MAX_FILE_BYTES = 25 * 1024 * 1024
+MAX_REQUEST_BYTES = 101 * 1024 * 1024
+MAX_ARCHIVE_ENTRIES = 500
+MAX_ARCHIVE_UNPACKED = 100 * 1024 * 1024
+ALLOWED_EXTENSIONS = {".md", ".zip", ".png", ".jpg", ".jpeg", ".gif", ".webp", ".svg", ".pdf", ".txt"}
+SAFE_NAME = re.compile(r"[A-Za-z0-9][A-Za-z0-9_.-]*\Z")
+
+
+def validate_upload(filename: str, payload: bytes) -> None:
+    """Validate staged files, including ZIP paths and expansion limits.
+
+    This is not ingestion: archive entries remain unextracted until the WCM
+    ingestion planner reviews them on the receiving machine.
+    """
+    if not SAFE_NAME.fullmatch(filename) or filename in {".", ".."}:
+        raise ValueError("Unsafe filename")
+    extension = Path(filename).suffix.lower()
+    if extension not in ALLOWED_EXTENSIONS:
+        raise ValueError("Unsupported file extension")
+    if not payload or len(payload) > MAX_FILE_BYTES:
+        raise ValueError("Invalid file size")
+    if extension == ".md":
+        if b"\x00" in payload:
+            raise ValueError("Invalid Markdown content")
+        payload.decode("utf-8")
+    if extension != ".zip":
+        return
+    try:
+        with ZipFile(BytesIO(payload)) as archive:
+            entries = archive.infolist()
+            if len(entries) > MAX_ARCHIVE_ENTRIES:
+                raise ValueError("Too many ZIP entries")
+            seen = set()
+            unpacked = 0
+            for entry in entries:
+                name = entry.filename
+                parts = name.rstrip("/").split("/")
+                if (not name or name.startswith("/") or "\\" in name or
+                    "\x00" in name or any(x in {"", ".", ".."} for x in parts) or
+                    re.match(r"^[A-Za-z]:", name)):
+                    raise ValueError("Unsafe ZIP path")
+                if name in seen:
+                    raise ValueError("Duplicate ZIP entry")
+                seen.add(name)
+                mode = (entry.external_attr >> 16) & 0o170000
+                if mode not in (0, 0o100000, 0o040000):
+                    raise ValueError("Unsupported ZIP entry type")
+                if entry.flag_bits & 1:
+                    raise ValueError("Encrypted ZIP entry")
+                unpacked += entry.file_size
+                if unpacked > MAX_ARCHIVE_UNPACKED:
+                    raise ValueError("ZIP exceeds unpacked size limit")
+    except BadZipFile as exc:
+        raise ValueError("Invalid ZIP archive") from exc
+
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -55,18 +109,22 @@ class Handler(BaseHTTPRequestHandler):
                 return self.respond(400, "Invalid multipart body")
             parts = list(parsed.iter_parts())
             if not (1 <= len(parts) <= MAX_FILES):
-                return self.respond(400, "Select 1 to 10 Markdown files")
+                return self.respond(400, "Select 1 to 10 files")
             validated = []
             for part in parts:
                 if part.get_content_disposition() != "form-data" or part.get_param("name", header="content-disposition") != "files":
                     return self.respond(400, "Unexpected upload field")
                 filename = part.get_filename()
-                if not filename or not SAFE_NAME.fullmatch(filename) or filename in {name for name, _ in validated}:
-                    return self.respond(400, "Unsafe or duplicate filename")
+                # Distinguish malformed multipart metadata from a repeated filename.
+                # Filename safety is checked separately by validate_upload().
+                if not filename:
+                    return self.respond(400, "Missing filename in upload part")
+                if filename in {name for name, _ in validated}:
+                    return self.respond(400, "Duplicate filename in upload request")
                 payload = part.get_payload(decode=True)
-                if payload is None or not (0 < len(payload) <= MAX_FILE_BYTES) or b"\x00" in payload:
-                    return self.respond(400, "Invalid Markdown size or content")
-                payload.decode("utf-8")
+                if payload is None:
+                    return self.respond(400, "Invalid upload payload")
+                validate_upload(filename, payload)
                 validated.append((filename, payload))
         except (ValueError, UnicodeError, TypeError) as exc:
             return self.respond(400, f"Invalid upload: {type(exc).__name__}")
@@ -88,7 +146,7 @@ class Handler(BaseHTTPRequestHandler):
             for name in created:
                 (self.directory / name).unlink(missing_ok=True)
             return self.respond(500, "Could not store uploaded files")
-        self.respond(201, f"Stored {len(created)} Markdown file(s)")
+        self.respond(201, f"Stored {len(created)} file(s)")
 
     def do_GET(self):
         self.respond(405, "POST only")

@@ -13,7 +13,7 @@ from pathlib import Path
 import shutil
 import re
 import hashlib
-from urllib.parse import urlsplit
+from urllib.parse import urlsplit, quote
 from typing import Iterable
 
 from .content import (
@@ -481,6 +481,43 @@ def _publish_image(reference: str, item: ContentItem, config, output_path: Path)
     return "/images/content/" + destination.name + ("?" + parsed.query if parsed.query else "")
 
 
+def _publish_local_resource(reference: str, item: ContentItem, config, output_path: Path) -> str:
+    """Publish a relative content-local download, retaining its resource filename.
+
+    Only regular files inside the source content tree are eligible. Resources are
+    published under a dedicated directory, avoiding collisions with shared assets.
+    """
+    parsed = urlsplit(reference)
+    if parsed.scheme or parsed.netloc or reference.startswith(("/", "#")):
+        return reference
+    if not parsed.path or not parsed.path.lower().startswith("resources/") and "/resources/" not in parsed.path.lower():
+        return reference
+    root = config.content_dir.resolve()
+    candidate = (item.source_path.parent / parsed.path).resolve()
+    if not candidate.is_file() or not candidate.is_relative_to(root):
+        return reference
+    relative = candidate.relative_to(root)
+    destination = output_path / "content-resources" / relative
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copy2(candidate, destination)
+    encoded = "/content-resources/" + "/".join(quote(part) for part in relative.parts)
+    return encoded + ("?" + parsed.query if parsed.query else "") + ("#" + parsed.fragment if parsed.fragment else "")
+
+
+def _resolve_body_resources(body: str, item: ContentItem, config, output_path: Path) -> str:
+    """Rewrite Markdown download links to published local resource URLs.
+
+    Image links continue to be handled by _resolve_body_images. Existing remote,
+    absolute and anchor links remain unchanged.
+    """
+    pattern = re.compile(r'(?<!!)\[([^\]]+)\]\(([^)]+)\)')
+    def replace(match: re.Match[str]) -> str:
+        reference = match.group(2)
+        published = _publish_local_resource(reference, item, config, output_path)
+        return match.group(0) if published == reference else f'[{match.group(1)}]({published})'
+    return pattern.sub(replace, body)
+
+
 def _resolve_body_images(body: str, item: ContentItem, config, output_path: Path) -> str:
     """Rewrite local Markdown images before Markdown rendering; leave external URLs intact."""
     pattern = re.compile(r'(!\[[^\]]*\]\()([^\)]+)(\))')
@@ -706,7 +743,20 @@ def _featured_for(
             and child in items
             and child.logical_id != item.logical_id
         ]
-        legacy.sort(key=lambda child: (child.date, child.title.lower()), reverse=True)
+        # Explicit featured_order takes precedence; unnumbered items follow
+        # alphabetically. Keep this independent of navigation and publication dates.
+        def featured_sort_key(child: ContentItem) -> tuple[int, int, str, str]:
+            raw_order = child.metadata.get("featured_order")
+            if raw_order is None or str(raw_order).strip() == "":
+                return (1, 0, child.title.casefold(), child.route)
+            try:
+                order = int(str(raw_order).strip())
+            except (TypeError, ValueError):
+                # Malformed metadata is treated as unspecified for sorting.
+                return (1, 0, child.title.casefold(), child.route)
+            return (0, order, child.title.casefold(), child.route)
+
+        legacy.sort(key=featured_sort_key)
         cards.extend(_featured_card(child) for child in legacy)
 
     if not cards:
@@ -932,6 +982,7 @@ def generate_site(source: str | Path, output: str | Path, languages: str | Itera
 
         body, index_replacements = _explicit_indexes(item.body, item, items, config.default_language, config, output_path)
         body = _resolve_body_images(body, item, config, output_path)
+        body = _resolve_body_resources(body, item, config, output_path)
         body_html = render_markdown(body)
         for marker, rendered_index in index_replacements.items():
             body_html = body_html.replace(f"<p>{marker}</p>", rendered_index)
