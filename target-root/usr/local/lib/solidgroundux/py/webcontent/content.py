@@ -567,14 +567,9 @@ def discover_content(config: SiteConfig, navigation: list[NavigationItem]) -> li
             elif base_route == "/":
                 template = "home"
             else:
-                # Child content inherits the nature of its main section. Static
-                # sections use normal pages; listing sections use listing indexes
-                # with articles below them. Front matter can always override this.
-                owner = _owning_navigation_item(base_route, navigation)
-                if owner is not None and owner.template == "listing":
-                    template = "listing" if base_name == "index" else "article"
-                else:
-                    template = "page"
+                # Page presentation is independent of section membership.
+                # Authors opt in to child indexes using ::: td-index.
+                template = "page"
 
         items.append(
             ContentItem(

@@ -632,36 +632,6 @@ def _direct_children(item: ContentItem, items: list[ContentItem], default_langua
     return children
 
 
-def _listing_for(item: ContentItem, items: list[ContentItem], default_language: str) -> str:
-    """Handle listing for for the web content workflow."""
-    children = [child for child in _direct_children(item, items, default_language) if not child.hidden]
-    children.sort(key=lambda child: (child.date, child.title.lower()), reverse=True)
-    return "\n".join(_card(child) for child in children)
-
-
-def _section_children_for(item: ContentItem, items: list[ContentItem], default_language: str, config, output_path: Path) -> str:
-    """Render local navigation for static section index pages."""
-    if item.template != "page" or item.base_name != "index":
-        return ""
-
-    children = [child for child in _direct_children(item, items, default_language) if not child.hidden]
-    if not children:
-        return ""
-
-    labels = {
-        "NL": "In deze sectie",
-        "EN": "In this section",
-    }
-    heading = labels.get(item.language, "In this section")
-    cards = _render_index(item, items, default_language, config, output_path)
-    return (
-        '<section class="section-children">'
-        f'<h2>{html.escape(heading)}</h2>'
-        f"{cards}"
-        "</section>"
-    )
-
-
 def _featured_card(item: ContentItem, image: str = "") -> str:
     """Render one curated Featured tile using target-page metadata."""
     # Explicit curated image wins; otherwise use article metadata or a section default.
@@ -675,9 +645,12 @@ def _featured_card(item: ContentItem, image: str = "") -> str:
         elif item.route.startswith("/sages/"):
             image = "/images/sageslegendes-default.png"
     image_html = ""
+    fit = str(item.metadata.get("featured_image_fit") or "cover").strip().lower()
+    if fit not in {"cover", "contain"}:
+        fit = "cover"
     if image:
         image_html = (
-            f'<a class="featured-card-media" href="{html.escape(item.route, quote=True)}" tabindex="-1">'
+            f'<a class="featured-card-media featured-card-media--{fit}" href="{html.escape(item.route, quote=True)}" tabindex="-1">'
             f'<img src="{html.escape(image, quote=True)}" alt="">'
             "</a>"
         )
@@ -986,7 +959,6 @@ def generate_site(source: str | Path, output: str | Path, languages: str | Itera
         body_html = render_markdown(body)
         for marker, rendered_index in index_replacements.items():
             body_html = body_html.replace(f"<p>{marker}</p>", rendered_index)
-        has_explicit_index = bool(index_replacements)
         inner_context = {
             "site": site_context,
             "page": page_context,
@@ -994,8 +966,6 @@ def generate_site(source: str | Path, output: str | Path, languages: str | Itera
             "page_summary": _summary_fragment(item),
             "article_meta": _article_meta(item),
             "article_footer": "",
-            "listing": _listing_for(item, items, config.default_language) if item.template == "listing" else "",
-            "section_children": "" if has_explicit_index else _section_children_for(item, items, config.default_language, config, output_path),
             "featured_content": (
                 _featured_for(
                     item,

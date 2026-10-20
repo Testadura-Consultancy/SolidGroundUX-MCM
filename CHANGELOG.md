@@ -16,6 +16,8 @@ The format is inspired by *Keep a Changelog* while remaining focused on practica
 
 ## Unreleased
 
+- Markdown image sizes: optional `width` and `height` (pixels) for inline Markdown images and `td-image-text`, including images nested in tiles and galleries; no change to featured-card sizing defaults.
+
 ### Web Content Management 2.1 — final workflow and authoring updates
 
 - Consolidated the Incoming workflow around **Retrieve Incoming**, **Import local files to Incoming**, and **Review and ingest Incoming package**, including ZIP packages with Markdown and local resources.

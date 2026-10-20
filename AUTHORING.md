@@ -132,3 +132,80 @@ teaser: "A short, compelling introduction for social media."
 De zijbalk wordt opgebouwd uit directories en de `title`-metadata van Markdown-pagina’s. Een `index_NL.md` of `index_EN.md` is optioneel; zonder index kan een directory een uitklapbare groep zijn. Klik op het pijltje om uit te klappen en op een bestaande indexpaginatitel om te navigeren. De actieve route wordt uitgeklapt. `order` sorteert siblings en `config/navigation.cfg` ordent de hoofdsecties.
 
 `hidden: true` op een gewone pagina verbergt alleen die pagina in de navigatie; op een sectie-index (`index_NL.md` of `index_EN.md`) verbergt het de **hele sectie inclusief onderliggende menu-items**. Met `?ShowHidden` in de URL worden verborgen pagina’s en complete verborgen secties tijdelijk zichtbaar in de navigatie. De pagina’s blijven ook zonder deze optie via hun URL bereikbaar; dit is geen toegangsbeveiliging. `private: true` geeft aan dat server-side bescherming vereist is. De generator weigert publicatie van een `private` pagina buiten de in `config/site.cfg` ingestelde `protected_prefixes`. Die instelling beschermt zelf niets: configureer en test authenticatie op de daadwerkelijke webserver. `draft: true` blijft los daarvan buiten de publieke generatie.
+
+## Sectie-indexen en expliciete inhoudsoverzichten
+
+Een sectie is een map met een `index_NL.md` (of andere taalvariant). De
+sectie-index gebruikt `template: page`, net als een gewone inhoudspagina.
+De generator voegt **niet automatisch** een overzicht van onderliggende
+pagina’s toe. Plaats de index expliciet op de gewenste plek:
+
+```markdown
+::: td-index
+:::
+```
+
+`td-index` toont de direct onderliggende gepubliceerde pagina's. Met
+`type=cards`, `type=list` of `type=articles` kies je de presentatie;
+`sort=newest` sorteert op publicatiedatum (nieuwste eerst). Standaard
+kiest de generator kaarten voor maximaal vier items en anders een lijst.
+Concepten worden in de publieke generatie niet opgenomen.
+
+```markdown
+::: td-index type=articles sort=newest
+:::
+```
+
+Voor een gewone pagina zonder indexblok verschijnt geen automatische lijst.
+Het oude `listing`-template is vervallen; bestaande sectie-indexen worden
+`template: page` met een expliciet `td-index`-blok.
+
+## Afbeelding naast tekst, featured-fit en uitklappen
+
+Met `td-image-text` plaats je een afbeelding naast gewone Markdown.
+Geef het afbeeldingspad direct op in de openingsregel. Standaard staat
+het plaatje links; voeg `right` toe voor rechts. Op smalle schermen komt
+het plaatje boven de tekst. Het hele plaatje blijft zichtbaar.
+
+```markdown
+::: td-image-text /images/testadura-logo.png
+### Een verhaal
+
+Tekst naast de afbeelding, inclusief **Markdown** en meer alinea's.
+:::
+
+::: td-image-text /images/testadura-logo.png right
+Ook rechts is mogelijk.
+:::
+```
+
+Een featured-kaart kan per pagina de volledige afbeelding tonen in plaats
+van uitsnijden: frontmatter `featured_image_fit: contain` (standaard `cover`).
+
+`td-details` is een toegankelijk uitklapblok op basis van HTML `details`;
+de inhoud is gewone Markdown. Schrijf `::: td-details Toelichting` en sluit
+af met `:::`. Gebruik `::: td-details open Toelichting` voor standaard open.
+
+
+### Afmetingen van afbeeldingen
+
+Bij gewone Markdown-afbeeldingen (ook binnen `td-grid`, `td-tile`, `td-gallery` en `td-slider`) kun je optioneel pixelafmetingen toevoegen:
+
+```markdown
+![Logo](/images/testadura-logo.png){width=200}
+![Diagram](/images/diagram.png){width=400 height=240}
+```
+
+Bij een afbeelding naast tekst gebruik je dezelfde parameters in de openingsregel:
+
+```markdown
+::: td-image-text /images/testadura-logo.png width=200
+Tekst naast het logo.
+:::
+
+::: td-image-text /images/testadura-logo.png right width=200 height=150
+Tekst links van het logo.
+:::
+```
+
+Afmetingen zijn positieve pixels (`1` tot `10000`). Zonder parameters blijft de standaardopmaak behouden. Met één afmeting blijft de beeldverhouding behouden; met twee afmetingen past de afbeelding zonder bijsnijden in het opgegeven vlak. De breedte wordt begrensd door de beschikbare schermruimte. Bij galerijen en sliders blijft de containerlay-out gehandhaafd; afmetingen gelden voor de afbeelding, niet voor de kaart of de schuifpositie. Featured-afbeeldingen behouden afzonderlijk `featured_image_fit: cover|contain`.

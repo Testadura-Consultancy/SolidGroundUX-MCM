@@ -65,7 +65,7 @@ def create_section(source, parent, slug, title_nl, title_en, languages="NL,EN"):
     """Create a new indexed section with draft NL/EN pages, without overwriting.
 
     Parent must already be indexed (except for the website root). Metadata
-    identifies these as section listing pages. Language choice is explicit.
+    identifies these as ordinary section pages. Language choice is explicit.
     """
     content = _root(source)
     base = _section(content, parent, allow_root=True)
@@ -92,7 +92,7 @@ def create_section(source, parent, slug, title_nl, title_en, languages="NL,EN"):
             title = titles[language].replace("\\", "\\\\").replace('"', '\\"')
             body = "Schrijf hier de introductie van deze sectie.\n" if language == "NL" else "Write the introduction for this section here.\n"
             path = target / f"index_{language}.md"
-            path.write_text(f'---\ntitle: "{title}"\nsummary: ""\ntemplate: listing\ncontent_type: section\nfeatured: false\ndraft: true\n---\n\n{body}', encoding="utf-8")
+            path.write_text(f'---\ntitle: "{title}"\nsummary: ""\ntemplate: page\ncontent_type: section\nfeatured: false\ndraft: true\n---\n\n{body}\n\n::: td-index\n:::', encoding="utf-8")
             created.append(path.relative_to(content).as_posix())
     except Exception:
         shutil.rmtree(target)

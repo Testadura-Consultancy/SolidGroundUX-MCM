@@ -66,7 +66,7 @@ def validate_site(source: str | Path) -> ValidationResult:
         if not path.is_dir():
             errors.append(f"Required directory not found: {path}")
 
-    required_templates = ["base.html", "home.html", "page.html", "article.html", "listing.html"]
+    required_templates = ["base.html", "home.html", "page.html", "article.html"]
     for name in required_templates:
         if not (config.templates_dir / name).is_file():
             errors.append(f"Required template not found: {config.templates_dir / name}")
@@ -95,7 +95,11 @@ def validate_site(source: str | Path) -> ValidationResult:
         logical_languages.setdefault(item.logical_id, set()).add(item.language)
         if not item.metadata.get("title"):
             errors.append(f"Missing required metadata 'title': {item.source_path}")
-        used_styles.update(referenced_style_classes(item.body, config.content_style_prefix))
+        # Index directives are generator constructs, not CSS component classes.
+        style_body = re.sub(r"(?m)^\s*:::\s+(?:td-index|index)(?:\s+[^\n]*)?$", "", item.body)
+        # td-details takes human-readable summary text, not class names.
+        style_body = re.sub(r"(?m)^\s*:::\s+td-details(?:\s+[^\n]*)?$", "", style_body)
+        used_styles.update(referenced_style_classes(style_body, config.content_style_prefix))
 
         if not item.draft:
             previous = live_routes.get(item.route)
