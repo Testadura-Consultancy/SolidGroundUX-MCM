@@ -209,6 +209,45 @@ set -uo pipefail
         return "$rc"
     }
 
+    # fn: _adsvr_join_additional_console - Track the distinct additional-DC workflow
+        # . Purpose
+        #   Map the manager's first failing stage to the corresponding nested console
+        #   item, without conflating domain creation with domain join.
+    _adsvr_join_additional_console() {
+        local rc=0 step="" key="" status=0
+        local -a steps=("adsvr-add-install" "adsvr-add-discover" "adsvr-add-join" "adsvr-add-kerberos" "adsvr-add-resolver" "adsvr-add-start" "adsvr-add-dns" "adsvr-add-repl")
+        _adsvr_run_action join-additional || rc=$?
+        case "$rc" in
+            0) status=8 ;;
+            51) status=1 ;;
+            52) status=2 ;;
+            53) _adsvr_record_provision_step "adsvr-add-install" 0; _adsvr_record_provision_step "adsvr-add-discover" 0; return 0 ;;
+            54) status=3 ;;
+            55) status=4 ;;
+            56) status=5 ;;
+            57) status=6 ;;
+            58) status=7 ;;
+            59) status=8 ;;
+            *) sayfail "Additional DC workflow returned unexpected status: $rc"; return "$rc" ;;
+        esac
+        local index=0
+        for step in "${steps[@]}"; do
+            index=$((index + 1))
+            (( index > status )) && break
+            if (( rc != 0 && index == status )); then
+                _adsvr_record_provision_step "$step" 1
+            else
+                _adsvr_record_provision_step "$step" 0
+            fi
+        done
+        (( rc == 0 ))
+    }
+
+    _adsvr_add_install() { _adsvr_run_action install; }
+    _adsvr_add_discover() { _adsvr_run_action join-preflight; }
+    _adsvr_add_join() { _adsvr_run_action join-domain; }
+    _adsvr_add_replication() { _adsvr_run_action join-replication; }
+
     _adsvr_step_install_packages() { _adsvr_run_action install; }
     _adsvr_step_preflight()        { _adsvr_run_action preflight; }
     _adsvr_step_identity()         { _adsvr_run_action identity; }
@@ -252,6 +291,11 @@ set -uo pipefail
     # ! Provision domain
     #   > Run the complete Active Directory server provisioning sequence.
     #   > Handler: _adsvr_provision_domain
+    #
+    # ! Join existing domain as additional DC
+    #   > Discover the existing domain and join as a writable Samba controller.
+    #   > Handler: _adsvr_join_additional_console
+    #   > Child steps: installation, discovery, join, Kerberos, resolver, service, DNS, replication.
     #
     # ! Install AD server prerequisites
     #   > Install Samba AD/DC, Kerberos, and DNS utilities.
@@ -298,6 +342,15 @@ set -uo pipefail
     #   > Handler: _adsvr_status
     sgnd_menu_register_group "$SGND_AD_SERVER_MODULE_ID" "$SGND_AD_SERVER_MODULE_NAME" "$(sgnd_header_get_field_value "${BASH_SOURCE[0]}" "Metadata" "Purpose")" 0 1 200
     sgnd_menu_register_item "adsvr-provision" "$SGND_AD_SERVER_MODULE_ID" "Provision domain" "_adsvr_provision_domain" "Run the complete Active Directory server provisioning sequence" 0 15 1 0
+    sgnd_menu_register_item "adsvr-additional" "$SGND_AD_SERVER_MODULE_ID" "Join existing domain as additional DC" "_adsvr_join_additional_console" "Join as a writable controller; retain the existing domain" 0 15 1 0
+    sgnd_menu_register_item "adsvr-add-install" "$SGND_AD_SERVER_MODULE_ID" "Install prerequisites (additional DC)" "_adsvr_add_install" "Install Samba AD/DC prerequisites" 0 15 1 1
+    sgnd_menu_register_item "adsvr-add-discover" "$SGND_AD_SERVER_MODULE_ID" "Discover existing domain" "_adsvr_add_discover" "Validate remote DC, DNS and system resolver" 0 15 1 1
+    sgnd_menu_register_item "adsvr-add-join" "$SGND_AD_SERVER_MODULE_ID" "Join existing domain" "_adsvr_add_join" "Interactive writable DC join; requires prior discovery" 0 15 1 1
+    sgnd_menu_register_item "adsvr-add-kerberos" "$SGND_AD_SERVER_MODULE_ID" "Install joined DC Kerberos" "_adsvr_step_kerberos" "Install joined Samba Kerberos settings" 0 15 1 1
+    sgnd_menu_register_item "adsvr-add-resolver" "$SGND_AD_SERVER_MODULE_ID" "Configure joined DC DNS resolver" "_adsvr_step_resolver" "Switch from existing DC DNS to own DNS" 0 15 1 1
+    sgnd_menu_register_item "adsvr-add-start" "$SGND_AD_SERVER_MODULE_ID" "Start additional DC" "_adsvr_step_start" "Start and validate Samba AD/DC" 0 15 1 1
+    sgnd_menu_register_item "adsvr-add-dns" "$SGND_AD_SERVER_MODULE_ID" "Register additional DC DNS" "_adsvr_step_register_dns" "Register AD records on joined controller" 0 15 1 1
+    sgnd_menu_register_item "adsvr-add-repl" "$SGND_AD_SERVER_MODULE_ID" "Inspect AD replication" "_adsvr_add_replication" "Check DRS replication with existing controllers" 0 15 1 1
     sgnd_menu_register_item "adsvr-install" "$SGND_AD_SERVER_MODULE_ID" "Install AD server prerequisites" "_adsvr_step_install_packages" "Install Samba AD/DC, Kerberos, and DNS utilities" 0 15 1 1
     sgnd_menu_register_item "adsvr-preflight" "$SGND_AD_SERVER_MODULE_ID" "Validate provisioning inputs" "_adsvr_step_preflight" "Collect realm settings and validate the machine before changes" 0 15 1 1
     sgnd_menu_register_item "adsvr-identity" "$SGND_AD_SERVER_MODULE_ID" "Prepare domain controller identity" "_adsvr_step_identity" "Prepare and validate the domain controller FQDN" 0 15 1 1

@@ -8,13 +8,29 @@ The format is inspired by *Keep a Changelog* while remaining focused on practica
 
 ### AD Server module
 
-- Add support for joining an existing Active Directory domain as an additional writable domain controller, including discovery/authentication, additional-DC provisioning, Kerberos/resolver/DNS configuration, replication validation, and compound subtask progress reporting. This is a post-2.1 feature.
+- **Pending live validation:** Additional writable DC joining must be tested on a disposable existing domain, including failed join recovery, DNS/resolver transition, and replication convergence.
 
 ### SolidGroundUX
 
-- Add a Management Console action to inspect and repair SolidGroundUX filesystem ownership/permissions by invoking the Framework-owned `sgnd-repair-permissions.sh` policy engine.
 
 ## Unreleased
+
+### Active Directory (pending live validation)
+
+- Added a separate **Join existing domain as additional DC** workflow with DNS/LDAP/Kerberos discovery, interactive Samba DC join, generated Kerberos configuration, resolver cutover, service/DNS registration and DRS replication status checks. Existing first-DC provisioning remains unchanged.
+- Added tracked child actions to report the first failing additional-DC stage. The workflow refuses to overwrite an existing smb.conf and requires the system resolver to discover the existing domain before joining. Live join and failure recovery are not tested.
+
+### Framework diagnostics
+
+- Added **Inspect / repair permissions** to Framework Diagnostics, invoking the Framework-owned policy engine in dry-run first and requiring explicit confirmation before applying its policy.
+
+### Database-server management (pending live validation)
+
+- Added module `61-postgresql.sh` with `manage-postgresql.sh` and `sgnd-manage-postgresql`, following the SQL Server host-management lifecycle for Ubuntu 24.04/26.04.
+- Added module `62-mariadb.sh` with `manage-mariadb.sh` and `sgnd-manage-mariadb`, using stock Ubuntu packages and a dedicated MariaDB configuration override.
+- Both modules register tracked preparation substeps, service, network, memory, firewall, storage inspection, status and validation actions. Automatic relocation of existing database directories is intentionally disabled to avoid damaging populated servers.
+- **Testing pending:** no live PostgreSQL/MariaDB installation, service, storage, or restart integration test has yet been performed.
+
 
 - Markdown image sizes: optional `width` and `height` (pixels) for inline Markdown images and `td-image-text`, including images nested in tiles and galleries; no change to featured-card sizing defaults.
 

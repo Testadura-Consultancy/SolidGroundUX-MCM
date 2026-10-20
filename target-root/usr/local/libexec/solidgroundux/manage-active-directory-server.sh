@@ -172,7 +172,7 @@ set -uo pipefail
 # - Framework integration -----------------------------------------------------------
     SGND_USING=()
     SGND_ARGS_SPEC=(
-        "action|a|enum|ACTION|Management action||provision-all,install,preflight,identity,provision,settings,kerberos,resolver,start,dns,validate,status"
+        "action|a|enum|ACTION|Management action||provision-all,join-additional,join-preflight,join-domain,join-replication,install,preflight,identity,provision,settings,kerberos,resolver,start,dns,validate,status"
     )
     SGND_SCRIPT_EXAMPLES=(
         "  $SGND_SCRIPT_NAME --action status"
@@ -192,6 +192,7 @@ set -uo pipefail
     SGND_AD_SERVER_IP=""
     SGND_AD_HOSTNAME_SHORT=""
     SGND_AD_HOSTNAME_FQDN=""
+    SGND_AD_EXISTING_DC_IP=""
 
     _adsvr_validate_realm() { sgnd_ad_validate_realm "$@"; }
 
@@ -603,6 +604,98 @@ set -uo pipefail
         return 0
     }
 
+# - Additional writable controller -------------------------------------------------
+    # fn: _adsvr_join_preflight - Discover and validate a remote writable AD domain
+        # . Purpose
+        #   Reject an existing local DC or Samba configuration, resolve the remote DC,
+        #   check AD discovery, and collect the target realm without changing the host.
+        # . Returns
+        #   0 when remote discovery succeeds; nonzero on missing prerequisites.
+    _adsvr_join_preflight() {
+        local realm="" existing_ip="" current_domain="" short=""
+        sgnd_ad_is_domain_controller && { sayfail "This host is already a domain controller."; return 1; }
+        [[ ! -e /etc/samba/smb.conf ]] || { sayfail "Existing /etc/samba/smb.conf must be reviewed before a DC join; refusing to overwrite it."; return 1; }
+        command -v samba-tool >/dev/null && command -v host >/dev/null && command -v kinit >/dev/null || {
+            sayfail "Install Samba AD prerequisites first, then retry discovery."; return 1;
+        }
+        current_domain="$(hostname -d 2>/dev/null || true)"
+        realm="${SGND_AD_REALM:-${current_domain^^}}"
+        ask --label "Existing domain Kerberos realm" --var realm --default "$realm" --validate _adsvr_validate_realm || return 1
+        SGND_AD_REALM="${realm^^}"
+        SGND_AD_DNS_DOMAIN="${SGND_AD_REALM,,}"
+        existing_ip="${SGND_AD_EXISTING_DC_IP:-}"
+        ask --label "Existing domain controller IPv4" --var existing_ip --default "$existing_ip" --validate sgnd_validate_ipv4 || return 1
+        SGND_AD_EXISTING_DC_IP="$existing_ip"
+        SGND_AD_SERVER_IP="$(sgnd_ad_primary_ipv4)"
+        short="$(hostname -s 2>/dev/null || true)"
+        [[ -n "$short" && "$short" != localhost && -n "$SGND_AD_SERVER_IP" && "$SGND_AD_SERVER_IP" != 127.* ]] || {
+            sayfail "Set a unique hostname and static server IPv4 before joining."; return 1;
+        }
+        SGND_AD_HOSTNAME_SHORT="$short"
+        SGND_AD_HOSTNAME_FQDN="${short}.${SGND_AD_DNS_DOMAIN}"
+        host -t SOA "$SGND_AD_DNS_DOMAIN" "$existing_ip" >/dev/null 2>&1 || { sayfail "Existing DC does not serve the domain SOA."; return 1; }
+        host -t SRV "_ldap._tcp.${SGND_AD_DNS_DOMAIN}" "$existing_ip" >/dev/null 2>&1 || { sayfail "LDAP discovery failed on existing DC."; return 1; }
+        host -t SRV "_kerberos._tcp.${SGND_AD_DNS_DOMAIN}" "$existing_ip" >/dev/null 2>&1 || { sayfail "Kerberos discovery failed on existing DC."; return 1; }
+        sudo samba-tool domain info "$existing_ip" || { sayfail "Unable to query the existing AD controller."; return 1; }
+        sgnd_print_labeledvalue --label "Existing DC" --value "$existing_ip"
+        sgnd_print_labeledvalue --label "Domain" --value "$SGND_AD_DNS_DOMAIN"
+        sgnd_print_labeledvalue --label "New controller" --value "$SGND_AD_HOSTNAME_FQDN ($SGND_AD_SERVER_IP)"
+        sayinfo "Before joining, configure system DNS to resolve through the existing DC ($existing_ip)."
+        # The join must never silently rewrite network configuration during discovery.
+        host -t SRV "_ldap._tcp.${SGND_AD_DNS_DOMAIN}" >/dev/null 2>&1 || {
+            sayfail "System resolver does not discover domain LDAP. Point DNS to the existing DC before joining."; return 1;
+        }
+        sayok "Existing AD domain discovery passed."
+    }
+
+    # fn: _adsvr_join_domain - Join an existing AD domain as an additional writable DC
+        # . Purpose
+        #   Use Samba's domain join DC path, not domain provision. Credentials are
+        #   obtained interactively by samba-tool and are never stored in a variable.
+        # . Returns
+        #   0 on successful join; otherwise nonzero with no implicit retry.
+    _adsvr_join_domain() {
+        [[ -n "$SGND_AD_DNS_DOMAIN" && -n "$SGND_AD_EXISTING_DC_IP" ]] || { sayfail "Run additional-DC preflight first."; return 1; }
+        (( ${FLAG_DRYRUN:-0} == 1 )) && { sayinfo "DRYRUN: Would join ${SGND_AD_DNS_DOMAIN} as a writable DC via ${SGND_AD_EXISTING_DC_IP}."; return 0; }
+        _adsvr_prepare_hosts || return 1
+        # Credentials are prompted directly on the controlling terminal by Samba.
+        sudo samba-tool domain join "$SGND_AD_DNS_DOMAIN" DC \
+            --server="$SGND_AD_EXISTING_DC_IP" --dns-backend=SAMBA_INTERNAL \
+            -U Administrator </dev/tty || return 1
+        sgnd_ad_is_domain_controller || { sayfail "Samba join succeeded but local DC state was not detected."; return 1; }
+        sayok "Joined existing domain as an additional writable controller."
+    }
+
+    # fn: _adsvr_join_replication - Validate incoming AD replication after DC join
+        # . Purpose
+        #   Check DRS replication status and domain health without forcing replication.
+    _adsvr_join_replication() {
+        systemctl is-active --quiet samba-ad-dc.service || { sayfail "AD/DC service is not active."; return 1; }
+        sudo samba-tool drs showrepl || { sayfail "DRS replication status query failed."; return 1; }
+        sudo samba-tool drs showrepl --summary || { sayfail "DRS replication summary failed."; return 1; }
+        sayok "Replication status inspection completed; review the partner results above."
+    }
+
+    # fn: _adsvr_join_additional - Track additional DC provisioning in one process
+        # . Returns
+        #   Codes 51-59 identify the first failing step for menu-level tracking.
+        #   53 is an operator cancellation without mutation.
+    _adsvr_join_additional() {
+        local decision="NO"
+        _adsvr_step_install_packages || return 51
+        _adsvr_join_preflight || return 52
+        ask_decision --label "Join ${SGND_AD_DNS_DOMAIN} as an additional writable DC" \
+            --choices "YES|Y,NO|N" --default "NO" --var decision || return 53
+        [[ "$decision" == "YES" ]] || { sayinfo "Additional controller join cancelled."; return 53; }
+        _adsvr_join_domain || return 54
+        _adsvr_step_kerberos || return 55
+        _adsvr_step_resolver || return 56
+        _adsvr_step_start || return 57
+        _adsvr_step_register_dns || return 58
+        _adsvr_join_replication || return 59
+        sayok "Additional writable domain controller joined; review replication status before production use."
+    }
+
 # - Validation/status -------------------------------------------------------------
     # fn: _adsvr_validate
         # . Purpose
@@ -655,7 +748,7 @@ set -uo pipefail
 # - Action dispatch -----------------------------------------------------------------
     _adsvr_action_is_mutating() {
         case "${1:-}" in
-            provision-all|install|identity|provision|settings|kerberos|resolver|start|dns) return 0 ;;
+            provision-all|join-additional|join-domain|install|identity|provision|settings|kerberos|resolver|start|dns) return 0 ;;
             *) return 1 ;;
         esac
     }
@@ -666,6 +759,10 @@ set -uo pipefail
 
         case "$action" in
             provision-all) _adsvr_provision_domain || rc=$? ;;
+            join-additional) _adsvr_join_additional || rc=$? ;;
+            join-preflight) _adsvr_join_preflight || rc=$? ;;
+            join-domain) _adsvr_join_preflight && _adsvr_join_domain || rc=$? ;;
+            join-replication) _adsvr_join_replication || rc=$? ;;
             install)       _adsvr_step_install_packages || rc=$? ;;
             preflight)     _adsvr_step_preflight || rc=$? ;;
             identity)      _adsvr_step_identity || rc=$? ;;

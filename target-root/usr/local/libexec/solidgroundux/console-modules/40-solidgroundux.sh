@@ -362,5 +362,39 @@ set -uo pipefail
     sgnd_menu_register_item "log-errors" "framework-logging" "Show recent errors" "_framework_log_show_errors" "Show the most recent error, failure, and fatal log entries" 0 30 1
     sgnd_menu_register_item "log-rotate" "framework-logging" "Rotate current logfile" "_framework_log_rotate" "Rotate the active framework logfile using the configured retention settings" 0 30 1
 
+    # fn: framework_repair_permissions - Inspect and optionally apply the Framework-owned policy
+        # . Purpose
+        #   Use the canonical framework permission engine without duplicating its rules in MCM.
+        #   Always show a dry-run first; repair requires a separate affirmative decision.
+    framework_repair_permissions() {
+        local engine=""
+        local policy=""
+        local decision="NO"
+        local root="${SGND_FRAMEWORK_ROOT:-/}"
+        if [[ "$root" == "/" ]]; then
+            engine="/usr/local/libexec/solidgroundux/sgnd-repair-permissions.sh"
+            policy="/usr/local/share/solidgroundux/permissions.dta"
+        else
+            engine="${root%/}/usr/local/libexec/solidgroundux/sgnd-repair-permissions.sh"
+            policy="${root%/}/usr/local/share/solidgroundux/permissions.dta"
+        fi
+        [[ -x "$engine" && -r "$policy" ]] || {
+            sayfail "Permissions engine or policy unavailable: $engine / $policy"
+            return 1
+        }
+        sgnd_print
+        sgnd_print_sectionheader "SolidGroundUX filesystem permission policy"
+        sgnd_print_labeledvalue --label "Policy" --value "$policy"
+        sgnd_print_labeledvalue --label "Engine" --value "$engine"
+        sayinfo "Inspecting permissions (dry-run); no changes will be made."
+        # The engine is framework-owned, and its root escalation is handled by sgnd_exe_start.
+        "$engine" --dryrun --file "$policy" || return $?
+        ask_decision --label "Apply this policy to filesystem ownership and permissions" \
+            --choices "YES|Y,NO|N" --default "NO" --var decision || return 0
+        [[ "$decision" == "YES" ]] || { sayinfo "Permission repair cancelled."; return 0; }
+        "$engine" --file "$policy"
+    }
+
     sgnd_menu_register_group "diagnostics" "Framework Diagnostics" "Run the complete framework smoke test" 0 1 850
+    sgnd_menu_register_item "permissions-repair" "diagnostics" "Inspect / repair permissions" "framework_repair_permissions" "Preview and optionally apply the Framework-owned permissions policy" 0 30 1
     sgnd_menu_register_item "smoketest" "diagnostics" "Framework smoke test" "_framework_smoketest" "Run the complete SolidGroundUX framework smoke test" 0 30 1
