@@ -4,14 +4,14 @@
 # -------------------------------------------------------------------------------------
 # Metadata:
 #   Version     : 2.1
-#   Build       : 2627501
+#   Build       : 2629401
 #   Shortname   : MANAGE_WEB_SERVER
 #   Source      : manage-web-server.sh
 #   Type        : script
 #   Group       : Role Managers
 #   Purpose     : Configure, manage, validate, and inspect an Nginx web server
 #
-#   Checksum : cde48e944b38ef39923d6b97ee88e48ea120d9bd49d15f8563ed55db9f1ad09c
+#   Checksum : 5b03c347a018f0f6bf4cf65d5ff8d2bc20ce28e3fe05d8437b116fa882b7d3a0
 # Description:
 #   Configure, manage, validate, and inspect an Nginx web server.
 #

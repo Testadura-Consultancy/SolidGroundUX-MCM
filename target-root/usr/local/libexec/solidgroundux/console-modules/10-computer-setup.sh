@@ -3,9 +3,9 @@
 # ----------------------------------------------------------------------------------
 # Metadata:
 #   Version     : 2.1
-#   Build       : 2627502
+#   Build       : 2629401
 #   Shortname   : COMPUTER_SETUP
-#   Checksum    : d7cc87d1fa26423898d2e7497e16cc0d1a2d69a35729f4165579229d8323e436
+#   Checksum    : cda3e4e1f0214e4c2de1b380cff356008409980e95169d59f6f11d902a003892
 #   Source      : 10-computer-setup.sh
 #   Type        : module
 #   Group       : Module Registration

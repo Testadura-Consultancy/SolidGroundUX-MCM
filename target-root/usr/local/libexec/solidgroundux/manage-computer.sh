@@ -4,12 +4,13 @@
 # ----------------------------------------------------------------------------------
 # Metadata:
 #   Version     : 2.1
-#   Build       : 2627501
+#   Build       : 2629401
 #   Shortname   : MANAGE_COMPUTER
 #   Source      : manage-computer.sh
 #   Type        : script
 #   Group       : Role Managers
 #   Purpose     : Computer Setup action implementation
+#   Checksum : ae086d397bbb4ce8d8cbc5e51ea1295f69c56e85fd802472274e493ad14dce50
 # Description:
 #   Standalone management actions dispatched from 10-computer-setup.sh.
 #   UI, reporting and errors use the SolidGroundUX framework.

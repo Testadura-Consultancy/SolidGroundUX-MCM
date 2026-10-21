@@ -3,14 +3,14 @@
 # ----------------------------------------------------------------------------------
 # Metadata:
 #   Version     : 2.1
-#   Build       : 2628700
+#   Build       : 2629401
 #   Shortname   : WEB_CONTENT_MANAGEMENT
 #   Source      : 55-web-content-management.sh
 #   Type        : module
 #   Group       : Module Registration
 #   Purpose     : Ingest, delete, generate, validate, and prepare content for static websites
 #
-#   Checksum : 62edb8649e36ddd83ed90a98b8c76600477813643e55a7f6cecc41fbf8a36a7b
+#   Checksum : 9c9ad7925cc3514f12ca46a8f292bd4913a6ac0798ffdd2f055a79e6abf59893
 # Description:
 #   Registers Web Content Management actions with the SolidGround Management Console.
 #   Persistent workflow and user interaction are implemented by manage-web-content.sh;

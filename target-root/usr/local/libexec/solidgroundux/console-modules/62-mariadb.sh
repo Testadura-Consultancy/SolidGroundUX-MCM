@@ -3,12 +3,13 @@
 # ----------------------------------------------------------------------------------
 # Metadata:
 #   Version     : 2.1
-#   Build       : 2629400
+#   Build       : 2629401
 #   Shortname   : MARIADB
 #   Source      : 62-mariadb.sh
 #   Type        : module
 #   Group       : Module Registration
 #   Purpose     : Install, configure, manage, validate, and inspect MariaDB
+#   Checksum : 2bcc018b04113227ac5833529013a53b5638ea5a1848c2c507ce149b6aa73f49
 # Description:
 #   Registers host-management actions. Database administration is out of scope.
 #   Live installation and integration validation are deferred to a test host.

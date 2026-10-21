@@ -4,14 +4,14 @@
 # -------------------------------------------------------------------------------------
 # Metadata:
 #   Version     : 2.1
-#   Build       : 2627501
+#   Build       : 2629401
 #   Shortname   : MANAGE_AD_SERVER
 #   Source      : manage-active-directory-server.sh
 #   Type        : script
 #   Group       : Role Managers
 #   Purpose     : Provision, validate, and inspect a Samba Active Directory domain controller
 #
-#   Checksum : 69a844e4e7408f7d90c7c3d2ef78260a19c624ab080c706fd16d593277df282f
+#   Checksum : 680765dbb4a6a14bf6b4273786977930f7ee232df77414121cf3d1c5da8e0b1a
 # Description:
 #   Implements persistent Active Directory server management actions exposed by the
 #   20-active-directory-server Management Console module.

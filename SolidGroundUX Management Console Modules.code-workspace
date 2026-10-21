@@ -1,6 +1,12 @@
 {
   "folders": [
-    { "name": "SolidGround Management Console Modules", "path": "." }
+    {
+      "name": "SolidGround Management Console Modules",
+      "path": "."
+    },
+    {
+      "path": "../SolidGroundUX/releases"
+    }
   ],
   "settings": {
     "files.exclude": {

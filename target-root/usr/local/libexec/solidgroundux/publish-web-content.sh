@@ -4,14 +4,14 @@
 # -------------------------------------------------------------------------------------
 # Metadata:
 #   Version     : 2.1
-#   Build       : 2627501
+#   Build       : 2629401
 #   Shortname   : PUBLISH_WEB_CONTENT
 #   Source      : publish-web-content.sh
 #   Type        : script
 #   Group       : Role Managers
 #   Purpose     : Publish local, remote, Git, and SolidGroundUX documentation content
 #
-#   Checksum : 7baf0966654a994326c52c60740887f10a2cffc90fe018c8f719d2d57d62ab24
+#   Checksum : 9b7d99be8af30206f2dbe1874ee62ea93852f4cbd6302da562ea6df5230938b3
 # Description:
 #   Publish local, remote, Git, and SolidGroundUX documentation content to Nginx sites.
 #

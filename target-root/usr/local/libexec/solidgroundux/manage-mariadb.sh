@@ -4,14 +4,14 @@
 # ----------------------------------------------------------------------------------
 # Metadata:
 #   Version     : 2.1
-#   Build       : 2627515
+#   Build       : 2629401
 #   Shortname   : MANAGE_MARIADB
 #   Source      : manage-mariadb.sh
 #   Type        : script
 #   Group       : Role Managers
 #   Purpose     : Install, configure, manage, validate, and inspect MariaDB
 #
-#   Checksum : 3abb07a7182c6e3653857224a974d2b9b0a020b6d0f85d794ded9977767b1538
+#   Checksum : 746e20d94153cf3b013887a77bfdc356df25a2ca1591cf33b0f550da1e8aad0d
 # Description:
 #   Install, configure, manage, validate, and inspect MariaDB.
 #
