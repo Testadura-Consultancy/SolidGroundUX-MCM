@@ -350,10 +350,10 @@ set -uo pipefail
         #   _sqlserver_ensure_directory
     _sqlserver_ensure_directory() {
         local path="$1"
-        local decision="YES"
+        local decision="Yes"
         if [[ ! -d "$path" ]]; then
-            ask_decision --label "Create directory $path" --choices "YES|Y,NO|N" --default "YES" --var decision
-            [[ "$decision" == "YES" ]] || return 1
+            ask_decision --label "Create directory $path" --choices "Yes|Y,No|N" --default "Yes" --var decision
+            [[ "${decision^^}" == "YES" ]] || return 1
             if (( ${FLAG_DRYRUN:-0} == 1 )); then sayinfo "DRYRUN: Would create $path."; return 0; fi
             sudo mkdir -p "$path" || return 1
         fi
@@ -455,7 +455,18 @@ set -uo pipefail
     _sqlserver_step_configure() {
         [[ -x /opt/mssql/bin/mssql-conf ]] || { sayfail "SQL Server is not installed."; return 1; }
         if (( ${FLAG_DRYRUN:-0} == 1 )); then sayinfo "DRYRUN: Would run mssql-conf setup."; return 0; fi
-        sudo /opt/mssql/bin/mssql-conf setup || return $?
+        if [[ -n "${SGND_SQLSERVER_INSTALL_EDITION:-}" && -n "${SGND_SQLSERVER_INSTALL_PASSWORD:-}" ]]; then
+            # Pass secrets only to the setup process; never echo them or write them to logs.
+            # Validate sudo before feeding the password on stdin; the secret is not a command argument.
+            sudo -v || return 1
+            printf '%s\n' "$SGND_SQLSERVER_INSTALL_PASSWORD" | \
+                sudo env ACCEPT_EULA=Y MSSQL_PID="$SGND_SQLSERVER_INSTALL_EDITION" \
+                    MSSQL_TCP_PORT="$SGND_SQLSERVER_INSTALL_PORT" \
+                    MSSQL_MEMORY_LIMIT_MB="$SGND_SQLSERVER_INSTALL_MEMORY" \
+                    bash -c 'IFS= read -r MSSQL_SA_PASSWORD || exit 1; export MSSQL_SA_PASSWORD; exec /opt/mssql/bin/mssql-conf -n setup' || return $?
+        else
+            sudo /opt/mssql/bin/mssql-conf setup || return $?
+        fi
         systemctl is-active --quiet "$SGND_SQLSERVER_SERVICE" || { sayfail "$SGND_SQLSERVER_SERVICE is not active after setup."; return 1; }
         sayok "Microsoft SQL Server configured and running."
     }
@@ -471,6 +482,55 @@ set -uo pipefail
         sudo env ACCEPT_EULA=Y DEBIAN_FRONTEND=noninteractive apt-get install -y mssql-tools18 unixodbc-dev || return 1
         _sqlserver_tools_installed || { sayfail "mssql-tools18 installed but sqlcmd is unavailable."; return 1; }
         sayok "SQL Server command-line tools installed."
+    }
+
+    # _sqlserver_collect_install_configuration
+    # Purpose:
+    #   Collect non-interactive SQL Server setup values once and retain them for review.
+    # Returns:
+    #   0 when approved, 2 when cancelled, 1 on invalid input.
+    # Usage:
+    #   _sqlserver_collect_install_configuration
+    _sqlserver_collect_install_configuration() {
+        local edition="EnterpriseDeveloper" port="1433" memory_mb="2048"
+        local action="" accepted="" password="" password_again=""
+        local -a editions=(EnterpriseDeveloper StandardDeveloper Express Evaluation Standard EnterpriseCore)
+        local edition_choice=""
+        while :; do
+            _sqlserver_ask_selection "SQL Server edition" edition_choice "${editions[@]}" || return 2
+            edition="$edition_choice"
+            ask --label "TCP port" --var port --default "$port" --validate _sqlserver_validate_port --back || return 2
+            ask --label "Memory limit (MB)" --var memory_mb --default "$memory_mb" --back || return 2
+            [[ "$memory_mb" =~ ^[1-9][0-9]*$ ]] || { sayfail "Memory limit must be a positive integer."; continue; }
+            sgnd_print
+            sgnd_print_sectionheader "Review SQL Server installation"
+            sgnd_print_labeledvalue --label "Version" --value "$SGND_SQLSERVER_MAJOR" --labelwidth 22
+            sgnd_print_labeledvalue --label "Edition" --value "$edition" --labelwidth 22
+            sgnd_print_labeledvalue --label "TCP port" --value "$port" --labelwidth 22
+            sgnd_print_labeledvalue --label "Memory limit" --value "${memory_mb}MB" --labelwidth 22
+            sgnd_print_labeledvalue --label "Administrator" --value "sa (password requested after approval)" --labelwidth 22
+            ask_decision --label "Review selection" --choices "Install|I,Modify|M,Cancel|C" --default "Install" --var action || return 2
+            case "${action^^}" in
+                MODIFY) continue ;;
+                CANCEL) return 2 ;;
+                INSTALL) break ;;
+                *) sayfail "Invalid review selection: $action"; return 1 ;;
+            esac
+        done
+        ask_decision --label "Accept Microsoft SQL Server license terms" --choices "Yes|Y,No|N" --default "No" --var accepted || return 2
+        [[ "${accepted^^}" == "YES" ]] || return 2
+        [[ -r /dev/tty && -w /dev/tty ]] || { sayfail "A terminal is required to enter the administrator password."; return 1; }
+        printf 'New sa password: ' >/dev/tty
+        IFS= read -r -s password </dev/tty || return 2
+        printf '\nConfirm sa password: ' >/dev/tty
+        IFS= read -r -s password_again </dev/tty || return 2
+        printf '\n' >/dev/tty
+        [[ -n "$password" && "$password" == "$password_again" ]] || { sayfail "Administrator passwords do not match or are empty."; return 1; }
+        SGND_SQLSERVER_INSTALL_EDITION="$edition"
+        SGND_SQLSERVER_INSTALL_PORT="$port"
+        SGND_SQLSERVER_INSTALL_MEMORY="$memory_mb"
+        SGND_SQLSERVER_INSTALL_PASSWORD="$password"
+        return 0
     }
 
     # fn: _sqlserver_prepare - Run the tracked SQL Server preparation workflow
@@ -494,9 +554,19 @@ set -uo pipefail
         # . Usage
         #   _sqlserver_prepare
     _sqlserver_prepare() {
+        local collect_rc=0
+        _sqlserver_collect_install_configuration || collect_rc=$?
+        if (( collect_rc == 2 )); then
+            saywarning "SQL Server installation cancelled by user."
+            return 2
+        fi
+        (( collect_rc == 0 )) || return "$collect_rc"
         _sqlserver_step_repository || return 51
         _sqlserver_step_install_engine || return 52
-        _sqlserver_step_configure || return 53
+        local setup_rc=0
+        _sqlserver_step_configure || setup_rc=$?
+        unset SGND_SQLSERVER_INSTALL_PASSWORD
+        (( setup_rc == 0 )) || return 53
         _sqlserver_step_install_tools || return 54
         sayok "SQL Server preparation completed successfully."
     }
@@ -537,13 +607,13 @@ set -uo pipefail
         _sqlserver_apply_conf filelocation.defaultlogdir "$log_dir" 1 || return 1
         _sqlserver_apply_conf filelocation.defaultbackupdir "$backup_dir" 1 || return 1
 
-        local restart="YES"
+        local restart="Yes"
         if systemctl is-active --quiet "$SGND_SQLSERVER_SERVICE" 2>/dev/null; then
             sgnd_print
             sayinfo "SQL Server must be restarted to apply the storage changes."
-            ask_decision --label "Restart SQL Server now" --choices "YES|Y,NO|N" --default "YES" --var restart
+            ask_decision --label "Restart SQL Server now" --choices "Yes|Y,No|N" --default "Yes" --var restart
 
-            if [[ "$restart" == "YES" ]]; then
+            if [[ "${restart^^}" == "YES" ]]; then
                 if (( ${FLAG_DRYRUN:-0} == 1 )); then
                     sayinfo "DRYRUN: Would restart $SGND_SQLSERVER_SERVICE."
                 else

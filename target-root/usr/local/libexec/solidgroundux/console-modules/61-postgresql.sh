@@ -82,18 +82,24 @@ set -uo pipefail
             sgnd_console_record_action_result "pg-$1" "$2" || true
         fi
     }
+    # pg_prepare
+    # Purpose: Run installation and record completed child configuration stages.
+    # Returns: Installer exit status.
+    # Usage: pg_prepare
     pg_prepare() {
         local rc=0
-        local -a steps=(repository install configure tools)
-        local index=0
-        _pg_run_manage prepare || rc=$?
-        if (( rc == 0 )); then
-            for index in "${!steps[@]}"; do _pg_record_step "${steps[index]}" 0; done
-            return 0
+        local had_cluster=0
+        if command -v pg_lsclusters >/dev/null 2>&1 \
+            && pg_lsclusters --no-header 2>/dev/null | grep -qE '^[[:space:]]*[0-9]+'; then
+            had_cluster=1
         fi
-        if (( rc >= 51 && rc <= 54 )); then
-            for (( index=0; index<rc-51; index++ )); do _pg_record_step "${steps[index]}" 0; done
-            _pg_record_step "${steps[rc-51]}" 1
+        _pg_run_manage prepare || rc=$?
+        if (( rc == 0 && had_cluster == 0 )); then
+            # A fresh successful installer verifies the new cluster, including its
+            # configured data directory, network and shared buffers.
+            _pg_record_step storage 0
+            _pg_record_step network 0
+            _pg_record_step memory 0
         fi
         return "$rc"
     }
@@ -104,10 +110,14 @@ set -uo pipefail
     pg_storage() { _pg_run_manage storage; }
     pg_network() { _pg_run_manage network; }
     pg_memory() { _pg_run_manage memory; }
+    pg_access() { _pg_run_manage access; }
     pg_service() { _pg_run_manage service; }
     pg_firewall() { _pg_run_manage firewall; }
     pg_validate() { _pg_run_manage validate; }
     pg_status() { _pg_run_manage status; }
+    pg_logs() { _pg_run_manage logs; }
+    pg_backup() { _pg_run_manage backup; }
+    pg_credentials() { _pg_run_manage credentials; }
 
 # - Module validation contract ------------------------------------------------------
     # 0=passed, 1=failed, 2=warning, 3=skipped/not applicable.
@@ -125,18 +135,17 @@ set -uo pipefail
     }
 
 # - Console registration ------------------------------------------------------------
-    sgnd_menu_register_group "$SGND_POSTGRESQL_MODULE_ID" "$SGND_POSTGRESQL_MODULE_NAME" \
-        "$(sgnd_header_get_field_value "${BASH_SOURCE[0]}" "Metadata" "Purpose")" 0 1 610
-    sgnd_menu_register_item "pg-prepare" "$SGND_POSTGRESQL_MODULE_ID" "Prepare PostgreSQL" "pg_prepare" "Install and prepare PostgreSQL" 0 15 1 0
-    sgnd_menu_register_item "pg-repository" "$SGND_POSTGRESQL_MODULE_ID" "Repository PostgreSQL" "pg_repository" "Use supported Ubuntu repositories" 0 15 1 1
-    sgnd_menu_register_item "pg-install" "$SGND_POSTGRESQL_MODULE_ID" "Install PostgreSQL" "pg_install" "Install PostgreSQL engine" 0 15 1 1
-    sgnd_menu_register_item "pg-configure" "$SGND_POSTGRESQL_MODULE_ID" "Configure PostgreSQL" "pg_configure" "Configure initial PostgreSQL installation" 0 15 1 1
-    sgnd_menu_register_item "pg-tools" "$SGND_POSTGRESQL_MODULE_ID" "Tools PostgreSQL" "pg_tools" "Install database command-line tools" 0 15 1 1
-    sgnd_menu_register_item "pg-storage" "$SGND_POSTGRESQL_MODULE_ID" "Storage PostgreSQL" "pg_storage" "Inspect storage and relocation guidance (no automatic moves)" 0 15 1 0
-    sgnd_menu_register_item "pg-network" "$SGND_POSTGRESQL_MODULE_ID" "Network PostgreSQL" "pg_network" "Configure network listening and port" 0 15 1 0
-    sgnd_menu_register_item "pg-memory" "$SGND_POSTGRESQL_MODULE_ID" "Memory PostgreSQL" "pg_memory" "Configure engine memory parameters" 0 15 1 0
-    sgnd_menu_register_item "pg-service" "$SGND_POSTGRESQL_MODULE_ID" "Service PostgreSQL" "pg_service" "Start, stop, restart or manage boot enablement" 0 15 1 0
-    sgnd_menu_register_item "pg-firewall" "$SGND_POSTGRESQL_MODULE_ID" "Firewall PostgreSQL" "pg_firewall" "Allow configured TCP port through UFW" 0 15 1 0
-    sgnd_menu_register_item "pg-validate" "$SGND_POSTGRESQL_MODULE_ID" "Validate PostgreSQL" "pg_validate" "Validate installed database server" 0 15 1 0
-    sgnd_menu_register_item "pg-status" "$SGND_POSTGRESQL_MODULE_ID" "Status PostgreSQL" "pg_status" "Show current database server status" 0 15 1 0
+    # Three native console groups: same module source, distinct headings.
+    sgnd_menu_register_group "pg-installation" "Installation & Configuration" "Install and configure PostgreSQL" 0 1 610
+    sgnd_menu_register_group "pg-server" "Server Management" "Operate and inspect PostgreSQL" 0 1 620
+    sgnd_menu_register_group "pg-administration" "Administration" "Administrator access and data protection" 0 1 630
+    sgnd_menu_register_item "pg-prepare" "pg-installation" "Prepare / Install PostgreSQL" "pg_prepare" "Prerequisites, configuration wizard, installation and verification" 0 0 1 0
+    sgnd_menu_register_item "pg-storage" "pg-installation" "Configure Data Directory" "pg_storage" "Inspect PostgreSQL data directory; no implicit cluster migration" 0 15 1 1
+    sgnd_menu_register_item "pg-network" "pg-installation" "Configure Network & Authentication" "pg_network" "Configure server listening and network connectivity" 0 15 1 1
+    sgnd_menu_register_item "pg-memory" "pg-installation" "Configure Memory" "pg_memory" "Configure PostgreSQL shared buffers" 0 15 1 1
+    sgnd_menu_register_item "pg-status" "pg-server" "Show Status & Configuration" "pg_status" "Server state, data storage and DBeaver connection information" 0 15 1 0
+    sgnd_menu_register_item "pg-service" "pg-server" "Start / Stop / Restart" "pg_service" "Manage PostgreSQL service" 0 15 1 0
+    sgnd_menu_register_item "pg-logs" "pg-server" "View Logs" "pg_logs" "Inspect database service logs" 0 15 1 0
+    sgnd_menu_register_item "pg-credentials" "pg-administration" "Manage Administrator Credentials" "pg_credentials" "Set database administrator credentials and remote access" 0 15 1 0
+    sgnd_menu_register_item "pg-backup" "pg-administration" "Backup / Restore" "pg_backup" "Database backup and restore guidance" 0 15 1 0
     sayinfo "PostgreSQL module registered with the console."

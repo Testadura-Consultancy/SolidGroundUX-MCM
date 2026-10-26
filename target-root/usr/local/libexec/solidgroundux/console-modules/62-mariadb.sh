@@ -82,20 +82,47 @@ set -uo pipefail
             sgnd_console_record_action_result "maria-$1" "$2" || true
         fi
     }
+    # maria_prepare
+    # Purpose:
+    #   Run the installer and report completed child configuration actions.
+    # Behavior:
+    #   - Only records fresh-install child actions after the helper succeeds and a
+    #     previously absent database instance is confirmed running.
+    #   - Existing-install inspection/reconfiguration never marks all children.
+    # Returns:
+    #   Installer exit status (nonzero when post-install verification fails).
+    # Usage:
+    #   maria_prepare
     maria_prepare() {
         local rc=0
-        local -a steps=(repository install configure tools)
-        local index=0
+        local had_instance=0
+        local actual_datadir=""
+
+        # Package presence alone does not mean database initialization succeeded.
+        # Check for a responsive local MariaDB instance before running the wizard.
+        if command -v mariadb >/dev/null 2>&1 \
+            && systemctl is-active --quiet mariadb \
+            && sudo -n mariadb -NBe 'SELECT 1' >/dev/null 2>&1; then
+            had_instance=1
+        fi
+
         _maria_run_manage prepare || rc=$?
-        if (( rc == 0 )); then
-            for index in "${!steps[@]}"; do _maria_record_step "${steps[index]}" 0; done
-            return 0
+        (( rc == 0 )) || return "$rc"
+
+        if (( had_instance == 0 )); then
+            # Cancellation also returns success from the wizard. In that case,
+            # leave the child menu indicators untouched rather than failing.
+            if systemctl is-active --quiet mariadb \
+                && sudo -n mariadb -NBe 'SELECT 1' >/dev/null 2>&1; then
+                actual_datadir="$(sudo -n mariadb -NBe 'SELECT @@datadir' 2>/dev/null)" || actual_datadir=""
+                if [[ "$actual_datadir" == /* ]]; then
+                    _maria_record_step storage 0
+                    _maria_record_step network 0
+                    _maria_record_step memory 0
+                fi
+            fi
         fi
-        if (( rc >= 51 && rc <= 54 )); then
-            for (( index=0; index<rc-51; index++ )); do _maria_record_step "${steps[index]}" 0; done
-            _maria_record_step "${steps[rc-51]}" 1
-        fi
-        return "$rc"
+        return 0
     }
     maria_repository() { _maria_run_manage repository; }
     maria_install() { _maria_run_manage install; }
@@ -104,10 +131,13 @@ set -uo pipefail
     maria_storage() { _maria_run_manage storage; }
     maria_network() { _maria_run_manage network; }
     maria_memory() { _maria_run_manage memory; }
+    maria_access() { _maria_run_manage access; }
     maria_service() { _maria_run_manage service; }
     maria_firewall() { _maria_run_manage firewall; }
     maria_validate() { _maria_run_manage validate; }
     maria_status() { _maria_run_manage status; }
+    maria_logs() { _maria_run_manage logs; }
+    maria_backup() { _maria_run_manage backup; }
 
 # - Module validation contract ------------------------------------------------------
     # 0=passed, 1=failed, 2=warning, 3=skipped/not applicable.
@@ -125,18 +155,17 @@ set -uo pipefail
     }
 
 # - Console registration ------------------------------------------------------------
-    sgnd_menu_register_group "$SGND_MARIADB_MODULE_ID" "$SGND_MARIADB_MODULE_NAME" \
-        "$(sgnd_header_get_field_value "${BASH_SOURCE[0]}" "Metadata" "Purpose")" 0 1 620
-    sgnd_menu_register_item "maria-prepare" "$SGND_MARIADB_MODULE_ID" "Prepare MariaDB" "maria_prepare" "Install and prepare MariaDB" 0 15 1 0
-    sgnd_menu_register_item "maria-repository" "$SGND_MARIADB_MODULE_ID" "Repository MariaDB" "maria_repository" "Use supported Ubuntu repositories" 0 15 1 1
-    sgnd_menu_register_item "maria-install" "$SGND_MARIADB_MODULE_ID" "Install MariaDB" "maria_install" "Install MariaDB engine" 0 15 1 1
-    sgnd_menu_register_item "maria-configure" "$SGND_MARIADB_MODULE_ID" "Configure MariaDB" "maria_configure" "Configure initial MariaDB installation" 0 15 1 1
-    sgnd_menu_register_item "maria-tools" "$SGND_MARIADB_MODULE_ID" "Tools MariaDB" "maria_tools" "Install database command-line tools" 0 15 1 1
-    sgnd_menu_register_item "maria-storage" "$SGND_MARIADB_MODULE_ID" "Storage MariaDB" "maria_storage" "Inspect storage and relocation guidance (no automatic moves)" 0 15 1 0
-    sgnd_menu_register_item "maria-network" "$SGND_MARIADB_MODULE_ID" "Network MariaDB" "maria_network" "Configure network listening and port" 0 15 1 0
-    sgnd_menu_register_item "maria-memory" "$SGND_MARIADB_MODULE_ID" "Memory MariaDB" "maria_memory" "Configure engine memory parameters" 0 15 1 0
-    sgnd_menu_register_item "maria-service" "$SGND_MARIADB_MODULE_ID" "Service MariaDB" "maria_service" "Start, stop, restart or manage boot enablement" 0 15 1 0
-    sgnd_menu_register_item "maria-firewall" "$SGND_MARIADB_MODULE_ID" "Firewall MariaDB" "maria_firewall" "Allow configured TCP port through UFW" 0 15 1 0
-    sgnd_menu_register_item "maria-validate" "$SGND_MARIADB_MODULE_ID" "Validate MariaDB" "maria_validate" "Validate installed database server" 0 15 1 0
-    sgnd_menu_register_item "maria-status" "$SGND_MARIADB_MODULE_ID" "Status MariaDB" "maria_status" "Show current database server status" 0 15 1 0
+    # Native groups keep installation, operations and administration distinct.
+    sgnd_menu_register_group "maria-installation" "Installation & Configuration" "Install and configure MariaDB" 0 1 640
+    sgnd_menu_register_group "maria-server" "Server Management" "Operate and inspect MariaDB" 0 1 650
+    sgnd_menu_register_group "maria-administration" "Administration" "Administrator access and data protection" 0 1 660
+    sgnd_menu_register_item "maria-prepare" "maria-installation" "Prepare / Install MariaDB" "maria_prepare" "Prerequisites, configuration questions, review and installation" 0 0 1 0
+    sgnd_menu_register_item "maria-storage" "maria-installation" "Configure Data Directory" "maria_storage" "Inspect data directory and filesystem; relocation not automatic" 0 15 1 1
+    sgnd_menu_register_item "maria-network" "maria-installation" "Configure Network & Authentication" "maria_network" "Configure MariaDB TCP port and listening interface" 0 15 1 1
+    sgnd_menu_register_item "maria-memory" "maria-installation" "Configure Memory" "maria_memory" "Configure InnoDB buffer pool" 0 15 1 1
+    sgnd_menu_register_item "maria-status" "maria-server" "Show Status & Configuration" "maria_status" "Server state, storage and DBeaver connection information" 0 15 1 0
+    sgnd_menu_register_item "maria-service" "maria-server" "Start / Stop / Restart" "maria_service" "Manage MariaDB service" 0 15 1 0
+    sgnd_menu_register_item "maria-logs" "maria-server" "View Logs" "maria_logs" "Inspect MariaDB service journal" 0 15 1 0
+    sgnd_menu_register_item "maria-access" "maria-administration" "Manage Administrator Credentials" "maria_access" "Manage dedicated remote administrator and workstation access" 0 15 1 0
+    sgnd_menu_register_item "maria-backup" "maria-administration" "Backup / Restore" "maria_backup" "MariaDB backup and restore guidance, not an automated restore" 0 15 1 0
     sayinfo "MariaDB module registered with the console."

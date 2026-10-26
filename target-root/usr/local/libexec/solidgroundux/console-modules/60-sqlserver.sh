@@ -109,8 +109,7 @@ set -uo pipefail
         #   - Leaves later child actions untouched after a failure.
         #
         # . Returns
-        #   0 when preparation succeeds; otherwise the workflow failure code returned by
-        #   manage-sqlserver.sh.
+        #   0 on success, 2 on user cancellation, or a workflow failure code.
         #
         # . Usage
         #   sqlserver_prepare
@@ -126,6 +125,11 @@ set -uo pipefail
                 _sqlserver_record_prepare_step "sql-configure" 0
                 _sqlserver_record_prepare_step "sql-tools" 0
                 return 0
+                ;;
+            2)
+                # Cancellation is a warning, not a completed installation.
+                # Do not update child results.
+                return 2
                 ;;
             51)
                 _sqlserver_record_prepare_step "sql-repo" 1
@@ -193,10 +197,10 @@ set -uo pipefail
         "$(sgnd_header_get_field_value "${BASH_SOURCE[0]}" "Metadata" "Purpose")" \
         0 1 600
 
-    sgnd_menu_register_item "sql-prepare" "$SGND_SQLSERVER_MODULE_ID" "Prepare SQL Server" "sqlserver_prepare" "Configure repositories, install and configure SQL Server, and install tools" 0 15 1 0
+    sgnd_menu_register_item "sql-prepare" "$SGND_SQLSERVER_MODULE_ID" "Prepare SQL Server" "sqlserver_prepare" "Review settings, confirm installation, configure repositories, engine and tools" 0 15 1 0
     sgnd_menu_register_item "sql-repo" "$SGND_SQLSERVER_MODULE_ID" "Configure Microsoft repositories" "sqlserver_repository" "Configure SQL Server 2025 and Microsoft package repositories" 0 15 1 1
     sgnd_menu_register_item "sql-install" "$SGND_SQLSERVER_MODULE_ID" "Install SQL Server engine" "sqlserver_install" "Install the Microsoft SQL Server 2025 database engine" 0 15 1 1
-    sgnd_menu_register_item "sql-configure" "$SGND_SQLSERVER_MODULE_ID" "Configure SQL Server" "sqlserver_configure" "Run the interactive mssql-conf setup workflow" 0 15 1 1
+    sgnd_menu_register_item "sql-configure" "$SGND_SQLSERVER_MODULE_ID" "Configure SQL Server" "sqlserver_configure" "Configure SQL Server setup (non-interactive when using Prepare)" 0 15 1 1
     sgnd_menu_register_item "sql-tools" "$SGND_SQLSERVER_MODULE_ID" "Install SQL Server tools" "sqlserver_tools" "Install sqlcmd, bcp, and unixODBC development libraries" 0 15 1 1
     sgnd_menu_register_item "sql-storage" "$SGND_SQLSERVER_MODULE_ID" "Configure SQL storage" "sqlserver_storage" "Configure SQL Server data, log, and backup locations" 0 15 1 0
     sgnd_menu_register_item "sql-network" "$SGND_SQLSERVER_MODULE_ID" "Configure SQL network" "sqlserver_network" "Configure the SQL Server TCP port" 0 15 1 0
