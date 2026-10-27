@@ -11,7 +11,7 @@ from pathlib import Path, PurePosixPath
 from zipfile import ZipFile, BadZipFile
 import re
 
-_INDEX_RE = re.compile(r"^index_[A-Za-z]{2}\.md$", re.I)
+_INDEX_RE = re.compile(r"^.+_Index_[A-Za-z]{2}\.md$", re.I)
 _PAGE_RE = re.compile(r"^.+_[A-Za-z]{2}\.md$", re.I)
 
 

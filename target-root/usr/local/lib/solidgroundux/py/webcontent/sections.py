@@ -11,7 +11,7 @@ from pathlib import Path
 import re
 import shutil
 
-from .content import load_navigation, load_site_config
+from .content import load_navigation, load_site_config, section_index, _INDEX_FILE_RE
 
 SLUG = re.compile(r"[a-z0-9]+(?:-[a-z0-9]+)*\Z")
 LANGUAGES = ("NL", "EN")
@@ -39,7 +39,7 @@ def _section(content, relative, *, allow_root=False):
 
 def _indexed(directory):
     """Check whether an existing directory defines at least one section index."""
-    return directory.is_dir() and any((directory / f"index_{lang}.md").is_file() for lang in LANGUAGES)
+    return directory.is_dir() and any(section_index(directory, lang) is not None for lang in LANGUAGES)
 
 
 def _protected(source, content, directory):
@@ -91,7 +91,7 @@ def create_section(source, parent, slug, title_nl, title_en, languages="NL,EN"):
         for language in chosen:
             title = titles[language].replace("\\", "\\\\").replace('"', '\\"')
             body = "Schrijf hier de introductie van deze sectie.\n" if language == "NL" else "Write the introduction for this section here.\n"
-            path = target / f"index_{language}.md"
+            path = target / f"{slug}_Index_{language}.md"
             path.write_text(f'---\ntitle: "{title}"\nsummary: ""\ntemplate: page\ncontent_type: section\nfeatured: false\ndraft: true\n---\n\n{body}\n\n::: td-index\n:::', encoding="utf-8")
             created.append(path.relative_to(content).as_posix())
     except Exception:
@@ -107,7 +107,7 @@ def inspect_section(source, section):
     if not _indexed(directory):
         raise ValueError("Select an existing indexed section")
     files = [path for path in directory.rglob("*") if path.is_file()]
-    indexes = [path for path in files if re.fullmatch(r"index_[A-Z]{2}\.md", path.name)]
+    indexes = [path for path in files if _INDEX_FILE_RE.fullmatch(path.name)]
     return {"success": True, "section": directory.relative_to(content).as_posix(),
             "protected": _protected(source, content, directory), "files": len(files),
             "index_pages": len(indexes), "subsections": sum(1 for sub in directory.rglob("*") if sub.is_dir() and _indexed(sub)),
@@ -136,7 +136,7 @@ def remove_section(source, section, mode, destination="", archive_root=""):
             raise ValueError("Destination must be an existing indexed section")
         if target == directory or target.is_relative_to(directory):
             raise ValueError("Cannot move into the section itself or a descendant")
-        children = [p for p in directory.iterdir() if not re.fullmatch(r"index_[A-Z]{2}\.md", p.name)]
+        children = [p for p in directory.iterdir() if not _INDEX_FILE_RE.fullmatch(p.name)]
         conflicts = [p.name for p in children if (target / p.name).exists()]
         if conflicts:
             raise ValueError("Destination contains conflicting names: " + ", ".join(conflicts))

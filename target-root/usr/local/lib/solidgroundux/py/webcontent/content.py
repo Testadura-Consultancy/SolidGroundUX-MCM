@@ -10,6 +10,16 @@ from typing import Any
 
 
 _CONTENT_FILE_RE = re.compile(r"^(?P<name>.+)_(?P<language>[A-Za-z]{2})\.md$")
+_INDEX_FILE_RE = re.compile(r"^.+_Index_(?P<language>[A-Za-z]{2})\.md$")
+
+
+def section_index(directory: Path, language: str) -> Path | None:
+    """Find the one descriptive index for a section/language."""
+    matches = sorted(path for path in directory.glob(f"*_Index_{language}.md") if _INDEX_FILE_RE.fullmatch(path.name))
+    if len(matches) > 1:
+        raise ValueError(f"Multiple {language} section indexes in {directory}: " + ", ".join(p.name for p in matches))
+    return matches[0] if matches else None
+
 
 
 @dataclass(slots=True)
@@ -312,20 +322,25 @@ def load_site_config(root: Path) -> SiteConfig:
     links_section = parser["links"] if "links" in parser else {}
 
     default_language = site.get("default_language", "NL").strip().upper()
+    # Index filenames must be descriptive; the legacy index_XX.md convention is unsupported.
+    old_indexes = sorted(content for content in (root / paths.get("content", "content").strip()).rglob("index_*.md") if re.fullmatch(r"index_[A-Za-z]{2}\.md", content.name))
+    if old_indexes:
+        raise ValueError("Legacy section indexes are unsupported: " + ", ".join(str(p) for p in old_indexes[:5]))
+
     # Root index files are the authoritative language registry. Other Markdown
     # files do not enable languages, and site.cfg does not duplicate this list.
     content_dir = root / paths.get("content", "content").strip()
     supported = sorted({
         match.group("language").upper()
-        for path in content_dir.glob("index_*.md")
+        for path in content_dir.glob("*_Index_*.md")
         if (match := _CONTENT_FILE_RE.fullmatch(path.name))
-        and match.group("name") == "index"
+        and _INDEX_FILE_RE.fullmatch(path.name)
     })
     if not supported:
-        raise ValueError(f"No root index_XX.md language files found in {content_dir}")
+        raise ValueError(f"No root *_Index_XX.md language files found in {content_dir}")
     if default_language not in supported:
         raise ValueError(
-            f"Default language {default_language} has no root index_{default_language}.md in {content_dir}"
+            f"Default language {default_language} has no root *_Index_{default_language}.md in {content_dir}"
         )
     supported.remove(default_language)
     supported.insert(0, default_language)
@@ -379,8 +394,8 @@ def load_navigation(root: Path, *, include_drafts: bool = False) -> list[Navigat
     for directory in index_dirs:
         variants = {}
         for language in config.supported_languages:
-            path = directory / f"index_{language}.md"
-            if path.is_file():
+            path = section_index(directory, language)
+            if path is not None:
                 metadata, _ = parse_front_matter(path.read_text(encoding="utf-8"))
                 variants[language] = metadata
         if not variants:
@@ -513,16 +528,21 @@ def discover_content(config: SiteConfig, navigation: list[NavigationItem]) -> li
     if not config.content_dir.is_dir():
         raise ValueError(f"Content directory not found: {config.content_dir}")
 
+    # Check for ambiguous index pages before resolving routes.
+    for directory in [config.content_dir] + [d for d in config.content_dir.rglob("*") if d.is_dir() and not is_ignored(d, config.content_dir)]:
+        for language in config.supported_languages:
+            section_index(directory, language)
+
     # Every directory containing publishable Markdown must be a section with
     # an index for at least one enabled language. Ancestor directories must
     # likewise be sections, so navigation cannot contain index-less gaps.
     # Root content is exempt because the root index is handled separately.
     indexed_dirs = {
         path.parent
-        for path in config.content_dir.rglob("index_*.md")
+        for path in config.content_dir.rglob("*_Index_*.md")
         if not is_ignored(path, config.content_dir)
         and (match := _CONTENT_FILE_RE.match(path.name)) is not None
-        and match.group("name") == "index"
+        and _INDEX_FILE_RE.fullmatch(path.name)
         and match.group("language").upper() in config.supported_languages
     }
     for path in sorted(config.content_dir.rglob("*.md")):
@@ -535,7 +555,7 @@ def discover_content(config: SiteConfig, navigation: list[NavigationItem]) -> li
         while current != config.content_dir:
             if current not in indexed_dirs:
                 raise ValueError(
-                    f"Missing section index_XX.md in '{current.relative_to(config.content_dir)}' "
+                    f"Missing section *_Index_XX.md in '{current.relative_to(config.content_dir)}' "
                     f"(required by '{path.relative_to(config.content_dir)}')"
                 )
             current = current.parent
@@ -552,7 +572,7 @@ def discover_content(config: SiteConfig, navigation: list[NavigationItem]) -> li
         language = match.group("language").upper()
         if language not in config.supported_languages:
             continue
-        base_name = match.group("name")
+        base_name = "index" if _INDEX_FILE_RE.fullmatch(path.name) else match.group("name")
         relative = path.relative_to(config.content_dir)
         logical_path = relative.with_name(base_name).as_posix()
         base_route = _base_route(relative, base_name)

@@ -896,7 +896,18 @@ def generate_site(source: str | Path, output: str | Path, languages: str | Itera
     for item in items:
         if item.language not in selected_languages:
             continue
-        template_path = config.templates_dir / f"{item.template}.html"
+        # Documentation chapters may provide scoped templates. All ordinary
+        # sites keep using the root-level templates unchanged.
+        chapter = item.source_path.relative_to(config.content_dir).parts[0] if item.source_path != config.content_dir else ''
+        chapter_root = config.templates_dir / chapter
+        override = chapter_root / f"{item.template}.html"
+        template_path = override if chapter and override.is_file() else config.templates_dir / f"{item.template}.html"
+        chapter_base_path = chapter_root / 'base.html'
+        current_base_template = (load_template(chapter_base_path, chapter_root)
+                                 if chapter and chapter_base_path.is_file() else base_template)
+        if not template_path.is_file() and item.template not in ('base', 'home', 'page', 'article'):
+            # Custom templates are optional; leave WCM general-purpose.
+            template_path = config.templates_dir / 'page.html'
         if not template_path.is_file():
             errors.append(f"Template not found for {item.source_path}: {template_path}")
             continue
@@ -981,7 +992,7 @@ def generate_site(source: str | Path, output: str | Path, languages: str | Itera
         }
         inner_html = render_template(load_template(template_path, config.templates_dir), inner_context)
         final_html = render_template(
-            base_template,
+            current_base_template,
             {
                 "site": site_context,
                 "page": page_context,

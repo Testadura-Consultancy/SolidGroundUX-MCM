@@ -5,7 +5,7 @@ import re
 import json
 import os
 import tempfile
-from .content import discover_content, load_navigation, load_site_config, parse_front_matter
+from .content import discover_content, load_navigation, load_site_config, parse_front_matter, section_index
 
 SAFE_KEY = re.compile(r"^[A-Za-z][A-Za-z0-9_-]*$")
 SAFE_SEGMENT = re.compile(r"^[a-z0-9][a-z0-9-]*$")
@@ -95,14 +95,14 @@ def move_page(source, path, parent, slug):
         Operation result or None, as defined by the implementation."""
     config, items = _setup(source)
     file = _resolve(config,path)
-    if file.stem.startswith('index_'):
+    if re.fullmatch(r'.+_Index_[A-Za-z]{2}', file.stem):
         raise ValueError('Section index pages must not be moved using Move Page; move the section as a whole in Git')
     if not SAFE_SEGMENT.fullmatch(slug):
         raise ValueError('Slug must be lowercase letters, digits and hyphens')
     if parent.startswith('/') or '..' in Path(parent).parts:
         raise ValueError('Destination parent must be a relative section path')
     target_dir=(config.content_dir / parent).resolve()
-    if not target_dir.is_relative_to(config.content_dir.resolve()) or not (target_dir / 'index_NL.md').exists() and not (target_dir / 'index_EN.md').exists():
+    if not target_dir.is_relative_to(config.content_dir.resolve()) or not any(section_index(target_dir, lang) for lang in ('NL', 'EN')):
         raise ValueError('Destination must be an existing section with an index page')
     suffix = file.stem.rsplit('_',1)[-1]
     target=target_dir/f'{slug}_{suffix}.md'

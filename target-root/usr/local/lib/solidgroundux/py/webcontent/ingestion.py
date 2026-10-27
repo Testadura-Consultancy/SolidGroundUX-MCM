@@ -150,7 +150,7 @@ def _infer_kind(metadata: dict[str, Any], path: Path) -> str:
     template = str(metadata.get("template", "") or "").strip().lower()
     if template == "article":
         return "article"
-    if re.match(r"^index_[A-Za-z]{2}\.md$", path.name):
+    if re.match(r"^.+_Index_[A-Za-z]{2}\.md$", path.name):
         return "section"
     return ""
 
@@ -435,7 +435,7 @@ def ingest_content(
     parent_dir = _route_to_content_dir(config.content_dir, parent)
     route = _normalize_route(parent.rstrip("/") + "/" + slug + "/")
     if kind == "section":
-        destination = parent_dir / slug / f"index_{language}.md"
+        destination = parent_dir / slug / f"{slug}_Index_{language}.md"
     else:
         destination = parent_dir / f"{slug}_{language}.md"
     archive_path = _archive_destination(source_path, input_path)

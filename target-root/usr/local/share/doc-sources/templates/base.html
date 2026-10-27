@@ -1,0 +1,17 @@
+<!doctype html>
+<html lang="{{page.language}}">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>{{page.title}} — {{site.title}}</title>
+<meta name="description" content="{{page.summary}}">
+{{seo_tags}}
+<link rel="stylesheet" href="/css/documentation.css">
+<link rel="stylesheet" href="/css/components.css">
+</head>
+<body>
+<header class="doc-header"><strong>{{site.title}}</strong>{{language_selector}}</header>
+<div class="doc-layout"><aside class="doc-nav">{{sidebar}}</aside><main class="doc-main">{{context_header}}{{content}}</main></div>
+{{footer}}
+</body>
+</html>
