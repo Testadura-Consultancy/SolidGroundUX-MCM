@@ -53,11 +53,11 @@
 # > trackpad, or touch without requiring JavaScript.
 #
 # >     ::: td-gallery
-# >     ![First image](/images/example-one.png)
+# >     ![First image](/assets/mcm-overview.png)
 # >
-# >     ![Second image](/images/example-two.png)
+# >     ![Second image](/assets/mcm-architecture.png)
 # >
-# >     ![Third image](/images/example-three.png)
+# >     ![Third image](/assets/mcm-module-lifecycle.png)
 # >     :::
 #
 # -- Callouts -----------------------------------------------------------------------
@@ -84,7 +84,7 @@
 #
 # >     [Identify]{.td-green}
 #
-# >     ![Product image](/images/product.png){.td-image-product}
+# >     ![Product image](/assets/mcm-new-console-module.png){.td-image-product}
 #
 # > Keep custom component names under the configured `td-` prefix. Validation reports
 # > a referenced `td-` class that does not exist in the site CSS.
@@ -254,7 +254,7 @@
 # > Add `{download}` immediately after a normal Markdown link to request a browser
 # > download instead of navigation:
 # >
-# >     [Download artikeltemplate](/images/templates/artikel_NL.md){download}
+# >     [Download artikeltemplate](/assets/templates/artikel_NL.md){download}
 # >
 # > For every new Markdown token or authoring component, update the repository's
 # > `AUTHORING.md`, both website-language authoring guides and the component

@@ -9,6 +9,7 @@ from datetime import timezone
 from xml.etree import ElementTree as ET
 from urllib.parse import urljoin, unquote
 import html
+import sys
 from pathlib import Path
 import shutil
 import re
@@ -275,7 +276,7 @@ def _render_navigation(
         label = html.escape(label_for(route))
         page = node["page"]
         link = (f'<a href="{html.escape(page.route, quote=True)}"{classes}{current}>{label}</a>'
-                if page else f'<span class="wc-nav-label">{label}</span>')
+                if page and not page.metadata.get('nav_only') else f'<span class="wc-nav-label">{label}</span>')
         # A hidden section index conceals this node and all descendants in
         # normal navigation; ShowHidden reveals the complete subtree. Ordinary
         # hidden pages conceal their own leaf only.
@@ -326,7 +327,7 @@ def _render_breadcrumb(items: list[ContentItem], item: ContentItem, default_lang
     for route in ancestor_routes:
         ancestor = (indexes.get((route, item.language))
                     or indexes.get((route, default_language)))
-        if ancestor is None:
+        if ancestor is None or ancestor.metadata.get('nav_only'):
             continue
         parts.append(
             '<li><a href="'
@@ -876,6 +877,10 @@ def generate_site(source: str | Path, output: str | Path, languages: str | Itera
         shutil.copytree(config.css_dir, output_path / "css")
     if config.images_dir.is_dir():
         shutil.copytree(config.images_dir, output_path / "images", ignore=_ignore_marked_directories)
+    # Publish repository-level assets without rewriting authored asset URLs.
+    assets_dir = source_path / "assets"
+    if assets_dir.is_dir():
+        shutil.copytree(assets_dir, output_path / "assets", ignore=_ignore_marked_directories)
     # JavaScript is a first-class site resource, copied before content hashes are computed.
     js_dir = source_path / "js"
     if js_dir.is_dir():
@@ -890,12 +895,21 @@ def generate_site(source: str | Path, output: str | Path, languages: str | Itera
     footer_template = load_template(config.templates_dir / "partials" / "footer.html", config.templates_dir)
 
     page_count = 0
+    render_total = sum(page.language in selected_languages and not page.metadata.get("nav_only") for page in items)
+    render_processed = 0
+    render_step = max(1, render_total // 20)
+    print(f"WCM: Rendering {render_total} pages", file=sys.stderr, flush=True)
     article_count = 0
     errors: list[str] = []
 
     for item in items:
         if item.language not in selected_languages:
             continue
+        if item.metadata.get('nav_only'):
+            continue
+        render_processed += 1
+        if render_processed == 1 or render_processed % render_step == 0 or render_processed == render_total:
+            print(f"WCM: Rendering {render_processed}/{render_total} ({render_processed * 100 // max(1, render_total)}%)", file=sys.stderr, flush=True)
         # Documentation chapters may provide scoped templates. All ordinary
         # sites keep using the root-level templates unchanged.
         chapter = item.source_path.relative_to(config.content_dir).parts[0] if item.source_path != config.content_dir else ''
@@ -1044,6 +1058,7 @@ def generate_site(source: str | Path, output: str | Path, languages: str | Itera
             article_count += 1
 
     warnings = list(validation.warnings)
+    print("WCM: Validating generated links", file=sys.stderr, flush=True)
     broken = _check_internal_links(output_path, warnings)
     sitemap_written = False
     rss_written = False
@@ -1096,7 +1111,8 @@ def _write_sitemap(output: Path, config, items: list[ContentItem], langs: set[st
     ET.register_namespace("", ns)
     root = ET.Element(f"{{{ns}}}urlset")
     for item in sorted(items, key=lambda value: value.route):
-        if item.language not in langs or item.status != "published" or item.hidden or item.private:
+        if (item.language not in langs or item.status != "published" or item.hidden
+                or item.private or item.metadata.get('nav_only')):
             continue
         entry = ET.SubElement(root, f"{{{ns}}}url")
         ET.SubElement(entry, f"{{{ns}}}loc").text = config.base_url.rstrip("/") + item.route

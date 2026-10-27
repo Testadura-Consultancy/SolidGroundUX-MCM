@@ -164,7 +164,9 @@ def _render_inline(text: str) -> str:
     escaped = re.sub(r"\*\*(.+?)\*\*", r"<strong>\1</strong>", escaped)
     escaped = re.sub(r"(?<!\*)\*([^*]+)\*(?!\*)", r"<em>\1</em>", escaped)
 
-    for key, fragment in tokens.items():
+    # Later tokens may contain earlier placeholders (e.g. a link wrapping code).
+    # Resolve outer fragments first so nested inline markup is restored.
+    for key, fragment in reversed(list(tokens.items())):
         escaped = escaped.replace(key, fragment)
     return escaped
 
