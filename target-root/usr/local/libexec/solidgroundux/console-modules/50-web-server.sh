@@ -173,19 +173,13 @@ set -uo pipefail
 
 # - Console registration ------------------------------------------------------------
     sgnd_menu_register_group "$SGND_WEB_SERVER_MODULE_ID" "General" "General Nginx host and site management" 0 1 500
-    sgnd_menu_register_group "web-documentation" "SolidGroundUX Documentation" "Configure and publish the documentation delivered with SolidGroundUX" 0 1 510
-    sgnd_menu_register_group "web-service" "Service" "Nginx service, firewall, validation, and status" 0 1 520
+    sgnd_menu_register_group "web-service" "Service" "Nginx service, firewall, validation, and status" 0 1 510
 
     sgnd_menu_register_item "web-prepare" "$SGND_WEB_SERVER_MODULE_ID" "Prepare web server" "web_prepare" "Install, validate, enable, and start Nginx" 0 15 1 0
     sgnd_menu_register_item "web-install" "$SGND_WEB_SERVER_MODULE_ID" "Install Nginx" "web_install" "Install Nginx and basic web-server utilities" 0 0 1 1
     sgnd_menu_register_item "web-start" "$SGND_WEB_SERVER_MODULE_ID" "Start web service" "web_start" "Enable and start nginx.service" 0 0 1 1
     sgnd_menu_register_item "web-root" "$SGND_WEB_SERVER_MODULE_ID" "Configure web content root" "web_configure_root" "Select or create the storage location used for web content" 0 15 1 0
-    sgnd_menu_register_item "web-sites" "$SGND_WEB_SERVER_MODULE_ID" "Manage sites" "web_manage_sites" "Create, enable, disable, change document roots, remove, clear content from, and list Nginx sites" 0 15 1 0
-    sgnd_menu_register_item "web-publish" "$SGND_WEB_SERVER_MODULE_ID" "Publish web content" "web_publish" "Publish a local, remote, or Git repository source into an Nginx site" 0 15 1 0
-
-    sgnd_menu_register_item "web-doc-configure" "web-documentation" "Configure documentation site" "web_doc_configure" "Create or select the Nginx site used for SolidGroundUX documentation" 0 15 1 0
-    sgnd_menu_register_item "web-doc-publish" "web-documentation" "Publish SolidGroundUX documentation" "web_doc_publish" "Publish installed, local, remote, or Git repository documentation content" 0 15 1 0
-    sgnd_menu_register_item "web-doc-status" "web-documentation" "Show documentation status" "web_doc_status" "Show documentation site and source configuration" 0 15 1 0
+    sgnd_menu_register_item "web-sites" "$SGND_WEB_SERVER_MODULE_ID" "Manage sites" "web_manage_sites" "Select and manage Nginx sites, settings, content, and DNS records" 0 15 1 0
 
     sgnd_menu_register_item "web-service-manage" "web-service" "Manage web service" "web_service_manage" "Start, stop, restart, enable, or disable nginx.service" 0 15 1 0
     sgnd_menu_register_item "web-firewall" "web-service" "Configure web firewall" "web_firewall" "Allow HTTP and HTTPS through UFW" 0 15 1 0

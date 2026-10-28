@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="{{page.language}}">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>{{page.title}} — {{site.title}}</title>
+<meta name="description" content="{{page.summary}}">
+{{seo_tags}}
+<link rel="icon" type="image/png" href="/images/favicon.png">
+<link rel="stylesheet" href="/css/documentation.css">
+<link rel="stylesheet" href="/css/components.css">
+<link rel="stylesheet" href="/css/bundle.css">
+</head>
+<body>
+<div class="doc-shell">
+<aside class="doc-nav" aria-label="Documentation navigation">
+<a class="doc-brand" href="/" aria-label="Documentation home"><img src="/images/doc-index-logo.png" alt="Testadura"></a>
+<div class="doc-nav-title">Index</div>
+{{sidebar}}
+</aside>
+<div class="doc-nav-resizer" role="separator" aria-label="Resize navigation" aria-orientation="vertical" tabindex="0" aria-valuemin="240" aria-valuemax="650" aria-valuenow="350" title="Drag to resize; double-click to reset"></div>
+<div class="doc-workspace">
+<header class="doc-header"><div class="doc-heading"><span>SolidGroundUX Documentation</span><img src="/images/doc-header-logo.png" alt="SolidGroundUX"></div>{{language_selector}}</header>
+<main class="doc-main">{{context_header}}{{content}}</main>
+{{footer}}
+</div>
+</div>
+<script src="/js/sgnd-doc-sidebar.js" defer></script>
+</body>
+</html>

@@ -3,14 +3,14 @@
 # ----------------------------------------------------------------------------------
 # Metadata:
 #   Version     : 2.1
-#   Build       : 2629401
+#   Build       : 2628700
 #   Shortname   : WEB_CONTENT_MANAGEMENT
 #   Source      : 55-web-content-management.sh
 #   Type        : module
 #   Group       : Module Registration
 #   Purpose     : Ingest, delete, generate, validate, and prepare content for static websites
 #
-#   Checksum : 9c9ad7925cc3514f12ca46a8f292bd4913a6ac0798ffdd2f055a79e6abf59893
+#   Checksum : 62edb8649e36ddd83ed90a98b8c76600477813643e55a7f6cecc41fbf8a36a7b
 # Description:
 #   Registers Web Content Management actions with the SolidGround Management Console.
 #   Persistent workflow and user interaction are implemented by manage-web-content.sh;
@@ -133,6 +133,13 @@ set -uo pipefail
     web_content_validate()        { _web_content_run_manage validate; }
     web_content_prepare_social()  { _web_content_run_manage prepare-social; }
     web_content_status()          { _web_content_run_manage status; }
+
+    # fn$ web_content_assemble_bundle - Open the documentation bundle manager
+        # Returns:
+        #   Exit status of the standalone bundle manager.
+        # Usage:
+        #   web_content_assemble_bundle
+    web_content_assemble_bundle() { _sgnd_run_module_script "manage-bundles.sh"; }
     # fn: web_content_manage_config - Select and edit an existing website configuration file.
     web_content_manage_config()   { _web_content_run_mutating_manage manage-config; }
 
@@ -163,7 +170,8 @@ set -uo pipefail
     sgnd_menu_register_group "web-content-ingestion" "Ingestion" "Acquire and review staged content" 0 1 550
     sgnd_menu_register_group "web-content-manage" "Manage" "Pages and repository configuration" 0 1 551
     sgnd_menu_register_group "web-content-validation" "Validation" "Source validation and status" 0 1 552
-    sgnd_menu_register_group "web-content-publish" "Publish" "Website generation and publication" 0 1 553
+    sgnd_menu_register_group "web-content-documentation" "SolidGroundUX Documentation" "Manage documentation bundles" 0 1 553
+    sgnd_menu_register_group "web-content-publish" "Publish" "Website generation and publication" 0 1 554
 
     # Ingestion: staging does not modify canonical content until review confirms it.
     sgnd_menu_register_item "web-content-retrieve" "web-content-ingestion" "Retrieve Incoming" "web_content_retrieve_incoming" "Retrieve staged files from the configured SSH source server" 0 15 1
@@ -180,6 +188,9 @@ set -uo pipefail
     # Validate before generating and publishing the website.
     sgnd_menu_register_item "web-content-validate" "web-content-validation" "Validate website source" "web_content_validate" "Validate configuration, content metadata, templates, and CSS styles" 0 15 1
     sgnd_menu_register_item "web-content-status" "web-content-validation" "Show web-content status" "web_content_status" "Show engine availability and remembered source/output settings" 0 15 1
+
+    # Documentation bundles produce Markdown inputs for the existing WCM workflow.
+    sgnd_menu_register_item "web-content-documentation-bundle" "web-content-documentation" "Assemble documentation bundle" "web_content_assemble_bundle" "Generate a Markdown version of documentation based on one or more repositories" 0 0 1
 
     # Publication is explicit: ingestion never automatically publishes content.
     sgnd_menu_register_item "web-content-generate" "web-content-publish" "Generate website" "web_content_generate" "Generate a static website from Markdown, templates, CSS, and assets" 0 15 1

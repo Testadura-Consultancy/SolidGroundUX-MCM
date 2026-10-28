@@ -932,11 +932,11 @@ EOF
         # . Usage
         #   _web_server_enable_site
     _web_server_enable_site() {
-        local site=""
+        local site="${1:-}"
         local -a sites=()
         mapfile -t sites < <(_web_server_available_sites 2>/dev/null || true)
         (( ${#sites[@]} > 0 )) || { saywarning "No Nginx sites are available."; return 0; }
-        _web_ask_selection --label "Enable Nginx site" --var site --items "${sites[@]}" || return 0
+        [[ -n "$site" ]] || _web_ask_selection --label "Enable Nginx site" --var site --items "${sites[@]}" || return 0
         [[ -e "/etc/nginx/sites-enabled/$site" ]] && { sayok "Site is already enabled: $site"; return 0; }
         if (( ${FLAG_DRYRUN:-0} == 1 )); then sayinfo "DRYRUN: Would enable $site."; return 0; fi
         sudo ln -s "/etc/nginx/sites-available/$site" "/etc/nginx/sites-enabled/$site" || return 1
@@ -950,11 +950,11 @@ EOF
         # . Usage
         #   _web_server_disable_site
     _web_server_disable_site() {
-        local site=""
+        local site="${1:-}"
         local -a sites=()
         mapfile -t sites < <(_web_server_enabled_sites 2>/dev/null || true)
         (( ${#sites[@]} > 0 )) || { saywarning "No enabled Nginx sites found."; return 0; }
-        _web_ask_selection --label "Disable Nginx site" --var site --items "${sites[@]}" || return 0
+        [[ -n "$site" ]] || _web_ask_selection --label "Disable Nginx site" --var site --items "${sites[@]}" || return 0
         if (( ${FLAG_DRYRUN:-0} == 1 )); then sayinfo "DRYRUN: Would disable $site."; return 0; fi
         sudo rm -f "/etc/nginx/sites-enabled/$site" || return 1
         _web_server_reload || return 1
@@ -968,7 +968,7 @@ EOF
         # . Usage
         #   _web_server_change_document_root
     _web_server_change_document_root() {
-        local site=""
+        local site="${1:-}"
         local config_file=""
         local current_root=""
         local document_root=""
@@ -978,7 +978,7 @@ EOF
 
         mapfile -t sites < <(_web_server_available_sites 2>/dev/null || true)
         (( ${#sites[@]} > 0 )) || { saywarning "No Nginx sites are available."; return 0; }
-        _web_ask_selection --label "Change document root" --var site --items "${sites[@]}" || return 0
+        [[ -n "$site" ]] || _web_ask_selection --label "Change document root" --var site --items "${sites[@]}" || return 0
 
         config_file="/etc/nginx/sites-available/$site"
         current_root="$(_web_server_site_document_root "$site" 2>/dev/null || true)"
@@ -1037,7 +1037,7 @@ EOF
         # . Usage
         #   _web_server_remove_site
     _web_server_remove_site() {
-        local site=""
+        local site="${1:-}"
         local document_root=""
         local decision="NO"
         local remove_content="NO"
@@ -1046,7 +1046,7 @@ EOF
 
         mapfile -t sites < <(_web_server_available_sites 2>/dev/null || true)
         (( ${#sites[@]} > 0 )) || { saywarning "No Nginx sites are available."; return 0; }
-        _web_ask_selection --label "Remove Nginx site configuration" --var site --items "${sites[@]}" || return 0
+        [[ -n "$site" ]] || _web_ask_selection --label "Remove Nginx site configuration" --var site --items "${sites[@]}" || return 0
         document_root="$(_web_server_site_document_root "$site" 2>/dev/null || true)"
         # Save the hostname before removing its Nginx configuration.
         web_address="$(awk '$1 == "server_name" {for (i=2; i<=NF; i++) {gsub(/;/, "", $i); printf "%s%s", (i==2 ? "" : " "), $i}; exit}' "/etc/nginx/sites-available/$site" 2>/dev/null || true)"
@@ -1094,14 +1094,14 @@ EOF
         # . Usage
         #   _web_server_remove_site_content
     _web_server_remove_site_content() {
-        local site=""
+        local site="${1:-}"
         local document_root=""
         local decision="NO"
         local -a sites=()
 
         mapfile -t sites < <(_web_server_available_sites 2>/dev/null || true)
         (( ${#sites[@]} > 0 )) || { saywarning "No Nginx sites are available."; return 0; }
-        _web_ask_selection --label "Remove content from site" --var site --items "${sites[@]}" || return 0
+        [[ -n "$site" ]] || _web_ask_selection --label "Remove content from site" --var site --items "${sites[@]}" || return 0
 
         document_root="$(_web_server_site_document_root "$site" 2>/dev/null || true)"
         [[ -n "$document_root" ]] || { sayfail "Could not determine document root for $site."; return 1; }
@@ -1158,13 +1158,13 @@ EOF
     #   certificate. Keep other sites untouched and roll back on Nginx failure.
     #   A self-signed certificate is for testing only until trusted by clients.
     _web_server_configure_https() {
-        local site="" cfg="" address="" root="" option="" cert="" key="" redirect="NO"
+        local site="${1:-}" cfg="" address="" root="" option="" cert="" key="" redirect="NO"
         local backup="" staged="" host="" answer="" tls_dir="" cert_tmp="" key_tmp=""
         local -a sites=()
         command -v openssl >/dev/null 2>&1 || { sayfail "openssl is required for HTTPS setup."; return 1; }
         mapfile -t sites < <(_web_server_available_sites 2>/dev/null || true)
         (( ${#sites[@]} > 0 )) || { saywarning "No Nginx sites are available."; return 0; }
-        _web_ask_selection --label "Configure HTTPS for site" --var site --items "${sites[@]}" || return 0
+        [[ -n "$site" ]] || _web_ask_selection --label "Configure HTTPS for site" --var site --items "${sites[@]}" || return 0
         [[ "$site" =~ ^[A-Za-z0-9][A-Za-z0-9._-]*$ ]] || { sayfail "Invalid site identifier."; return 2; }
         cfg="/etc/nginx/sites-available/$site"
         [[ -f "$cfg" && ! -L "$cfg" ]] || { sayfail "Unsupported site configuration: $cfg"; return 1; }
@@ -1290,14 +1290,14 @@ EOF
     #   Keep password files after disabling protection to avoid deleting credentials
     #   that might be used elsewhere; only the Nginx guard is removed.
     _web_server_configure_basic_auth() {
-        local site="" cfg="" action="" prefix="" username="" decision="NO"
+        local site="${1:-}" cfg="" action="" prefix="" username="" decision="NO"
         local host="" marker_start="# SGND_BASIC_AUTH_BEGIN" marker_end="# SGND_BASIC_AUTH_END"
         local auth_dir="/etc/nginx/solidgroundux-auth" auth_file="" temp_pass=""
         local staged="" backup="" config_copy="" rc=0
         local -a sites=()
         mapfile -t sites < <(_web_server_available_sites 2>/dev/null || true)
         (( ${#sites[@]} > 0 )) || { saywarning "No Nginx sites available."; return 0; }
-        _web_ask_selection --label "Configure private URL section" --var site --items "${sites[@]}" || return 0
+        [[ -n "$site" ]] || _web_ask_selection --label "Configure private URL section" --var site --items "${sites[@]}" || return 0
         [[ "$site" =~ ^[A-Za-z0-9][A-Za-z0-9._-]*$ ]] || { sayfail "Invalid site identifier."; return 2; }
         cfg="/etc/nginx/sites-available/$site"
         [[ -f "$cfg" && ! -L "$cfg" && -L "/etc/nginx/sites-enabled/$site" ]] || {
@@ -1494,12 +1494,12 @@ EOF
     #   Basic Authentication on its Nginx endpoint. Roll back Nginx on failure.
     #   Currently supports one upload service per host; never expose it without auth.
     _web_server_configure_markdown_upload() {
-        local site="" cfg="" host="" root="" publisher="" source="" directory="/srv/storage/webcontent-incoming"
+        local site="${1:-}" cfg="" host="" root="" publisher="" source="" directory="/srv/storage/webcontent-incoming"
         local backup="" staged="" unit_tmp="" decision="NO" auth_file="" rc=0
         local -a sites=()
         mapfile -t sites < <(_web_server_available_sites 2>/dev/null || true)
         (( ${#sites[@]} > 0 )) || { saywarning "No managed site available."; return 0; }
-        _web_ask_selection --label "Install Markdown upload for HTTPS site" --var site --items "${sites[@]}" || return 0
+        [[ -n "$site" ]] || _web_ask_selection --label "Install Markdown upload for HTTPS site" --var site --items "${sites[@]}" || return 0
         [[ "$site" =~ ^[A-Za-z0-9][A-Za-z0-9._-]*$ ]] || { sayfail "Invalid site name."; return 2; }
         cfg="/etc/nginx/sites-available/$site"
         source="/usr/local/lib/solidgroundux/py/webcontent/webcontent-upload-service.py"
@@ -1623,27 +1623,101 @@ UNIT
         return 1
     }
 
-    # fn: _web_server_manage_sites - Open the site-management workflow
+    # fn: _web_server_site_summary - Display the current site selection before actions
+        # . Purpose
+        #   Keep the selected site's hostname, root, status, and protection visible.
         # . Returns
-        #   0 on success; non-zero when the operation cannot be completed.
+        #   0 on completion.
+        # . Usage
+        #   _web_server_site_summary "my-site"
+    _web_server_site_summary() {
+        local site="$1" cfg="/etc/nginx/sites-available/$site"
+        local address="" root="" enabled="Disabled" https="No" protected="No" upload="No"
+        [[ -f "$cfg" ]] || return 1
+        address="$(awk '$1 == "server_name" {gsub(/;/, "", $2); print $2; exit}' "$cfg")"
+        root="$(_web_server_site_document_root "$site" 2>/dev/null || true)"
+        [[ -e "/etc/nginx/sites-enabled/$site" ]] && enabled="Enabled"
+        grep -Eq '^[[:space:]]*listen[[:space:]]+.*443[[:space:]]+ssl' "$cfg" && https="Yes"
+        grep -Fq '# SGND_BASIC_AUTH_BEGIN' "$cfg" && protected="Yes"
+        grep -Fq '# SGND_UPLOAD_BEGIN' "$cfg" && upload="Yes"
+        sgnd_print_labeledvalue --label "Selected site" --value "$site" --labelwidth 22
+        sgnd_print_labeledvalue --label "Web address" --value "${address:-Not configured}" --labelwidth 22
+        sgnd_print_labeledvalue --label "Document root" --value "${root:-Not configured}" --labelwidth 22
+        sgnd_print_labeledvalue --label "Status" --value "$enabled" --labelwidth 22
+        sgnd_print_labeledvalue --label "HTTPS" --value "$https" --labelwidth 22
+        sgnd_print_labeledvalue --label "Private section" --value "$protected" --labelwidth 22
+        sgnd_print_labeledvalue --label "Markdown upload" --value "$upload" --labelwidth 22
+    }
+
+    # fn: _web_server_manage_sites - Select a site once and manage it using grouped actions
+        # . Purpose
+        #   List sites, choose the active site, and keep its details above the actions.
+        #   Reuse existing site operations without repeated site-selection prompts.
+        # . Returns
+        #   0 on return to the calling menu; other action errors are shown in context.
         # . Usage
         #   _web_server_manage_sites
     _web_server_manage_sites() {
-        local action=""
-        _web_ask_selection --label "Site management" --var action --items "Create site" "Enable site" "Disable site" "Change document root" "Configure HTTPS" "Configure private section" "Configure Markdown upload" "Update Markdown upload receiver" "Remove site" "Remove site content" "List sites" || return 0
-        case "$action" in
-            "Create site") _web_server_create_site ;;
-            "Enable site") _web_server_enable_site ;;
-            "Disable site") _web_server_disable_site ;;
-            "Change document root") _web_server_change_document_root ;;
-            "Configure HTTPS") _web_server_configure_https ;;
-            "Configure private section") _web_server_configure_basic_auth ;;
-            "Configure Markdown upload") _web_server_configure_markdown_upload ;;
-            "Update Markdown upload receiver") _web_server_update_markdown_upload ;;
-            "Remove site") _web_server_remove_site ;;
-            "Remove site content") _web_server_remove_site_content ;;
-            "List sites") _web_server_list_sites ;;
-        esac
+        local site="" action="" input="" address="" cfg=""
+        local -a sites=()
+        while :; do
+            mapfile -t sites < <(_web_server_available_sites 2>/dev/null || true)
+            _web_server_list_sites || return $?
+            sgnd_print
+            if (( ${#sites[@]} == 0 )); then
+                _web_ask_selection --label "Site selection" --var action --items "Create site" || return 0
+                [[ "$action" == "Create site" ]] && _web_server_create_site
+                continue
+            fi
+            _web_ask_selection --label "Select site" --var site --items "${sites[@]}" || return 0
+            while [[ -f "/etc/nginx/sites-available/$site" ]]; do
+                sgnd_print
+                sgnd_print_sectionheader "Site management"
+                _web_server_site_summary "$site" || break
+                sgnd_print
+                sgnd_print_sectionheader "Configure"
+                sgnd_print --text "1. Change document root" --pad 2
+                sgnd_print --text "2. Configure HTTPS" --pad 2
+                sgnd_print --text "3. Configure private section (Basic Auth)" --pad 2
+                sgnd_print --text "4. Configure Markdown upload" --pad 2
+                sgnd_print --text "5. Update Markdown upload receiver" --pad 2
+                sgnd_print
+                sgnd_print_sectionheader "Site management"
+                sgnd_print --text "6. Create site" --pad 2
+                sgnd_print --text "7. Enable site" --pad 2
+                sgnd_print --text "8. Disable site" --pad 2
+                sgnd_print --text "9. Remove site" --pad 2
+                sgnd_print --text "10. Remove site content" --pad 2
+                sgnd_print --text "11. Remove DNS record" --pad 2
+                sgnd_print --text "S. Select another site" --pad 2
+                sgnd_print --text "Q. Back" --pad 2
+                sgnd_print
+                sgnd_print_sectionheader ""
+                input=""
+                ask --label "Selection" --var input || return 0
+                input="${input//[[:space:]]/}"
+                case "${input^^}" in
+                    1) _web_server_change_document_root "$site" ;;
+                    2) _web_server_configure_https "$site" ;;
+                    3) _web_server_configure_basic_auth "$site" ;;
+                    4) _web_server_configure_markdown_upload "$site" ;;
+                    5) _web_server_update_markdown_upload ;;
+                    6) _web_server_create_site; break ;;
+                    7) _web_server_enable_site "$site" ;;
+                    8) _web_server_disable_site "$site" ;;
+                    9) _web_server_remove_site "$site"; break ;;
+                    10) _web_server_remove_site_content "$site" ;;
+                    11)
+                        cfg="/etc/nginx/sites-available/$site"
+                        address="$(awk '$1 == "server_name" {for (i=2; i<=NF; i++) {gsub(/;/, "", $i); printf "%s%s", (i==2 ? "" : " "), $i}; exit}' "$cfg")"
+                        _web_server_remove_dns_record "$address"
+                        ;;
+                    S) break ;;
+                    Q) return 0 ;;
+                    *) saywarning "Invalid selection: $input" ;;
+                esac
+            done
+        done
     }
 
 # - SolidGroundUX documentation ----------------------------------------------------
