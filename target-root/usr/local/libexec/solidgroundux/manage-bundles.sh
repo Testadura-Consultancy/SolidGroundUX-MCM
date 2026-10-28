@@ -414,8 +414,20 @@ for key in ("title", "output_dir", "overwrite", "chapter0"):
             esac
             [[ "$field" == chapter0 && "$entry" == - ]] && entry=""
             previous="${!field}"
-            [[ "$entry" == "$previous" ]] && continue
+            # An unchanged legacy Chapter 0 path inside generated output still needs
+            # migration into the persistent bundle store. Never skip that backend call.
+            if [[ "$entry" == "$previous" ]]; then
+                if [[ "$field" != chapter0 || -z "$entry" || "$entry" != "$output_dir/content/"* ]]; then
+                    continue
+                fi
+            fi
             _bundle_python set "$SGND_DOC_ACTIVE_BUNDLE" "$field" "$entry" >/dev/null || return $?
+            if [[ "$field" == chapter0 ]]; then
+                # The backend may retain a generated page under its permanent store.
+                # Display the actual saved path, not the path the user entered.
+                raw="$(_bundle_python show "$SGND_DOC_ACTIVE_BUNDLE")" || return $?
+                entry="$(printf '%s' "$raw" | python3 -c 'import json,sys; print(json.load(sys.stdin).get("chapter0", ""))')" || return $?
+            fi
             printf -v "$field" '%s' "$entry"
         done
         rows=()

@@ -100,8 +100,30 @@ def run(args):
             raise ValueError('Overwrite must be replace or fail')
         if args.field == 'output_dir' and value and not Path(value).is_absolute():
             raise ValueError('Output directory must be an absolute path')
-        if args.field == 'chapter0' and value and not Path(value).is_file():
-            raise ValueError('Chapter 0 Markdown file does not exist')
+        if args.field == 'chapter0':
+            # Selecting the already-retained file is a no-op: preserve its
+            # original generated location for duplicate-page exclusion.
+            if value and Path(value).expanduser().resolve() == Path(data.get('chapter0') or '/nonexistent-sgnd-chapter0').expanduser().resolve() and data.get('chapter0_origin'):
+                save(store, data)
+                print('Saved bundle: ' + data['id'])
+                return
+            if value and not Path(value).expanduser().is_file():
+                raise ValueError('Chapter 0 Markdown file does not exist')
+            if value:
+                selected = Path(value).expanduser().resolve()
+                data['chapter0_origin'] = str(selected)
+                output_content = Path(data['output_dir']).expanduser().resolve() / 'content' if data['output_dir'] else None
+                if output_content and selected.is_relative_to(output_content):
+                    # Generated output is replaced on every build: retain the selected
+                    # introductory page independently so future rebuilds still work.
+                    retained = store / 'chapter0' / (data['id'] + '.md')
+                    retained.parent.mkdir(parents=True, exist_ok=True)
+                    retained.write_bytes(selected.read_bytes())
+                    value = str(retained)
+                else:
+                    value = str(selected)
+            else:
+                data.pop('chapter0_origin', None)
         data[args.field] = value
     elif args.command == 'add-product':
         if any(p['id'] == args.product_id for p in data['products']):

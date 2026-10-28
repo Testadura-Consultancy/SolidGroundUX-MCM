@@ -634,6 +634,75 @@ def build_appendices(products: list[dict], content: Path, root: Path) -> dict:
             'licenses': bool(license_lines), 'change_logs': bool(changes_lines), 'attribution': bool(attribution_lines)}
 
 
+def split_wcm_document(markdown: str) -> tuple[dict[str, str], str]:
+    """Separate a WCM document's leading YAML metadata from its Markdown body.
+
+    WCM page metadata belongs to the document, not the body that is promoted
+    into another page. Do not interpret ordinary Markdown rules as metadata.
+    """
+    normalized = markdown.lstrip('\ufeff').replace('\r\n', '\n').replace('\r', '\n')
+    lines = normalized.splitlines(keepends=True)
+    metadata: dict[str, str] = {}
+    if not lines or lines[0].strip() != '---':
+        return metadata, normalized
+    try:
+        end = next(i for i in range(1, len(lines)) if lines[i].strip() == '---')
+    except StopIteration:
+        return {}, normalized
+    for line in lines[1:end]:
+        match = re.match(r'^([A-Za-z_][A-Za-z0-9_]*):\s*(.*)$', line.rstrip('\n'))
+        if not match:
+            # A leading horizontal rule is valid Markdown, not necessarily YAML.
+            return {}, normalized
+        metadata[match.group(1)] = match.group(2)
+    if not {'title', 'template', 'content_type'}.intersection(metadata):
+        return {}, normalized
+    return metadata, ''.join(lines[end + 1:])
+
+
+def chapter0_body(markdown: str) -> str:
+    """Return just the body of a promoted WCM page.
+
+    Older generated introductions may already contain a *second* WCM page
+    embedded after a logo. Consume that nested document boundary explicitly,
+    rather than deleting arbitrary text that resembles YAML fields.
+    """
+    _, body = split_wcm_document(markdown)
+    lines = body.splitlines(keepends=True)
+    result: list[str] = []
+    cursor = 0
+    while cursor < len(lines):
+        if lines[cursor].strip() == '---':
+            # The second front matter has the same documented WCM page shape,
+            # but may be located after an image/introductory content.
+            nested_metadata, nested_body = split_wcm_document(''.join(lines[cursor:]))
+            if nested_metadata:
+                result.append(nested_body)
+                break
+        result.append(lines[cursor])
+        cursor += 1
+    return ''.join(result).strip()
+
+
+def exclude_chapter0(content: Path, output: Path, origin: str) -> None:
+    """Omit the exact generated index promoted from a previous bundle output."""
+    if not origin:
+        return
+    try:
+        relative = Path(origin).expanduser().resolve().relative_to(output / 'content')
+    except ValueError:
+        return  # An external authored Chapter 0 has no generated duplicate to remove.
+    target = content / relative
+    if not target.is_file() or target.name.endswith('_NL.md') is False:
+        raise ValueError(f'Chapter 0 original is not a generated Markdown page: {relative}')
+    # Keep any sibling pages and subchapters; this is a page move, not a section delete.
+    target.unlink()
+    folder = target.parent
+    while folder != content and folder.is_dir() and not any(folder.iterdir()):
+        folder.rmdir()
+        folder = folder.parent
+
+
 def generate(bundle: dict, docs_root: Path | None = None) -> dict:
     output = Path(bundle['output_dir']).expanduser().resolve()
     if not output.is_absolute() or output == Path('/'):
@@ -669,7 +738,9 @@ def generate(bundle: dict, docs_root: Path | None = None) -> dict:
         counts = Counter()
         counts['products'] = len(products)
         template_owners = build_template_owners(products)
-        for i, product in enumerate(products, 1):
+        # Reserve the first top-level navigation position for an optional Chapter 0.
+        chapter0 = bundle.get('chapter0', '')
+        for i, product in enumerate(products, 2 if chapter0 else 1):
             collect(product, content, i, counts, template_owners)
         counts.update(build_appendices(products, content, root))
         # Images referenced by comments belong to each product source tree.
@@ -678,21 +749,32 @@ def generate(bundle: dict, docs_root: Path | None = None) -> dict:
             copy_legacy_images(Path(product['source_dir']).expanduser().resolve(), root)
             asset_dir = Path(product['source_dir']).expanduser().resolve() / 'assets'
             copy_assets_checked(asset_dir, root / 'assets')
-        chapter0 = bundle.get('chapter0', '')
+        # The home/title page is independent of Chapter 0. It always displays
+        # the bundle metrics; the home template supplies its established branding.
+        metrics = ('\n'.join(f'- **{label}:** {counts.get(key, 0)}' for label, key in
+                             [('Products', 'products'), ('Source files', 'files'),
+                              ('Functions', 'functions'), ('Declarations', 'declarations'),
+                              ('Lines of code and comments', 'lines')]))
+        for key in ('version', 'build'):
+            if counts.get(key):
+                metrics += f'\n- **{key.title()}:** {counts[key]}'
+        write_index(content, bundle.get('title', bundle['id']), metrics, 0, template='home')
+
         if chapter0:
-            custom = Path(chapter0)
+            custom = Path(chapter0).expanduser().resolve()
             if not custom.is_file():
                 raise ValueError(f'Chapter 0 Markdown missing: {custom}')
-            preface = custom.read_text(encoding='utf-8')
-        else:
-            preface = ('\n'.join(f'- **{label}:** {counts.get(key, 0)}' for label, key in
-                                   [('Products', 'products'), ('Source files', 'files'),
-                                    ('Functions', 'functions'), ('Declarations', 'declarations'),
-                                    ('Lines of code and comments', 'lines')]))
-            for key in ('version', 'build'):
-                if counts.get(key):
-                    preface += f'\n- **{key.title()}:** {counts[key]}'
-        write_index(content, bundle.get('title', bundle['id']), preface, 0, template='home')
+            # A generated page selected as Chapter 0 must have been retained by
+            # sgnd_doc_bundles.py outside output. Never consume a page that the
+            # current build will remove, which would break future regenerations.
+            if custom.is_relative_to(output):
+                raise ValueError('Chapter 0 points inside the generated output. '
+                                 'Select the page again in Configure bundle to retain it independently.')
+            intro = chapter0_body(custom.read_text(encoding='utf-8'))
+            if not intro:
+                raise ValueError('Chapter 0 Markdown contains no page body')
+            exclude_chapter0(content, output, bundle.get('chapter0_origin', chapter0))
+            write_index(content / 'introduction', 'Introduction', intro, 1, template='page')
         # Bundle defaults are supplied by the SDK documentation resources.
         # Product resources are scoped to their chapter; no product can overwrite
         # another chapter's templates or the bundle-wide defaults.
