@@ -130,6 +130,8 @@ set -uo pipefail
     web_content_generate()        { _web_content_run_manage generate; }
     # fn: web_content_publish - Preview and synchronize generated website files to a configured destination.
     web_content_publish()         { _web_content_run_manage publish; }
+    # fn: web_content_publish_github_pages - Push generated documentation to GitHub Pages.
+    web_content_publish_github_pages() { _web_content_run_manage publish-github-pages; }
     web_content_validate()        { _web_content_run_manage validate; }
     web_content_prepare_social()  { _web_content_run_manage prepare-social; }
     web_content_status()          { _web_content_run_manage status; }
@@ -191,9 +193,10 @@ set -uo pipefail
 
     # Documentation bundles produce Markdown inputs for the existing WCM workflow.
     sgnd_menu_register_item "web-content-documentation-bundle" "web-content-documentation" "Assemble documentation bundle" "web_content_assemble_bundle" "Generate a Markdown version of documentation based on one or more repositories" 0 0 1
+    sgnd_menu_register_item "web-content-documentation-github" "web-content-documentation" "Push to GitHub Pages" "web_content_publish_github_pages" "Publish generated documentation from the SolidGroundUX repository main/docs directory" 0 0 1
 
     # Publication is explicit: ingestion never automatically publishes content.
     sgnd_menu_register_item "web-content-generate" "web-content-publish" "Generate website" "web_content_generate" "Generate a static website from Markdown, templates, CSS, and assets" 0 15 1
-    sgnd_menu_register_item "web-content-publish-site" "web-content-publish" "Publish website" "web_content_publish" "Preview and upload generated files using a configured publishing profile" 0 0 1
+    sgnd_menu_register_item "web-content-publish-site" "web-content-publish" "Publish website" "web_content_publish" "Deploy generated HTML to a selected Nginx website over SSH" 0 0 1
 
     sayinfo "Web Content Management module registered with the console."

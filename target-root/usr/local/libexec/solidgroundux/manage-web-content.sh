@@ -134,7 +134,7 @@ set -uo pipefail
 # - Framework integration -----------------------------------------------------------
     SGND_USING=(sgnd-ssh-deployment.sh)
     SGND_ARGS_SPEC=(
-        "action|a|enum|ACTION|Management action||ingest,delete,edit-metadata,move-page,manage-config,configure-source,retrieve-incoming,import-local,ingest-incoming,generate,publish,validate,prepare-social,status"
+        "action|a|enum|ACTION|Management action||ingest,delete,edit-metadata,move-page,manage-config,configure-source,retrieve-incoming,import-local,ingest-incoming,generate,publish,publish-github-pages,validate,prepare-social,status"
         "ingest-dir|i|value|INGEST_DIR|Override Markdown ingestion directory||"
     )
     SGND_SCRIPT_EXAMPLES=(
@@ -144,6 +144,7 @@ set -uo pipefail
         "  $SGND_SCRIPT_NAME --action delete"
         "  $SGND_SCRIPT_NAME --action generate"
         "  $SGND_SCRIPT_NAME --action publish"
+        "  $SGND_SCRIPT_NAME --action publish-github-pages"
         "  $SGND_SCRIPT_NAME --action manage-config"
         "  $SGND_SCRIPT_NAME --action validate"
         "  $SGND_SCRIPT_NAME --action prepare-social"
@@ -170,6 +171,8 @@ set -uo pipefail
         SGND_WEB_PUBLISH_IDENTITY
         SGND_WEB_PUBLISH_STRATEGY
         SGND_WEB_PUBLISH_HOSTNAME
+        SGND_WEB_GITHUB_SOURCE
+        SGND_WEB_GITHUB_REPO
         SGND_WEB_INCOMING_HOST
         SGND_WEB_INCOMING_USER
         SGND_WEB_INCOMING_PORT
@@ -198,6 +201,8 @@ set -uo pipefail
     : "${SGND_WEB_PUBLISH_IDENTITY:=}"
     : "${SGND_WEB_PUBLISH_STRATEGY:=Update}"
     : "${SGND_WEB_PUBLISH_HOSTNAME:=}"
+    : "${SGND_WEB_GITHUB_SOURCE:=}"
+    : "${SGND_WEB_GITHUB_REPO:=}"
     : "${SGND_WEB_INCOMING_HOST:=td-web}"
     : "${SGND_WEB_INCOMING_USER:=sysadmin}"
     : "${SGND_WEB_INCOMING_PORT:=22}"
@@ -2313,6 +2318,204 @@ PYCODE
         return "$rc"
     }
 
+# - GitHub Pages documentation deployment --------------------------------------------
+    # fn: _web_content_github_pages_configure - Save local Pages deployment paths.
+        # . Purpose
+        #   Choose the already-generated documentation HTML and the checked-out
+        #   SolidGroundUX repository, without any Markdown or remote website profile.
+        # . Returns
+        #   0 on completion; 2 when the operator cancels a prompt.
+        # . Usage
+        #   _web_content_github_pages_configure
+    _web_content_github_pages_configure() {
+        local selected_source="${SGND_WEB_GITHUB_SOURCE:-${SGND_WEB_CONTENT_OUTPUT%/}}"
+        local selected_repo="${SGND_WEB_GITHUB_REPO:-}"
+        ask --label "Generated documentation HTML" --var selected_source --default "$selected_source" --back || return 2
+        ask --label "SolidGroundUX Git repository root" --var selected_repo --default "$selected_repo" --back || return 2
+        [[ -n "$selected_source" && -n "$selected_repo" ]] || {
+            sayfail "Both the generated website and the repository root are required."
+            return 1
+        }
+        SGND_WEB_GITHUB_SOURCE="$selected_source"
+        SGND_WEB_GITHUB_REPO="$selected_repo"
+        return 0
+    }
+
+    # fn: _web_content_github_pages_rebase - Adapt the API search to GitHub Pages' subpath.
+        # . Purpose
+        #   The WebContent generator already writes relative HTML links, but the
+        #   documentation API search script and JSON still use site-root paths.
+        #   Change those paths only inside the Pages copy, not the original output.
+        # . Arguments
+        #   $1: Checked-out GitHub Pages docs directory.
+        # . Returns
+        #   0 on success; nonzero if a present API search resource cannot be adapted.
+        # . Usage
+        #   _web_content_github_pages_rebase "$docs_dir"
+    _web_content_github_pages_rebase() {
+        local docs_dir="${1:?missing docs directory}"
+        python3 - "$docs_dir" <<'PY_GITHUB_PAGES'
+import json
+import sys
+from pathlib import Path
+
+site = Path(sys.argv[1])
+base = '/SolidGroundUX'
+script = site / 'js' / 'sgnd-api-index.js'
+if script.is_file():
+    value = script.read_text(encoding='utf-8')
+    old = "fetch('/assets/sgnd-api-index.json')"
+    new = f"fetch('{base}/assets/sgnd-api-index.json')"
+    if old in value:
+        script.write_text(value.replace(old, new), encoding='utf-8')
+    elif new not in value:
+        raise RuntimeError('Unrecognized documentation API search script URL')
+
+index = site / 'assets' / 'sgnd-api-index.json'
+if index.is_file():
+    records = json.loads(index.read_text(encoding='utf-8'))
+    if not isinstance(records, list):
+        raise ValueError('Documentation API search index must be an array')
+    for record in records:
+        if not isinstance(record, dict):
+            raise ValueError('Invalid documentation API search entry')
+        url = record.get('url')
+        if isinstance(url, str) and url.startswith('/') and not url.startswith('//') and not url.startswith(base + '/'):
+            record['url'] = base + url
+    index.write_text(json.dumps(records, ensure_ascii=False, separators=(',', ':')), encoding='utf-8')
+PY_GITHUB_PAGES
+    }
+
+    # fn: _web_content_github_pages_push - Publish documentation to main/docs.
+        # . Purpose
+        #   Reuse the generated HTML, commit only the Framework repository's docs
+        #   directory, and push it to the existing GitHub Pages branch.
+        # . Behavior
+        #   - Verifies the source is a generated SolidGroundUX documentation site.
+        #   - Rejects a wrong Git remote, wrong branch, symlinks, and dirty docs.
+        #   - Never stages or commits changes outside docs/.
+        #   - GitHub Pages builds the result from main/docs; no GitHub API is used.
+        # . Returns
+        #   0 on success; nonzero for invalid paths or failed copy/commit/push.
+        # . Usage
+        #   _web_content_github_pages_push
+    _web_content_github_pages_push() {
+        local source="" repo="" docs="" branch="" origin=""
+        local pending=""
+        command -v git >/dev/null 2>&1 || { sayfail "Git is not installed."; return 127; }
+        command -v rsync >/dev/null 2>&1 || { sayfail "rsync is not installed."; return 127; }
+        command -v python3 >/dev/null 2>&1 || { sayfail "Python 3 is not installed."; return 127; }
+        source="$(realpath -e -- "$SGND_WEB_GITHUB_SOURCE")" || { sayfail "Generated documentation directory not found."; return 1; }
+        repo="$(realpath -e -- "$SGND_WEB_GITHUB_REPO")" || { sayfail "SolidGroundUX repository directory not found."; return 1; }
+        [[ -d "$source" && -f "$source/index.html" && -f "$source/introduction/index.html" ]] || {
+            sayfail "The selected source does not contain the generated documentation homepage and introduction."
+            return 1
+        }
+        grep -qi 'SolidGroundUX' "$source/index.html" || {
+            sayfail "The generated homepage does not identify SolidGroundUX documentation."
+            return 1
+        }
+        [[ -z "$(find "$source" -type l -print -quit)" ]] || {
+            sayfail "Generated documentation contains symbolic links; refusing to publish files outside its root."
+            return 1
+        }
+        [[ "$(git -C "$repo" rev-parse --show-toplevel 2>/dev/null)" == "$repo" ]] || {
+            sayfail "The destination must be the root of a checked-out Git repository."
+            return 1
+        }
+        branch="$(git -C "$repo" symbolic-ref --quiet --short HEAD 2>/dev/null)" || {
+            sayfail "Check out the main branch before publishing GitHub Pages."
+            return 1
+        }
+        [[ "$branch" == "main" ]] || { sayfail "GitHub Pages uses main/docs. Current branch is $branch."; return 1; }
+        origin="$(git -C "$repo" remote get-url origin 2>/dev/null)" || {
+            sayfail "Git remote 'origin' is not configured."
+            return 1
+        }
+        case "${origin%.git}" in
+            */SolidGroundUX|*:SolidGroundUX) ;;
+            *) sayfail "The origin remote does not identify the SolidGroundUX repository: $origin"; return 1 ;;
+        esac
+        docs="$repo/docs"
+        [[ ! -L "$docs" ]] || { sayfail "Refusing to deploy into a symbolic-link docs directory."; return 1; }
+        # The generated HTML must not be inside the destination (or vice versa).
+        [[ "$source" != "$docs" && "$source" != "$docs/"* && "$docs" != "$source/"* ]] || {
+            sayfail "The generated site and the repository docs directory must be separate."
+            return 1
+        }
+        pending="$(git -C "$repo" status --porcelain -- docs)" || return 1
+        [[ -z "$pending" ]] || {
+            sayfail "Repository docs/ contains uncommitted changes. Commit or restore them before replacing the Pages site."
+            return 1
+        }
+        git -C "$repo" diff --cached --quiet || {
+            sayfail "Other Git changes are staged. Commit or unstage them before publishing."
+            return 1
+        }
+        mkdir -p -- "$docs" || { sayfail "Cannot create the docs directory."; return 1; }
+        rsync -a --delete --exclude='.git' -- "$source/" "$docs/" || {
+            sayfail "Could not synchronize the generated site into docs/."
+            return 1
+        }
+        # GitHub Pages must serve generated assets beginning with underscores.
+        touch -- "$docs/.nojekyll" || return 1
+        _web_content_github_pages_rebase "$docs" || {
+            sayfail "GitHub Pages URL adjustment failed; the generated HTML was not committed."
+            return 1
+        }
+        git -C "$repo" add -A -- docs || { sayfail "Could not stage docs/."; return 1; }
+        if ! git -C "$repo" diff --cached --quiet -- docs; then
+            git -C "$repo" commit -m 'Update generated SolidGroundUX documentation for GitHub Pages' -- docs || {
+                sayfail "Git commit failed. No push attempted."
+                return 1
+            }
+        else
+            sayinfo "Generated documentation is unchanged; checking the GitHub remote."
+        fi
+        git -C "$repo" push origin main || { sayfail "GitHub push failed. The local Git commit is retained for retry."; return 1; }
+        sayok "GitHub Pages documentation pushed to main/docs."
+        sgnd_print_labeledvalue --label "GitHub Pages" --value "https://testadura-consultancy.github.io/SolidGroundUX/" --labelwidth 22
+        return 0
+    }
+
+    # fn: _web_content_publish_github_pages - Review paths and choose Push or Modify.
+        # . Purpose
+        #   Publish only generated documentation to the existing Pages location.
+        #   Retain paths in ordinary SolidGroundUX state variables.
+        # . Returns
+        #   0 on successful push or operator cancellation; nonzero on failure.
+        # . Usage
+        #   _web_content_publish_github_pages
+    _web_content_publish_github_pages() {
+        local choice="" rc=0
+        if [[ -z "$SGND_WEB_GITHUB_SOURCE" || -z "$SGND_WEB_GITHUB_REPO" ]]; then
+            _web_content_github_pages_configure || {
+                rc=$?
+                (( rc == 2 )) && return 0
+                return "$rc"
+            }
+        fi
+        while :; do
+            sgnd_print
+            sgnd_print_sectionheader --text "Push to GitHub Pages"
+            sgnd_print_labeledvalue --label "Generated HTML" --value "$SGND_WEB_GITHUB_SOURCE" --labelwidth 22
+            sgnd_print_labeledvalue --label "Git repository" --value "$SGND_WEB_GITHUB_REPO" --labelwidth 22
+            sgnd_print_labeledvalue --label "Pages location" --value "main:/docs" --labelwidth 22
+            ask_selection --label "Action" --var choice --items "Push" "Modify" || return 0
+            case "$choice" in
+                Push) _web_content_github_pages_push; return $? ;;
+                Modify)
+                    _web_content_github_pages_configure || {
+                        rc=$?
+                        (( rc == 2 )) && return 0
+                        return "$rc"
+                    }
+                    ;;
+                *) return 0 ;;
+            esac
+        done
+    }
+
 # - Action dispatch -----------------------------------------------------------------
     # fn: _run_action - Dispatch the requested command-line management action.
         # . Behavior
@@ -2337,6 +2540,7 @@ PYCODE
                 return $?
                 ;;
             generate) _web_content_generate ;;
+            publish-github-pages) _web_content_publish_github_pages ;;
             publish)
                 _web_content_publish || rc=$?
                 if (( rc != 0 )); then
