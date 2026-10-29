@@ -319,6 +319,7 @@ set -uo pipefail
         local entry=""
         [[ -d /etc/nginx/sites-enabled ]] || return 1
         while IFS= read -r -d '' entry; do
+            [[ "${entry##*/}" == "00-solidgroundux-https-default" ]] && continue
             basename -- "$entry"
         done < <(find /etc/nginx/sites-enabled -mindepth 1 -maxdepth 1 -print0 2>/dev/null | sort -z)
     }
@@ -332,8 +333,33 @@ set -uo pipefail
         local entry=""
         [[ -d /etc/nginx/sites-available ]] || return 1
         while IFS= read -r -d '' entry; do
+            [[ "${entry##*/}" == "00-solidgroundux-https-default" ]] && continue
             basename -- "$entry"
         done < <(find /etc/nginx/sites-available -mindepth 1 -maxdepth 1 -type f -print0 2>/dev/null | sort -z)
+    }
+
+    # fn: _web_server_read_site_config - Read Nginx site configuration for inspection
+        # . Purpose
+        #   Allow inspection of root-owned configuration files without changing
+        #   their ownership or permissions. Prompt for sudo only when required.
+        # . Arguments
+        #   $1  Existing Nginx site identifier.
+        # . Output
+        #   Writes the configuration contents to stdout.
+        # . Returns
+        #   0 when the configuration was read; non-zero otherwise.
+        # . Usage
+        #   config="$(_web_server_read_site_config "$site")" || return $?
+    _web_server_read_site_config() {
+        local site="${1:-}" config_file=""
+        _web_server_validate_site_name "$site" || return 1
+        config_file="/etc/nginx/sites-available/$site"
+        [[ -f "$config_file" && ! -L "$config_file" ]] || return 1
+        if [[ -r "$config_file" ]]; then
+            cat -- "$config_file"
+        else
+            sudo cat -- "$config_file"
+        fi
     }
 
     # fn: _web_server_validate_site_name - Validate an Nginx site name
@@ -519,11 +545,10 @@ set -uo pipefail
         #   _web_server_site_document_root <site>
     _web_server_site_document_root() {
         local site="$1"
-        local config_file="/etc/nginx/sites-available/$site"
-        local root=""
+        local config="" root=""
 
-        [[ -r "$config_file" ]] || return 1
-        root="$(awk '$1 == "root" {gsub(/;/, "", $2); print $2; exit}' "$config_file" 2>/dev/null || true)"
+        config="$(_web_server_read_site_config "$site")" || return 1
+        root="$(awk '$1 == "root" {gsub(/;/, "", $2); print $2; exit}' <<< "$config")"
         [[ -n "$root" && "$root" == /* && "$root" != "/" ]] || return 1
         printf '%s\n' "$root"
     }
@@ -1178,6 +1203,7 @@ EOF
         local state=""
         local root=""
         local address=""
+        local config=""
 
         _web_server_package_installed || { sayfail "Nginx is not installed."; return 1; }
         mapfile -t sites < <(_web_server_available_sites 2>/dev/null || true)
@@ -1192,13 +1218,17 @@ EOF
         for site in "${sites[@]}"; do
             state="Disabled"
             [[ -e "/etc/nginx/sites-enabled/$site" ]] && state="Enabled"
-            root="$(awk '$1 == "root" {gsub(/;/, "", $2); print $2; exit}' "/etc/nginx/sites-available/$site" 2>/dev/null || true)"
-            address="$(awk '$1 == "server_name" {gsub(/;/, "", $2); print $2; exit}' "/etc/nginx/sites-available/$site" 2>/dev/null || true)"
+            config="$(_web_server_read_site_config "$site")" || {
+                saywarning "Cannot inspect Nginx site: $site"
+                continue
+            }
+            root="$(awk '$1 == "root" {gsub(/;/, "", $2); print $2; exit}' <<< "$config")"
+            address="$(awk '$1 == "server_name" {gsub(/;/, "", $2); print $2; exit}' <<< "$config")"
             [[ "$address" == "_" ]] && address="Default/catch-all"
             sgnd_print_labeledvalue --label "$site" --value "$state" --labelwidth 24
             sgnd_print_labeledvalue --label "  Web address" --value "${address:-Not configured}" --labelwidth 24
             sgnd_print_labeledvalue --label "  Document root" --value "${root:-Not configured}" --labelwidth 24
-            if grep -Eq '^[[:space:]]*listen[[:space:]]+.*443[[:space:]]+ssl' "/etc/nginx/sites-available/$site"; then
+            if grep -Eq '^[[:space:]]*listen[[:space:]]+.*443[[:space:]]+ssl' <<< "$config"; then
                 sgnd_print_labeledvalue --label "  HTTPS" --value "Configured" --labelwidth 24
             else
                 sgnd_print_labeledvalue --label "  HTTPS" --value "Not configured" --labelwidth 24
@@ -1777,14 +1807,14 @@ UNIT
         #   _web_server_site_summary "my-site"
     _web_server_site_summary() {
         local site="$1" cfg="/etc/nginx/sites-available/$site"
-        local address="" root="" enabled="Disabled" https="No" protected="No" upload="No"
-        [[ -f "$cfg" ]] || return 1
-        address="$(awk '$1 == "server_name" {gsub(/;/, "", $2); print $2; exit}' "$cfg")"
+        local address="" root="" enabled="Disabled" https="No" protected="No" upload="No" config=""
+        config="$(_web_server_read_site_config "$site")" || return 1
+        address="$(awk '$1 == "server_name" {gsub(/;/, "", $2); print $2; exit}' <<< "$config")"
         root="$(_web_server_site_document_root "$site" 2>/dev/null || true)"
         [[ -e "/etc/nginx/sites-enabled/$site" ]] && enabled="Enabled"
-        grep -Eq '^[[:space:]]*listen[[:space:]]+.*443[[:space:]]+ssl' "$cfg" && https="Yes"
-        grep -Fq '# SGND_BASIC_AUTH_BEGIN' "$cfg" && protected="Yes"
-        grep -Fq '# SGND_UPLOAD_BEGIN' "$cfg" && upload="Yes"
+        grep -Eq '^[[:space:]]*listen[[:space:]]+.*443[[:space:]]+ssl' <<< "$config" && https="Yes"
+        grep -Fq '# SGND_BASIC_AUTH_BEGIN' <<< "$config" && protected="Yes"
+        grep -Fq '# SGND_UPLOAD_BEGIN' <<< "$config" && upload="Yes"
         sgnd_print_labeledvalue --label "Selected site" --value "$site" --labelwidth 22
         sgnd_print_labeledvalue --label "Web address" --value "${address:-Not configured}" --labelwidth 22
         sgnd_print_labeledvalue --label "Document root" --value "${root:-Not configured}" --labelwidth 22

@@ -476,7 +476,8 @@ set -uo pipefail
         local -a sites=() ordered_sites=()
 
         command -v rsync >/dev/null 2>&1 || { sayfail "rsync is required for publishing."; return 1; }
-        mapfile -t sites < <(find /etc/nginx/sites-available -mindepth 1 -maxdepth 1 -type f -printf '%f\n' 2>/dev/null | sort)
+        # The internal TLS catch-all is not a publishable website.
+        mapfile -t sites < <(find /etc/nginx/sites-available -mindepth 1 -maxdepth 1 -type f ! -name '00-solidgroundux-https-default' -printf '%f\n' 2>/dev/null | sort)
         (( ${#sites[@]} > 0 )) || { saywarning "No Nginx sites are available."; return 0; }
 
         if [[ -n "$site" ]]; then

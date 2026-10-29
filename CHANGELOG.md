@@ -42,9 +42,9 @@ The format is inspired by *Keep a Changelog* while remaining focused on practica
 
 - End-to-end deployment on a restored Nginx host: generated SolidGroundUX documentation published over HTTP, then HTTPS enabled with redirection and a self-signed certificate; the public certificate was exported and trusted by the Windows certificate store (Edge displayed a secure connection; Chrome still indicated a resource-security warning). A second, independent Testadura WWW website was published alongside it.
 
-#### Known issues
+#### Additional fixes
 
-- The internal `00-solidgroundux-https-default` Nginx configuration can appear in the regular **Manage sites** listing; inspection may emit a permissions error for that file. It should be hidden from the ordinary website list and inspected with appropriate privileges. Not fixed in this update.
+- Hide the internal `00-solidgroundux-https-default` Nginx configuration from website selection and listing; inspect site configurations with sudo when required, without changing file permissions.
 
 ### Active Directory (pending live validation)
 
@@ -55,12 +55,12 @@ The format is inspired by *Keep a Changelog* while remaining focused on practica
 
 - Added **Inspect / repair permissions** to Framework Diagnostics, invoking the Framework-owned policy engine in dry-run first and requiring explicit confirmation before applying its policy.
 
-### Database-server management (pending live validation)
+### Database-server management
 
 - Added module `61-postgresql.sh` with `manage-postgresql.sh` and `sgnd-manage-postgresql`, following the SQL Server host-management lifecycle for Ubuntu 24.04/26.04.
 - Added module `62-mariadb.sh` with `manage-mariadb.sh` and `sgnd-manage-mariadb`, using stock Ubuntu packages and a dedicated MariaDB configuration override.
 - Both modules register tracked preparation substeps, service, network, memory, firewall, storage inspection, status and validation actions. Automatic relocation of existing database directories is intentionally disabled to avoid damaging populated servers.
-- **Testing pending:** no live PostgreSQL/MariaDB installation, service, storage, or restart integration test has yet been performed.
+- **Validation update:** Live PostgreSQL and MariaDB servers are confirmed operational. This does not imply separate validation of every storage, restart, or recovery scenario.
 
 
 ### Web Content Management 2.1 — final workflow and authoring updates
