@@ -13,6 +13,10 @@ The format is inspired by *Keep a Changelog* while remaining focused on practica
 
 ## Unreleased
 
+### Web Content Management metadata editor (2026-10-29)
+
+- Added an explicit **Remove metadata field** action to the staged page editor. Removed front-matter keys fall back to computed defaults after Save; `:clear` continues to retain an empty explicit field. Mixed edits and removals are committed atomically, with the Markdown body preserved.
+
 ### Documentation bundles and website publication (2026-10-29)
 
 #### Added

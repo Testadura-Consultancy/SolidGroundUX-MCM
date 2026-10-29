@@ -1336,8 +1336,9 @@ PYCODE
         [[ "$selected" =~ \[([^][]+)\]$ ]] || { sayfail "Invalid page selection"; return 1; }
         file="${BASH_REMATCH[1]}"
         if [[ "$operation" == "edit-metadata" ]]; then
-            # Stage multiple front-matter edits in memory, then commit them
-            # through one atomic Python operation. Cancel discards the batch.
+            # Stage field updates and explicit removals in a JSON batch (null
+            # means remove; an empty string means clear). Save commits atomically;
+            # discarding the batch leaves the source unchanged.
             local selected_field="" edit_field="" current_value="" metadata_new_value=""
             local staged_file="" staged_count=0
             local -a field_options=() resolved_lines=()
@@ -1364,7 +1365,12 @@ import json, sys
 with open(sys.argv[1], encoding='utf-8') as handle:
     metadata = json.load(handle).get('metadata', {})
 with open(sys.argv[2], encoding='utf-8') as handle:
-    metadata.update(json.load(handle))
+    changes = json.load(handle)
+for key, value in changes.items():
+    if value is None:
+        metadata.pop(key, None)
+    else:
+        metadata[key] = value
 for key, value in metadata.items():
     shown = str(value).lower() if isinstance(value, bool) else str(value if value is not None else '')
     print('{} = {}'.format(key, shown.replace('\n', ' ')))
@@ -1398,7 +1404,22 @@ with open(sys.argv[1], encoding='utf-8') as handle:
 PYCODE
 )"
                 sgnd_print_sectionheader --text "Staged changes: $staged_count"
-                field_options+=("Add metadata field" "Save all staged changes" "Discard changes and finish")
+                # Removed fields vanish from the effective field list. Show them
+                # explicitly so a pending deletion cannot be mistaken for a save.
+                local -a staged_removals=()
+                mapfile -t staged_removals < <(python3 - "$staged_file" <<'PYCODE'
+import json, sys
+with open(sys.argv[1], encoding='utf-8') as handle:
+    for key, value in json.load(handle).items():
+        if value is None:
+            print(key)
+PYCODE
+)
+                local removed_field=""
+                for removed_field in "${staged_removals[@]}"; do
+                    sgnd_print_labeledvalue --label "$removed_field" --value "Remove on Save" --labelwidth 20
+                done
+                field_options+=("Add metadata field" "Remove metadata field" "Save all staged changes" "Discard changes and finish")
                 selected_field=""
                 ask_selection --label "Choose a metadata field or action" --var selected_field --items "${field_options[@]}" || break
                 case "$selected_field" in
@@ -1424,6 +1445,61 @@ PYCODE
                         [[ "$edit_field" =~ ^[A-Za-z][A-Za-z0-9_-]*$ ]] || { saywarning "Invalid field name."; continue; }
                         case "$edit_field" in parent|slug|language) saywarning "Location-dependent field cannot be edited here."; continue ;; esac
                         ;;
+                    "Remove metadata field")
+                        # Only explicit (including staged-new) fields are removable.
+                        # Derived defaults do not exist in the source front matter.
+                        local -a removable_fields=()
+                        mapfile -t removable_fields < <(python3 - "$list_file" "$staged_file" <<'PYCODE'
+import json, re, sys
+with open(sys.argv[1], encoding='utf-8') as handle:
+    metadata = json.load(handle).get('metadata', {})
+with open(sys.argv[2], encoding='utf-8') as handle:
+    changes = json.load(handle)
+for key, value in changes.items():
+    if value is None:
+        metadata.pop(key, None)
+    else:
+        metadata[key] = value
+for key in metadata:
+    if re.fullmatch(r'[A-Za-z][A-Za-z0-9_-]*', key) and key not in {'parent', 'slug', 'language'}:
+        print(key)
+PYCODE
+)
+                        if (( ${#removable_fields[@]} == 0 )); then
+                            saywarning "No explicit metadata fields to remove."
+                            continue
+                        fi
+                        local remove_field=""
+                        ask_selection --label "Choose field to remove (staged until Save)" --var remove_field --items "${removable_fields[@]}" || continue
+                        if ! python3 - "$list_file" "$staged_file" "$remove_field" <<'PYCODE'
+import json, os, sys, tempfile
+source, path, key = sys.argv[1:]
+with open(source, encoding='utf-8') as handle:
+    original = json.load(handle).get('metadata', {})
+with open(path, encoding='utf-8') as handle:
+    changes = json.load(handle)
+# Removing a field created in this batch cancels its addition; removing a
+# source field stages JSON null so the engine deletes its front-matter line.
+if key in original:
+    changes[key] = None
+else:
+    changes.pop(key, None)
+fd, temp = tempfile.mkstemp(prefix='.wcm-stage-', dir=os.path.dirname(path))
+try:
+    with os.fdopen(fd, 'w', encoding='utf-8') as handle:
+        json.dump(changes, handle, ensure_ascii=False)
+    os.replace(temp, path)
+finally:
+    if os.path.exists(temp):
+        os.unlink(temp)
+PYCODE
+                        then
+                            saywarning "Could not stage metadata removal."
+                            continue
+                        fi
+                        sayinfo "Staged removal: $remove_field (not yet saved)"
+                        continue
+                        ;;
                     *) edit_field="${selected_field%% = *}" ;;
                 esac
                 current_value="$(python3 - "$list_file" "$staged_file" "$edit_field" <<'PYCODE'
@@ -1431,7 +1507,12 @@ import json, sys
 with open(sys.argv[1], encoding='utf-8') as handle:
     metadata = json.load(handle).get('metadata', {})
 with open(sys.argv[2], encoding='utf-8') as handle:
-    metadata.update(json.load(handle))
+    changes = json.load(handle)
+for key, value in changes.items():
+    if value is None:
+        metadata.pop(key, None)
+    else:
+        metadata[key] = value
 value = metadata.get(sys.argv[3], '')
 if isinstance(value, bool):
     print(str(value).lower())

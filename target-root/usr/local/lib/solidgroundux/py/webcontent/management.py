@@ -169,7 +169,11 @@ def inspect_metadata(source, path):
             'resolved': resolved}
 
 def edit_metadata_fields(source, path, changes):
-    """Apply multiple validated scalar updates atomically, without changing body text."""
+    """Atomically set scalar front-matter fields or remove fields marked by JSON null.
+
+    Removing a field deletes its line (rather than writing an empty value), so
+    page defaults apply again. Unmentioned fields and Markdown body stay intact.
+    """
     if not isinstance(changes, dict) or not changes:
         raise ValueError('Changes must be a nonempty JSON object')
     config = load_site_config(Path(source).expanduser().resolve())
@@ -184,8 +188,26 @@ def edit_metadata_fields(source, path, changes):
     for key, value in changes.items():
         if not isinstance(key, str) or not SAFE_KEY.fullmatch(key) or key in _RESERVED_FIELDS:
             raise ValueError(f'Invalid or location-dependent metadata field: {key}')
-        if not isinstance(value, (str, bool, int, float)) or value is None:
-            raise ValueError(f'Field {key} requires a scalar value')
+        # JSON null explicitly removes an existing field; an empty string does not.
+        pattern = re.compile(r'^' + re.escape(key) + r'\s*:')
+        found = [i for i in range(1, close) if pattern.match(lines[i])]
+        if len(found) > 1:
+            raise ValueError(f'Duplicate metadata key: {key}')
+        if value is None:
+            if not found:
+                raise ValueError(f'Cannot remove missing metadata field: {key}')
+            # Remove the complete field, including any indented list, mapping,
+            # or folded/literal block value. A single-line deletion would leave
+            # orphaned indented lines and invalidate otherwise valid front matter.
+            start = found[0]
+            end = start + 1
+            while end < close and (not lines[end].strip() or lines[end][0].isspace()):
+                end += 1
+            del lines[start:end]
+            close -= end - start
+            continue
+        if not isinstance(value, (str, bool, int, float)):
+            raise ValueError(f'Field {key} requires a scalar value or null to remove')
         if key in _BOOLEAN_FIELDS:
             normalized = str(value).strip().lower()
             if normalized not in {'true', 'false'}:
@@ -196,10 +218,6 @@ def edit_metadata_fields(source, path, changes):
             if '\n' in value or '\r' in value:
                 raise ValueError(f'Multiline field not supported: {key}')
             encoded = json.dumps(value, ensure_ascii=False)
-        pattern = re.compile(r'^' + re.escape(key) + r'\s*:')
-        found = [i for i in range(1, close) if pattern.match(lines[i])]
-        if len(found) > 1:
-            raise ValueError(f'Duplicate metadata key: {key}')
         if found:
             lines[found[0]] = f'{key}: {encoded}\n'
         else:
@@ -217,4 +235,5 @@ def edit_metadata_fields(source, path, changes):
     finally:
         if os.path.exists(temporary):
             os.unlink(temporary)
-    return {'success': True, 'file': path, 'updated_fields': list(changes)}
+    return {'success': True, 'file': path, 'updated_fields': list(changes),
+            'removed_fields': [key for key, value in changes.items() if value is None]}

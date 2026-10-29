@@ -213,9 +213,12 @@
 #
 # -- How to edit, move or remove content ---------------------------------------------
 #
-# > **Edit page metadata**: browse to a page, select the field, change its value,
-# > and finish editing. Enter accepts the current value; use `:clear` to empty a
-# > supported text field. This action leaves the Markdown body untouched.
+# > **Edit page metadata**: browse to a page and stage one or more changes.
+# > Select an existing field to edit, add a new field, or choose **Remove metadata
+# > field** to delete an explicitly stored key so its default applies again.
+# > Enter accepts the current value; `:clear` sets a text field to an empty string
+# > but does **not** remove it. Choose **Save all staged changes** to write the
+# > batch atomically, or discard it. The Markdown body remains untouched.
 # >
 # > **Move / rename page**: select a non-index page, choose an existing destination
 # > section and a new slug, then confirm. The current implementation moves one

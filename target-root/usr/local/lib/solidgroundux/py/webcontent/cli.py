@@ -136,7 +136,7 @@ def _parser() -> argparse.ArgumentParser:
     inspect.add_argument("--source", required=True)
     inspect.add_argument("--content-file", required=True)
     inspect.add_argument("--result-file")
-    bulk = subparsers.add_parser("edit-metadata-fields", help="Apply multiple metadata fields from a JSON object file.")
+    bulk = subparsers.add_parser("edit-metadata-fields", help="Update metadata from JSON; null deletes a front-matter key.")
     bulk.add_argument("--source", required=True)
     bulk.add_argument("--content-file", required=True)
     bulk.add_argument("--changes-file", required=True)
