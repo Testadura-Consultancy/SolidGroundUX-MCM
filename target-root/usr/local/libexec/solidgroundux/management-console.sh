@@ -983,10 +983,10 @@ set -uo pipefail
             done
         fi
 
+        # This is an informational screen: there is no pending action to cancel.
         ask_dlg_autocontinue \
             --seconds 15 \
             --message "" \
-            --cancel \
             --pause || true
         SGND_LAST_WAITSECS=0
         return 0
@@ -2193,10 +2193,10 @@ set -uo pipefail
             _sgnd_console_dispatch "$choice" || true
 
             if (( ${SGND_LAST_WAITSECS:-0} > 0 )); then
+                # The module has returned; this countdown only preserves its output.
                 ask_dlg_autocontinue \
                     --seconds "$SGND_LAST_WAITSECS" \
                     --message "" \
-                    --cancel \
                     --pause || true
             fi
         done
