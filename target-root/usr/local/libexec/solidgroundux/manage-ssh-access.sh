@@ -4,13 +4,13 @@
 # ----------------------------------------------------------------------------------
 # Metadata:
 #   Version     : 2.1
-#   Build       : 2629401
+#   Build       : 2630201
 #   Shortname   : MANAGE_SSH_ACCESS
 #   Source      : manage-ssh-access.sh
 #   Type        : script
 #   Group       : Role Managers
 #   Purpose     : Computer Setup action implementation
-#   Checksum : d5e18c0005a09ca2218b4f3d1272d8c22951cf351fb1affe578ce4b476ecf321
+#   Checksum : f3d3c055415469e90655ab01a3e966b572a09a9bed1a688f953085d045db1b1b
 # Description:
 #   Standalone management actions dispatched from 10-computer-setup.sh.
 #   UI, reporting and errors use the SolidGroundUX framework.

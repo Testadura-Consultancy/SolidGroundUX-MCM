@@ -3,8 +3,8 @@
 # ----------------------------------------------------------------------------------
 # Metadata:
 #   Version     : 2.1
-#   Build       : 2629401
-#   Checksum    : cc227974f58649fbf6a8b4a8f39130799ca1e261ea78c14a988cf321cff014f1
+#   Build       : 2630201
+#   Checksum    : dacdca68d3fa3cd2ec5a4ad57034cbe8a11c17a860c02779fa523815df4aa19f
 #   Source      : 40-solidgroundux.sh
 #   Type        : module
 #   Group       : Module Registration

@@ -6,7 +6,7 @@
 </td>
 <td valign="middle">
   <h2>SolidGroundUX: Management Console Modules</h2>
-  <h4>Version 2.1.2626414 · © 2026 Testadura</h4>
+  <h4>Version 2.1.2630201 · © 2026 Testadura</h4>
 </td>
 </tr>
 </table>
@@ -41,7 +41,7 @@ SolidGroundUX release. They are now maintained as a separate project so
 that management functionality can evolve independently from the
 SolidGroundUX framework itself.
 
-SolidGroundUX provides the framework, runtime and shared utilities. This project owns the Management Console host, its public `sgnd-console` command, the console modules, and the management-specific executables that use the Framework.
+SolidGroundUX provides the framework, runtime and shared utilities. This project owns the Management Console host, its public `sgnd-console` command, console modules, management executables and the current documentation/website management workflow. The SDK owns workspace and release tooling; the Framework owns shared runtime services.
 
 ## Architecture
 
@@ -83,9 +83,27 @@ belong to this project. Generic SolidGroundUX utilities remain part of
 the SolidGroundUX framework project, even when a Management Console
 module provides a menu entry for them.
 
-For example, the Development module may expose framework utilities such
+For example, the Development module may expose **SDK-owned** utilities such
 as workspace creation, deployment or release preparation without taking
-ownership of those utilities.
+ownership of those utilities. It also exposes **MCM-owned** documentation
+bundles and website workflows.
+
+## Documentation bundles and website publishing
+
+MCM owns the current, independent stages of static website production:
+
+- **Documentation website:** **Assemble Markdown → Generate Website → Publish Website**.
+- **Ordinary WWW website:** **Generate Website → Publish Website**.
+
+Documentation Bundles combines one or more source repositories under a saved bundle definition. An optional generated Chapter 0 becomes the bundle introduction **once**, after the source-to-Markdown stage. It is excluded from its original content location and generated indexes.
+
+Web Content Management reads a Markdown website source, renders static HTML, and publishes an explicitly chosen **generated HTML directory**. Publishing saves the HTML source directory, `user@host`, remote directory, website hostname and Update/Mirror synchronization mode. After selecting the destination server, it can discover existing Nginx websites and their document roots or suggest a new root for a new site. It then offers **Publish / Modify / Cancel**. It does not require the source Markdown repository during publishing or a separate destination-profile registry.
+
+Nginx website management provides optional HTTPS configuration, including self-signed certificates, HTTP-to-HTTPS redirection and export of the **public** certificate for workstation trust setup. The private key is never exported. These actions are separate from the HTML publishing operation. See [PUBLISHING.md](PUBLISHING.md) and [AUTHORING.md](AUTHORING.md) for operator and author guidance.
+
+## Database management status
+
+The PostgreSQL and MariaDB modules are available alongside SQL Server. Their installation, service, storage and restart workflows still require live functional testing; module presence must not be confused with completed integration validation.
 
 ## Framework integration
 
@@ -188,7 +206,10 @@ target-root/
                 │   ├── 40-solidgroundux.sh
                 │   ├── 45-solidground-framework-test.sh
                 │   ├── 50-web-server.sh
+                │   ├── 55-web-content-management.sh
                 │   ├── 60-sqlserver.sh
+                │   ├── 61-postgresql.sh
+                │   ├── 62-mariadb.sh
                 │   ├── 70-docker-server.sh
                 │   └── 90-development.sh
                 ├── manage-active-directory-client.sh
@@ -200,8 +221,12 @@ target-root/
                 ├── manage-samba-shares.sh
                 ├── manage-solidgroundux.sh
                 ├── manage-sqlserver.sh
+                ├── manage-postgresql.sh
+                ├── manage-mariadb.sh
                 ├── manage-storage.sh
                 ├── manage-web-server.sh
+                ├── manage-web-content.sh
+                ├── manage-bundles.sh
                 ├── publish-web-content.sh
                 └── set-identity.sh
 ```
@@ -210,6 +235,11 @@ Management-specific executables may live alongside the SolidGroundUX
 executable tooling outside the `console-modules` directory. They remain
 part of this project when their primary purpose is to implement
 functionality owned by a Management Console module.
+
+The documentation-bundle parser and website renderer are installed under
+`usr/local/lib/solidgroundux/py/` (not SDK), including `sgnd_doc_bundles.py`,
+`sgnd_doc_markdown.py` and the `webcontent/` package. The tree above shows
+representative executables, not an exhaustive file manifest.
 
 ## Convenience templates
 

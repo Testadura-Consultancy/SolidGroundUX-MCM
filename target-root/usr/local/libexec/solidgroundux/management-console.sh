@@ -4,9 +4,9 @@
 # -------------------------------------------------------------------------------------
 # Metadata:
 #   Version     : 2.1
-#   Build       : 2627501
+#   Build       : 2630201
 #   Shortname   : MANAGEMENT_CONSOLE
-#   Checksum    : a5367d924f0c4bc830887b875f0eaeefd2cbbd81cf0183e5ee827a053cb1cc52
+#   Checksum    : 796da68181ce7f0e65b502cbf2eb43a9c555c7f4d4bb8275c2c90dd597a960f7
 #   Source      : management-console.sh
 #   Wrapper     : sgnd-console
 #   Type        : script

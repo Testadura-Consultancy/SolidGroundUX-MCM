@@ -4,14 +4,14 @@
 # ----------------------------------------------------------------------------------
 # Metadata:
 #   Version     : 2.1
-#   Build       : 2627515
+#   Build       : 2630201
 #   Shortname   : MANAGE_SQLSERVER
 #   Source      : manage-sqlserver.sh
 #   Type        : script
 #   Group       : Role Managers
 #   Purpose     : Install, configure, manage, validate, and inspect Microsoft SQL Server
 #
-#   Checksum : 3abb07a7182c6e3653857224a974d2b9b0a020b6d0f85d794ded9977767b1538
+#   Checksum : d58d881f48fa29d46b6bbf6830a03b661d045ece7a5edc3fa63010561aa78658
 # Description:
 #   Install, configure, manage, validate, and inspect Microsoft SQL Server.
 #

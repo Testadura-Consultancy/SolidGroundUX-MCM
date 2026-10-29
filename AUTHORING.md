@@ -1,11 +1,32 @@
 # Testadura website authoring
 
 Normal website content is Markdown. Authors should not need to write HTML for
-ordinary pages or common layouts.
+ordinary pages or common layouts. This guide describes **authoring a website
+source**, not source-repository documentation extraction or publication of HTML.
 
 The WebContent renderer supports standard Markdown plus a small Testadura
 component extension. Component blocks start with `::: <class>` and end with
 `:::`. Blocks may be nested.
+
+## Website source and publication stages
+
+A regular WWW website uses **Generate Website → Publish Website**. A documentation
+website first runs **Assemble Markdown** using MCM Documentation Bundles; that
+produces the website Markdown source consumed by the same generator. Both kinds
+of website use the same HTML publisher. Publishing never reads the original
+source repositories.
+
+A website source has `config/site.cfg`, a `content/` tree, and the assets,
+templates and stylesheets used by the generator. The homepage is supplied by a
+root-level `*_Index_XX.md` file for the configured default language, for example
+`content/Site_Index_NL.md`; the filename stem is site-specific. Section landing
+pages use `index_NL.md` (and optional other language variants). Both contain
+ordinary Markdown with YAML front matter. To omit a subtree from discovery,
+place a `.ignore` file in that directory.
+
+For the operator workflow (HTML source directory, destination server, website
+selection, Update/Mirror, HTTPS and certificate export), see
+[PUBLISHING.md](PUBLISHING.md).
 
 ## Tiles in a responsive grid
 
@@ -129,7 +150,9 @@ teaser: "A short, compelling introduction for social media."
 
 ## Recursieve navigatie en private content
 
-De zijbalk wordt opgebouwd uit directories en de `title`-metadata van Markdown-pagina’s. Een `index_NL.md` of `index_EN.md` is optioneel; zonder index kan een directory een uitklapbare groep zijn. Klik op het pijltje om uit te klappen en op een bestaande indexpaginatitel om te navigeren. De actieve route wordt uitgeklapt. `order` sorteert siblings en `config/navigation.cfg` ordent de hoofdsecties.
+De zijbalk wordt opgebouwd uit directories en de `title`-metadata van Markdown-pagina’s. Een `index_NL.md` of `index_EN.md` is optioneel; zonder index kan een directory een uitklapbare groep zijn. Klik op het pijltje om uit te klappen en op een bestaande indexpaginatitel om te navigeren. De actieve route wordt uitgeklapt. `nav_order` (met `order` als terugval) sorteert de navigatie. Hoofdsecties
+worden uit sectie-indexen afgeleid; `config/navigation.cfg` stuurt die
+navigatie in de huidige generator niet aan.
 
 `hidden: true` op een gewone pagina verbergt alleen die pagina in de navigatie; op een sectie-index (`index_NL.md` of `index_EN.md`) verbergt het de **hele sectie inclusief onderliggende menu-items**. Met `?ShowHidden` in de URL worden verborgen pagina’s en complete verborgen secties tijdelijk zichtbaar in de navigatie. De pagina’s blijven ook zonder deze optie via hun URL bereikbaar; dit is geen toegangsbeveiliging. `private: true` geeft aan dat server-side bescherming vereist is. De generator weigert publicatie van een `private` pagina buiten de in `config/site.cfg` ingestelde `protected_prefixes`. Die instelling beschermt zelf niets: configureer en test authenticatie op de daadwerkelijke webserver. `draft: true` blijft los daarvan buiten de publieke generatie.
 

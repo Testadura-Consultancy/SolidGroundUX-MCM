@@ -3,13 +3,13 @@
 # ----------------------------------------------------------------------------------
 # Metadata:
 #   Version     : 2.1
-#   Build       : 2629401
+#   Build       : 2630201
 #   Shortname   : POSTGRESQL
 #   Source      : 61-postgresql.sh
 #   Type        : module
 #   Group       : Module Registration
 #   Purpose     : Install, configure, manage, validate, and inspect PostgreSQL
-#   Checksum : a57a3d27c80fcb92347e46a0ed1f75071d154f11d08fff1d71c3154b162c8f07
+#   Checksum : 983cd86192c605d1ac0b52797c1536aa5bf650fa3cfbbc4d798411bd2b36d0b2
 # Description:
 #   Registers host-management actions. Database administration is out of scope.
 #   Live installation and integration validation are deferred to a test host.

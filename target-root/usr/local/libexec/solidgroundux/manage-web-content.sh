@@ -4,14 +4,14 @@
 # -------------------------------------------------------------------------------------
 # Metadata:
 #   Version     : 2.1
-#   Build       : 2629401
+#   Build       : 2630201
 #   Shortname   : MANAGE_WEB_CONTENT
 #   Source      : manage-web-content.sh
 #   Type        : script
 #   Group       : Role Managers
 #   Purpose     : Ingest, delete, generate, validate, and prepare static website content
 #
-#   Checksum : 39335ab659c0ba286155b55aabeb7221a7ad02af7b6c59f6d8fa93240ca16364
+#   Checksum : 39435352e09c9760df9ad0f5244f263d0eca89e66d0a5e23161d16f2c3f2cd48
 # Description:
 #   Provides the SolidGroundUX user-facing workflow for the reusable Python WebContent
 #   engine. All prompts, state, progress, and result reporting remain in this Bash layer;

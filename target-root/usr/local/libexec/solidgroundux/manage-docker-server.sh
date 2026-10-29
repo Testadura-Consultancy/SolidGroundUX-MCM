@@ -4,14 +4,14 @@
 # ----------------------------------------------------------------------------------
 # Metadata:
 #   Version     : 2.1
-#   Build       : 2627515
+#   Build       : 2630201
 #   Shortname   : MANAGE_DOCKER
 #   Source      : manage-docker-server.sh
 #   Type        : script
 #   Group       : Role Managers
 #   Purpose     : Install, configure, validate, and inspect a Docker host
 #
-#   Checksum : 777e5dd508159e0feafce25036162592e6ce731c6a6784424c56967eb5b9da1b
+#   Checksum : a6330ad578e84dcea58b2fb8db41a79fa85b29489b1b43d52341da90c61ffb01
 # Description:
 #   Provides first-version Docker host management for SolidGroundUX. The script
 #   deliberately avoids migrating an existing Docker data root automatically.

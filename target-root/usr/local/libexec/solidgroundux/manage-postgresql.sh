@@ -4,14 +4,14 @@
 # ----------------------------------------------------------------------------------
 # Metadata:
 #   Version     : 2.1
-#   Build       : 2629401
+#   Build       : 2630201
 #   Shortname   : MANAGE_POSTGRESQL
 #   Source      : manage-postgresql.sh
 #   Type        : script
 #   Group       : Role Managers
 #   Purpose     : Install, configure, manage, validate, and inspect PostgreSQL
 #
-#   Checksum : 558bb945df657d46495cea1b1fa5b52744d2a4a6aab225e544aa4ddfa53631aa
+#   Checksum : 35b7ef9c1443231c83a0cd84d701a0034ceac99bdb486c1a804914e2ab166da3
 # Description:
 #   Install, configure, manage, validate, and inspect PostgreSQL.
 #

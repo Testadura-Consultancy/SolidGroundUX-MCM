@@ -10,10 +10,41 @@ The format is inspired by *Keep a Changelog* while remaining focused on practica
 
 - **Pending live validation:** Additional writable DC joining must be tested on a disposable existing domain, including failed join recovery, DNS/resolver transition, and replication convergence.
 
-### SolidGroundUX
-
 
 ## Unreleased
+
+### Documentation bundles and website publication (2026-10-29)
+
+#### Added
+
+- Added persistent documentation-bundle configuration for assembling Markdown from multiple source repositories (Framework, SDK, and MCM) into one documentation website, with optional designated Chapter 0.
+- Added remote Nginx website discovery to publishing: an existing website supplies its hostname and document root; when creating a new website, the tool suggests an appropriate root based on the remote server's configured websites, with manual entry available.
+- Added public HTTPS certificate export for the selected managed website, including the export path, SHA-256 fingerprint and an SCP retrieval command. Private keys are not exported.
+- Added a dedicated unmatched-host HTTPS fallback so requests for hostnames without a matching HTTPS virtual host do not expose another hosted website; Ubuntu's ordinary HTTP default site remains supported.
+
+#### Changed
+
+- Moved the documentation bundle manager and source-to-Markdown generator from SDK to MCM as the authoritative implementation; obsolete SDK copies are not maintained.
+- Changed generated Chapter 0 handling to store a stable relative generated-content reference and resolve it **after** Markdown generation. The selected document becomes the bundle homepage exactly once, is removed from its original content position and indexes/navigation, and does not produce duplicate YAML front matter. Existing absolute references can be migrated.
+- Separated the website pipeline into independent operations: **Assemble Markdown → Generate Website → Publish Website** for documentation, and **Generate Website → Publish Website** for ordinary WWW content.
+- Simplified **Publish Website** to state-saved source HTML directory, destination `user@host`, remote directory, website hostname and Update/Mirror synchronization, followed by Publish/Modify/Cancel. Publishing no longer depends on the Markdown repository or a separately managed destination registry.
+- Placed remote server selection ahead of website discovery, and postponed the completed settings summary until a remote website has been selected or created.
+- Standardized displayed Yes/No decisions and their defaults to title case (`Yes` / `No`) while preserving framework-internal uppercase decision values.
+- Kept HTTPS optional for managed sites, with existing-certificate or self-signed configuration and optional HTTP-to-HTTPS redirection.
+
+#### Fixed
+
+- Corrected duplicate/ambiguous legacy publishing-destination resolution during the transition away from repository-scoped destinations.
+- Corrected publication status reporting so failed deployment and cancellation are not described as successful publication.
+- Corrected the initial HTTPS fallback design to coexist with Ubuntu's default HTTP virtual host instead of requiring the administrator to remove it.
+
+#### Verified
+
+- End-to-end deployment on a restored Nginx host: generated SolidGroundUX documentation published over HTTP, then HTTPS enabled with redirection and a self-signed certificate; the public certificate was exported and trusted by the Windows certificate store (Edge displayed a secure connection; Chrome still indicated a resource-security warning). A second, independent Testadura WWW website was published alongside it.
+
+#### Known issues
+
+- The internal `00-solidgroundux-https-default` Nginx configuration can appear in the regular **Manage sites** listing; inspection may emit a permissions error for that file. It should be hidden from the ordinary website list and inspected with appropriate privileges. Not fixed in this update.
 
 ### Active Directory (pending live validation)
 
@@ -32,9 +63,9 @@ The format is inspired by *Keep a Changelog* while remaining focused on practica
 - **Testing pending:** no live PostgreSQL/MariaDB installation, service, storage, or restart integration test has yet been performed.
 
 
-- Markdown image sizes: optional `width` and `height` (pixels) for inline Markdown images and `td-image-text`, including images nested in tiles and galleries; no change to featured-card sizing defaults.
-
 ### Web Content Management 2.1 — final workflow and authoring updates
+
+- Markdown image sizes: optional `width` and `height` (pixels) for inline Markdown images and `td-image-text`, including images nested in tiles and galleries; no change to featured-card sizing defaults.
 
 - Consolidated the Incoming workflow around **Retrieve Incoming**, **Import local files to Incoming**, and **Review and ingest Incoming package**, including ZIP packages with Markdown and local resources.
 - Added automatic movement of successfully ingested packages to `incoming/archive/`; failed or conflicting packages remain available for review.
