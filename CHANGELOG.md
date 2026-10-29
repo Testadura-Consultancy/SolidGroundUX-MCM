@@ -4,13 +4,6 @@ All notable changes to SolidGroundUX Management Console Modules are documented i
 
 The format is inspired by *Keep a Changelog* while remaining focused on practical framework development.
 
-## Backlog
-
-### AD Server module
-
-- **Pending live validation:** Additional writable DC joining must be tested on a disposable existing domain, including failed join recovery, DNS/resolver transition, and replication convergence.
-
-
 ## Unreleased
 
 ### Web Content Management metadata editor (2026-10-29)
@@ -32,6 +25,7 @@ The format is inspired by *Keep a Changelog* while remaining focused on practica
 - Changed generated Chapter 0 handling to store a stable relative generated-content reference and resolve it **after** Markdown generation. The selected document becomes the bundle homepage exactly once, is removed from its original content position and indexes/navigation, and does not produce duplicate YAML front matter. Existing absolute references can be migrated.
 - Separated the website pipeline into independent operations: **Assemble Markdown → Generate Website → Publish Website** for documentation, and **Generate Website → Publish Website** for ordinary WWW content.
 - Simplified **Publish Website** to state-saved source HTML directory, destination `user@host`, remote directory, website hostname and Update/Mirror synchronization, followed by Publish/Modify/Cancel. Publishing no longer depends on the Markdown repository or a separately managed destination registry.
+- Simplified general post-action countdowns to Enter to continue and P/Space to pause; removed the unused Cancel choice from completed-action dialogs without changing pre-action confirmations.
 - Placed remote server selection ahead of website discovery, and postponed the completed settings summary until a remote website has been selected or created.
 - Standardized displayed Yes/No decisions and their defaults to title case (`Yes` / `No`) while preserving framework-internal uppercase decision values.
 - Kept HTTPS optional for managed sites, with existing-certificate or self-signed configuration and optional HTTP-to-HTTPS redirection.
@@ -41,16 +35,13 @@ The format is inspired by *Keep a Changelog* while remaining focused on practica
 - Corrected duplicate/ambiguous legacy publishing-destination resolution during the transition away from repository-scoped destinations.
 - Corrected publication status reporting so failed deployment and cancellation are not described as successful publication.
 - Corrected the initial HTTPS fallback design to coexist with Ubuntu's default HTTP virtual host instead of requiring the administrator to remove it.
+- Hid the internal `00-solidgroundux-https-default` configuration from ordinary Nginx website listings and made site inspection use sudo when needed, without broadening permissions.
 
 #### Verified
 
 - End-to-end deployment on a restored Nginx host: generated SolidGroundUX documentation published over HTTP, then HTTPS enabled with redirection and a self-signed certificate; the public certificate was exported and trusted by the Windows certificate store (Edge displayed a secure connection; Chrome still indicated a resource-security warning). A second, independent Testadura WWW website was published alongside it.
 
-#### Additional fixes
-
-- Hide the internal `00-solidgroundux-https-default` Nginx configuration from website selection and listing; inspect site configurations with sudo when required, without changing file permissions.
-
-### Active Directory (pending live validation)
+### Active Directory
 
 - Added a separate **Join existing domain as additional DC** workflow with DNS/LDAP/Kerberos discovery, interactive Samba DC join, generated Kerberos configuration, resolver cutover, service/DNS registration and DRS replication status checks. Existing first-DC provisioning remains unchanged.
 - Added tracked child actions to report the first failing additional-DC stage. The workflow refuses to overwrite an existing smb.conf and requires the system resolver to discover the existing domain before joining. Live join and failure recovery are not tested.
