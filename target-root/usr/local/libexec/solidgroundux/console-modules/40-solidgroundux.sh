@@ -366,17 +366,21 @@ set -uo pipefail
         # . Purpose
         #   Use the canonical framework permission engine without duplicating its rules in MCM.
         #   Always show a dry-run first; repair requires a separate affirmative decision.
+        #   Resolve the permission policy from the framework-owned SGND_SHARE_DIR.
     framework_repair_permissions() {
         local engine=""
-        local policy=""
+        local policy="${SGND_SHARE_DIR:-}"
         local decision="NO"
         local root="${SGND_FRAMEWORK_ROOT:-/}"
+        [[ -n "$policy" ]] || {
+            sayfail "SGND_SHARE_DIR is not initialized by the framework."
+            return 1
+        }
+        policy="${policy%/}/permissions.dta"
         if [[ "$root" == "/" ]]; then
             engine="/usr/local/libexec/solidgroundux/sgnd-repair-permissions.sh"
-            policy="/usr/local/share/solidgroundux/permissions.dta"
         else
             engine="${root%/}/usr/local/libexec/solidgroundux/sgnd-repair-permissions.sh"
-            policy="${root%/}/usr/local/share/solidgroundux/permissions.dta"
         fi
         [[ -x "$engine" && -r "$policy" ]] || {
             sayfail "Permissions engine or policy unavailable: $engine / $policy"
