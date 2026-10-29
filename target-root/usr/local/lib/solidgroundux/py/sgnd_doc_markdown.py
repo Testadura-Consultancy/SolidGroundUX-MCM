@@ -684,23 +684,55 @@ def chapter0_body(markdown: str) -> str:
     return ''.join(result).strip()
 
 
-def exclude_chapter0(content: Path, output: Path, origin: str) -> None:
-    """Omit the exact generated index promoted from a previous bundle output."""
-    if not origin:
-        return
-    try:
-        relative = Path(origin).expanduser().resolve().relative_to(output / 'content')
-    except ValueError:
-        return  # An external authored Chapter 0 has no generated duplicate to remove.
-    target = content / relative
-    if not target.is_file() or target.name.endswith('_NL.md') is False:
-        raise ValueError(f'Chapter 0 original is not a generated Markdown page: {relative}')
-    # Keep any sibling pages and subchapters; this is a page move, not a section delete.
+def generated_chapter0_path(content: Path, reference: str, origin: str = '') -> Path | None:
+    """Resolve a logical generated page, migrating old absolute output references.
+
+    External authored Markdown is deliberately not interpreted as a generated
+    route. A retained snapshot with an original generated path is migrated.
+    """
+    selected = reference
+    if origin and '/content/' in origin:
+        selected = origin
+    if selected.startswith('content/'):
+        relative = Path(selected[len('content/'):])
+    elif '/content/' in selected:
+        relative = Path(selected.rsplit('/content/', 1)[1])
+    else:
+        return None
+    if relative.is_absolute() or '..' in relative.parts or relative.suffix.lower() != '.md':
+        raise ValueError(f'Invalid generated Chapter 0 route: {reference}')
+    target = (content / relative).resolve()
+    if not target.is_relative_to(content.resolve()):
+        raise ValueError(f'Invalid generated Chapter 0 route: {reference}')
+    return target
+
+
+def exclude_chapter0(content: Path, target: Path) -> None:
+    """Promote exactly one generated page, removing its normal navigation entry."""
     target.unlink()
     folder = target.parent
     while folder != content and folder.is_dir() and not any(folder.iterdir()):
         folder.rmdir()
         folder = folder.parent
+
+
+def rewrite_chapter0_links(content: Path, old_page: Path) -> None:
+    """Retarget absolute links to a promoted page to its Introduction route."""
+    relative = old_page.relative_to(content)
+    parts = list(relative.parts)
+    filename = parts.pop()
+    stem = filename.removesuffix('_Index_NL.md') if filename.endswith('_Index_NL.md') else filename.removesuffix('_NL.md')
+    routes = {'/' + '/'.join(parts + [stem]).strip('/') + '/'}
+    if filename.endswith('_Index_NL.md'):
+        routes.add('/' + '/'.join(parts).strip('/') + '/')
+    for file in content.rglob('*.md'):
+        text = file.read_text(encoding='utf-8')
+        original = text
+        for route in routes:
+            text = text.replace('](' + route + ')', '](/introduction/)')
+            text = text.replace('](' + route + '#', '](/introduction/#')
+        if text != original:
+            file.write_text(text, encoding='utf-8')
 
 
 def generate(bundle: dict, docs_root: Path | None = None) -> dict:
@@ -761,19 +793,21 @@ def generate(bundle: dict, docs_root: Path | None = None) -> dict:
         write_index(content, bundle.get('title', bundle['id']), metrics, 0, template='home')
 
         if chapter0:
-            custom = Path(chapter0).expanduser().resolve()
-            if not custom.is_file():
-                raise ValueError(f'Chapter 0 Markdown missing: {custom}')
-            # A generated page selected as Chapter 0 must have been retained by
-            # sgnd_doc_bundles.py outside output. Never consume a page that the
-            # current build will remove, which would break future regenerations.
-            if custom.is_relative_to(output):
-                raise ValueError('Chapter 0 points inside the generated output. '
-                                 'Select the page again in Configure bundle to retain it independently.')
-            intro = chapter0_body(custom.read_text(encoding='utf-8'))
+            generated = generated_chapter0_path(content, chapter0, bundle.get('chapter0_origin', ''))
+            if generated is not None:
+                if not generated.is_file():
+                    raise ValueError(f'Generated Chapter 0 route not found in this build: {generated.relative_to(content)}')
+                intro = chapter0_body(generated.read_text(encoding='utf-8'))
+            else:
+                custom = Path(chapter0).expanduser().resolve()
+                if not custom.is_file():
+                    raise ValueError(f'External Chapter 0 Markdown missing: {custom}')
+                intro = chapter0_body(custom.read_text(encoding='utf-8'))
             if not intro:
                 raise ValueError('Chapter 0 Markdown contains no page body')
-            exclude_chapter0(content, output, bundle.get('chapter0_origin', chapter0))
+            if generated is not None:
+                rewrite_chapter0_links(content, generated)
+                exclude_chapter0(content, generated)
             write_index(content / 'introduction', 'Introduction', intro, 1, template='page')
         # Bundle defaults are supplied by the SDK documentation resources.
         # Product resources are scoped to their chapter; no product can overwrite

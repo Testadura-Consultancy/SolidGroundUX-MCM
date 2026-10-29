@@ -337,7 +337,7 @@ set -uo pipefail
         local decision="YES"
 
         if [[ ! -d "$path" ]]; then
-            ask_decision --label "Directory does not exist. Create it" --choices "YES|Y,NO|N" --default "YES" --var decision
+            ask_decision --label "Directory does not exist. Create it" --choices "Yes|Y,No|N" --default "Yes" --var decision
             [[ "$decision" == "YES" ]] || return 1
 
             if (( ${FLAG_DRYRUN:-0} == 1 )); then
@@ -377,7 +377,7 @@ set -uo pipefail
         done < <(find "$input_dir" -mindepth 1 -maxdepth 1 -type d -print0 2>/dev/null)
 
         if (( ${#candidates[@]} == 1 )); then
-            ask_decision --label "Use detected web root ${candidates[0]}" --choices "YES|Y,NO|N" --default "YES" --var decision
+            ask_decision --label "Use detected web root ${candidates[0]}" --choices "Yes|Y,No|N" --default "Yes" --var decision
             if [[ "$decision" == "YES" ]]; then
                 printf -v "$var_name" '%s' "${candidates[0]}"
                 return 0
@@ -426,7 +426,7 @@ set -uo pipefail
 
         key="$(_web_server_publish_key)"
 
-        ask_decision --label "Configure passwordless publishing access to $remote" --choices "YES|Y,NO|N" --default "YES" --var decision
+        ask_decision --label "Configure passwordless publishing access to $remote" --choices "Yes|Y,No|N" --default "Yes" --var decision
         [[ "$decision" == "YES" ]] || return 1
 
         if (( ${FLAG_DRYRUN:-0} == 1 )); then
@@ -553,7 +553,7 @@ set -uo pipefail
         _web_server_ensure_directory "$document_root" "www-data:www-data" || { [[ -n "$temp_dir" ]] && rm -rf -- "$temp_dir"; return 1; }
         sgnd_print
         sgnd_print_sectionheader ""
-        ask_decision --label "Synchronize source into $document_root" --choices "YES|Y,NO|N" --default "YES" --var decision
+        ask_decision --label "Synchronize source into $document_root" --choices "Yes|Y,No|N" --default "Yes" --var decision
         [[ "$decision" == "YES" ]] || { [[ -n "$temp_dir" ]] && rm -rf -- "$temp_dir"; return 0; }
 
         if (( ${FLAG_DRYRUN:-0} == 1 )); then
@@ -693,7 +693,7 @@ set -uo pipefail
         _web_server_ensure_directory "$document_root" "www-data:www-data" || { [[ -n "$temp_dir" ]] && rm -rf -- "$temp_dir"; return 1; }
         sgnd_print
         sgnd_print_sectionheader ""
-        ask_decision --label "Publish documentation to $site" --choices "YES|Y,NO|N" --default "YES" --var decision
+        ask_decision --label "Publish documentation to $site" --choices "Yes|Y,No|N" --default "Yes" --var decision
         if [[ "$decision" != "YES" ]]; then
             [[ -n "$temp_dir" ]] && rm -rf -- "$temp_dir"
             return 0

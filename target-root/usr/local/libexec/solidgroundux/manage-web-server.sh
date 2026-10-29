@@ -403,7 +403,7 @@ set -uo pipefail
             return 0
         }
 
-        ask_decision --label "Create DNS record for ${record_name}.${local_domain}" --choices "YES|Y,NO|N" --default "YES" --var decision
+        ask_decision --label "Create DNS record for ${record_name}.${local_domain}" --choices "Yes|Y,No|N" --default "Yes" --var decision
         [[ "$decision" == "YES" ]] || return 0
 
         ask --label "DNS server" --var dns_server --default "$dns_server" --validate sgnd_validate_ipv4 --back || return 0
@@ -490,7 +490,7 @@ set -uo pipefail
         fi
 
         sgnd_print_labeledvalue --label "DNS A record" --value "${record_name}.${local_domain} -> $local_ip" --labelwidth 22
-        ask_decision --label "Remove this DNS A record as well" --choices "YES|Y,NO|N" --default "NO" --var decision || return 0
+        ask_decision --label "Remove this DNS A record as well" --choices "Yes|Y,No|N" --default "No" --var decision || return 0
         [[ "$decision" == "YES" ]] || return 0
         ask --label "DNS account" --var account --default "$account" --back || return 0
         if (( ${FLAG_DRYRUN:-0} == 1 )); then
@@ -566,7 +566,7 @@ set -uo pipefail
         local decision="YES"
 
         if [[ ! -d "$path" ]]; then
-            ask_decision --label "Directory does not exist. Create it" --choices "YES|Y,NO|N" --default "YES" --var decision
+            ask_decision --label "Directory does not exist. Create it" --choices "Yes|Y,No|N" --default "Yes" --var decision
             [[ "$decision" == "YES" ]] || return 1
 
             if (( ${FLAG_DRYRUN:-0} == 1 )); then
@@ -582,12 +582,65 @@ set -uo pipefail
         fi
     }
 
+    # fn: _web_server_ensure_https_fallback - Prevent unknown HTTPS names reaching a named site
+        # . Purpose
+        #   A removed hostname must never serve another site's content. Ubuntu's
+        #   standard port-80 default remains untouched; only HTTPS needs a fallback.
+        # . Behavior
+        #   Create a dedicated HTTPS default when no explicit HTTPS default exists.
+        #   Preserve other administrators' defaults and all named virtual hosts.
+        #   Validate before keeping the new configuration; rollback on failure.
+    _web_server_ensure_https_fallback() {
+        local available="/etc/nginx/sites-available/00-solidgroundux-https-default"
+        local enabled="/etc/nginx/sites-enabled/00-solidgroundux-https-default"
+        local existing="" staged=""
+        command -v nginx >/dev/null 2>&1 || return 1
+        if [[ -L "$enabled" && "$(readlink -- "$enabled")" == "$available" && -f "$available" ]]; then
+            # Do not silently accept an invalid or externally modified configuration.
+            sudo nginx -t >/dev/null 2>&1 || return 1
+            return 0
+        fi
+        if [[ -e "$available" || -L "$available" || -e "$enabled" || -L "$enabled" ]]; then
+            sayfail "HTTPS fallback configuration path is occupied; no changes made."
+            return 1
+        fi
+        # Only port 443 matters. Ubuntu's ordinary port-80 default is expected.
+        existing="$(sudo nginx -T 2>/dev/null | grep -E '^[[:space:]]*listen[[:space:]]+([^;]*:)?443([[:space:];]|$)[^;]*default_server' || true)"
+        if [[ -n "$existing" ]]; then
+            saywarning "Existing HTTPS default server found; leaving its configuration untouched."
+            return 0
+        fi
+        if (( ${FLAG_DRYRUN:-0} == 1 )); then
+            sayinfo "DRYRUN: Would add an HTTPS fallback that rejects unknown hostnames."
+            return 0
+        fi
+        staged="$(mktemp)" || return 1
+        cat > "$staged" <<'NGINX'
+# SolidGroundUX: reject unmatched TLS hostnames; do not serve another site's content.
+server {
+    listen 443 ssl default_server;
+    listen [::]:443 ssl default_server;
+    server_name _;
+    ssl_reject_handshake on;
+}
+NGINX
+        if ! sudo cp -- "$staged" "$available" || ! sudo ln -s -- "$available" "$enabled" || ! sudo nginx -t >/dev/null 2>&1; then
+            sudo rm -f -- "$enabled" "$available"
+            rm -f -- "$staged"
+            sayfail "Could not configure HTTPS fallback; changes rolled back."
+            return 1
+        fi
+        rm -f -- "$staged"
+        sayok "Unknown HTTPS hostnames will be rejected."
+    }
+
     # fn: _web_server_reload - Validate and reload Nginx
         # . Returns
         #   0 on success; non-zero when the operation cannot be completed.
         # . Usage
         #   _web_server_reload
     _web_server_reload() {
+        _web_server_ensure_https_fallback || return 1
         sudo nginx -t || return 1
         if (( ${FLAG_DRYRUN:-0} == 1 )); then
             sayinfo "DRYRUN: Would reload nginx.service."
@@ -624,6 +677,7 @@ set -uo pipefail
         #   _web_server_step_start
     _web_server_step_start() {
         command -v nginx >/dev/null 2>&1 || { sayfail "Nginx is not installed."; return 1; }
+        _web_server_ensure_https_fallback || return 1
         sudo nginx -t >/dev/null 2>&1 || { sayfail "Nginx configuration validation failed."; return 1; }
 
         if (( ${FLAG_DRYRUN:-0} == 1 )); then
@@ -755,7 +809,7 @@ set -uo pipefail
         sgnd_print_labeledvalue --label "HTTP / HTTPS" --value "$nginx_profile_state" --labelwidth 20
         sgnd_print
         sgnd_print_sectionheader ""
-        ask_decision --label "Allow HTTP and HTTPS through UFW" --choices "YES|Y,NO|N" --default "YES" --var decision || return 0
+        ask_decision --label "Allow HTTP and HTTPS through UFW" --choices "Yes|Y,No|N" --default "Yes" --var decision || return 0
         [[ "$decision" == "YES" ]] || return 0
 
         if (( ${FLAG_DRYRUN:-0} == 1 )); then
@@ -880,7 +934,7 @@ EOF
             sayfail "Could not enable Nginx site."
             return 1
         fi
-        if ! nginx -t || ! systemctl reload nginx.service; then
+        if ! _web_server_ensure_https_fallback || ! nginx -t || ! systemctl reload nginx.service; then
             rm -f -- "$linked" "$cfg" || true
             nginx -t >/dev/null 2>&1 && systemctl reload nginx.service >/dev/null 2>&1 || true
             sayfail "Nginx validation/reload failed; new site configuration rolled back."
@@ -1051,12 +1105,12 @@ EOF
         # Save the hostname before removing its Nginx configuration.
         web_address="$(awk '$1 == "server_name" {for (i=2; i<=NF; i++) {gsub(/;/, "", $i); printf "%s%s", (i==2 ? "" : " "), $i}; exit}' "/etc/nginx/sites-available/$site" 2>/dev/null || true)"
 
-        ask_decision --label "Remove site configuration '$site'" --choices "YES|Y,NO|N" --default "NO" --var decision
+        ask_decision --label "Remove site configuration '$site'" --choices "Yes|Y,No|N" --default "No" --var decision
         [[ "$decision" == "YES" ]] || return 0
 
         if [[ -n "$document_root" ]]; then
             sgnd_print_labeledvalue --label "Document root" --value "$document_root" --labelwidth 22
-            ask_decision --label "Remove site content as well" --choices "YES|Y,NO|N" --default "NO" --var remove_content
+            ask_decision --label "Remove site content as well" --choices "Yes|Y,No|N" --default "No" --var remove_content
         fi
 
         if (( ${FLAG_DRYRUN:-0} == 1 )); then
@@ -1107,7 +1161,7 @@ EOF
         [[ -n "$document_root" ]] || { sayfail "Could not determine document root for $site."; return 1; }
 
         sgnd_print_labeledvalue --label "Document root" --value "$document_root" --labelwidth 22
-        ask_decision --label "Remove all content from '$site'" --choices "YES|Y,NO|N" --default "NO" --var decision
+        ask_decision --label "Remove all content from '$site'" --choices "Yes|Y,No|N" --default "No" --var decision
         [[ "$decision" == "YES" ]] || return 0
 
         _web_server_remove_document_content "$document_root"
@@ -1215,11 +1269,11 @@ EOF
                 }
                 ;;
         esac
-        ask_decision --label "Redirect HTTP to HTTPS" --choices "YES|Y,NO|N" --default "YES" --var redirect || return 0
+        ask_decision --label "Redirect HTTP to HTTPS" --choices "Yes|Y,No|N" --default "Yes" --var redirect || return 0
         sgnd_print_labeledvalue --label "TLS certificate" --value "$cert" --labelwidth 22
         sgnd_print_labeledvalue --label "Redirect HTTP" --value "$redirect" --labelwidth 22
         answer="NO"
-        ask_decision --label "Enable HTTPS for $site" --choices "YES|Y,NO|N" --default "NO" --var answer || return 0
+        ask_decision --label "Enable HTTPS for $site" --choices "Yes|Y,No|N" --default "No" --var answer || return 0
         [[ "$answer" == "YES" ]] || return 0
         if (( ${FLAG_DRYRUN:-0} == 1 )); then
             sayinfo "DRYRUN: Would configure HTTPS on $address and redirect=$redirect; no changes written."
@@ -1274,9 +1328,100 @@ EOF
         fi
         rm -f -- "$backup" "$staged"
         sayok "HTTPS enabled for $address."
+        sgnd_print_labeledvalue --label "Public certificate" --value "$cert" --labelwidth 22
+        sayinfo "Use 'Export public certificate' under Site management to download a workstation copy."
         if [[ "$option" == "Generate self-signed test certificate" ]]; then
             saywarning "Self-signed certificate: browsers will not trust this until its certificate is explicitly trusted. Do not use for public uploads."
         fi
+    }
+
+    # fn: _web_server_export_https_certificate - Export a site's public TLS certificate
+    # . Purpose
+    #   Make the public certificate of an HTTPS-enabled Nginx site available to the
+    #   invoking administrator for download and, when self-signed, local trust setup.
+    # . Behavior
+    #   - Read ssl_certificate from the selected site's Nginx configuration.
+    #   - Export only the first X.509 certificate (never the private key or chain keys).
+    #   - Save to the invoking user's private sgnd-certificates directory.
+    #   - Report the source path, exported path, SHA-256 fingerprint, and SCP command.
+    #   - Do not change Nginx configuration or restart the service.
+    # . Arguments
+    #   $1  Optional Nginx site identifier.
+    # . Returns
+    #   0 on success or cancellation; non-zero for invalid or inaccessible certificates.
+    # . Usage
+    #   _web_server_export_https_certificate "sgndux"
+    _web_server_export_https_certificate() {
+        local site="${1:-}" cfg="" cert="" address="" username="" home_dir=""
+        local export_dir="" export_file="" temporary="" fingerprint="" server=""
+        local -a sites=()
+
+        command -v openssl >/dev/null 2>&1 || { sayfail "openssl is required to export certificates."; return 1; }
+        if [[ -z "$site" ]]; then
+            mapfile -t sites < <(_web_server_available_sites 2>/dev/null || true)
+            (( ${#sites[@]} > 0 )) || { saywarning "No Nginx sites are available."; return 0; }
+            _web_ask_selection --label "Export certificate for site" --var site --items "${sites[@]}" || return 0
+        fi
+        [[ "$site" =~ ^[A-Za-z0-9][A-Za-z0-9._-]*$ ]] || { sayfail "Invalid site identifier."; return 2; }
+        cfg="/etc/nginx/sites-available/$site"
+        [[ -f "$cfg" ]] || { sayfail "Site configuration not found: $site"; return 1; }
+
+        # Use the certificate Nginx actually references; never assume the generated path.
+        cert="$(awk '$1 == "ssl_certificate" { sub(/;$/, "", $2); print $2; exit }' "$cfg")"
+        [[ "$cert" == /* && "$cert" != *[[:space:]]* && "$cert" != *\$* && "$cert" != *\;* ]] || {
+            saywarning "No static HTTPS certificate configured for $site."
+            return 1
+        }
+        sudo -v || { sayfail "Administrator authorization is required to read the TLS certificate."; return 1; }
+        if ! sudo openssl x509 -in "$cert" -noout >/dev/null 2>&1; then
+            sayfail "Unable to read a valid public X.509 certificate from $cert."
+            return 1
+        fi
+
+        address="$(awk '$1 == "server_name" { sub(/;$/, "", $2); print $2; exit }' "$cfg")"
+        [[ "$address" =~ ^[A-Za-z0-9][A-Za-z0-9.-]*$ ]] || address="$site"
+        username="${SUDO_USER:-$(id -un)}"
+        [[ "$username" =~ ^[A-Za-z_][A-Za-z0-9_.-]*[$]?$ ]] || { sayfail "Cannot determine invoking user."; return 1; }
+        home_dir="$(getent passwd "$username" | awk -F: 'NR==1 {print $6}')"
+        [[ "$home_dir" == /* && -d "$home_dir" ]] || { sayfail "Cannot determine home directory for $username."; return 1; }
+        export_dir="${home_dir%/}/sgnd-certificates"
+        export_file="$export_dir/$address.crt"
+        fingerprint="$(sudo openssl x509 -in "$cert" -noout -fingerprint -sha256 2>/dev/null)" || return 1
+
+        sgnd_print_labeledvalue --label "Website" --value "$address" --labelwidth 22
+        sgnd_print_labeledvalue --label "Nginx certificate" --value "$cert" --labelwidth 22
+        sgnd_print_labeledvalue --label "SHA-256" --value "$fingerprint" --labelwidth 22
+        if (( ${FLAG_DRYRUN:-0} == 1 )); then
+            sayinfo "DRYRUN: Would export public certificate to $export_file."
+            return 0
+        fi
+
+        if ! sudo -u "$username" install -d -m 0700 -- "$export_dir"; then
+            sayfail "Unable to create certificate export directory: $export_dir"
+            return 1
+        fi
+        temporary="$(sudo -u "$username" mktemp "$export_dir/.${site}.XXXXXX")" || {
+            sayfail "Unable to stage public certificate for export."
+            return 1
+        }
+        # The redirection writes the extracted public PEM; no private-key material is read.
+        if ! sudo openssl x509 -in "$cert" -outform PEM > "$temporary"; then
+            sudo -u "$username" rm -f -- "$temporary"
+            sayfail "Unable to export public certificate."
+            return 1
+        fi
+        if ! sudo -u "$username" chmod 0644 -- "$temporary" ||
+           ! sudo -u "$username" mv -fT -- "$temporary" "$export_file"; then
+            sudo -u "$username" rm -f -- "$temporary"
+            sayfail "Unable to save certificate export."
+            return 1
+        fi
+        server="$(hostname -s 2>/dev/null || hostname)"
+        sayok "Public certificate exported. Private key remains on the server."
+        sgnd_print_labeledvalue --label "Exported file" --value "$export_file" --labelwidth 22
+        sgnd_print_labeledvalue --label "Download with" --value "scp ${username}@${server}:sgnd-certificates/${address}.crt ." --labelwidth 22
+        sayinfo "Only explicitly verified self-signed certificates belong in a workstation's Trusted Root store; CA-signed sites require trust in their issuing CA instead."
+        return 0
     }
 
     # fn: _web_server_configure_basic_auth - Protect one HTTPS URL prefix with Nginx Basic Auth
@@ -1329,7 +1474,7 @@ EOF
             if ! command -v htpasswd >/dev/null 2>&1; then
                 local install_answer="NO"
                 saywarning "Basic Authentication requires apache2-utils (htpasswd)."
-                ask_decision --label "Install apache2-utils now" --choices "YES|Y,NO|N" --default "NO" --var install_answer || return 0
+                ask_decision --label "Install apache2-utils now" --choices "Yes|Y,No|N" --default "No" --var install_answer || return 0
                 [[ "$install_answer" == YES ]] || { saywarning "Dependency was not installed."; return 127; }
                 if (( ${FLAG_DRYRUN:-0} == 1 )); then
                     sayinfo "DRYRUN: Would install apache2-utils."
@@ -1343,7 +1488,7 @@ EOF
             fi
         fi
         decision="NO"
-        ask_decision --label "Apply private-section change to $site" --choices "YES|Y,NO|N" --default "NO" --var decision || return 0
+        ask_decision --label "Apply private-section change to $site" --choices "Yes|Y,No|N" --default "No" --var decision || return 0
         [[ "$decision" == YES ]] || return 0
         if (( ${FLAG_DRYRUN:-0} == 1 )); then
             sayinfo "DRYRUN: Would modify Basic Auth for $site ($action)."
@@ -1459,7 +1604,7 @@ EOF
             sayinfo "Upload service already uses the canonical library implementation."
             return 0
         fi
-        ask_decision --label "Switch upload service to canonical Python library and restart it" --choices "YES|Y,NO|N" --default "NO" --var decision || return 0
+        ask_decision --label "Switch upload service to canonical Python library and restart it" --choices "Yes|Y,No|N" --default "No" --var decision || return 0
         [[ "$decision" == YES ]] || return 0
         if (( ${FLAG_DRYRUN:-0} == 1 )); then sayinfo "DRYRUN: Would migrate upload receiver service."; return 0; fi
         sudo -v || return 1
@@ -1547,7 +1692,7 @@ EOF
         [[ "$directory" =~ ^/[a-zA-Z0-9/_-]+$ && "$directory" != *".."* && "$directory" != "$root"* ]] || {
             sayfail "Choose a safe absolute path outside the site document root."; return 2;
         }
-        ask_decision --label "Install protected upload endpoint for $host" --choices "YES|Y,NO|N" --default "NO" --var decision || return 0
+        ask_decision --label "Install protected upload endpoint for $host" --choices "Yes|Y,No|N" --default "No" --var decision || return 0
         [[ "$decision" == YES ]] || return 0
         if (( ${FLAG_DRYRUN:-0} == 1 )); then sayinfo "DRYRUN: Would configure protected Markdown upload."; return 0; fi
         sudo -v || return 1
@@ -1678,17 +1823,18 @@ UNIT
                 sgnd_print_sectionheader "Configure"
                 sgnd_print --text "1. Change document root" --pad 2
                 sgnd_print --text "2. Configure HTTPS" --pad 2
-                sgnd_print --text "3. Configure private section (Basic Auth)" --pad 2
-                sgnd_print --text "4. Configure Markdown upload" --pad 2
-                sgnd_print --text "5. Update Markdown upload receiver" --pad 2
+                sgnd_print --text "3. Export public HTTPS certificate" --pad 2
+                sgnd_print --text "4. Configure private section (Basic Auth)" --pad 2
+                sgnd_print --text "5. Configure Markdown upload" --pad 2
+                sgnd_print --text "6. Update Markdown upload receiver" --pad 2
                 sgnd_print
                 sgnd_print_sectionheader "Site management"
-                sgnd_print --text "6. Create site" --pad 2
-                sgnd_print --text "7. Enable site" --pad 2
-                sgnd_print --text "8. Disable site" --pad 2
-                sgnd_print --text "9. Remove site" --pad 2
-                sgnd_print --text "10. Remove site content" --pad 2
-                sgnd_print --text "11. Remove DNS record" --pad 2
+                sgnd_print --text "7. Create site" --pad 2
+                sgnd_print --text "8. Enable site" --pad 2
+                sgnd_print --text "9. Disable site" --pad 2
+                sgnd_print --text "10. Remove site" --pad 2
+                sgnd_print --text "11. Remove site content" --pad 2
+                sgnd_print --text "12. Remove DNS record" --pad 2
                 sgnd_print --text "S. Select another site" --pad 2
                 sgnd_print --text "Q. Back" --pad 2
                 sgnd_print
@@ -1699,15 +1845,16 @@ UNIT
                 case "${input^^}" in
                     1) _web_server_change_document_root "$site" ;;
                     2) _web_server_configure_https "$site" ;;
-                    3) _web_server_configure_basic_auth "$site" ;;
-                    4) _web_server_configure_markdown_upload "$site" ;;
-                    5) _web_server_update_markdown_upload ;;
-                    6) _web_server_create_site; break ;;
-                    7) _web_server_enable_site "$site" ;;
-                    8) _web_server_disable_site "$site" ;;
-                    9) _web_server_remove_site "$site"; break ;;
-                    10) _web_server_remove_site_content "$site" ;;
-                    11)
+                    3) _web_server_export_https_certificate "$site" ;;
+                    4) _web_server_configure_basic_auth "$site" ;;
+                    5) _web_server_configure_markdown_upload "$site" ;;
+                    6) _web_server_update_markdown_upload ;;
+                    7) _web_server_create_site; break ;;
+                    8) _web_server_enable_site "$site" ;;
+                    9) _web_server_disable_site "$site" ;;
+                    10) _web_server_remove_site "$site"; break ;;
+                    11) _web_server_remove_site_content "$site" ;;
+                    12)
                         cfg="/etc/nginx/sites-available/$site"
                         address="$(awk '$1 == "server_name" {for (i=2; i<=NF; i++) {gsub(/;/, "", $i); printf "%s%s", (i==2 ? "" : " "), $i}; exit}' "$cfg")"
                         _web_server_remove_dns_record "$address"
@@ -1864,7 +2011,7 @@ EOF
         sgnd_print_labeledvalue --label "Installed docs" --value "$source" --labelwidth 24
         sgnd_print_labeledvalue --label "Published docs" --value "$destination" --labelwidth 24
         sayinfo "Installed and published documentation differ. A mirror update also deletes obsolete published files."
-        ask_decision --label "Update published documentation" --choices "YES|Y,NO|N" --default "NO" --var decision || return 0
+        ask_decision --label "Update published documentation" --choices "Yes|Y,No|N" --default "No" --var decision || return 0
         [[ "$decision" == YES ]] || return 0
         if (( ${FLAG_DRYRUN:-0} == 1 )); then
             sayinfo "DRYRUN: Would mirror $source to $destination (including deletions)."

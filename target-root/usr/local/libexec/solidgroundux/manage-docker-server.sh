@@ -374,7 +374,7 @@ print()
         fi
 
         if _docker_directory_nonempty "$target_root"; then
-            ask_decision --label "Target directory contains data. Use it anyway" --choices "YES|Y,NO|N" --default "NO" --var decision
+            ask_decision --label "Target directory contains data. Use it anyway" --choices "Yes|Y,No|N" --default "No" --var decision
             [[ "$decision" == "YES" ]] || return 0
         fi
 

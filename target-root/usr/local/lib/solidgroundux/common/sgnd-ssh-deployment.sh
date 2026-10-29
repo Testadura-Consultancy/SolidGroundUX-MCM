@@ -67,7 +67,7 @@ sgnd_ssh_ensure_access() {
                 [[ -r "${candidate}.pub" ]] || { sayfail "Public key not readable: ${candidate}.pub"; continue; }
                 command -v ssh-copy-id >/dev/null || { sayfail "ssh-copy-id is unavailable."; continue; }
                 local decision="NO"
-                ask_decision --label "Install public key for ${user}@${host}" --choices "YES|Y,NO|N" --default "NO" --var decision || continue
+                ask_decision --label "Install public key for ${user}@${host}" --choices "Yes|Y,No|N" --default "No" --var decision || continue
                 [[ "$decision" == YES ]] || continue
                 ssh-copy-id -p "$port" -i "${candidate}.pub" -- "${user}@${host}" || sayfail "Public key installation failed."
                 ;;

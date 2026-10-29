@@ -162,6 +162,12 @@ set -uo pipefail
         SGND_WEB_CONTENT_INGEST_PARENT
         SGND_WEB_PUBLISH_PROFILES_B64
         SGND_WEB_PUBLISH_LAST
+        SGND_WEB_PUBLISH_SOURCE
+        SGND_WEB_PUBLISH_HOST
+        SGND_WEB_PUBLISH_REMOTE_DIR
+        SGND_WEB_PUBLISH_USER
+        SGND_WEB_PUBLISH_PORT
+        SGND_WEB_PUBLISH_IDENTITY
         SGND_WEB_PUBLISH_STRATEGY
         SGND_WEB_PUBLISH_HOSTNAME
         SGND_WEB_INCOMING_HOST
@@ -184,6 +190,12 @@ set -uo pipefail
     : "${SGND_WEB_CONTENT_INGEST_PARENT:=}"
     : "${SGND_WEB_PUBLISH_PROFILES_B64:=}"
     : "${SGND_WEB_PUBLISH_LAST:=}"
+    : "${SGND_WEB_PUBLISH_SOURCE:=}"
+    : "${SGND_WEB_PUBLISH_HOST:=}"
+    : "${SGND_WEB_PUBLISH_REMOTE_DIR:=}"
+    : "${SGND_WEB_PUBLISH_USER:=}"
+    : "${SGND_WEB_PUBLISH_PORT:=22}"
+    : "${SGND_WEB_PUBLISH_IDENTITY:=}"
     : "${SGND_WEB_PUBLISH_STRATEGY:=Update}"
     : "${SGND_WEB_PUBLISH_HOSTNAME:=}"
     : "${SGND_WEB_INCOMING_HOST:=td-web}"
@@ -424,7 +436,7 @@ PY
         done
 
         if (( remembered_valid )); then
-            ask_decision --label "Use remembered language: $remembered" --choices "YES|Y,NO|N" --default "YES" --var decision || return 1
+            ask_decision --label "Use remembered language: $remembered" --choices "Yes|Y,No|N" --default "Yes" --var decision || return 1
             if [[ "$decision" == "YES" ]]; then
                 selected="$remembered"
             fi
@@ -450,7 +462,7 @@ PY
 
         remembered_label="$(_web_content_kind_label "$remembered")"
         if [[ -n "$remembered_label" ]]; then
-            ask_decision --label "Use remembered content type: $remembered_label" --choices "YES|Y,NO|N" --default "YES" --var decision || return 1
+            ask_decision --label "Use remembered content type: $remembered_label" --choices "Yes|Y,No|N" --default "Yes" --var decision || return 1
             if [[ "$decision" == "YES" ]]; then
                 selected="$remembered"
             fi
@@ -486,7 +498,7 @@ PY
         done
 
         if [[ -n "$remembered_option" ]]; then
-            ask_decision --label "Use remembered parent: $remembered_option" --choices "YES|Y,NO|N" --default "YES" --var decision || return 1
+            ask_decision --label "Use remembered parent: $remembered_option" --choices "Yes|Y,No|N" --default "Yes" --var decision || return 1
             if [[ "$decision" == "YES" ]]; then
                 selected="$remembered"
             fi
@@ -519,7 +531,7 @@ PY
         local route=""
         local archive_path=""
         local decision=""
-        local confirmation_default="NO"
+        local confirmation_default="No"
         local rc=0
         local -a supported_languages=()
         local -a parent_options=()
@@ -631,8 +643,8 @@ PY
         sgnd_print_labeledvalue --label "Source action" --value "Archive original after successful ingestion" --labelwidth 20
         rm -f "$preview_file"
 
-        [[ "$batch_mode" == "Yes" ]] && confirmation_default="YES"
-        ask_decision --label "Ingest this file" --choices "YES|Y,NO|N" --default "$confirmation_default" --var decision
+        [[ "$batch_mode" == "Yes" ]] && confirmation_default="Yes"
+        ask_decision --label "Ingest this file" --choices "Yes|Y,No|N" --default "$confirmation_default" --var decision
         if [[ "$decision" != "YES" ]]; then
             saycancel "Content ingestion skipped: $(basename -- "$input_file")"
             return 2
@@ -877,8 +889,8 @@ PY
         if [[ "$all_languages_required" == "Yes" ]]; then
             ask_decision \
                 --label "Selected default-language page has $translation_count translation(s). Archive and remove all language versions?" \
-                --choices "YES|Y,NO|N" \
-                --default "YES" \
+                --choices "Yes|Y,No|N" \
+                --default "Yes" \
                 --var decision || { rm -f "$preview_file"; return 2; }
             if [[ "$decision" != "YES" ]]; then
                 saycancel "Content deletion cancelled to avoid orphaned translations."
@@ -906,8 +918,8 @@ PY
         if [[ "$recursive_required" == "Yes" ]]; then
             ask_decision \
                 --label "Selected page has $descendant_count child page(s). Archive and remove the complete section?" \
-                --choices "YES|Y,NO|N" \
-                --default "NO" \
+                --choices "Yes|Y,No|N" \
+                --default "No" \
                 --var decision || { rm -f "$preview_file"; return 2; }
             if [[ "$decision" != "YES" ]]; then
                 saycancel "Content deletion cancelled."
@@ -948,8 +960,8 @@ PY
 
         ask_decision \
             --label "Archive and remove this content from the active website source?" \
-            --choices "YES|Y,NO|N" \
-            --default "NO" \
+            --choices "Yes|Y,No|N" \
+            --default "No" \
             --var decision || { rm -f "$preview_file"; return 2; }
         if [[ "$decision" != "YES" ]]; then
             saycancel "Content deletion cancelled."
@@ -1469,7 +1481,7 @@ PYCODE
             ask --label "New slug" --var slug --default "$slug" --back || { rm -f -- "$list_file" "$result_file"; return 0; }
             sgnd_print_labeledvalue --label "From" --value "$file" --labelwidth 20
             sgnd_print_labeledvalue --label "To" --value "${parent:+$parent/}${slug}" --labelwidth 20
-            ask_decision --label "Move this page and change its URL?" --choices "YES|Y,NO|N" --default "NO" --var decision || { rm -f -- "$list_file" "$result_file"; return 0; }
+            ask_decision --label "Move this page and change its URL?" --choices "Yes|Y,No|N" --default "No" --var decision || { rm -f -- "$list_file" "$result_file"; return 0; }
             if [[ "$decision" != "YES" ]]; then
                 saycancel "Page move cancelled."
                 rm -f -- "$list_file" "$result_file"
@@ -1578,196 +1590,302 @@ PYCODE
     }
 
 # - Website publication -------------------------------------------------------------
-    # fn: _web_publish_store - Maintain named publication destinations in framework .state.
-        # . Behavior
-        #   - Stores versioned JSON as base64 to keep the .state value shell-safe.
-        #   - Scopes each destination to the selected canonical website repository.
-        #   - Never stores secrets: only optional paths to private keys.
-        #   - Rejects malformed state instead of evaluating it as Bash code.
-        # . Arguments
-        #   $1 OPERATION: list, get, put, or delete.
-        #   $2 NAME: destination name (except for list).
-        #   Remaining args for put: method, path, host, user, port, identity.
-    _web_publish_store() {
-        local operation="${1:?missing operation}"
-        local name="${2:-}"
-        shift 2 || true
-        WEB_PUBLISH_STATE="${SGND_WEB_PUBLISH_PROFILES_B64:-}" python3 - "$operation" "$name" "$SGND_WEB_CONTENT_SOURCE" "$@" <<'PYCODE'
-import base64
-import json
-import os
-import pathlib
-import sys
-
-operation, name, root, *values = sys.argv[1:]
-root = str(pathlib.Path(root).resolve())
-raw = os.environ.get('WEB_PUBLISH_STATE', '')
-try:
-    state = json.loads(base64.b64decode(raw, validate=True).decode('utf-8')) if raw else []
-    if not isinstance(state, list) or any(not isinstance(p, dict) for p in state):
-        raise ValueError('not an array of destination records')
-except (ValueError, UnicodeError, json.JSONDecodeError) as error:
-    print('Invalid publishing state: {}'.format(error), file=sys.stderr)
-    sys.exit(2)
-
-matches = [p for p in state if p.get('repository') == root and p.get('name') == name]
-if operation == 'list':
-    for p in state:
-        if p.get('repository') == root:
-            print(p.get('name', ''))
-elif operation == 'get':
-    if len(matches) != 1:
-        print('Unknown publishing destination: {}'.format(name), file=sys.stderr)
-        sys.exit(1)
-    for field in ('name', 'method', 'path', 'host', 'user', 'port', 'identity'):
-        sys.stdout.buffer.write(str(matches[0].get(field, '')).encode('utf-8') + b'\0')
-elif operation == 'put':
-    if len(values) != 6:
-        sys.exit(2)
-    method, path, host, user, port, identity = values
-    state = [p for p in state if not (p.get('repository') == root and p.get('name') == name)]
-    state.append(dict(repository=root, name=name, method=method, path=path,
-                      host=host, user=user, port=port, identity=identity))
-    print(base64.b64encode(json.dumps(state, separators=(',', ':'), ensure_ascii=False).encode()).decode())
-elif operation == 'delete':
-    if len(matches) != 1:
-        sys.exit(1)
-    state = [p for p in state if not (p.get('repository') == root and p.get('name') == name)]
-    print(base64.b64encode(json.dumps(state, separators=(',', ':'), ensure_ascii=False).encode()).decode())
-else:
-    sys.exit(2)
-PYCODE
-    }
-
-    # fn: _web_publish_safe_path - Accept only absolute, dedicated directories, not roots.
+    # fn: _web_publish_safe_path - Require a dedicated absolute deployment directory.
+        # Returns:
+        #   0 for a safe directory, 1 otherwise.
+        # Usage:
+        #   _web_publish_safe_path "$path"
     _web_publish_safe_path() {
         local path="${1:-}"
         [[ "$path" == /* && "$path" != / && "$path" != *'..'* && "$path" != *$'\n'* && "$path" != *$'\r'* ]] || return 1
-        [[ "$path" != *'"'* && "$path" != *"'"* && "$path" != *'*'* && "$path" != *';'* && "$path" != *'$'* && "$path" != *'`'* && "$path" != *'!'* && "$path" != *'\\'* ]] || return 1
-        [[ "${path#/}" == */* ]] || return 1
+        [[ "$path" != *'"'* && "$path" != *"'"* && "$path" != *'*'* && "$path" != *';'* && "$path" != *'$'* && "$path" != *'`'* && "$path" != *'!'* && "$path" != *'\'* ]] || return 1
+        [[ "${path#/}" == */* && "$path" != *[[:space:]]* ]]
     }
 
-    # fn: _web_publish_edit - Ask method-specific questions and remember a destination.
-        # . Behavior
-        #   - Uses ordinary SolidGroundUX selection/input dialogues.
-        #   - Prompts only for values relevant to the chosen transport method.
-        #   - Persists profile data via SGND_STATE_VARIABLES, never publishing.cfg.
-    _web_publish_edit() {
-        local name="${1:-}" method="" selected="" target="" host="" user="" port="22" identity=""
-        local encoded="" value_file="" original_name="$name"
-        local -a values=()
-        if [[ -n "$name" ]]; then
-            value_file="$(mktemp)" || { sayfail "Cannot create destination buffer."; return 1; }
-            if ! _web_publish_store get "$name" > "$value_file"; then
-                rm -f -- "$value_file"; sayfail "Could not read publishing destination: $name"; return 1
+    # fn: _web_publish_restore_legacy - Import one unambiguous previously saved destination.
+        # Behavior:
+        #   - Does not require the old Markdown repository to exist.
+        #   - Ignores ambiguous destinations rather than guessing which root is correct.
+        #   - Does not change or remove the legacy state.
+        # Returns:
+        #   0 whether or not an unambiguous legacy destination is found.
+        # Usage:
+        #   _web_publish_restore_legacy
+    _web_publish_restore_legacy() {
+        [[ -z "$SGND_WEB_PUBLISH_HOST" && -z "$SGND_WEB_PUBLISH_REMOTE_DIR" ]] || return 0
+        [[ -n "${SGND_WEB_PUBLISH_PROFILES_B64:-}" ]] || return 0
+        local buffer="" name="" method="" target="" host="" user="" port="" identity=""
+        local -a fields=()
+        buffer="$(mktemp)" || return 0
+        if WEB_PUBLISH_STATE="$SGND_WEB_PUBLISH_PROFILES_B64" python3 - "$SGND_WEB_PUBLISH_LAST" > "$buffer" <<'PYCODE'
+import base64, json, os, sys
+try:
+    records = json.loads(base64.b64decode(os.environ['WEB_PUBLISH_STATE'], validate=True))
+    if not isinstance(records, list):
+        sys.exit(1)
+    name = sys.argv[1]
+    matches = [r for r in records if isinstance(r, dict) and r.get('method') == 'rsync' and (not name or r.get('name') == name)]
+    values = {(str(r.get('path','')), str(r.get('host','')), str(r.get('user','')),
+               str(r.get('port','22')), str(r.get('identity',''))) for r in matches}
+    if len(values) != 1:
+        sys.exit(1)
+    for value in next(iter(values)):
+        sys.stdout.buffer.write(value.encode() + b'\0')
+except (ValueError, KeyError, TypeError, UnicodeError):
+    sys.exit(1)
+PYCODE
+        then
+            mapfile -d '' -t fields < "$buffer"
+            if (( ${#fields[@]} == 5 )) && _web_publish_safe_path "${fields[0]}"; then
+                SGND_WEB_PUBLISH_REMOTE_DIR="${fields[0]}"
+                SGND_WEB_PUBLISH_HOST="${fields[1]}"
+                SGND_WEB_PUBLISH_USER="${fields[2]}"
+                SGND_WEB_PUBLISH_PORT="${fields[3]:-22}"
+                SGND_WEB_PUBLISH_IDENTITY="${fields[4]}"
+                sayinfo "Recovered your previous publishing settings."
             fi
-            mapfile -d '' -t values < "$value_file"
-            rm -f -- "$value_file"
-            (( ${#values[@]} == 7 )) || { sayfail "Corrupt publishing destination: $name"; return 1; }
-            method="${values[1]}"; target="${values[2]}"; host="${values[3]}"
-            user="${values[4]}"; port="${values[5]}"; identity="${values[6]}"
+        fi
+        rm -f -- "$buffer"
+        return 0
+    }
+
+    # fn: _web_publish_discover_sites - List active remote Nginx hostnames and document roots.
+        # Behavior:
+        #   - Uses the active Nginx configuration; falls back to readable enabled
+        #     site files if nginx -T requires unavailable privileges.
+        #   - Requires no write access; sudo -n is attempted only for reading config.
+        #   - Returns named virtual hosts for existing-site selection.
+        #   - With mode `roots`, returns eligible document roots; uses named sites
+        #     preferentially, falling back to the Nginx default root when needed.
+        #   - A failed lookup is optional: the caller can always enter values manually.
+        # Arguments:
+        #   $1 hostname; $2 user; $3 port; $4 optional SSH identity; $5 mode.
+        # Output:
+        #   Mode sites: hostname TAB absolute-root; mode roots: absolute-root.
+        # Returns:
+        #   Nonzero if SSH, Nginx dump or parsing fails.
+        # Usage:
+        #   _web_publish_discover_sites "$host" "$user" "$port" "$identity"
+    _web_publish_discover_sites() {
+        local host="$1" user="$2" port="$3" identity="${4:-}" mode="${5:-sites}" config="" rc=0
+        local -a ssh_args=(ssh -o BatchMode=yes -o ConnectTimeout=8 -p "$port")
+        [[ -z "$identity" ]] || ssh_args+=(-i "${identity/#\~\//$HOME/}")
+        config="$(mktemp)" || return 1
+        # Prefer the live Nginx dump. On a standard Ubuntu installation the SSH
+        # account may lack passwordless sudo and permission to inspect TLS keys;
+        # in that case read enabled site files (not sites-available) if accessible.
+        # This is read-only and never changes Nginx or its ownership.
+        "${ssh_args[@]}" -- "${user}@${host}" \
+            'config="$(sudo -n nginx -T 2>/dev/null)" || config="$(nginx -T 2>/dev/null)" || { config=""; count=0; for file in /etc/nginx/sites-enabled/* /etc/nginx/conf.d/*.conf; do [ -r "$file" ] || continue; config="$config$(cat "$file")"; config="$config
+"; count=$((count+1)); done; [ "$count" -gt 0 ] || exit 1; }; printf "%s\n" "$config"' > "$config" || rc=$?
+        if (( rc != 0 )); then rm -f -- "$config"; return "$rc"; fi
+        python3 - "$config" "$mode" <<'PYCODE'
+import re
+import sys
+
+try:
+    content = open(sys.argv[1], encoding='utf-8', errors='replace').read()
+    # Nginx lexer: skip comments, preserve quoted tokens, track nested blocks.
+    tokens = re.findall(r'(?m)\#[^\n]*|"(?:\\.|[^"\\])*"|\'(?:\\.|[^\'\\])*\'|[{};]|[^\s{};#]+', content)
+    levels = []
+    directive = []
+    sites = []
+    current = None
+    for token in tokens:
+        if token.startswith('#'):
+            continue
+        if token == '{':
+            kind = directive[0] if directive else ''
+            levels.append(kind)
+            if kind == 'server' and levels.count('server') == 1:
+                current = {'names': [], 'root': ''}
+            directive = []
+        elif token == '}':
+            if levels and levels[-1] == 'server' and current is not None:
+                sites.append(current)
+                current = None
+            if levels:
+                levels.pop()
+            directive = []
+        elif token == ';':
+            if current is not None and levels and levels[-1] == 'server':
+                if directive and directive[0] == 'server_name':
+                    current['names'].extend(directive[1:])
+                elif len(directive) > 1 and directive[0] == 'root':
+                    current['root'] = directive[1]
+            directive = []
+        else:
+            directive.append(token.strip('"\''))
+    roots = {}
+    valid_roots = set()
+    for site in sites:
+        root = site['root']
+        if not root.startswith('/') or any(c.isspace() for c in root) or '$' in root:
+            continue
+        valid_roots.add(root)
+        for name in site['names']:
+            if re.fullmatch(r'[A-Za-z0-9][A-Za-z0-9.-]*', name) and '.' in name:
+                roots.setdefault(name.lower(), set()).add(root)
+    if sys.argv[2] == 'roots':
+        # Prefer actual named websites over the distribution's default welcome page.
+        named_roots = {root for values in roots.values() if len(values) == 1 for root in values}
+        for root in sorted(named_roots or valid_roots):
+            print(root)
+    else:
+        for name in sorted(roots):
+            if len(roots[name]) == 1:
+                print(name + '\t' + next(iter(roots[name])))
+except (OSError, ValueError) as exc:
+    print('Nginx configuration could not be parsed: ' + str(exc), file=sys.stderr)
+    sys.exit(1)
+PYCODE
+        rc=$?
+        rm -f -- "$config"
+        return "$rc"
+    }
+
+    # fn: _web_publish_configure - Configure website publication after selecting the server.
+        # Behavior:
+        #   - Requires generated HTML and an SSH login before offering remote websites.
+        #   - Selecting an existing Nginx website fills its hostname and document root.
+        #   - For a new website, proposes a root beneath the existing sites' parent
+        #     directory when a unique parent can be determined; otherwise asks.
+        #   - A failed Nginx lookup never changes existing-site selection into creation.
+        #   - Saves all five publishing settings only after configuration succeeds.
+        # Returns:
+        #   0 configured; 2 cancelled; 1 invalid configuration.
+        # Usage:
+        #   _web_publish_configure
+    _web_publish_configure() {
+        local source="${SGND_WEB_PUBLISH_SOURCE:-${SGND_WEB_CONTENT_OUTPUT%/}}"
+        local host="${SGND_WEB_PUBLISH_HOST:-${SGND_WEB_INCOMING_HOST:-}}"
+        local user="${SGND_WEB_PUBLISH_USER:-${SGND_WEB_INCOMING_USER:-${USER:-}}}"
+        local port="${SGND_WEB_PUBLISH_PORT:-22}" identity="${SGND_WEB_PUBLISH_IDENTITY:-}"
+        local target="${SGND_WEB_PUBLISH_REMOTE_DIR:-}" hostname="${SGND_WEB_PUBLISH_HOSTNAME:-}"
+        local strategy="${SGND_WEB_PUBLISH_STRATEGY:-Update}" login="" site_action="" sites_file="" site_choice="" item="" row=""
+        local base="" suggested_base="" site_slug="" found=0
+        local -a available=() choices=() bases=()
+        ask --label "Source directory (generated HTML)" --var source --default "$source" --back || return 2
+        [[ -d "$source" && -f "${source%/}/index.html" ]] || { sayfail "Missing generated website: $source (index.html required)."; return 1; }
+        source="$(realpath -e -- "$source")" || return 1
+        [[ "$source" != / && "$source" != *-preview && "$source" != */preview && "$source" != */preview/* ]] || { sayfail "Unsafe or preview website directory."; return 1; }
+        [[ -z "$(find "$source" -type l -print -quit)" ]] || { sayfail "Site output contains symlinks; refusing publication."; return 1; }
+
+        login="${user}@${host}"
+        ask --label "Destination host (user@host)" --var login --default "$login" --back || return 2
+        if [[ "$login" == *@* ]]; then
+            user="${login%@*}"
+            host="${login#*@}"
         else
-            ask --label "Destination name" --var name --back || return 2
+            host="$login"
         fi
-        [[ "$name" =~ ^[A-Za-z0-9][A-Za-z0-9_.\ -]*$ ]] || { sayfail "Destination name may contain letters, digits, spaces, dots, hyphens and underscores."; return 1; }
-        if [[ -z "$original_name" ]]; then
-            local existing_names=""
-            existing_names="$(_web_publish_store list '')" || { sayfail "Cannot check existing destinations."; return 1; }
-            if [[ "
-$existing_names
-" == *$'\n'"$name"$'\n'* ]]; then
-                sayfail "Destination '$name' already exists. Choose Edit destination instead."
-                return 1
-            fi
-        fi
-        case "$method" in
-            local) selected="Local filesystem" ;;
-            share) selected="Mounted network share (SMB/NFS)" ;;
-            rsync) selected="SSH / rsync" ;;
-            sftp) selected="SFTP" ;;
-        esac
-        ask_selection --label "Deployment method" --var selected --items \
-            "Local filesystem" "Mounted network share (SMB/NFS)" "SSH / rsync" "SFTP" || return 2
-        case "$selected" in
-            "Local filesystem") method=local ;;
-            "Mounted network share (SMB/NFS)") method=share ;;
-            "SSH / rsync") method=rsync ;;
-            SFTP) method=sftp ;;
-            *) sayfail "Unknown deployment method."; return 1 ;;
-        esac
-        case "$method" in
-            rsync|sftp)
-                ask --label "Server hostname" --var host --default "$host" --back || return 2
-                ask --label "SSH / SFTP username" --var user --default "$user" --back || return 2
-                ask --label "SSH / SFTP port" --var port --default "${port:-22}" --back || return 2
-                if [[ "$method" == rsync ]]; then
-                    ask --label "SSH identity file (optional)" --var identity --default "$identity" --back || return 2
-                else
-                    identity=""
-                    sayinfo "SFTP uses your configured SSH agent/key authentication; no passwords are stored."
-                fi
-                ;;
-            *) host=""; user=""; port="22"; identity="" ;;
-        esac
-        ask --label "Destination directory (absolute path)" --var target --default "$target" --back || return 2
-        _web_publish_safe_path "$target" || { sayfail "Destination must be a safe absolute subdirectory, not a filesystem root."; return 1; }
-        [[ "$port" =~ ^[0-9]+$ ]] && (( 10#$port >= 1 && 10#$port <= 65535 )) || { sayfail "Invalid port: $port"; return 1; }
-        if [[ "$method" == rsync || "$method" == sftp ]]; then
-            [[ "$host" =~ ^[a-zA-Z0-9._-]+$ && "$user" =~ ^[a-zA-Z_][a-zA-Z0-9_.-]*$ ]] || { sayfail "Invalid hostname or remote username."; return 1; }
-            [[ "$target" != *[[:space:]]* ]] || { sayfail "Remote destination paths cannot contain whitespace."; return 1; }
-        fi
-        sgnd_print
-        sgnd_print_sectionheader --text "Destination settings"
-        sgnd_print_labeledvalue --label "Name" --value "$name" --labelwidth 20
-        sgnd_print_labeledvalue --label "Method" --value "$selected" --labelwidth 20
-        [[ -n "$host" ]] && sgnd_print_labeledvalue --label "Server" --value "${user}@${host}:${port}" --labelwidth 20
-        sgnd_print_labeledvalue --label "Directory" --value "$target" --labelwidth 20
-        local decision="NO"
-        ask_decision --label "Save this destination?" --choices "YES|Y,NO|N" --default "YES" --var decision || return 2
-        [[ "$decision" == YES ]] || { saycancel "Destination unchanged."; return 2; }
-        encoded="$(_web_publish_store put "$name" "$method" "$target" "$host" "$user" "$port" "$identity")" || { sayfail "Could not save destination in state."; return 1; }
-        SGND_WEB_PUBLISH_PROFILES_B64="$encoded"
-        SGND_WEB_PUBLISH_LAST="$name"
-        sayok "Destination '$name' saved in SolidGroundUX state."
-    }
+        [[ "$host" =~ ^[A-Za-z0-9._-]+$ && "$user" =~ ^[A-Za-z_][A-Za-z0-9_.-]*$ ]] || { sayfail "Invalid SSH user or host."; return 1; }
+        [[ "$port" =~ ^[0-9]+$ ]] && (( 10#$port > 0 && 10#$port < 65536 )) || { sayfail "Invalid SSH port."; return 1; }
 
-    # fn: _web_publish_choose_destination - Manage destination records before publishing.
-        # . Behavior
-        #   - Offers add/edit/remove and a publish selection in one continuous workflow.
-        #   - Returns 2 on cancellation rather than pretending publication succeeded.
-    _web_publish_choose_destination() {
-        local choice="" selected="" decision="" profiles_text="" name="" encoded=""
-        local -a names=() options=()
         while :; do
-            names=(); options=()
-            profiles_text="$(_web_publish_store list '')" || { sayfail "Cannot read saved publishing destinations."; return 1; }
-            if [[ -n "$profiles_text" ]]; then mapfile -t names <<< "$profiles_text"; fi
-            for name in "${names[@]}"; do options+=("Publish to $name"); done
-            options+=("Add destination")
-            if (( ${#names[@]} > 0 )); then options+=("Edit destination" "Remove destination"); fi
-            ask_selection --label "Publishing destination" --var choice --items "${options[@]}" || return 2
-            case "$choice" in
-                "Add destination") _web_publish_edit '' || { [[ $? == 1 ]] && return 1; }; continue ;;
-                "Edit destination"|"Remove destination")
-                    ask_selection --label "Select destination" --var selected --items "${names[@]}" || continue
-                    if [[ "$choice" == "Edit destination" ]]; then
-                        _web_publish_edit "$selected" || { [[ $? == 1 ]] && return 1; }
-                    else
-                        decision="NO"
-                        ask_decision --label "Remove saved destination '$selected'?" --choices "YES|Y,NO|N" --default "NO" --var decision || continue
-                        if [[ "$decision" == YES ]]; then
-                            encoded="$(_web_publish_store delete "$selected")" || { sayfail "Could not remove destination."; return 1; }
-                            SGND_WEB_PUBLISH_PROFILES_B64="$encoded"
-                            [[ "$SGND_WEB_PUBLISH_LAST" != "$selected" ]] || SGND_WEB_PUBLISH_LAST=""
-                            sayok "Destination removed from state."
-                        fi
+            # ask_selection already provides Q. Back; do not add a second Back entry.
+            ask_selection --label "Remote website on ${user}@${host}" --var site_action --items \
+                "Select existing website" "Create new website" || return 2
+            case "$site_action" in
+                "Select existing website")
+                    if ! _web_publish_prepare_ssh "$user" "$host" "$port" "${identity/#\~\//$HOME/}"; then
+                        saywarning "SSH unavailable for ${user}@${host}; select a website again or create a new one."
+                        continue
                     fi
-                    continue
+                    sites_file="$(mktemp)" || return 1
+                    available=()
+                    if _web_publish_discover_sites "$host" "$user" "$port" "$identity" > "$sites_file"; then
+                        mapfile -t available < "$sites_file"
+                    else
+                        rm -f -- "$sites_file"
+                        saywarning "Could not retrieve active Nginx websites from ${user}@${host}."
+                        continue
+                    fi
+                    rm -f -- "$sites_file"
+                    if (( ${#available[@]} == 0 )); then
+                        saywarning "No named Nginx websites found on ${user}@${host}."
+                        continue
+                    fi
+                    choices=()
+                    for row in "${available[@]}"; do
+                        choices+=("${row%%$'\t'*}  ->  ${row#*$'\t'}")
+                    done
+                    ask_selection --label "Existing website" --var site_choice --items "${choices[@]}" || return 2
+                    found=0
+                    for row in "${available[@]}"; do
+                        item="${row%%$'\t'*}  ->  ${row#*$'\t'}"
+                        if [[ "$item" == "$site_choice" ]]; then
+                            hostname="${row%%$'\t'*}"
+                            target="${row#*$'\t'}"
+                            found=1
+                            break
+                        fi
+                    done
+                    (( found )) || { sayfail "The selected website could not be resolved."; return 1; }
+                    break
                     ;;
-                "Publish to "*) WEB_PUBLISH_SELECTED="${choice#Publish to }"; return 0 ;;
-                *) sayfail "Unknown publication choice."; return 1 ;;
+                "Create new website")
+                    # A new website must never accidentally inherit the selected old
+                    # website's root. Determine a suitable base from live Nginx roots.
+                    target=""
+                    ask --label "New website hostname" --var hostname --default "" --back || return 2
+                    [[ "$hostname" =~ ^[A-Za-z0-9][A-Za-z0-9.-]*$ && "$hostname" == *.* ]] || { sayfail "Invalid website hostname."; return 1; }
+                    site_slug="${hostname%%.*}"
+                    bases=()
+                    available=()
+                    if _web_publish_prepare_ssh "$user" "$host" "$port" "${identity/#\~\//$HOME/}"; then
+                        sites_file="$(mktemp)" || return 1
+                        if _web_publish_discover_sites "$host" "$user" "$port" "$identity" roots > "$sites_file"; then
+                            mapfile -t available < "$sites_file"
+                        else
+                            saywarning "Nginx document roots unavailable; enter the new directory manually."
+                        fi
+                        rm -f -- "$sites_file"
+                    else
+                        saywarning "SSH unavailable; enter the new document root manually."
+                    fi
+                    for row in "${available[@]}"; do
+                        base="$(dirname -- "$row")"
+                        _web_publish_safe_path "$base/new-site" || continue
+                        found=0
+                        for item in "${bases[@]}"; do
+                            [[ "$item" != "$base" ]] || { found=1; break; }
+                        done
+                        (( found )) || bases+=("$base")
+                    done
+                    if (( ${#bases[@]} == 1 )); then
+                        suggested_base="${bases[0]}"
+                    elif (( ${#bases[@]} > 1 )); then
+                        # Multiple directory trees: ask rather than assume ownership.
+                        ask_selection --label "Existing website root directories" --var suggested_base --items \
+                            "${bases[@]}" "Enter manually" || return 2
+                        [[ "$suggested_base" != "Enter manually" ]] || suggested_base=""
+                    else
+                        suggested_base=""
+                    fi
+                    if [[ -n "$suggested_base" ]]; then
+                        target="${suggested_base%/}/${site_slug}"
+                        sayinfo "Suggested document root from Nginx sites: $target"
+                    fi
+                    ask --label "Remote directory" --var target --default "$target" --back || return 2
+                    break
+                    ;;
+                *) sayfail "Invalid website selection."; return 1 ;;
             esac
         done
+        _web_publish_safe_path "$target" || { sayfail "Destination must be a safe absolute directory."; return 1; }
+        [[ "$hostname" =~ ^[A-Za-z0-9][A-Za-z0-9.-]*$ && "$hostname" == *.* ]] || { sayfail "Invalid website hostname."; return 1; }
+        ask_selection --label "Synchronization" --var strategy --items "Update" "Mirror" || return 2
+        [[ "$strategy" == Update || "$strategy" == Mirror ]] || return 1
+        SGND_WEB_PUBLISH_SOURCE="$source"
+        SGND_WEB_PUBLISH_HOST="$host"
+        SGND_WEB_PUBLISH_USER="$user"
+        SGND_WEB_PUBLISH_PORT="$port"
+        SGND_WEB_PUBLISH_IDENTITY="$identity"
+        SGND_WEB_PUBLISH_REMOTE_DIR="$target"
+        SGND_WEB_PUBLISH_HOSTNAME="$hostname"
+        SGND_WEB_PUBLISH_STRATEGY="$strategy"
+        return 0
     }
 
     # fn: _web_publish_prepare_ssh - Discover the shared agent and repair SSH access when requested.
@@ -1792,6 +1910,7 @@ $existing_names
     _web_publish_remote_site() {
         local host="$1" user="$2" port="$3" identity="$4" target="$5" address="$6"
         local name="" decision="NO" ssh_identity="" output="" rc=0
+        local remote_command="" site_list="" site_name="" site_root="" found_in_active=0
         local -a ssh_args=(ssh -o BatchMode=yes -p "$port")
         [[ -z "$address" ]] && return 0
         [[ "$address" =~ ^[A-Za-z0-9][A-Za-z0-9.-]*$ && "$address" == *.* ]] || { sayfail "Invalid website hostname."; return 1; }
@@ -1801,19 +1920,42 @@ $existing_names
             ssh_identity="${identity/#\~\//$HOME/}"
             ssh_args+=(-i "$ssh_identity")
         fi
-        # The remote command receives strictly validated tokens, not arbitrary shell input.
-        local probe='for f in /etc/nginx/sites-available/*; do [ -f "$f" ] || continue; if grep -Eq "^[[:space:]]*server_name[[:space:]]+${1};" "$f"; then r=""; while read -r k v rest; do if [ "$k" = root ]; then r="${v%;}"; break; fi; done < "$f"; [ "$r" = "$2" ] || exit 5; [ -d "$2" ] && [ -w "$2" ] && exit 0; exit 6; fi; done; exit 4'
-        local remote_command=""
-        printf -v remote_command 'bash -c %q -- %q %q' "$probe" "$address" "$target"
-        "${ssh_args[@]}" "${user}@${host}" "$remote_command" >/dev/null 2>&1
-        rc=$?
+        # Inspect the same active Nginx configuration used by the website picker;
+        # a server_name directive can contain multiple hostnames on one line.
+        site_list="$(mktemp)" || return 1
+        if _web_publish_discover_sites "$host" "$user" "$port" "$identity" > "$site_list"; then
+            found_in_active=1
+            rc=4
+            while IFS=$'\t' read -r site_name site_root; do
+                [[ "${site_name,,}" == "${address,,}" ]] || continue
+                if [[ "$site_root" != "$target" ]]; then
+                    rc=5
+                else
+                    printf -v remote_command 'test -d %q && test -w %q' "$target" "$target"
+                    if "${ssh_args[@]}" "${user}@${host}" "$remote_command" >/dev/null 2>&1; then
+                        rc=0
+                    else
+                        rc=6
+                    fi
+                fi
+                break
+            done < "$site_list"
+        fi
+        rm -f -- "$site_list"
+        if (( found_in_active == 0 )); then
+            # Fallback for hosts where the SSH account cannot dump Nginx config.
+            local probe='for f in /etc/nginx/sites-available/*; do [ -f "$f" ] || continue; if grep -Eq "^[[:space:]]*server_name[[:space:]]+${1};" "$f"; then r=""; while read -r k v rest; do if [ "$k" = root ]; then r="${v%;}"; break; fi; done < "$f"; [ "$r" = "$2" ] || exit 5; [ -d "$2" ] && [ -w "$2" ] && exit 0; exit 6; fi; done; exit 4'
+            printf -v remote_command 'bash -c %q -- %q %q' "$probe" "$address" "$target"
+            "${ssh_args[@]}" "${user}@${host}" "$remote_command" >/dev/null 2>&1
+            rc=$?
+        fi
         if (( rc == 0 )); then
             sayinfo "Nginx hostname $address is already configured on $host."
             return 0
         fi
         if (( rc == 6 )); then
             saywarning "Nginx hostname exists, but the deployment user cannot write to $target."
-            ask_decision --label "Repair document root ownership on $host" --choices "YES|Y,NO|N" --default "NO" --var decision || return 1
+            ask_decision --label "Repair document root ownership on $host" --choices "Yes|Y,No|N" --default "No" --var decision || return 1
             [[ "$decision" == YES ]] || return 1
             local repair='p=/usr/local/libexec/solidgroundux/manage-web-server.sh; if [ -x "$p" ]; then exec sudo -n "$p" --action ensure-directory --document-root "$1" --deployment-user "$2"; fi; echo "Remote web server module missing" >&2; exit 127'
             printf -v remote_command 'bash -c %q -- %q %q' "$repair" "$target" "$user"
@@ -1835,7 +1977,7 @@ $existing_names
             return "$rc"
         fi
         saywarning "No Nginx site for $address was found on $host."
-        ask_decision --label "Configure Nginx site on $host for $address and $target?" --choices "YES|Y,NO|N" --default "NO" --var decision || return 0
+        ask_decision --label "Configure Nginx site on $host for $address and $target?" --choices "Yes|Y,No|N" --default "No" --var decision || return 0
         [[ "$decision" == YES ]] || return 0
         local remote_script=''
         remote_script='p=/usr/local/libexec/solidgroundux/manage-web-server.sh; if [ -x "$p" ]; then exec sudo -n "$p" --action ensure-site --site-name "$1" --web-address "$2" --document-root "$3" --deployment-user "$4"; fi; echo "Remote manage-web-server.sh not installed at /usr/local/libexec/solidgroundux/" >&2; exit 127'
@@ -1858,7 +2000,7 @@ $existing_names
         local decision="NO" ssh_identity="" remote_command="" rc=0
         [[ -n "$address" ]] || return 0
         [[ -t 0 ]] || { sayinfo "DNS registration skipped in noninteractive mode."; return 0; }
-        ask_decision --label "Check/register internal DNS for $address on $host" --choices "YES|Y,NO|N" --default "NO" --var decision || return 0
+        ask_decision --label "Check/register internal DNS for $address on $host" --choices "Yes|Y,No|N" --default "No" --var decision || return 0
         [[ "$decision" == YES ]] || return 0
         local -a ssh_args=(ssh -tt -p "$port")
         if [[ -n "$identity" ]]; then ssh_identity="${identity/#\~\//$HOME/}"; ssh_args+=(-i "$ssh_identity"); fi
@@ -1890,177 +2032,121 @@ $existing_names
         fi
     }
 
-    # fn: _web_content_publish - Validate, preview and deploy generated website files.
-        # . Behavior
-        #   - Supports local filesystem, already mounted SMB/NFS shares, rsync/SSH and SFTP.
-        #   - Uses update by default, with optional mirror for rsync transports.
-        #   - Remote Nginx provisioning, if requested, needs its own explicit approval.
-        #   - File transfer never starts before preview and confirmation.
-        #   - Captures transfer diagnostics and reports all failures via framework logging.
-        #   - Refuses preview generation output, symlinks and unsafe target paths.
+    # fn: _web_content_publish - Review, preview and publish a generated HTML website.
+        # Behavior:
+        #   - Shows five saved values with Publish, Modify and Cancel actions.
+        #   - Publishing does not depend on or prompt for a Markdown repository.
+        #   - Reuses SSH/rsync and optional remote Nginx provisioning.
+        #   - Dry-runs before deployment, and propagates failures to the action dispatcher.
+        # Returns:
+        #   0 on success/cancel, nonzero on a failed deployment or configuration.
+        # Usage:
+        #   _web_content_publish
     _web_content_publish() {
-        local selected="" source="" type="" target="" host="" user="" port="" identity=""
-        local strategy="Update" decision="NO" rc=0 preview="" destination="" ssh_transport="" ssh_identity="" value_file=""
-        local -a values=() command_args=() extra=() transport=()
-        _web_content_select_source || return 0
-        WEB_PUBLISH_SELECTED=""
-        _web_publish_choose_destination || { rc=$?; [[ "$rc" == 2 ]] && return 0; return "$rc"; }
-        selected="$WEB_PUBLISH_SELECTED"
-        value_file="$(mktemp)" || { sayfail "Cannot create profile read buffer."; return 1; }
-        if ! _web_publish_store get "$selected" > "$value_file"; then
-            rm -f -- "$value_file"; sayfail "Could not load publishing destination '$selected'."; return 1
+        local action="" source="" host="" user="" port="" identity="" target="" website_hostname="" strategy=""
+        local rc=0 preview="" deployment_log="" destination="" ssh_transport="" ssh_identity="" decision="No"
+        local additions=0 updates=0 removals=0
+        local -a command_args=() transport=()
+        WEB_PUBLISH_RESULT="cancelled"
+        _web_publish_restore_legacy
+        # On the first run, configure the server and website before displaying
+        # a review of publishing settings that do not yet exist.
+        if [[ -z "$SGND_WEB_PUBLISH_HOST" || -z "$SGND_WEB_PUBLISH_REMOTE_DIR" || -z "$SGND_WEB_PUBLISH_HOSTNAME" ]]; then
+            _web_publish_configure || { rc=$?; (( rc == 2 )) && return 0; return "$rc"; }
         fi
-        mapfile -d '' -t values < "$value_file"; rm -f -- "$value_file"
-        (( ${#values[@]} == 7 )) || { sayfail "Invalid destination record: $selected"; return 1; }
-        type="${values[1]}"; target="${values[2]}"; host="${values[3]}"; user="${values[4]}"
-        port="${values[5]:-22}"; identity="${values[6]}"
-        _web_publish_safe_path "$target" || { sayfail "Unsafe destination: $target"; return 1; }
-        [[ "$port" =~ ^[0-9]+$ ]] && (( 10#$port >= 1 && 10#$port <= 65535 )) || { sayfail "Invalid port: $port"; return 1; }
-        source="${SGND_WEB_CONTENT_OUTPUT%/}"
-        ask --label "Generated website directory" --var source --default "$source" --back || return 0
-        [[ -d "$source" && -f "$source/index.html" ]] || { sayfail "Missing generated website: $source (index.html required)."; return 1; }
-        source="$(realpath -e -- "$source")" || { sayfail "Cannot resolve generated website directory."; return 1; }
-        local repo_real=""
-        repo_real="$(realpath -e -- "$SGND_WEB_CONTENT_SOURCE")" || { sayfail "Cannot resolve website repository."; return 1; }
-        [[ "$source" != / && "$source" != "$repo_real" ]] || { sayfail "Unsafe website source directory."; return 1; }
-        [[ "$source" != *-preview && "$source" != */preview && "$source" != */preview/* ]] || { sayfail "Refusing to publish preview output."; return 1; }
-        [[ -z "$(find "$source" -type l -print -quit)" ]] || { sayfail "Site output contains symlinks; refusing publication."; return 1; }
-        strategy="${SGND_WEB_PUBLISH_STRATEGY:-Update}"
-        if [[ "$type" == sftp ]]; then
-            strategy=Update
-            sayinfo "SFTP supports update-only publication; mirror is unavailable for this method."
-        else
-            ask_selection --label "Synchronization strategy" --var strategy --items "Update" "Mirror" || return 0
-        fi
-        [[ "$strategy" == Update || "$strategy" == Mirror ]] || { sayfail "Invalid synchronization strategy."; return 1; }
-        SGND_WEB_PUBLISH_STRATEGY="$strategy"
-        local website_hostname=""
-        if [[ "$type" == rsync ]]; then
-            # A hostname remembered for a different destination must not be reused silently.
-            if [[ "${SGND_WEB_PUBLISH_LAST:-}" == "$selected" ]]; then
-                website_hostname="${SGND_WEB_PUBLISH_HOSTNAME:-}"
+        while :; do
+            sgnd_print
+            sgnd_print_sectionheader --text "Publish Website"
+            sgnd_print_labeledvalue --label "Source directory" --value "${SGND_WEB_PUBLISH_SOURCE:-${SGND_WEB_CONTENT_OUTPUT%/}}" --labelwidth 20
+            sgnd_print_labeledvalue --label "Destination host" --value "${SGND_WEB_PUBLISH_USER:-${SGND_WEB_INCOMING_USER:-${USER:-}}}@${SGND_WEB_PUBLISH_HOST:-${SGND_WEB_INCOMING_HOST:-}}" --labelwidth 20
+            sgnd_print_labeledvalue --label "Remote directory" --value "${SGND_WEB_PUBLISH_REMOTE_DIR:--}" --labelwidth 20
+            sgnd_print_labeledvalue --label "Website hostname" --value "${SGND_WEB_PUBLISH_HOSTNAME:--}" --labelwidth 20
+            sgnd_print_labeledvalue --label "Synchronization" --value "${SGND_WEB_PUBLISH_STRATEGY:-Update}" --labelwidth 20
+            if [[ -z "$SGND_WEB_PUBLISH_HOST" || -z "$SGND_WEB_PUBLISH_REMOTE_DIR" || -z "$SGND_WEB_PUBLISH_HOSTNAME" ]]; then
+                action="Modify"
+            else
+                ask_selection --label "Publication" --var action --items "Publish" "Modify" "Cancel" || return 0
             fi
-            ask --label "Website hostname (optional; Nginx check)" --var website_hostname --default "$website_hostname" --back || return 0
-            SGND_WEB_PUBLISH_HOSTNAME="$website_hostname"
-            ssh_identity="${identity/#\~\//$HOME/}"
-            _web_publish_prepare_ssh "$user" "$host" "$port" "$ssh_identity" || return $?
-            _web_publish_remote_site "$host" "$user" "$port" "$identity" "$target" "$website_hostname" || return $?
-            _web_publish_offer_dns "$host" "$user" "$port" "$identity" "$website_hostname"
-        fi
-        SGND_WEB_PUBLISH_LAST="$selected"
-        preview="$(mktemp)" || { sayfail "Cannot create publication preview buffer."; return 1; }
-        case "$type" in
-            local|share)
-                command -v rsync >/dev/null 2>&1 || { sayfail "Install rsync for local/share publishing."; rm -f "$preview"; return 127; }
-                destination="$(realpath -m -- "$target")" || { sayfail "Cannot resolve destination."; rm -f "$preview"; return 1; }
-                [[ "$destination" != "$source" && "$destination" != "$source/"* && "$source" != "$destination/"* ]] || {
-                    sayfail "Publishing destination overlaps source."; rm -f "$preview"; return 1;
-                }
-                if [[ "$type" == share && ! -d "$destination" ]]; then
-                    sayfail "Network share is not mounted or directory does not exist: $destination"; rm -f "$preview"; return 1
-                fi
-                if [[ "$type" == share ]] && command -v mountpoint >/dev/null 2>&1; then
-                    sayinfo "Ensure that the network share is mounted at $destination before continuing."
-                fi
-                transport=(rsync -rltvi)
-                [[ "$strategy" == Mirror ]] && transport+=(--delete)
-                command_args=("${transport[@]}" --dry-run -- "$source/" "$destination/")
-                ;;
-            rsync)
-                command -v rsync >/dev/null 2>&1 || { sayfail "Install rsync for SSH publication."; rm -f "$preview"; return 127; }
-                [[ "$host" =~ ^[a-zA-Z0-9._-]+$ && "$user" =~ ^[a-zA-Z_][a-zA-Z0-9_.-]*$ ]] || {
-                    sayfail "Invalid SSH hostname or user."; rm -f "$preview"; return 1;
-                }
-                [[ "$target" != *[[:space:]]* ]] || { sayfail "Remote SSH destination contains spaces."; rm -f "$preview"; return 1; }
-                ssh_transport="ssh -o BatchMode=yes -p $port"
-                if [[ -n "$identity" ]]; then
-                    ssh_identity="${identity/#\~\//$HOME/}"
-                    [[ -r "$ssh_identity" && "$ssh_identity" != *' '* ]] || { sayfail "Invalid SSH identity path."; rm -f "$preview"; return 1; }
-                    ssh_transport+=" -i $ssh_identity"
-                fi
-                destination="${user}@${host}:${target}/"
-                transport=(rsync -rltvi -e "$ssh_transport")
-                [[ "$strategy" == Mirror ]] && transport+=(--delete)
-                command_args=("${transport[@]}" --dry-run -- "$source/" "$destination")
-                ;;
-            sftp)
-                command -v lftp >/dev/null 2>&1 || { sayfail "Install lftp for SFTP publishing: sudo apt install lftp"; rm -f "$preview"; return 127; }
-                [[ "$host" =~ ^[a-zA-Z0-9._-]+$ && "$user" =~ ^[a-zA-Z_][a-zA-Z0-9_.-]*$ ]] || {
-                    sayfail "Invalid SFTP hostname or user."; rm -f "$preview"; return 1;
-                }
-                _web_publish_safe_path "$source" || { sayfail "SFTP source path contains unsupported characters."; rm -f "$preview"; return 1; }
-                extra=("set cmd:fail-exit true" "set net:max-retries 1" "open -u \"$user\" sftp://$host:$port" "mirror --reverse --verbose --dry-run --no-perms \"$source\" \"$target\"" "bye")
-                command_args=(lftp -e "$(printf '%s; ' "${extra[@]}")")
-                destination="${user}@${host}:${target}"
-                ;;
-            *) sayfail "Unknown deployment method: $type"; rm -f "$preview"; return 1 ;;
-        esac
-        sgnd_print
-        sgnd_print_sectionheader --text "Publication preview: $selected"
-        sgnd_print_labeledvalue --label "Source" --value "$source" --labelwidth 20
-        sgnd_print_labeledvalue --label "Destination" --value "$destination" --labelwidth 20
-        sgnd_print_labeledvalue --label "Method" --value "$type" --labelwidth 20
-        sgnd_print_labeledvalue --label "Strategy" --value "$strategy" --labelwidth 20
-        sayinfo "Checking planned changes (dry-run)..."
+            case "$action" in
+                Modify) _web_publish_configure || { rc=$?; (( rc == 2 )) && return 0; return "$rc"; }; continue ;;
+                Cancel) saycancel "Publication cancelled."; return 0 ;;
+                Publish) break ;;
+                *) sayfail "Invalid publishing action."; return 1 ;;
+            esac
+        done
+        source="${SGND_WEB_PUBLISH_SOURCE:-${SGND_WEB_CONTENT_OUTPUT%/}}"
+        host="$SGND_WEB_PUBLISH_HOST"
+        user="${SGND_WEB_PUBLISH_USER:-${SGND_WEB_INCOMING_USER:-${USER:-}}}"
+        port="${SGND_WEB_PUBLISH_PORT:-22}"
+        identity="$SGND_WEB_PUBLISH_IDENTITY"
+        target="$SGND_WEB_PUBLISH_REMOTE_DIR"
+        website_hostname="$SGND_WEB_PUBLISH_HOSTNAME"
+        strategy="$SGND_WEB_PUBLISH_STRATEGY"
+        [[ -d "$source" && -f "${source%/}/index.html" ]] || { sayfail "Missing generated website: $source (index.html required)."; return 1; }
+        source="$(realpath -e -- "$source")" || return 1
+        [[ "$source" != / && "$source" != *-preview && "$source" != */preview && "$source" != */preview/* ]] || { sayfail "Unsafe or preview website directory."; return 1; }
+        [[ -z "$(find "$source" -type l -print -quit)" ]] || { sayfail "Site output contains symlinks; refusing publication."; return 1; }
+        _web_publish_safe_path "$target" || { sayfail "Unsafe destination directory: $target"; return 1; }
+        [[ "$strategy" == Update || "$strategy" == Mirror ]] || { sayfail "Invalid synchronization strategy."; return 1; }
+        [[ "$host" =~ ^[A-Za-z0-9._-]+$ && "$user" =~ ^[A-Za-z_][A-Za-z0-9_.-]*$ ]] || { sayfail "Invalid SSH host or username."; return 1; }
+        [[ "$port" =~ ^[0-9]+$ ]] && (( 10#$port > 0 && 10#$port < 65536 )) || { sayfail "Invalid SSH port."; return 1; }
+        command -v rsync >/dev/null 2>&1 || { sayfail "Install rsync before publishing."; return 127; }
+        ssh_identity="${identity/#\~\//$HOME/}"
+        [[ -z "$identity" || ( -r "$ssh_identity" && "$ssh_identity" != *' '* ) ]] || { sayfail "Invalid SSH identity file."; return 1; }
+        _web_publish_prepare_ssh "$user" "$host" "$port" "$ssh_identity" || return $?
+        _web_publish_remote_site "$host" "$user" "$port" "$identity" "$target" "$website_hostname" || return $?
+        ssh_transport="ssh -o BatchMode=yes -p $port"
+        [[ -z "$identity" ]] || ssh_transport+=" -i $ssh_identity"
+        destination="${user}@${host}:${target}/"
+        transport=(rsync -rltvi -e "$ssh_transport")
+        [[ "$strategy" == Mirror ]] && transport+=(--delete)
+        command_args=("${transport[@]}" --dry-run -- "$source/" "$destination")
+        preview="$(mktemp)" || return 1
+        sayinfo "Checking planned publication changes (dry-run)..."
         "${command_args[@]}" > "$preview" 2>&1 || rc=$?
         if (( rc != 0 )); then
             sayfail "Publication preview failed (exit $rc); nothing uploaded."
             while IFS= read -r line; do [[ -n "$line" ]] && sgnd_print --text "$line"; done < "$preview"
-            rm -f "$preview"; return "$rc"
-        fi
-        # rsync itemized transfers can be summarized; SFTP preview remains an estimate.
-        if [[ "$type" == sftp ]]; then
-            saywarning "SFTP preview is indicative; the remote server may change before upload."
-        else
-            local additions=0 updates=0 removals=0
-            additions="$(grep -Ec '^>f\+|^cd\+' "$preview" || true)"
-            updates="$(grep -Ec '^>f[^+]|^\.f' "$preview" || true)"
-            removals="$(grep -c '^\*deleting' "$preview" || true)"
-            sgnd_print_labeledvalue --label "New items" --value "$additions" --labelwidth 20
-            sgnd_print_labeledvalue --label "Changed files" --value "$updates" --labelwidth 20
-            sgnd_print_labeledvalue --label "Delete candidates" --value "$removals" --labelwidth 20
-        fi
-        if [[ "$strategy" == Mirror ]]; then
-            saywarning "MIRROR will DELETE remote files missing from the generated website."
-            while IFS= read -r line; do [[ "$line" == *deleting* ]] && sgnd_print --text "$line"; done < "$preview"
-        fi
-        rm -f "$preview"
-        if [[ "$strategy" == Mirror ]]; then
-            decision="NO"
-            ask_decision --label "Confirm MIRROR (including removals) to $selected?" --choices "YES|Y,NO|N" --default "NO" --var decision || return 0
-        else
-            decision="NO"
-            ask_decision --label "Publish generated site to $selected?" --choices "YES|Y,NO|N" --default "NO" --var decision || return 0
-        fi
-        [[ "$decision" == YES ]] || { saycancel "Publication cancelled; no changes made."; return 0; }
-        rc=0
-        local deployment_log=""
-        deployment_log="$(mktemp)" || { sayfail "Cannot create deployment log."; return 1; }
-        sayinfo "Publishing generated website to $selected..."
-        case "$type" in
-            local|share)
-                if [[ "$type" == local ]]; then
-                    mkdir -p -- "$destination" || { sayfail "Cannot create publication directory: $destination"; rm -f "$deployment_log"; return 1; }
-                fi
-                "${transport[@]}" -- "$source/" "$destination/" > "$deployment_log" 2>&1 || rc=$?
-                ;;
-            rsync) "${transport[@]}" -- "$source/" "$destination" > "$deployment_log" 2>&1 || rc=$? ;;
-            sftp)
-                extra=("set cmd:fail-exit true" "set net:max-retries 1" "open -u \"$user\" sftp://$host:$port" "mirror --reverse --verbose --no-perms \"$source\" \"$target\"" "bye")
-                lftp -e "$(printf '%s; ' "${extra[@]}")" > "$deployment_log" 2>&1 || rc=$?
-                ;;
-        esac
-        if (( rc != 0 )); then
-            sayfail "Publication to $selected failed (exit $rc)."
-            while IFS= read -r line; do [[ -n "$line" ]] && sgnd_print --text "$line"; done < "$deployment_log"
-            rm -f "$deployment_log"
+            rm -f -- "$preview"
             return "$rc"
         fi
-        rm -f "$deployment_log"
-        sayok "Website published to $selected using $type ($strategy)."
-        if [[ "$type" == rsync ]]; then
-            _web_publish_verify_http "$website_hostname"
+        sgnd_print_sectionheader --text "Publication preview"
+        sgnd_print_labeledvalue --label "Source" --value "$source" --labelwidth 20
+        sgnd_print_labeledvalue --label "Destination" --value "$destination" --labelwidth 20
+        sgnd_print_labeledvalue --label "Strategy" --value "$strategy" --labelwidth 20
+        additions="$(grep -Ec '^>f\+|^cd\+' "$preview" || true)"
+        updates="$(grep -Ec '^>f[^+]|^\.f' "$preview" || true)"
+        removals="$(grep -c '^\*deleting' "$preview" || true)"
+        sgnd_print_labeledvalue --label "New items" --value "$additions" --labelwidth 20
+        sgnd_print_labeledvalue --label "Changed files" --value "$updates" --labelwidth 20
+        sgnd_print_labeledvalue --label "Delete candidates" --value "$removals" --labelwidth 20
+        if [[ "$strategy" == Mirror ]]; then
+            saywarning "Mirror will delete remote files missing from the generated website."
+            while IFS= read -r line; do [[ "$line" == *deleting* ]] && sgnd_print --text "$line"; done < "$preview"
         fi
+        rm -f -- "$preview"
+        if [[ "$strategy" == Mirror ]]; then
+            ask_decision --label "Confirm mirror (including removals)" --choices "Yes|Y,No|N" --default "No" --var decision || return 0
+        else
+            ask_decision --label "Publish generated website" --choices "Yes|Y,No|N" --default "No" --var decision || return 0
+        fi
+        [[ "$decision" == YES ]] || { saycancel "Publication cancelled; no changes made."; return 0; }
+        deployment_log="$(mktemp)" || return 1
+        rc=0
+        sayinfo "Publishing generated website to $host..."
+        "${transport[@]}" -- "$source/" "$destination" > "$deployment_log" 2>&1 || rc=$?
+        if (( rc != 0 )); then
+            sayfail "Publication failed (exit $rc)."
+            while IFS= read -r line; do [[ -n "$line" ]] && sgnd_print --text "$line"; done < "$deployment_log"
+            rm -f -- "$deployment_log"
+            return "$rc"
+        fi
+        rm -f -- "$deployment_log"
+        sayok "Website published to $host ($strategy)."
+        WEB_PUBLISH_RESULT="success"
+        _web_publish_offer_dns "$host" "$user" "$port" "$identity" "$website_hostname"
+        _web_publish_verify_http "$website_hostname"
+        return 0
     }
 
 # - Local import into staging -------------------------------------------------------
@@ -2090,7 +2176,7 @@ $existing_names
             if [[ -n "$conflicts" ]]; then
                 saywarning "Existing incoming files detected:"
                 while IFS= read -r line; do [[ -n "$line" ]] && sgnd_print --text "$line"; done <<< "$conflicts"
-                ask_decision --label "Skip existing files and copy only new files?" --choices "YES|Y,NO|N" --default "NO" --var decision || { rm -f -- "$result_file"; return 0; }
+                ask_decision --label "Skip existing files and copy only new files?" --choices "Yes|Y,No|N" --default "No" --var decision || { rm -f -- "$result_file"; return 0; }
                 [[ "$decision" == "YES" || "$decision" == "Y" ]] || { rm -f -- "$result_file"; return 0; }
                 policy="skip"
                 _web_content_run_engine "$result_file" preview-local-import --input-path "$input_path" --incoming "$incoming" --conflict-policy "$policy" || {
@@ -2126,7 +2212,7 @@ PYCODE
             return 0
         fi
         decision="NO"
-        ask_decision --label "Copy these files into Incoming?" --choices "YES|Y,NO|N" --default "NO" --var decision || { rm -f -- "$result_file"; return 0; }
+        ask_decision --label "Copy these files into Incoming?" --choices "Yes|Y,No|N" --default "No" --var decision || { rm -f -- "$result_file"; return 0; }
         if [[ "$decision" != "YES" && "$decision" != "Y" ]]; then
             sayinfo "Local import cancelled; no files copied."
             rm -f -- "$result_file"
@@ -2191,7 +2277,7 @@ PYCODE
             if [[ -n "$conflicts" ]]; then
                 saywarning "Existing content files detected:"
                 while IFS= read -r line; do [[ -n "$line" ]] && sgnd_print --text "$line"; done <<< "$conflicts"
-                ask_decision --label "Skip existing files and ingest only new files?" --choices "YES|Y,NO|N" --default "NO" --var decision || { rm -f -- "$result_file"; return 0; }
+                ask_decision --label "Skip existing files and ingest only new files?" --choices "Yes|Y,No|N" --default "No" --var decision || { rm -f -- "$result_file"; return 0; }
                 [[ "$decision" == "YES" || "$decision" == "Y" ]] || { rm -f -- "$result_file"; return 0; }
                 policy="skip"
                 _web_content_run_engine "$result_file" preview-incoming-ingest --input-path "$input_path" --source "$SGND_WEB_CONTENT_SOURCE" --conflict-policy skip || {
@@ -2207,7 +2293,7 @@ PYCODE
         sayinfo "Content ingestion preview (policy: $policy):"
         while IFS= read -r line; do [[ -n "$line" ]] && sgnd_print --text "$line"; done <<< "$files"
         decision="NO"
-        ask_decision --label "Accept this package into website content?" --choices "YES|Y,NO|N" --default "NO" --var decision || { rm -f -- "$result_file"; return 0; }
+        ask_decision --label "Accept this package into website content?" --choices "Yes|Y,No|N" --default "No" --var decision || { rm -f -- "$result_file"; return 0; }
         if [[ "$decision" == "YES" || "$decision" == "Y" ]]; then
             if _web_content_run_engine "$result_file" ingest-incoming --input-path "$input_path" --source "$SGND_WEB_CONTENT_SOURCE" --conflict-policy "$policy" --confirm; then
                 sayok "Package ingestion completed. Validate and generate the website before publishing."
@@ -2235,7 +2321,7 @@ PYCODE
         #   - The operator can press P/Space to pause the countdown.
         #   - Preserves the original publication exit status after the dialogue.
     _run_action() {
-        local action="${1:?missing action}" rc=0
+        local action="${1:?missing action}" rc=0 completion_message=""
         case "$action" in
             ingest) _web_content_ingest ;;
             configure-source) _web_content_configure_incoming ;;
@@ -2253,13 +2339,20 @@ PYCODE
             generate) _web_content_generate ;;
             publish)
                 _web_content_publish || rc=$?
+                if (( rc != 0 )); then
+                    completion_message="Publication failed. Return to menu?"
+                elif [[ "${WEB_PUBLISH_RESULT:-}" == "success" ]]; then
+                    completion_message="Publication completed. Return to menu?"
+                else
+                    completion_message="Publication cancelled. Return to menu?"
+                fi
                 sgnd_print
                 sgnd_print_sectionheader ""
                 if [[ -t 0 && "${FLAG_AUTO:-0}" != 1 ]]; then
                     # Reuse the verified framework dialogue; do not introduce a new ask API.
                     ask_dlg_autocontinue \
                         --seconds 60 \
-                        --message "Publication finished. Return to menu?" \
+                        --message "$completion_message" \
                         --pause \
                         --legend "Enter=return to menu; P/Space=pause; timeout=menu" \
                         || true

@@ -179,7 +179,7 @@ SGND_STATE_SAVE=0
         sgnd_print_sectionheader --text "Generate deployment SSH key"
         sgnd_print_labeledvalue --label "Private key" --value "$key" --labelwidth 20
         sayinfo "ssh-keygen will request a passphrase. A passphrase is recommended."
-        ask_decision --label "Generate this SSH key pair?" --choices "YES|Y,NO|N" --default "NO" --var decision || return 2
+        ask_decision --label "Generate this SSH key pair?" --choices "Yes|Y,No|N" --default "No" --var decision || return 2
         [[ "$decision" == "YES" ]] || { saycancel "SSH key generation cancelled."; return 0; }
         if (( ${FLAG_DRYRUN:-0} == 1 )); then
             sayinfo "Dry run: Would generate a new Ed25519 key at $key."
@@ -201,7 +201,7 @@ SGND_STATE_SAVE=0
         sgnd_print_sectionheader --text "Install SSH public key"
         sgnd_print_labeledvalue --label "Public key" --value "${key}.pub" --labelwidth 20
         sgnd_print_labeledvalue --label "Remote login" --value "${remote_user}@${remote_host}" --labelwidth 20
-        ask_decision --label "Install this public key on the remote host?" --choices "YES|Y,NO|N" --default "NO" --var decision || return 2
+        ask_decision --label "Install this public key on the remote host?" --choices "Yes|Y,No|N" --default "No" --var decision || return 2
         [[ "$decision" == "YES" ]] || { saycancel "Key installation cancelled."; return 0; }
         if (( ${FLAG_DRYRUN:-0} == 1 )); then
             sayinfo "Dry run: Would install ${key}.pub on ${remote_user}@${remote_host}."

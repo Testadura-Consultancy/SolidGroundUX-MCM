@@ -140,6 +140,7 @@ set -uo pipefail
     web_start()                   { _web_run_manage start; }
     web_configure_root()          { _web_run_manage configure-root; }
     web_manage_sites()            { _web_run_manage manage-sites; }
+    web_configure_default()       { _web_run_manage configure-default; }
     web_publish()                 { _web_run_publish publish-site; }
     web_doc_configure()           { _web_run_manage configure-documentation; }
     web_doc_publish()             { _web_run_publish publish-documentation; }
@@ -179,6 +180,7 @@ set -uo pipefail
     sgnd_menu_register_item "web-install" "$SGND_WEB_SERVER_MODULE_ID" "Install Nginx" "web_install" "Install Nginx and basic web-server utilities" 0 0 1 1
     sgnd_menu_register_item "web-start" "$SGND_WEB_SERVER_MODULE_ID" "Start web service" "web_start" "Enable and start nginx.service" 0 0 1 1
     sgnd_menu_register_item "web-root" "$SGND_WEB_SERVER_MODULE_ID" "Configure web content root" "web_configure_root" "Select or create the storage location used for web content" 0 15 1 0
+    sgnd_menu_register_item "web-default" "$SGND_WEB_SERVER_MODULE_ID" "Protect unknown hostnames" "web_configure_default" "Reject unknown HTTP hosts and HTTPS SNI without serving another site" 0 15 1 0
     sgnd_menu_register_item "web-sites" "$SGND_WEB_SERVER_MODULE_ID" "Manage sites" "web_manage_sites" "Select and manage Nginx sites, settings, content, and DNS records" 0 15 1 0
 
     sgnd_menu_register_item "web-service-manage" "web-service" "Manage web service" "web_service_manage" "Start, stop, restart, enable, or disable nginx.service" 0 15 1 0

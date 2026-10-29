@@ -390,7 +390,7 @@ set -uo pipefail
         # The engine is framework-owned, and its root escalation is handled by sgnd_exe_start.
         "$engine" --dryrun --file "$policy" || return $?
         ask_decision --label "Apply this policy to filesystem ownership and permissions" \
-            --choices "YES|Y,NO|N" --default "NO" --var decision || return 0
+            --choices "Yes|Y,No|N" --default "No" --var decision || return 0
         [[ "$decision" == "YES" ]] || { sayinfo "Permission repair cancelled."; return 0; }
         "$engine" --file "$policy"
     }

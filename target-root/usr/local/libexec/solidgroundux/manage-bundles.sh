@@ -199,12 +199,12 @@ set -uo pipefail
         # . Usage
         #   _bundle_validate_overwrite replace
     _bundle_validate_overwrite() { [[ "$1" == replace || "$1" == fail ]]; }
-    # fn$ _bundle_validate_chapter0 - Accept optional existing introduction file
+    # fn$ _bundle_validate_chapter0 - Accept external files or generated content routes
         # . Returns
-        #   0 if empty, '-', or an existing file.
+        #   0 if empty, '-', an existing file, or a content/... Markdown route.
         # . Usage
         #   _bundle_validate_chapter0 '-'
-    _bundle_validate_chapter0() { [[ -z "$1" || "$1" == '-' || -f "$1" ]]; }
+    _bundle_validate_chapter0() { [[ -z "$1" || "$1" == '-' || -f "$1" || ( "$1" == content/*.md && "$1" != *..* ) ]]; }
     # fn$ _bundle_validate_position - Require a positive one-based position
         # . Returns
         #   0 for positive integers.
@@ -403,6 +403,7 @@ for key in ("title", "output_dir", "overwrite", "chapter0"):
         sgnd_print
         sgnd_print_sectionheader 'Configure bundle' --padend 0
         sgnd_print_labeledvalue --label 'Bundle' --value "$SGND_DOC_ACTIVE_BUNDLE" --labelwidth 25
+        sgnd_print 'Chapter 0: use content/.../*.md for a generated page, or an external Markdown file.'
         sgnd_print 'Enter Q to cancel an input. Use - to clear Chapter 0.'
         for field in title output_dir overwrite chapter0; do
             entry=""
@@ -414,17 +415,13 @@ for key in ("title", "output_dir", "overwrite", "chapter0"):
             esac
             [[ "$field" == chapter0 && "$entry" == - ]] && entry=""
             previous="${!field}"
-            # An unchanged legacy Chapter 0 path inside generated output still needs
-            # migration into the persistent bundle store. Never skip that backend call.
-            if [[ "$entry" == "$previous" ]]; then
-                if [[ "$field" != chapter0 || -z "$entry" || "$entry" != "$output_dir/content/"* ]]; then
-                    continue
-                fi
+            # Pass legacy selections through once to migrate absolute output paths.
+            if [[ "$entry" == "$previous" && "$field" != chapter0 ]]; then
+                continue
             fi
             _bundle_python set "$SGND_DOC_ACTIVE_BUNDLE" "$field" "$entry" >/dev/null || return $?
             if [[ "$field" == chapter0 ]]; then
-                # The backend may retain a generated page under its permanent store.
-                # Display the actual saved path, not the path the user entered.
+                # Display the normalized logical reference saved by the backend.
                 raw="$(_bundle_python show "$SGND_DOC_ACTIVE_BUNDLE")" || return $?
                 entry="$(printf '%s' "$raw" | python3 -c 'import json,sys; print(json.load(sys.stdin).get("chapter0", ""))')" || return $?
             fi

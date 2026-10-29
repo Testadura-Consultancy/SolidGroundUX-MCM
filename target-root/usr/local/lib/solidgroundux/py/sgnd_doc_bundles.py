@@ -101,29 +101,28 @@ def run(args):
         if args.field == 'output_dir' and value and not Path(value).is_absolute():
             raise ValueError('Output directory must be an absolute path')
         if args.field == 'chapter0':
-            # Selecting the already-retained file is a no-op: preserve its
-            # original generated location for duplicate-page exclusion.
-            if value and Path(value).expanduser().resolve() == Path(data.get('chapter0') or '/nonexistent-sgnd-chapter0').expanduser().resolve() and data.get('chapter0_origin'):
-                save(store, data)
-                print('Saved bundle: ' + data['id'])
-                return
-            if value and not Path(value).expanduser().is_file():
-                raise ValueError('Chapter 0 Markdown file does not exist')
+            # Generated Chapter 0 is a logical route, not a copy of output from
+            # an earlier build. Resolve it against the newly generated tree.
             if value:
-                selected = Path(value).expanduser().resolve()
-                data['chapter0_origin'] = str(selected)
-                output_content = Path(data['output_dir']).expanduser().resolve() / 'content' if data['output_dir'] else None
-                if output_content and selected.is_relative_to(output_content):
-                    # Generated output is replaced on every build: retain the selected
-                    # introductory page independently so future rebuilds still work.
-                    retained = store / 'chapter0' / (data['id'] + '.md')
-                    retained.parent.mkdir(parents=True, exist_ok=True)
-                    retained.write_bytes(selected.read_bytes())
-                    value = str(retained)
+                selected = Path(value).expanduser()
+                if selected.is_absolute():
+                    # Migrate older stored paths, including retained snapshots,
+                    # using the original selection when available.
+                    if str(selected) == data.get('chapter0') and data.get('chapter0_origin'):
+                        selected = Path(data['chapter0_origin']).expanduser()
+                    normalized = selected.as_posix()
+                    if '/content/' in normalized:
+                        value = 'content/' + normalized.rsplit('/content/', 1)[1]
+                    elif not selected.is_file():
+                        raise ValueError('External Chapter 0 Markdown file does not exist')
+                    else:
+                        value = str(selected.resolve())
                 else:
-                    value = str(selected)
-            else:
-                data.pop('chapter0_origin', None)
+                    normalized = selected.as_posix()
+                    if not normalized.startswith('content/') or '..' in selected.parts or not normalized.endswith('.md'):
+                        raise ValueError('Generated Chapter 0 must be a relative content/.../*.md path')
+                    value = normalized
+            data.pop('chapter0_origin', None)
         data[args.field] = value
     elif args.command == 'add-product':
         if any(p['id'] == args.product_id for p in data['products']):

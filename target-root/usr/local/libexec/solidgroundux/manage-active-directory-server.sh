@@ -685,7 +685,7 @@ set -uo pipefail
         _adsvr_step_install_packages || return 51
         _adsvr_join_preflight || return 52
         ask_decision --label "Join ${SGND_AD_DNS_DOMAIN} as an additional writable DC" \
-            --choices "YES|Y,NO|N" --default "NO" --var decision || return 53
+            --choices "Yes|Y,No|N" --default "No" --var decision || return 53
         [[ "$decision" == "YES" ]] || { sayinfo "Additional controller join cancelled."; return 53; }
         _adsvr_join_domain || return 54
         _adsvr_step_kerberos || return 55

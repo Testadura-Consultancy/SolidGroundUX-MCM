@@ -1871,7 +1871,7 @@ set -uo pipefail
 
         ask_decision \
             --label "Exit SolidGround Management Console" \
-            --choices "Yes|Y,NO|N" \
+            --choices "Yes|Y,No|N" \
             --default "No" \
             --var decision
 
