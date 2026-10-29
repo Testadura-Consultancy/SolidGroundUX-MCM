@@ -123,19 +123,6 @@ set -uo pipefail
         _sgnd_run_public_command "sgnd-create-wrappers"
     }
 
-    # fn: _dev_generate_docs
-        # . Purpose
-        #   Launch the canonical SolidGroundUX documentation generator.
-        #
-        # . Returns
-        #   Returns the underlying public-command status.
-        #
-        # . Usage
-        #   _dev_generate_docs
-    _dev_generate_docs() {
-        _sgnd_run_public_command "sgnd-doc-generator"
-    }
-
 
 
 # - Module validation contract -----------------------------------------------------
@@ -192,6 +179,5 @@ set -uo pipefail
     sgnd_menu_register_item "dev-deployws" "$SGND_DEVELOPMENT_MODULE_ID" "Deploy workspace" "_dev_deploy_workspace" "Select and deploy workspace files locally or remotely" 0 0 1 0
     sgnd_menu_register_item "dev-preprel" "$SGND_DEVELOPMENT_MODULE_ID" "Prepare release" "_dev_prepare_release" "Create a release archive with checksums and manifests" 0 15 1 0
     sgnd_menu_register_item "dev-wrappers" "$SGND_DEVELOPMENT_MODULE_ID" "Create wrappers" "_dev_create_wrappers" "Create root-aware bin or sbin wrappers for selected scripts" 0 20 1 0
-    sgnd_menu_register_item "dev-gendocs" "$SGND_DEVELOPMENT_MODULE_ID" "Generate documentation" "_dev_generate_docs" "Generate SolidGroundUX source documentation" 0 0 1 0
-
+   
     sayinfo "Development module registered with the console."
