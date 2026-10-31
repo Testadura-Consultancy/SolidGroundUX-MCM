@@ -39,7 +39,9 @@ set -uo pipefail
         #   Exits with code 2 when executed instead of sourced.
         #
         # . Usage
+        #   ```bash
         #   _sgnd_lib_guard
+        #   ```
     _sgnd_lib_guard() {
         local lib_base=""
         local guard=""
@@ -79,7 +81,9 @@ set -uo pipefail
         #   Returns the underlying public-command status.
         #
         # . Usage
+        #   ```bash
         #   _dev_create_workspace
+        #   ```
     _dev_create_workspace() {
         _sgnd_run_public_command "sgnd-create-workspace"
     }
@@ -92,7 +96,9 @@ set -uo pipefail
         #   Returns the underlying public-command status.
         #
         # . Usage
+        #   ```bash
         #   _dev_deploy_workspace
+        #   ```
     _dev_deploy_workspace() {
         _sgnd_run_public_command "sgnd-deploy-workspace"
     }
@@ -105,7 +111,9 @@ set -uo pipefail
         #   Returns the underlying public-command status.
         #
         # . Usage
+        #   ```bash
         #   _dev_prepare_release
+        #   ```
     _dev_prepare_release() {
         _sgnd_run_public_command "sgnd-prepare-release"
     }
@@ -118,7 +126,9 @@ set -uo pipefail
         #   Returns the underlying public-command status.
         #
         # . Usage
+        #   ```bash
         #   _dev_create_wrappers
+        #   ```
     _dev_create_wrappers() {
         _sgnd_run_public_command "sgnd-create-wrappers"
     }
@@ -134,6 +144,15 @@ set -uo pipefail
     #
     # Every validator sets SGND_MODULE_VALIDATION_MESSAGE to a concise result summary.
     # Detailed diagnostic output may be written by the validator or delegated action.
+    # fn: validate_module_development - Validate the management module and record its status for the console.
+        #
+        # . Returns
+        #   A console validation status (0=pass, 1=fail, 2=warning, 3=skipped).
+        #
+        # . Usage
+        #   ```bash
+        #   validate_module_development
+        #   ```
     validate_module_development() {
         SGND_MODULE_VALIDATION_MESSAGE="Development module is loaded and registered."
         return 0

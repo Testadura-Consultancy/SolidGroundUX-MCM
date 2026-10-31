@@ -17,6 +17,16 @@
 #   the SolidGroundUX Management Console. All mutating actions honor --dryrun and
 #   provide a useful preview of the changes that would be made.
 #
+# Usage:
+#   Run the executable from its shell command (or installed wrapper):
+#   ```bash
+#   manage-solidgroundux --action config-system-configure
+#   manage-solidgroundux --dryrun --action log-rotate
+#   ```
+#
+#   Script-specific options:
+#   - `--action NAME`, `-a`: Management action (choices: `config-system-configure`, `config-system-edit`, `config-user-edit`, `log-rotate`).
+#
 # Attribution:
 #   Developers  : Mark Fieten
 #   Company     : Testadura Consultancy
@@ -58,7 +68,9 @@ set -uo pipefail
         #   be found, or the executable common library is unreadable.
         #
         # . Usage
+        #   ```bash
         #   _framework_locator || return $?
+        #   ```
     _framework_locator() {
         local script_file=""
         local path_without_root=""
@@ -140,6 +152,7 @@ set -uo pipefail
     SGND_STATE_SAVE=0
 
 # - Helpers -----------------------------------------------------------------------
+    # fn: _framework_config_validator - Choose a validator for a Framework configuration key.
     _framework_config_validator() {
         local key="${1:-}"
 
@@ -159,6 +172,7 @@ set -uo pipefail
         esac
     }
 
+    # fn: _framework_config_validate_log_level - Accept one of the supported Framework logging levels.
     _framework_config_validate_log_level() {
         case "${1,,}" in
             silent|quiet|normal|verbose|debug|trace) return 0 ;;
@@ -166,6 +180,7 @@ set -uo pipefail
         esac
     }
 
+    # fn: _framework_config_write_value - Write a configuration key and value back to the selected configuration file.
     _framework_config_write_value() {
         local file="${1:?missing cfg file}"
         local key="${2:?missing cfg key}"
@@ -214,6 +229,7 @@ set -uo pipefail
         return "$rc"
     }
 
+    # fn: _framework_config_edit_file - Open a Framework configuration file in the selected external editor.
     _framework_config_edit_file() {
         local title="$1"
         local file="$2"
@@ -253,6 +269,7 @@ set -uo pipefail
         sudo "${editor_command[@]}" "$file"
     }
 
+    # fn: _framework_configure_file - Configure file in the Framework workflow.
     _framework_configure_file() {
         local cfg_file="${1:-${SGND_FRAMEWORK_SYSCFG_FILE:-}}"
         local spec=""
@@ -326,6 +343,7 @@ set -uo pipefail
         fi
     }
 
+    # fn: _framework_log_validate - Log validate in the Framework workflow.
     _framework_log_validate() {
         [[ -n "${SGND_LOG_PATH:-}" ]] || {
             saywarning "SGND_LOG_PATH is not set"
@@ -338,6 +356,7 @@ set -uo pipefail
         }
     }
 
+    # fn: _framework_log_rotate - Log rotate in the Framework workflow.
     _framework_log_rotate() {
         local logfile="${SGND_LOG_PATH:-}"
         local keep="${SGND_LOG_KEEP:-5}"
@@ -395,6 +414,7 @@ set -uo pipefail
     }
 
 # - Actions -----------------------------------------------------------------------
+    # fn: _run_action - Dispatch the requested management action to its implementation.
     _run_action() {
         local action="${1:?missing action}"
 
@@ -423,6 +443,7 @@ set -uo pipefail
     }
 
 # - Main --------------------------------------------------------------------------
+    # fn: main - Dispatch command-line options to the appropriate management workflow.
     main() {
         local action=""
         local selection=""

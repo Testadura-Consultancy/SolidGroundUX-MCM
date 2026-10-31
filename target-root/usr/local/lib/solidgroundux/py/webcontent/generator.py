@@ -32,6 +32,7 @@ from .templates import load_template, render_template, unresolved_placeholders
 from .validation import validate_site
 
 
+# cls: GenerationResult - Outcome and diagnostics from a website generation run.
 @dataclass(slots=True)
 class GenerationResult:
     """Outcome and diagnostics from a website generation run."""
@@ -46,6 +47,7 @@ class GenerationResult:
     sitemap_generated: bool = False
     rss_generated: bool = False
 
+    # fn: as_dict - Serialize the result to a JSON-compatible mapping.
     def as_dict(self) -> dict[str, object]:
         """Serialize the result to a JSON-compatible mapping.
         
@@ -65,6 +67,7 @@ class GenerationResult:
         }
 
 
+# fn: _normalize_languages - Normalize selected languages into canonical language identifiers.
 def _normalize_languages(value: str | Iterable[str], supported: list[str]) -> set[str]:
     """Normalize languages to a canonical representation."""
     if isinstance(value, str):
@@ -80,6 +83,7 @@ def _normalize_languages(value: str | Iterable[str], supported: list[str]) -> se
     return selected
 
 
+# fn: _route_to_output - Map a content route to its destination in the generated website tree.
 def _route_to_output(output_root: Path, route: str) -> Path:
     """Handle route to output for the web content workflow."""
     clean = route.strip("/")
@@ -94,6 +98,9 @@ _ROOT_RELATIVE_URL_RE = re.compile(
 )
 
 
+# fn: _make_output_relative_urls - Make site-local root-relative URLs work both over HTTP and ``file://``.
+# . Description
+#   Generated pages can live at arbitrary route depth. Rewriting ``/css/...``, ``/images/...`` and internal ``href="/..."`` targets to a path relative to
 def _make_output_relative_urls(document: str, route: str) -> str:
     """Make site-local root-relative URLs work both over HTTP and ``file://``.
 
@@ -106,6 +113,9 @@ def _make_output_relative_urls(document: str, route: str) -> str:
     depth = len([part for part in route.strip("/").split("/") if part])
     root_prefix = "../" * depth
 
+    # fn: replace - Substitute the current matched fragment during content rendering.
+    # . Description
+    #   Args: match: Input used by this operation.
     def replace(match: re.Match[str]) -> str:
         """Handle replace for the web content workflow.
         
@@ -132,6 +142,9 @@ _VERSIONED_ASSET_RE = re.compile(
 )
 
 
+# fn: _version_local_assets - Append a content hash to root-relative local .css/.js href/src links.
+# . Description
+#   Existing query parameters and fragments are preserved. Paths are restricted to files inside the generated output root (never arbitrary filesystem paths).
 def _version_local_assets(document: str, output_root: Path) -> str:
     """Append a content hash to root-relative local .css/.js href/src links.
 
@@ -142,6 +155,7 @@ def _version_local_assets(document: str, output_root: Path) -> str:
     resolved_root = output_root.resolve()
     digests: dict[Path, str] = {}
 
+    # fn: replace - Substitute the current matched fragment during content rendering.
     def replace(match: re.Match[str]) -> str:
         url = match.group("url")
         parsed = urlsplit(url)
@@ -161,6 +175,7 @@ def _version_local_assets(document: str, output_root: Path) -> str:
     return _VERSIONED_ASSET_RE.sub(replace, document)
 
 
+# fn: _base_route_for_item - Derive the canonical base route of a content item.
 def _base_route_for_item(item: ContentItem, default_language: str) -> str:
     """Handle base route for item for the web content workflow."""
     route = item.route
@@ -174,6 +189,7 @@ def _base_route_for_item(item: ContentItem, default_language: str) -> str:
     return route
 
 
+# fn: _ignore_marked_directories - Exclude marked asset subtrees and the marker itself during copying.
 def _ignore_marked_directories(directory: str, names: list[str]) -> set[str]:
     """Exclude marked asset subtrees and the marker itself during copying."""
     root = Path(directory)
@@ -182,12 +198,16 @@ def _ignore_marked_directories(directory: str, names: list[str]) -> set[str]:
     return ignored
 
 
+# fn: _render_navigation - Build a recursive sidebar from translated page titles and content routes.
+# . Description
+#   Section indexes supply navigation labels and ordering at every depth. Existing intermediate folders can still group ordinary pages until the
 def _render_navigation(
     navigation: list[NavigationItem],
     items: list[ContentItem],
     language: str,
     default_language: str,
     current_base_route: str,
+    doc_sidebar: bool = False,
 ) -> str:
     """Build a recursive sidebar from translated page titles and content routes.
 
@@ -238,6 +258,7 @@ def _render_navigation(
     # Root entries are discovered from section indexes, not navigation.cfg.
     top_by_path = {n.path: n for n in top}
 
+    # fn: label_for - Choose the display label for a navigation item.
     def label_for(route: str) -> str:
         page = nodes[route]["page"]
         # Root groups keep their explicitly authored navigation labels, even
@@ -249,12 +270,14 @@ def _render_navigation(
             return str(page.metadata.get("nav_title") or page.title)
         return route.strip("/").split("/")[-1].replace("-", " ").capitalize()
 
+    # fn: render - Render a content item or navigation section using its configured template.
     def render(route: str, ancestors: set[str]) -> str:
         if route in ancestors:
             return ""
         node = nodes[route]
         # Home is its own navigation entry, not a container for every section.
         child_routes = () if route == "/" else node["children"]
+        # fn: child_order - Prefer section navigation order over ordinary page ordering.
         def child_order(child_route: str) -> int:
             """Prefer section navigation order over ordinary page ordering."""
             child_page = nodes[child_route]["page"]
@@ -269,29 +292,87 @@ def _render_navigation(
         children = sorted(child_routes, key=lambda r: (
             child_order(r), label_for(r).casefold(), r,
         ))
-        active = current_base_route == route
+
+        # Resolve an absent section page to its first available descendant.
+        # Invisible and navigation-only pages are not valid destinations.
+        def first_visible_page(candidate: str, visited: set[str]) -> ContentItem | None:
+            if candidate in visited:
+                return None
+            candidate_node = nodes[candidate]
+            candidate_page = candidate_node["page"]
+            if candidate_page and not candidate_page.hidden and not candidate_page.metadata.get("nav_only"):
+                return candidate_page
+            ordered = sorted(candidate_node["children"], key=lambda r: (
+                child_order(r), label_for(r).casefold(), r,
+            ))
+            for descendant in ordered:
+                result = first_visible_page(descendant, visited | {candidate})
+                if result is not None:
+                    return result
+            return None
+
+        label = html.escape(label_for(route))
+        page = node["page"]
+        # Authored indexes are content pages: their section title must remain
+        # a route to that content. Navigation-only indexes have no published
+        # page of their own, so their title points at the first visible child.
+        destination = page if page and not page.metadata.get("nav_only") else None
+        alias_child = None
+        if destination is None:
+            for child in children:
+                destination = first_visible_page(child, {route})
+                if destination is not None:
+                    # Hide only a directly linked leaf. Removing a child group
+                    # would also remove the navigation to all its descendants.
+                    if (doc_sidebar and not nodes[child]["children"]
+                            and nodes[child]["page"] is destination):
+                        alias_child = child
+                    break
+        destination_base_route = (_base_route_for_item(destination, default_language)
+                                  if destination is not None else None)
+        active = current_base_route == route or (
+            alias_child is not None and current_base_route == destination_base_route
+        )
         expanded = active or (route.endswith("/") and current_base_route.startswith(route))
         classes = ' class="active"' if active else ""
         current = ' aria-current="page"' if active else ""
-        label = html.escape(label_for(route))
-        page = node["page"]
-        link = (f'<a href="{html.escape(page.route, quote=True)}"{classes}{current}>{label}</a>'
-                if page and not page.metadata.get('nav_only') else f'<span class="wc-nav-label">{label}</span>')
+        link = (f'<a href="{html.escape(destination.route, quote=True)}"{classes}{current}>{label}</a>'
+                if destination is not None else f'<span class="wc-nav-label">{label}</span>')
         # A hidden section index conceals this node and all descendants in
         # normal navigation; ShowHidden reveals the complete subtree. Ordinary
         # hidden pages conceal their own leaf only.
         hidden_class = ' wc-hidden-link' if page is not None and page.hidden else ''
         if not children:
             return '<div class="wc-nav-leaf' + hidden_class + '">' + link + '</div>'
-        child_html = "".join(render(child, ancestors | {route}) for child in children)
-        return ('<details class="wc-nav-group' + hidden_class + '"' + (' open' if expanded else '') + '>'
-                '<summary><span class="wc-nav-arrow" aria-hidden="true"></span>'
-                + link + '</summary><div class="wc-nav-children">' + child_html + '</div></details>')
+        child_html = "".join(render(child, ancestors | {route}) for child in children if child != alias_child)
+        if not doc_sidebar:
+            # Preserve the historical WWW markup for sites with their own
+            # templates and stylesheets. Only the documentation layout uses
+            # the independent title/disclosure presentation.
+            return ('<details class="wc-nav-group' + hidden_class + '"'
+                    + (' open' if expanded else '') + '>'
+                    '<summary><span class="wc-nav-arrow" aria-hidden="true"></span>'
+                    + link + '</summary><div class="wc-nav-children">' + child_html
+                    + '</div></details>')
+        if alias_child is not None and len(children) == 1:
+            # A section with one page has nothing left to expand.
+            return '<div class="wc-nav-leaf' + hidden_class + '">' + link + '</div>'
+        # Put the destination outside <details>. Browsers hide all non-summary
+        # descendants of closed <details>, and nested links within <summary>
+        # compete with the native disclosure action. The title therefore stays
+        # visible and navigates normally; only the chevron toggles children.
+        return ('<div class="wc-nav-group' + hidden_class + '">'
+                '<div class="wc-nav-heading">' + link + '</div>'
+                '<details class="wc-nav-disclosure"' + (' open' if expanded else '') + '>'
+                '<summary aria-label="Toggle ' + html.escape(label_for(route), quote=True)
+                + '"><span class="wc-nav-arrow" aria-hidden="true"></span></summary>'
+                '<div class="wc-nav-children">' + child_html + '</div></details></div>')
 
     # Root and nested navigation are both derived from index/page metadata.
     return "\n".join(render(route, set()) for route in roots)
 
 
+# fn: _render_external_links - Render external links for website output.
 def _render_external_links(links: dict[str, str]) -> str:
     """Render external links for website output."""
     result: list[str] = []
@@ -305,12 +386,29 @@ def _render_external_links(links: dict[str, str]) -> str:
     return "\n".join(result)
 
 
-def _render_breadcrumb(items: list[ContentItem], item: ContentItem, default_language: str) -> str:
-    """Link to real ancestor indexes, preferring the page language over Dutch.
+# fn: _source_filename - Return the original source filename for generated documentation pages.
+def _source_filename(item: ContentItem) -> str:
+    """Use explicit provenance, or the legacy source index's Source line."""
+    value = item.metadata.get("source_file")
+    if isinstance(value, str) and value.strip():
+        # Metadata is display-only; do not allow a path or URL as a label.
+        return Path(value.strip().replace("\\", "/")).name
+    if item.template == "source":
+        match = re.search(r"(?m)^\*\*Source:\*\* `([^`\n]+)`\s*$", item.body)
+        if match:
+            return Path(match.group(1).replace("\\", "/")).name
+    return ""
 
-    Missing translated ancestors use their published default-language index.
-    Never create synthetic translated URLs or language annotations for fallback.
-    The current page is omitted because its title is already in the header.
+
+# fn: _render_breadcrumb - Show the section hierarchy down to the actual source file.
+# . Description
+#   Link publishable ancestor indexes. Navigation-only chapters remain plain text.
+#   Source pages use their original filename, not their display title.
+def _render_breadcrumb(items: list[ContentItem], item: ContentItem, default_language: str) -> str:
+    """Show available ancestors and, for generated pages, the source filename.
+
+    Prefer same-language section indexes, with the published default-language
+    index as a fallback. Never synthesize a URL for a navigation-only section.
     """
     current_base_route = _base_route_for_item(item, default_language)
     current_parts = [part for part in current_base_route.strip("/").split("/") if part]
@@ -324,18 +422,32 @@ def _render_breadcrumb(items: list[ContentItem], item: ContentItem, default_lang
         if candidate.base_name == "index"
     }
     parts: list[str] = []
+    last_source_filename = ""
     for route in ancestor_routes:
         ancestor = (indexes.get((route, item.language))
                     or indexes.get((route, default_language)))
-        if ancestor is None or ancestor.metadata.get('nav_only'):
+        if ancestor is None:
             continue
-        parts.append(
-            '<li><a href="'
-            + html.escape(ancestor.route, quote=True)
-            + '">'
-            + html.escape(str(ancestor.metadata.get("nav_title") or ancestor.title))
-            + "</a></li>"
-        )
+        filename = _source_filename(ancestor)
+        label = html.escape(filename or str(ancestor.metadata.get("nav_title") or ancestor.title))
+        if ancestor.metadata.get("nav_only"):
+            parts.append(f"<li><span>{label}</span></li>")
+        else:
+            parts.append(
+                '<li><a href="'
+                + html.escape(ancestor.route, quote=True)
+                + '">'
+                + label
+                + "</a></li>"
+            )
+        if filename:
+            last_source_filename = filename
+
+    # Source overviews and standalone prefaces do not have a source-file
+    # ancestor. Function pages already link to their source overview.
+    filename = _source_filename(item)
+    if filename and filename != last_source_filename:
+        parts.append(f'<li><span aria-current="location">{html.escape(filename)}</span></li>')
     if not parts:
         return ""
     return (
@@ -345,19 +457,20 @@ def _render_breadcrumb(items: list[ContentItem], item: ContentItem, default_lang
     )
 
 
+# fn: _context_header - Render page context; language navigation lives in the persistent sidebar.
 def _context_header(
     breadcrumb_html: str, page_title: str, page_type: str
 ) -> str:
-    """Render page context; language navigation lives in the persistent sidebar."""
+    """Render the page title and breadcrumb in the documentation header."""
     width_class = " context-header-inner-narrow" if page_type in {"page", "article"} else ""
     return (
-        '<header class="context-header" id="contextHeader">'
+        '<div class="context-header" id="contextHeader">'
         f'<div class="context-header-inner{width_class}">'
         '<div class="context-header-copy">'
         + breadcrumb_html
         + f'<h1 class="context-title">{html.escape(page_title)}</h1>'
         + "</div>"
-        + "</div></header>"
+        + "</div></div>"
     )
 
 
@@ -369,6 +482,9 @@ _LANGUAGE_NAMES = {
 }
 
 
+# fn: _render_language_selector - Show enabled languages, linking missing translations to the real Dutch page.
+# . Description
+#   A fallback link is navigation, not a translation: do not mark it hreflang. Only published/preview-visible variants supplied by the caller are eligible.
 def _render_language_selector(
     config,
     item: ContentItem,
@@ -434,6 +550,7 @@ def _render_language_selector(
     return render_template(load_template(partial_path, config.templates_dir), {"language_links": "\n".join(links)})
 
 
+# fn: _article_meta - Collect metadata for RSS and article-page generation.
 def _article_meta(item: ContentItem) -> str:
     """Handle article meta for the web content workflow."""
     parts: list[str] = []
@@ -446,6 +563,7 @@ def _article_meta(item: ContentItem) -> str:
     return '<div class="article-meta">' + "\n".join(parts) + "</div>"
 
 
+# fn: _summary_fragment - Render the visible excerpt of a content summary.
 def _summary_fragment(item: ContentItem) -> str:
     """Handle summary fragment for the web content workflow."""
     if not item.summary:
@@ -453,6 +571,7 @@ def _summary_fragment(item: ContentItem) -> str:
     return f'<p class="page-summary">{html.escape(item.summary)}</p>'
 
 
+# fn: _image_for - Prefer index art, then hero art; publish local assets safely.
 def _image_for(item: ContentItem, config, output_path: Path) -> str:
     """Prefer index art, then hero art; publish local assets safely."""
     for key in ("index_image", "hero_image"):
@@ -462,6 +581,7 @@ def _image_for(item: ContentItem, config, output_path: Path) -> str:
     return ""
 
 
+# fn: _publish_image - Resolve relative author images beside Markdown, without escaping content root.
 def _publish_image(reference: str, item: ContentItem, config, output_path: Path) -> str:
     """Resolve relative author images beside Markdown, without escaping content root."""
     parsed = urlsplit(reference)
@@ -482,6 +602,9 @@ def _publish_image(reference: str, item: ContentItem, config, output_path: Path)
     return "/images/content/" + destination.name + ("?" + parsed.query if parsed.query else "")
 
 
+# fn: _publish_local_resource - Publish a relative content-local download, retaining its resource filename.
+# . Description
+#   Only regular files inside the source content tree are eligible. Resources are published under a dedicated directory, avoiding collisions with shared assets.
 def _publish_local_resource(reference: str, item: ContentItem, config, output_path: Path) -> str:
     """Publish a relative content-local download, retaining its resource filename.
 
@@ -505,6 +628,9 @@ def _publish_local_resource(reference: str, item: ContentItem, config, output_pa
     return encoded + ("?" + parsed.query if parsed.query else "") + ("#" + parsed.fragment if parsed.fragment else "")
 
 
+# fn: _resolve_body_resources - Rewrite Markdown download links to published local resource URLs.
+# . Description
+#   Image links continue to be handled by _resolve_body_images. Existing remote, absolute and anchor links remain unchanged.
 def _resolve_body_resources(body: str, item: ContentItem, config, output_path: Path) -> str:
     """Rewrite Markdown download links to published local resource URLs.
 
@@ -512,6 +638,7 @@ def _resolve_body_resources(body: str, item: ContentItem, config, output_path: P
     absolute and anchor links remain unchanged.
     """
     pattern = re.compile(r'(?<!!)\[([^\]]+)\]\(([^)]+)\)')
+    # fn: replace - Substitute the current matched fragment during content rendering.
     def replace(match: re.Match[str]) -> str:
         reference = match.group(2)
         published = _publish_local_resource(reference, item, config, output_path)
@@ -519,9 +646,13 @@ def _resolve_body_resources(body: str, item: ContentItem, config, output_path: P
     return pattern.sub(replace, body)
 
 
+# fn: _resolve_body_images - Rewrite local Markdown images before Markdown rendering; leave external URLs intact.
 def _resolve_body_images(body: str, item: ContentItem, config, output_path: Path) -> str:
     """Rewrite local Markdown images before Markdown rendering; leave external URLs intact."""
     pattern = re.compile(r'(!\[[^\]]*\]\()([^\)]+)(\))')
+    # fn: replace - Substitute the current matched fragment during content rendering.
+    # . Description
+    #   Args: match: Input used by this operation.
     def replace(match: re.Match[str]) -> str:
         """Handle replace for the web content workflow.
         
@@ -536,6 +667,7 @@ def _resolve_body_images(body: str, item: ContentItem, config, output_path: Path
     return pattern.sub(replace, body)
 
 
+# fn: _card - Render an existing section card, optionally with its identifying image.
 def _card(item: ContentItem, heading_level: int = 2, image: str = "") -> str:
     """Render an existing section card, optionally with its identifying image."""
     heading_level = 2 if heading_level not in {2, 3} else heading_level
@@ -548,6 +680,7 @@ def _card(item: ContentItem, heading_level: int = 2, image: str = "") -> str:
             + date + summary + '</article>')
 
 
+# fn: _index_row - Build the structured row for a generated content index.
 def _index_row(item: ContentItem, image: str, *, article: bool) -> str:
     """Handle index row for the web content workflow."""
     media = (f'<img src="{html.escape(image, quote=True)}" alt="" loading="lazy">') if image else ""
@@ -560,6 +693,7 @@ def _index_row(item: ContentItem, image: str, *, article: bool) -> str:
             + '</span><span class="index-row-arrow" aria-hidden="true">›</span></a>')
 
 
+# fn: _render_index - Render index for website output.
 def _render_index(item: ContentItem, items: list[ContentItem], default_language: str,
                   config, output_path: Path, kind: str = "auto", sort: str = "") -> str:
     """Render index for website output."""
@@ -582,10 +716,14 @@ _INDEX_BLOCK_RE = re.compile(r'^\s*:::\s+(?:index|td-index)([^\n]*)\n\s*:::\s*$'
 _INDEX_OPTION_RE = re.compile(r'(type|sort)\s*=\s*["\']?([A-Za-z]+)')
 
 
+# fn: _explicit_indexes - Replace index blocks with inert markers restored after Markdown rendering.
 def _explicit_indexes(body: str, item: ContentItem, items: list[ContentItem],
                       default_language: str, config, output_path: Path) -> tuple[str, dict[str, str]]:
     """Replace index blocks with inert markers restored after Markdown rendering."""
     replacements: dict[str, str] = {}
+    # fn: replace - Substitute the current matched fragment during content rendering.
+    # . Description
+    #   Args: match: Input used by this operation.
     def replace(match: re.Match[str]) -> str:
         """Handle replace for the web content workflow.
         
@@ -602,6 +740,9 @@ def _explicit_indexes(body: str, item: ContentItem, items: list[ContentItem],
     return _INDEX_BLOCK_RE.sub(replace, body), replacements
 
 
+# fn: _direct_children - Find immediate children, preferring the page language and then Dutch.
+# . Description
+#   A language-specific listing may reference a Dutch-only child directly. Resolve each logical page once so translations never create duplicate cards
 def _direct_children(item: ContentItem, items: list[ContentItem], default_language: str) -> list[ContentItem]:
     """Find immediate children, preferring the page language and then Dutch.
 
@@ -633,6 +774,7 @@ def _direct_children(item: ContentItem, items: list[ContentItem], default_langua
     return children
 
 
+# fn: _featured_card - Render one curated Featured tile using target-page metadata.
 def _featured_card(item: ContentItem, image: str = "") -> str:
     """Render one curated Featured tile using target-page metadata."""
     # Explicit curated image wins; otherwise use article metadata or a section default.
@@ -680,6 +822,9 @@ def _featured_card(item: ContentItem, image: str = "") -> str:
     )
 
 
+# fn: _featured_for - Render the home-page Featured slider.
+# . Description
+#   ``featured.cfg`` is authoritative when present. Routes are resolved against the current language and silently omitted when that translation does not yet
 def _featured_for(
     item: ContentItem,
     items: list[ContentItem],
@@ -719,6 +864,7 @@ def _featured_for(
         ]
         # Explicit featured_order takes precedence; unnumbered items follow
         # alphabetically. Keep this independent of navigation and publication dates.
+        # fn: featured_sort_key - Order featured pages by explicit sort order and fallback title.
         def featured_sort_key(child: ContentItem) -> tuple[int, int, str, str]:
             raw_order = child.metadata.get("featured_order")
             if raw_order is None or str(raw_order).strip() == "":
@@ -804,6 +950,9 @@ def _featured_for(
     )
 
 
+# fn: generate_site - Generate static pages, assets, navigation, and discovery files.
+# . Description
+#   Args: source: Input used by this operation.
 def generate_site(source: str | Path, output: str | Path, languages: str | Iterable[str] = "ALL", *, mode: str = "public", rss: bool = False) -> GenerationResult:
     """Generate static pages, assets, navigation, and discovery files.
     
@@ -927,7 +1076,10 @@ def generate_site(source: str | Path, output: str | Path, languages: str | Itera
             continue
 
         current_base_route = _base_route_for_item(item, config.default_language)
-        navigation_html = _render_navigation(navigation, items, item.language, config.default_language, current_base_route)
+        navigation_html = _render_navigation(
+            navigation, items, item.language, config.default_language,
+            current_base_route, doc_sidebar='class="doc-nav"' in current_base_template,
+        )
         breadcrumb_html = _render_breadcrumb(items, item, config.default_language)
         language_selector = _render_language_selector(config, item, variants, selected_languages)
         # Landing pages can intentionally omit the contextual title bar.
@@ -1071,8 +1223,12 @@ def generate_site(source: str | Path, output: str | Path, languages: str | Itera
                             skipped_count, broken, sitemap_written, rss_written)
 
 
+# fn: _seo_tags - Return escaped metadata; previews are excluded from indexing regardless of URL.
 def _seo_tags(item: ContentItem, config, canonical: str, description: str, image: str, mode: str, actual_variants: dict[str, ContentItem] | None = None) -> str:
     """Return escaped metadata; previews are excluded from indexing regardless of URL."""
+    # fn: esc - Escape content for inclusion in generated XML or HTML.
+    # . Description
+    #   Args: value: Input used by this operation.
     def esc(value: str) -> str:
         """Handle esc for the web content workflow.
         
@@ -1105,6 +1261,7 @@ def _seo_tags(item: ContentItem, config, canonical: str, description: str, image
     return "\n    ".join(tags)
 
 
+# fn: _write_sitemap - Write sitemap to generated output.
 def _write_sitemap(output: Path, config, items: list[ContentItem], langs: set[str]) -> None:
     """Write sitemap to generated output."""
     ns = "http://www.sitemaps.org/schemas/sitemap/0.9"
@@ -1122,6 +1279,7 @@ def _write_sitemap(output: Path, config, items: list[ContentItem], langs: set[st
     (output / "robots.txt").write_text("User-agent: *\nAllow: /\nSitemap: " + config.base_url.rstrip("/") + "/sitemap.xml\n", encoding="utf-8")
 
 
+# fn: _write_rss - Write rss to generated output.
 def _write_rss(output: Path, config, items: list[ContentItem], langs: set[str]) -> bool:
     """Write rss to generated output."""
     articles = sorted((i for i in items if i.template == "article" and i.date and i.language in langs and i.status == "published" and not i.hidden and not i.private), key=lambda i: i.date, reverse=True)
@@ -1145,6 +1303,7 @@ def _write_rss(output: Path, config, items: list[ContentItem], langs: set[str]) 
     return True
 
 
+# fn: _check_internal_links - Inspect rendered href/src URLs against the generated output tree.
 def _check_internal_links(output: Path, warnings: list[str]) -> int:
     """Inspect rendered href/src URLs against the generated output tree."""
     count = 0

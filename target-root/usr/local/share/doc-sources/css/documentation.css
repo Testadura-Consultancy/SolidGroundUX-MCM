@@ -3,18 +3,35 @@
 :root{font-family:Arial,Helvetica,sans-serif;color:#17243a;background:#fff;font-size:15px}
 *{box-sizing:border-box}body{margin:0;line-height:1.48}
 .doc-shell{display:grid;grid-template-columns:var(--doc-nav-width,350px) 5px minmax(0,1fr);min-height:100vh}
-.doc-nav{background:#f1f3f6;border-right:5px solid #d4d8e1;padding:1.15rem 1.25rem 2rem;min-width:0;overflow-wrap:anywhere}
+.doc-nav{background:#f7f8fa;border-right:5px solid #d4d8e1;padding:1.15rem 1.25rem 2rem;min-width:0;overflow-wrap:anywhere}
 .doc-brand{display:block;padding:.6rem .5rem .9rem;text-decoration:none}
 .doc-brand img{width:100%;max-width:270px;height:auto;display:block}
 .doc-nav-title{font-weight:700;font-size:1.35rem;margin:.5rem 0 .8rem;padding-bottom:.4rem;border-bottom:1px solid #d5d9e1}
 .doc-nav .wc-nav-group,.doc-nav .wc-nav-leaf{font-size:.91rem;line-height:1.35;margin:.12rem 0}
 .doc-nav .wc-nav-children{padding-left:1.05rem;margin-left:.25rem;border-left:1px solid #d9dde4}
-.doc-nav details>summary{cursor:pointer}
-.doc-nav a{color:#173e82;text-decoration:none}
+/* Documentation keeps the same recursive navigation as WWW, with a
+   dedicated disclosure arrow and a distinctly marked current page. */
+/* A disclosure chevron and a page title are independent click targets.
+   A real link must not be nested inside <summary>: browsers may toggle the
+   disclosure instead of navigating. */
+.doc-nav .wc-nav-group{position:relative}
+.doc-nav .wc-nav-disclosure>summary{position:absolute;top:0;left:0;width:1.45rem;height:1.6rem;cursor:pointer;list-style:none;display:flex;align-items:center;justify-content:center;padding:0;border-radius:3px}
+.doc-nav .wc-nav-disclosure>summary::-webkit-details-marker{display:none}
+.doc-nav .wc-nav-arrow{flex:none;width:.55rem;height:.55rem;border:solid #4d535d;border-width:0 1.5px 1.5px 0;transform:rotate(-45deg);transition:transform .12s ease}
+.doc-nav details[open]>summary>.wc-nav-arrow{transform:rotate(45deg)}
+.doc-nav .wc-nav-disclosure>summary:hover,.doc-nav .wc-nav-heading:hover,.doc-nav .wc-nav-leaf:hover{background:#fff}
+.doc-nav .wc-nav-group>.wc-nav-heading{min-height:1.6rem;border-left:3px solid transparent;border-radius:3px;padding:.18rem .3rem .18rem 1.55rem}
+.doc-nav .wc-nav-group>.wc-nav-heading:has(a.active){border-left-color:#c63a35;background:#fff}
+.doc-nav a{color:#17212e;text-decoration:none;min-width:0}
 .doc-nav a:hover{text-decoration:underline}
-.doc-nav a.active{font-weight:700;color:#122f5b}
+.doc-nav a:focus-visible,.doc-nav summary:focus-visible{outline:2px solid #3465a3;outline-offset:2px}
+.doc-nav .wc-nav-leaf{padding:.18rem .3rem .18rem 1.05rem;border-left:3px solid transparent;border-radius:3px}
+.doc-nav .wc-nav-leaf:has(a.active){border-left-color:#c63a35;background:#fff}
+.doc-nav a.active{font-weight:700;color:#17212e}
 .doc-workspace{min-width:0}
-.doc-header{min-height:76px;padding:.85rem 1.8rem;border-bottom:1px solid #d6dbe2;display:flex;justify-content:flex-end;align-items:center;gap:1rem;background:#f1f3f6}
+.doc-header{min-height:115px;padding:1.05rem 2.8rem 1.2rem;border-bottom:1px solid #d6dbe2;display:flex;justify-content:space-between;align-items:flex-start;gap:1.5rem;background:#f1f3f6}
+.doc-header-context{flex:1;min-width:0;align-self:flex-end}
+.doc-header-tools{display:flex;align-items:center;justify-content:flex-end;gap:1rem;flex-shrink:0}
 .doc-heading{display:flex;align-items:center;justify-content:flex-end;gap:1rem;font-size:.95rem;color:#586a88}
 .doc-heading img{height:48px;width:48px;object-fit:contain}
 .doc-main{padding:1.5rem 2.8rem 4rem;max-width:105rem;min-width:0;margin:0 auto}
@@ -28,15 +45,15 @@
 .doc-main li{margin:.2rem 0}
 .doc-main pre{padding:.9rem 1rem;background:#f5f7fa;border:1px solid #dce1e8;border-radius:5px;line-height:1.48}
 .doc-main code{font-size:.91em}
-.context-header{margin-bottom:1.3rem;border-bottom:1px solid #d5dae2}
-.context-breadcrumb ol{padding:0;margin:0 0 .55rem;list-style:none;display:flex;flex-wrap:wrap;gap:.3rem;font-size:.82rem;font-style:italic;color:#697895}
+.context-header{margin:0;border:0}
+.context-breadcrumb ol{padding:0;margin:0 0 .45rem;list-style:none;display:flex;flex-wrap:wrap;gap:.3rem;font-size:.85rem;color:#697895}
 .context-breadcrumb li+li:before{content:' / ';padding-right:.35rem;color:#9aa3b1}
-.context-header .context-title{font-size:1.65rem;margin:.35rem 0 .8rem}
+.context-header .context-title{font-size:2.15rem;line-height:1.15;margin:0;color:#17243a}
 .doc-entry{min-width:0}.doc-entry>h1:first-child{margin-top:0}
 .doc-entry pre{white-space:pre;overflow:auto}
 .doc-source ul{line-height:1.6}
 .doc-footer{padding:1rem 2rem;border-top:1px solid #dde1e7;color:#607087}
-@media(max-width:850px){.doc-shell{grid-template-columns:1fr}.doc-nav{border-right:0;border-bottom:3px solid #d4d8e1}.doc-brand img{max-width:220px}.doc-main{padding:1.25rem}.doc-header{padding:.6rem 1.2rem}}
+@media(max-width:850px){.doc-shell{grid-template-columns:1fr}.doc-nav{border-right:0;border-bottom:3px solid #d4d8e1}.doc-brand img{max-width:220px}.doc-main{padding:1.25rem}.doc-header{padding:1rem 1.25rem;flex-wrap:wrap;gap:.75rem}.doc-header-tools{width:100%;justify-content:flex-end}.context-header .context-title{font-size:1.8rem}}
 
 .doc-home-hero{margin:0 0 1.5rem}.doc-home-hero img{display:block;width:100%;max-width:980px;height:auto;border-radius:6px}
 
@@ -50,3 +67,51 @@
 .doc-api-table th,.doc-api-table td{padding:.5rem .7rem;border-bottom:1px solid #dde1e7;text-align:left;vertical-align:top}
 .doc-api-table th{background:#f1f3f6;position:sticky;top:0}
 @media(max-width:850px){.doc-shell{grid-template-columns:1fr}.doc-nav-resizer{display:none}}
+
+/* Documentation table headings match the muted title bar.  Explicit Markdown
+   column alignments remain authoritative; ordinary table body styling stays as-is. */
+.doc-main .table-scroll thead th{background:#f1f3f6;text-align:left;padding:.5rem .65rem;border-bottom:2px solid #c8d1dd}
+
+/* Generated # def: group tables: a merged category cell and one separator
+   per group, rather than boxing all definition rows. */
+.doc-main .doc-def-table{border-collapse:collapse;width:max-content;min-width:100%;max-width:100%}
+.doc-main .doc-def-table tbody td{padding:.3rem .65rem;vertical-align:middle}
+.doc-main .doc-def-table tbody tr.doc-def-group-start>td{border-top:1.5px solid #b9c4d2}
+.doc-main .doc-def-table .doc-def-group{background:#f2f4f7;border-right:1px solid #cbd4e1;color:#26364b;min-width:6.5rem}
+.doc-main .doc-def-table tbody tr:last-child>td{border-bottom:1px solid #d5dce5}
+
+/* Read-only Theme Gallery appendix. Keep the specimen visually separate from
+   the documentation shell without affecting other pages or ordinary tables. */
+.sgnd-theme-gallery{min-width:0;margin:1rem 0 2rem}
+.sgnd-theme-gallery .sgnd-theme-toolbar{display:flex;gap:.7rem;align-items:center;flex-wrap:wrap;margin-bottom:1rem}
+.sgnd-theme-gallery .sgnd-theme-tab{border:1px solid #b5c0cf;border-radius:5px;background:#f1f3f6;padding:.55rem .85rem;color:#26364b;font:inherit;cursor:pointer}
+.sgnd-theme-gallery .sgnd-theme-tab.active{background:#304b68;border-color:#304b68;color:#fff}
+.sgnd-theme-gallery .sgnd-theme-tab:focus-visible,.sgnd-theme-gallery select:focus-visible{outline:2px solid #3465a3;outline-offset:2px}
+.sgnd-theme-gallery .sgnd-theme-count{margin-left:auto;color:#586a88;font-size:.9rem}
+.sgnd-theme-gallery .sgnd-theme-choices[hidden]{display:none}
+.sgnd-theme-gallery select{padding:.5rem;border:1px solid #b5c0cf;border-radius:5px;background:#fff;color:#17243a;max-width:100%;font:inherit}
+.sgnd-theme-gallery .sgnd-theme-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,325px),1fr));gap:1rem;min-width:0}
+.sgnd-theme-gallery .sgnd-theme-grid-compare{grid-template-columns:repeat(2,minmax(0,1fr))}
+.sgnd-theme-gallery .sgnd-theme-card{background:#111a26;border:1px solid #304057;border-radius:8px;overflow:hidden;min-width:0;color:#cbd5e1}
+.sgnd-theme-gallery .sgnd-theme-cardhead{padding:.65rem .85rem;display:flex;gap:.5rem;flex-wrap:wrap;justify-content:space-between;align-items:center;border-bottom:1px solid #304057}
+.sgnd-theme-gallery .sgnd-theme-cardhead b{color:#f1f5f9;font-size:1rem}
+.sgnd-theme-gallery .sgnd-theme-cardhead small{color:#9fb0c3;font-family:monospace;font-size:.75rem}
+.sgnd-theme-gallery .sgnd-theme-screen{padding:.8rem;background:#080b0f;color:#ddd;font:12px/1.5 ui-monospace,SFMono-Regular,Consolas,"Liberation Mono",monospace;min-width:0}
+.sgnd-theme-gallery .sgnd-theme-title{font-weight:bold}
+.sgnd-theme-gallery .sgnd-theme-rule{height:1px;margin:.35rem 0 .55rem}
+.sgnd-theme-gallery .sgnd-theme-subtitle{font-weight:bold;margin:.65rem 0 .25rem}
+.sgnd-theme-gallery .sgnd-theme-msg{display:flex;gap:.4rem;align-items:baseline;white-space:nowrap;overflow:hidden}
+.sgnd-theme-gallery .sgnd-theme-icon{min-width:5ch;flex:none}
+.sgnd-theme-gallery .sgnd-theme-label{min-width:7ch;font-weight:bold;flex:none}
+.sgnd-theme-gallery .sgnd-theme-prompt{margin:.35rem 0}
+.sgnd-theme-gallery .sgnd-theme-sample-table{width:100%;border-collapse:collapse;table-layout:auto;margin:.35rem 0;max-width:100%}
+.sgnd-theme-gallery .sgnd-theme-sample-table th,.sgnd-theme-gallery .sgnd-theme-sample-table td{padding:2px 5px;border:0;background:none;font:inherit;text-align:left;white-space:nowrap}
+.sgnd-theme-gallery .sgnd-theme-sample-table th{font-weight:bold}
+.sgnd-theme-gallery .sgnd-theme-sample-table td:last-child,.sgnd-theme-gallery .sgnd-theme-sample-table th:last-child{text-align:right}
+.sgnd-theme-gallery .sgnd-theme-progress{display:flex;height:9px;margin:.35rem 0}
+.sgnd-theme-gallery .sgnd-theme-progress span{height:9px}
+.sgnd-theme-gallery .sgnd-theme-swatches{display:flex;gap:4px;margin-top:.6rem;flex-wrap:wrap}
+.sgnd-theme-gallery .sgnd-theme-swatches span{width:17px;height:12px;border:1px solid #60697677;border-radius:2px}
+.sgnd-theme-gallery .sgnd-theme-foot{padding:.5rem .85rem;font:11px monospace;color:#9fb0c3}
+.sgnd-theme-gallery .sgnd-theme-note{margin-top:1.2rem;color:#586a88;font-size:.87rem}
+@media(max-width:850px){.sgnd-theme-gallery .sgnd-theme-grid-compare{grid-template-columns:1fr}.sgnd-theme-gallery .sgnd-theme-count{margin-left:0}}

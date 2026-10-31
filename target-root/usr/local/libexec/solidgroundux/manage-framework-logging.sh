@@ -29,6 +29,17 @@
 #   - Business logic implementation (provided by the script author)
 #   - Library behavior (handled in /common modules)
 #
+# Usage:
+#   Run the executable from its shell command (or installed wrapper):
+#   ```bash
+#   manage-framework-logging --action view
+#   manage-framework-logging --action errors
+#   manage-framework-logging --dryrun --action rotate
+#   ```
+#
+#   Script-specific options:
+#   - `--action NAME`, `-a`: Management action (choices: `view`, `follow`, `errors`, `rotate`).
+#
 # Attribution:
 #   Developers  : Mark Fieten
 #   Company     : Testadura Consultancy
@@ -69,7 +80,9 @@ set -uo pipefail
         #   be found, or the executable common library is unreadable.
         #
         # . Usage
+        #   ```bash
         #   _framework_locator || return $?
+        #   ```
     _framework_locator() {
         local script_file=""
         local path_without_root=""
@@ -296,6 +309,7 @@ set -uo pipefail
         #   - Reporting
         #   - Cleanup
 
+    # fn: _log_select - Log select in the Framework workflow.
     _log_select() {
         local primary="${SGND_LOG_PATH:-}"
         local alternate="${SGND_ALTLOG_PATH:-}"
@@ -339,6 +353,7 @@ set -uo pipefail
         return 0
     }
 
+    # fn: _log_view - Log view in the Framework workflow.
     _log_view() {
         local pager="${PAGER:-less}"
         local -a pager_command=()
@@ -347,6 +362,7 @@ set -uo pipefail
         "${pager_command[@]}" +G -- "$SGND_SELECTED_LOG_PATH"
     }
 
+    # fn: _log_follow - Log follow in the Framework workflow.
     _log_follow() {
         local key=""
         local tail_pid=""
@@ -380,6 +396,7 @@ set -uo pipefail
         return 0
     }
 
+    # fn: _log_errors - Log errors in the Framework workflow.
     _log_errors() {
         local pager="${PAGER:-less}"
         local -a pager_command=()
@@ -388,6 +405,7 @@ set -uo pipefail
         grep -E ' type=(ERROR|FAIL|FATAL) ' -- "$SGND_SELECTED_LOG_PATH" | tail -n 100 | "${pager_command[@]}"
     }
 
+    # fn: _log_rotate - Log rotate in the Framework workflow.
     _log_rotate() {
         local logfile=""
         local keep="${SGND_LOG_KEEP:-5}"
@@ -425,6 +443,7 @@ set -uo pipefail
         sayok "Framework logfile rotated: $logfile"
     }
 
+    # fn: _run_action - Dispatch the requested management action to its implementation.
     _run_action() {
         case "${1:?missing action}" in
             view)   _log_view ;;
@@ -454,7 +473,9 @@ set -uo pipefail
         #   Exits with the resulting status code from startup or script logic.
         #
         # . Usage
+        #   ```bash
         #   main "$@"
+        #   ```
     main() {
         local action=""
 

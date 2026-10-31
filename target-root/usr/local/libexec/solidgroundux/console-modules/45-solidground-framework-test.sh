@@ -47,7 +47,9 @@ set -uo pipefail
         #   Exits with code 2 when executed instead of sourced.
         #
         # . Usage
+        #   ```bash
         #   _sgnd_lib_guard
+        #   ```
     _sgnd_lib_guard() {
         local lib_base=""
         local guard=""
@@ -79,6 +81,7 @@ set -uo pipefail
 
     SGND_MODULE_NAME="${SGND_FRAMEWORK_TEST_MODULE_NAME}"
 # - Test agent ---------------------------------------------------------------------
+    # fn: _framework_test_run_framework_suite - Test run framework suite.
     _framework_test_run_framework_suite() {
         local suite="${1:?missing test suite}"
         local -a args=(--suite "$suite")
@@ -87,14 +90,17 @@ set -uo pipefail
         _sgnd_run_public_command "sgnd-smoketest" "${args[@]}"
     }
 
+    # fn: _framework_test_smoketest - Test smoketest in the Framework workflow.
     _framework_test_smoketest() {
         _framework_test_run_framework_suite "smoke"
     }
 
+    # fn: _framework_test_validate_installation - Test validate installation in the Framework workflow.
     _framework_test_validate_installation() {
         _framework_test_run_framework_suite "installation"
     }
 
+    # fn: _framework_test_console_result - Test console result in the Framework workflow.
     _framework_test_console_result() {
         local label="${1:?missing label}"
         local status="${2:?missing status}"
@@ -111,6 +117,7 @@ set -uo pipefail
         return 1
     }
 
+    # fn: _framework_test_validate_console - Test validate console in the Framework workflow.
     _framework_test_validate_console() {
         local row=""
         local key=""
@@ -199,6 +206,7 @@ set -uo pipefail
         (( FRAMEWORK_TEST_CONSOLE_FAIL == 0 ))
     }
 
+    # fn: _framework_test_read_module_metadata - Test read module metadata in the Framework workflow.
     _framework_test_read_module_metadata() {
         local module_file="${1:?missing module file}"
         local line=""
@@ -222,6 +230,7 @@ set -uo pipefail
         [[ -n "$FRAMEWORK_TEST_DISCOVERED_ID" && -n "$FRAMEWORK_TEST_DISCOVERED_NAME" ]]
     }
 
+    # fn: _framework_test_render_validation_result - Test render validation result in the Framework workflow.
     _framework_test_render_validation_result() {
         local status="${1:?missing status}"
         local label="${2:?missing label}"
@@ -236,6 +245,7 @@ set -uo pipefail
         esac
     }
 
+    # fn: _framework_test_validate_modules - Test validate modules in the Framework workflow.
     _framework_test_validate_modules() {
         local module_dir="${SGND_FRAMEWORK_ROOT%/}/usr/local/libexec/solidgroundux/console-modules"
         local module_file=""
@@ -385,6 +395,7 @@ set -uo pipefail
         return "$validation_rc"
     }
 
+    # fn: _framework_test_run_all - Test run all in the Framework workflow.
     _framework_test_run_all() {
         local rc=0
 
@@ -396,6 +407,15 @@ set -uo pipefail
     }
 
 # - Module validation contract ------------------------------------------------------
+    # fn: validate_module_framework_test - Validate the Framework module and record its status for the console.
+        #
+        # . Returns
+        #   A console validation status (0=pass, 1=fail, 2=warning, 3=skipped).
+        #
+        # . Usage
+        #   ```bash
+        #   validate_module_framework_test
+        #   ```
     validate_module_framework_test() {
         SGND_MODULE_VALIDATION_MESSAGE="Framework Test agent is loaded and registered."
         return 0

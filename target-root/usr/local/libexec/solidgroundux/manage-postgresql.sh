@@ -15,6 +15,16 @@
 # Description:
 #   Install, configure, manage, validate, and inspect PostgreSQL.
 #
+# Usage:
+#   Run the executable from its shell command (or installed wrapper):
+#   ```bash
+#   manage-postgresql --action status
+#   manage-postgresql --dryrun --action storage
+#   ```
+#
+#   Script-specific options:
+#   - `--action NAME`, `-a`: Management action (supported actions: `prepare`, `repository`, `install`, `configure`, `storage`, `network`, `memory`, `access`, `credentials`, `service`, `firewall`, `tools`, `validate`, `status`, `logs`, `backup`).
+#
 # Attribution:
 #   Developers    : Mark Fieten
 #   Company       : Testadura Consultancy
@@ -56,7 +66,9 @@ set -uo pipefail
         #   be found, or the executable common library is unreadable.
         #
         # . Usage
+        #   ```bash
         #   _framework_locator || return $?
+        #   ```
     _framework_locator() {
         local script_file=""
         local path_without_root=""
@@ -245,6 +257,7 @@ CIDR_PY
     _db_check_port() { [[ "$1" =~ ^[0-9]+$ ]] && (( 10#$1 >= 1 && 10#$1 <= 65535 )); }
 
     # fn: _db_choose_service_action - Apply an explicitly selected systemd operation
+    # fn: _db_service - Manage the service for db in the PostgreSQL workflow.
     _db_service() {
         local choice="" operation=""
         sgnd_print_sectionheader "PostgreSQL service management"
@@ -294,10 +307,15 @@ CIDR_PY
         sayinfo "No storage files or configuration have been changed."
     }
 
-    # _db_directory_inspect
-    # Purpose: Inspect an installation target without provisioning or modifying disks.
-    # Returns: 0 when suitable, 2 when cancelled, 3 when the choice must change.
-    # Usage: _db_directory_inspect "/srv/storage/data" disposition
+    # fn: _db_directory_inspect - Inspect db directory in the PostgreSQL workflow.
+        # . Purpose
+        #   Inspect an installation target without provisioning or modifying disks.
+        # . Returns
+        #   0 when suitable, 2 when cancelled, 3 when the choice must change.
+        # . Usage
+        #   ```bash
+        #   _db_directory_inspect "/srv/storage/data" disposition
+        #   ```
     _db_directory_inspect() {
         local target="$1" output_name="$2" choice="" mount="" source="" fs=""
         local target_real="" root_real="" parent=""
@@ -363,10 +381,15 @@ CIDR_PY
         esac
     }
 
-    # _db_clear_directory
-    # Purpose: Remove contents of an approved, unregistered data directory only.
-    # Returns: 0 on success, 2 when cancelled, 1 on unsafe target or failure.
-    # Usage: _db_clear_directory "/srv/storage/data"
+    # fn: _db_clear_directory - Validate the selected PostgreSQL data directory and request confirmation before clearing it.
+        # . Purpose
+        #   Remove contents of an approved, unregistered data directory only.
+        # . Returns
+        #   0 on success, 2 when cancelled, 1 on unsafe target or failure.
+        # . Usage
+        #   ```bash
+        #   _db_clear_directory "/srv/storage/data"
+        #   ```
     _db_clear_directory() {
         local target="$1" mount="" cluster_path="" answer=""
         [[ "$target" == /* && "$target" != / && "$target" != *'..'* && -d "$target" && ! -L "$target" ]] || return 1
@@ -594,6 +617,7 @@ CIDR_PY
 
 # - PostgreSQL-specific operations -------------------------------------------------
     # Debian/Ubuntu support multiple clusters; refuse ambiguous selections.
+    # fn: _db_cluster - Identify the PostgreSQL cluster from the available pg_lsclusters entries.
     _db_cluster() {
         local -a clusters=()
         local version="" name="" port="" status="" owner="" directory="" logfile=""
@@ -604,6 +628,7 @@ CIDR_PY
         (( ${#clusters[@]} == 1 )) || { sayfail "Expected exactly one PostgreSQL cluster; found ${#clusters[@]}. Manage multi-cluster hosts manually."; return 1; }
         printf '%s\n' "${clusters[0]}"
     }
+    # fn: _db_conf - Read a PostgreSQL cluster setting through pg_conftool.
     _db_conf() {
         local version="" cluster="" assignment="" result=""
         read -r version cluster <<< "$(_db_cluster)" || return 1
@@ -615,28 +640,33 @@ CIDR_PY
         if [[ "$result" == \'*\' && ${#result} -ge 2 ]]; then result="${result:1:${#result}-2}"; fi
         printf '%s\n' "$result"
     }
+    # fn: _db_set - Set db in the PostgreSQL workflow.
     _db_set() {
         local version="" cluster="" setting="$1" value="$2"
         read -r version cluster <<< "$(_db_cluster)" || return 1
         _db_run_write pg_conftool "$version" "$cluster" set "$setting" "$value"
     }
+    # fn: _db_port - Read and validate the configured PostgreSQL TCP port.
     _db_port() {
         local port=""
         port="$(_db_conf port)" || return 1
         [[ "$port" =~ ^[0-9]+$ ]] || return 1
         printf '%s\n' "$port"
     }
+    # fn: _db_configure - Configure db in the PostgreSQL workflow.
     _db_configure() {
         _db_installed || { sayfail "PostgreSQL is not installed."; return 1; }
         _db_cluster >/dev/null || return 1
         sayok "PostgreSQL cluster detected. Authentication and database roles remain unchanged."
     }
+    # fn: _db_storage_detail - Display the configured database data directory.
     _db_storage_detail() {
         local version="" cluster="" dir=""
         read -r version cluster <<< "$(_db_cluster)" || return 1
         dir="$(pg_lsclusters --no-header | awk -v v="$version" -v c="$cluster" '$1==v && $2==c {print $6;exit}')"
         sgnd_print_labeledvalue --label "Data directory" --value "$dir" --labelwidth 22
     }
+    # fn: _db_network - Review or configure the MariaDB TCP port and bind address.
     _db_network() {
         local port="" address="" value="" newport="" newaddress=""
         _db_installed && _db_cluster >/dev/null || return 1
@@ -664,7 +694,7 @@ CIDR_PY
     # Returns:
     #   0 for unchanged or successfully applied settings; nonzero on failure.
     # Usage:
-    #   _db_memory
+    # fn: _db_memory - Review or configure the MariaDB InnoDB buffer-pool size.
     _db_memory() {
         local current="" value="" normalized_current="" normalized_value=""
         _db_installed || { _db_failure_pause "PostgreSQL is not installed."; return 1; }
@@ -743,10 +773,15 @@ CIDR_PY
         sayend "PostgreSQL workstation access configured"
     }
 
-    # _db_status
-    # Purpose: Show the live server configuration and workstation connection settings.
-    # Returns: 0 after reporting available information.
-    # Usage: _db_status
+    # fn: _db_status - Inspect status for db in the PostgreSQL workflow.
+        # . Purpose
+        #   Show the live server configuration and workstation connection settings.
+        # . Returns
+        #   0 after reporting available information.
+        # . Usage
+        #   ```bash
+        #   _db_status
+        #   ```
     _db_status() {
         local cluster="Unavailable" port="Unavailable" memory="Unavailable"
         local listen="Unavailable" directory="Unavailable" version="" name="" owner=""
@@ -802,6 +837,7 @@ CIDR_PY
         sayinfo "In DBeaver: New Connection > PostgreSQL, enter the displayed host, port, database and username."
         sayinfo "The connection details are derived from this server, not a verified test from your workstation."
     }
+    # fn: _db_validate - Validate db in the PostgreSQL workflow.
     _db_validate() {
         local failures=0 port=""
         _db_installed || { sayfail "PostgreSQL engine not installed."; return 1; }
@@ -841,6 +877,7 @@ CIDR_PY
     }
 
 # - Main ----------------------------------------------------------------------------
+    # fn: main - Dispatch command-line options to the appropriate management workflow.
     main() {
         _framework_locator || return $?
         sgnd_exe_start "$@" || return $?

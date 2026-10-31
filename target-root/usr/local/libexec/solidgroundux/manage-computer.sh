@@ -14,6 +14,16 @@
 # Description:
 #   Standalone management actions dispatched from 10-computer-setup.sh.
 #   UI, reporting and errors use the SolidGroundUX framework.
+#
+# Usage:
+#   Run the executable from its shell command (or installed wrapper):
+#   ```bash
+#   manage-computer --action ssh-host-keys
+#   ```
+#
+#   Script-specific options:
+#   - `--action NAME`, `-a`: Computer Setup action (choices: `ssh-host-keys`, `ssh-service`, `sudoers`, `status`, `validate`).
+#
 # ==================================================================================
 set -uo pipefail
 
@@ -49,7 +59,9 @@ set -uo pipefail
         #   be found, or the executable common library is unreadable.
         #
         # . Usage
+        #   ```bash
         #   _framework_locator || return $?
+        #   ```
     _framework_locator() {
         local script_file=""
         local path_without_root=""
@@ -132,7 +144,9 @@ SGND_STATE_SAVE=0
         # . Returns
         #   0 on success; non-zero on failure.
         # . Usage
+        #   ```bash
         #   _computer_configure_ssh_service
+        #   ```
     _computer_configure_ssh_service() {
         local ssh_unit="ssh.service"
         local enabled="N"
@@ -183,7 +197,9 @@ SGND_STATE_SAVE=0
         # . Returns
         #   0 on success; non-zero on failure.
         # . Usage
+        #   ```bash
         #   _computer_generate_ssh_keys
+        #   ```
     _computer_generate_ssh_keys() {
         if (( ${FLAG_DRYRUN:-0} == 1 )); then
             sayinfo "Dry run: Would generate SSH host keys and restart SSH."
@@ -218,7 +234,9 @@ SGND_STATE_SAVE=0
         # . Returns
         #   0 on success; non-zero on failure or cancellation.
         # . Usage
+        #   ```bash
         #   _computer_configure_sudoers
+        #   ```
     _computer_configure_sudoers() {
         local admin_user="${SUDO_USER:-${USER:-sysadmin}}"
         local temp_file=""
@@ -297,7 +315,9 @@ SGND_STATE_SAVE=0
         # . Returns
         #   0 after displaying available status information.
         # . Usage
+        #   ```bash
         #   _computer_status "<dns_servers>" "<dns_servers>"
+        #   ```
     _computer_status() {
         local hostname_short=""
         local fqdn=""
@@ -368,7 +388,9 @@ SGND_STATE_SAVE=0
         # . Returns
         #   0 when all required checks pass; 1 otherwise.
         # . Usage
+        #   ```bash
         #   _computer_validate
+        #   ```
     _computer_validate() {
         local failures=0
         local hostname_short=""
@@ -434,6 +456,7 @@ SGND_STATE_SAVE=0
 
 
 # - Dispatch ------------------------------------------------------------------------
+# fn: _run_action - Dispatch the requested management action to its implementation.
 _run_action() {
     local action="${1:?missing action}"
     case "$action" in
@@ -446,6 +469,7 @@ _run_action() {
     esac
 }
 
+# fn: main - Dispatch command-line options to the appropriate management workflow.
 main() {
     _framework_locator || return $?
     sgnd_exe_start -- "$@" || return $?

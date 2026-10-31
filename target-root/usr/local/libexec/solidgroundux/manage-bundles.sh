@@ -6,15 +6,25 @@
 #   Version     : 2.1
 #   Source      : manage-bundles.sh
 #   Type        : script
-#   Group       : Web Content Management
+#   Group       : Role Managers
+#   Subgroup    : Web Content Management
 #   Purpose     : Manage documentation bundles through the SolidGroundUX interface.
 #
 #   Build : 2630201
 #   Checksum : 855701f92cbfafb06593247b4a4f84dedcd3aeafea389b5e70b8c5c1d47beae8
+#
 # Description:
 #   MCM frontend for sgnd_doc_bundles.py and sgnd_doc_markdown.py. The Python programs
 #   remain responsible for persistence, validation, and Markdown preparation.
 #   Menus, tables, prompts, messages and lifecycle use the framework's public APIs.
+#
+# Usage:
+#   Run the executable from its shell command (or installed wrapper):
+#   ```bash
+#   manage-bundles
+#   ```
+#
+#   Opens the interactive documentation-bundle menu.
 #
 # Attribution:
 #   Developers  : Mark Fieten
@@ -56,7 +66,9 @@ set -uo pipefail
         #   be found, or the executable common library is unreadable.
         #
         # . Usage
+        #   ```bash
         #   _framework_locator || return $?
+        #   ```
     _framework_locator() {
         local script_file=""
         local path_without_root=""
@@ -156,7 +168,9 @@ set -uo pipefail
         # . Returns
         #   The backend exit status, or 1/127 on missing files or interpreter.
         # . Usage
+        #   ```bash
         #   _bundle_python list-json
+        #   ```
     _bundle_python() {
         local script="${SGND_FRAMEWORK_ROOT%/}/usr/local/lib/solidgroundux/py/sgnd_doc_bundles.py"
         local output="" rc=0
@@ -181,7 +195,9 @@ set -uo pipefail
         # . Returns
         #   Generator status, or 1/127 if unavailable.
         # . Usage
+        #   ```bash
         #   _bundle_markdown_python "$SGND_DOC_ACTIVE_BUNDLE"
+        #   ```
     _bundle_markdown_python() {
         local script="${SGND_FRAMEWORK_ROOT%/}/usr/local/lib/solidgroundux/py/sgnd_doc_markdown.py"
         local docs_root="${SGND_FRAMEWORK_ROOT%/}/usr/local/share/doc-sources"
@@ -211,7 +227,9 @@ set -uo pipefail
         # . Returns
         #   ask status (Q with --back returns 1).
         # . Usage
+        #   ```bash
         #   _bundle_prompt 'Bundle title' '' title _bundle_validate_nonempty
+        #   ```
     _bundle_prompt() {
         local prompt_label="$1" prompt_default="${2:-}" prompt_target="$3"
         local validator="${4:-}" width="${5:-25}"
@@ -224,44 +242,50 @@ set -uo pipefail
         # . Returns
         #   0 for nonempty input, 1 otherwise.
         # . Usage
+        #   ```bash
         #   _bundle_validate_nonempty "value"
+        #   ```
     _bundle_validate_nonempty() { [[ -n "${1//[[:space:]]/}" ]]; }
     # fn$ _bundle_validate_directory - Validate an existing source directory
         # . Returns
         #   0 if directory exists.
         # . Usage
+        #   ```bash
         #   _bundle_validate_directory /tmp
+        #   ```
     _bundle_validate_directory() { [[ -d "$1" ]]; }
     # fn$ _bundle_validate_output - Require an absolute output directory
         # . Returns
         #   0 for absolute paths.
         # . Usage
+        #   ```bash
         #   _bundle_validate_output /tmp/docs
+        #   ```
     _bundle_validate_output() { [[ "$1" == /* ]]; }
     # fn$ _bundle_validate_overwrite - Accept supported overwrite policies
         # . Returns
         #   0 for replace or fail.
         # . Usage
+        #   ```bash
         #   _bundle_validate_overwrite replace
+        #   ```
     _bundle_validate_overwrite() { [[ "$1" == replace || "$1" == fail ]]; }
-    # fn$ _bundle_validate_chapter0 - Accept external files or generated content routes
-        # . Returns
-        #   0 if empty, '-', an existing file, or a content/... Markdown route.
-        # . Usage
-        #   _bundle_validate_chapter0 '-'
-    _bundle_validate_chapter0() { [[ -z "$1" || "$1" == '-' || -f "$1" || ( "$1" == content/*.md && "$1" != *..* ) ]]; }
     # fn$ _bundle_validate_position - Require a positive one-based position
         # . Returns
         #   0 for positive integers.
         # . Usage
+        #   ```bash
         #   _bundle_validate_position 2
+        #   ```
     _bundle_validate_position() { [[ "$1" =~ ^[1-9][0-9]*$ ]]; }
 
     # fn: _bundle_require_active - Reject an operation without a selected bundle
         # . Returns
         #   0 if a bundle is selected; 1 otherwise.
         # . Usage
+        #   ```bash
         #   _bundle_require_active || return $?
+        #   ```
     _bundle_require_active() {
         [[ -n "${SGND_DOC_ACTIVE_BUNDLE:-}" ]] && return 0
         sayfail 'Select a bundle first.' >&2
@@ -274,7 +298,9 @@ set -uo pipefail
         # . Returns
         #   The status from sgnd_dt_print_table.
         # . Usage
+        #   ```bash
         #   _bundle_render_table 'Bundles' 'No|Identifier' SGND_BUNDLE_ROWS
+        #   ```
     _bundle_render_table() {
         sgnd_print
         sgnd_print_sectionheader "$1" --padend 0
@@ -289,7 +315,9 @@ set -uo pipefail
         # . Returns
         #   0 on success; nonzero if the backend or JSON response fails.
         # . Usage
+        #   ```bash
         #   _bundle_read_bundle_table
+        #   ```
     _bundle_read_bundle_table() {
         local raw="" encoded="" id="" title="" count="" row="" number=0
         raw="$(_bundle_python list-json)" || return $?
@@ -319,7 +347,9 @@ for item in items:
         # . Returns
         #   0 on success; nonzero if backend or JSON parsing fails.
         # . Usage
+        #   ```bash
         #   _bundle_read_sources_table
+        #   ```
     _bundle_read_sources_table() {
         local raw="" encoded="" id="" title="" directory="" number=0
         raw="$(_bundle_python show "$SGND_DOC_ACTIVE_BUNDLE")" || return $?
@@ -349,7 +379,9 @@ for source in item["products"]:
         # . Returns
         #   0 on selection; 1 for Q/cancellation.
         # . Usage
+        #   ```bash
         #   _bundle_choose_row selected SGND_BUNDLE_IDS
+        #   ```
     _bundle_choose_row() {
         local output_var="$1" array_name="$2" choice="" index=0
         local -n candidates="$array_name"
@@ -372,7 +404,9 @@ for source in item["products"]:
         # . Returns
         #   0 after the prompt completes.
         # . Usage
+        #   ```bash
         #   _bundle_continue
+        #   ```
     _bundle_continue() {
         local reply=""
         sgnd_print
@@ -386,7 +420,9 @@ for source in item["products"]:
         # . Returns
         #   Backend or table rendering status.
         # . Usage
+        #   ```bash
         #   _bundle_list
+        #   ```
     _bundle_list() {
         _bundle_read_bundle_table || return $?
         _bundle_render_table 'Saved documentation bundles' 'No|Identifier|Title|Products' SGND_BUNDLE_ROWS
@@ -399,7 +435,9 @@ for source in item["products"]:
         # . Returns
         #   0 on selection or cancellation; nonzero on loading error.
         # . Usage
+        #   ```bash
         #   _bundle_select
+        #   ```
     _bundle_select() {
         local selected=""
         _bundle_list || return $?
@@ -413,7 +451,9 @@ for source in item["products"]:
         # . Returns
         #   Backend status, or 0 when an input is cancelled.
         # . Usage
+        #   ```bash
         #   _bundle_create
+        #   ```
     _bundle_create() {
         local name="" title=""
         _bundle_prompt 'Bundle identifier' '' name _bundle_validate_nonempty || { saycancel 'Create bundle cancelled'; return 0; }
@@ -428,48 +468,40 @@ for source in item["products"]:
         # . Returns
         #   Backend status, or 0 on cancellation.
         # . Usage
+        #   ```bash
         #   _bundle_configure
+        #   ```
     _bundle_configure() {
-        local raw="" decoded="" title="" output_dir="" overwrite="" chapter0="" entry="" field="" previous=""
+        local raw="" decoded="" title="" output_dir="" overwrite="" entry="" field="" previous=""
         local -a current=() rows=()
         _bundle_require_active || return $?
         raw="$(_bundle_python show "$SGND_DOC_ACTIVE_BUNDLE")" || return $?
         decoded="$(printf '%s' "$raw" | python3 -c '
 import json, sys
 item = json.load(sys.stdin)
-for key in ("title", "output_dir", "overwrite", "chapter0"):
+for key in ("title", "output_dir", "overwrite"):
     print(str(item.get(key, "")).replace("\n", " ").replace("\r", " "))
 ' 2>&1)" || { sayfail "Could not parse bundle configuration: $decoded" >&2; return 1; }
         mapfile -t current <<< "$decoded"
         title="${current[0]:-}"
         output_dir="${current[1]:-}"
         overwrite="${current[2]:-replace}"
-        chapter0="${current[3]:-}"
         sgnd_print
         sgnd_print_sectionheader 'Configure bundle' --padend 0
         sgnd_print_labeledvalue --label 'Bundle' --value "$SGND_DOC_ACTIVE_BUNDLE" --labelwidth 25
-        sgnd_print 'Chapter 0: use content/.../*.md for a generated page, or an external Markdown file.'
-        sgnd_print 'Enter Q to cancel an input. Use - to clear Chapter 0.'
-        for field in title output_dir overwrite chapter0; do
+        sgnd_print 'Bundle introductions, conclusions and authored pages are managed separately.'
+        for field in title output_dir overwrite; do
             entry=""
             case "$field" in
                 title)      _bundle_prompt 'Bundle title' "$title" entry _bundle_validate_nonempty 27 || { saycancel 'Configuration cancelled'; return 0; } ;;
                 output_dir) _bundle_prompt 'Output directory' "$output_dir" entry _bundle_validate_output 27 || { saycancel 'Configuration cancelled'; return 0; } ;;
                 overwrite)  _bundle_prompt 'Overwrite policy' "$overwrite" entry _bundle_validate_overwrite 27 || { saycancel 'Configuration cancelled'; return 0; } ;;
-                chapter0)   _bundle_prompt 'Chapter 0 Markdown file' "$chapter0" entry _bundle_validate_chapter0 27 || { saycancel 'Configuration cancelled'; return 0; } ;;
             esac
-            [[ "$field" == chapter0 && "$entry" == - ]] && entry=""
             previous="${!field}"
-            # Pass legacy selections through once to migrate absolute output paths.
-            if [[ "$entry" == "$previous" && "$field" != chapter0 ]]; then
+            if [[ "$entry" == "$previous" ]]; then
                 continue
             fi
             _bundle_python set "$SGND_DOC_ACTIVE_BUNDLE" "$field" "$entry" >/dev/null || return $?
-            if [[ "$field" == chapter0 ]]; then
-                # Display the normalized logical reference saved by the backend.
-                raw="$(_bundle_python show "$SGND_DOC_ACTIVE_BUNDLE")" || return $?
-                entry="$(printf '%s' "$raw" | python3 -c 'import json,sys; print(json.load(sys.stdin).get("chapter0", ""))')" || return $?
-            fi
             printf -v "$field" '%s' "$entry"
         done
         rows=()
@@ -477,15 +509,98 @@ for key in ("title", "output_dir", "overwrite", "chapter0"):
         sgnd_dt_append 'Setting|Value' rows 'Title' "${title//|//}" || return $?
         sgnd_dt_append 'Setting|Value' rows 'Output directory' "${output_dir//|//}" || return $?
         sgnd_dt_append 'Setting|Value' rows 'Overwrite policy' "$overwrite" || return $?
-        sgnd_dt_append 'Setting|Value' rows 'Chapter 0' "${chapter0//|//}" || return $?
         _bundle_render_table 'Bundle configuration' 'Setting|Value' rows
+    }
+
+    # fn$ _bundle_validate_doc_role - Accept the three bundle document placement roles.
+    _bundle_validate_doc_role() { [[ "$1" == preface || "$1" == epilogue || "$1" == page ]]; }
+
+    # fn$ _bundle_validate_doc_action - Accept document-management commands.
+    _bundle_validate_doc_action() { [[ "$1" == add || "$1" == remove || "$1" == move || "$1" == auto || "$1" == none || "$1" == manual ]]; }
+
+    # fn$ _bundle_validate_doc_role_or_page - Accept section-level document placement.
+    _bundle_validate_doc_role_or_page() { [[ "$1" == page || "$1" == preface || "$1" == epilogue ]]; }
+
+    # fn$ _bundle_validate_doc_path - Check documentation source file extensions.
+    _bundle_validate_doc_path() { [[ -f "$1" && ( "$1" == *.sh || "$1" == *.py || "$1" == *.md ) ]]; }
+
+    # fn: _bundle_manage_documents - Manage ordered introductory, closing and authored pages.
+    # . Purpose
+    #   Show explicit document selections and allow manual or automatic modes.
+    # . Returns
+    #   0 on cancellation, nonzero if a backend operation fails.
+    # . Usage
+    #   ```bash
+    #   _bundle_manage_documents
+    #   ```
+    _bundle_manage_documents() {
+        local role="" action="" filename="" position="" new_position="" product="" group="" subgroup="" placement="" raw="" encoded="" line=""
+        local -a rows=()
+        _bundle_require_active || return $?
+        _bundle_prompt 'Role (preface|epilogue|page)' '' role _bundle_validate_doc_role || return 0
+        raw="$(_bundle_python show "$SGND_DOC_ACTIVE_BUNDLE")" || return $?
+        encoded="$(printf '%s' "$raw" | python3 -c '
+import json,sys
+b=json.load(sys.stdin)
+r=sys.argv[1]
+k={"preface":"bundle_prefaces","epilogue":"bundle_epilogues","page":"documents"}[r]
+if k not in b: print("MODE\x1fAutomatic discovery" if r != "page" else "MODE\x1fNo selected documents")
+else: print("MODE\x1fManual (empty disables automatic discovery)" if r != "page" else "MODE\x1fSelected documents")
+for index, entry in enumerate(b.get(k, []), 1):
+    print(str(index)+"\x1f"+entry["path"].replace("|","/"))
+' "$role" 2>&1)" || { sayfail "Could not read documents: $encoded" >&2; return 1; }
+        rows=()
+        while IFS=$'\x1f' read -r position line; do
+            [[ "$position" == MODE ]] && { sgnd_print_labeledvalue --label 'Mode' --value "$line" --labelwidth 20; continue; }
+            [[ -n "$position" ]] || continue
+            sgnd_dt_append 'No|Source' rows "$position" "$line" || return $?
+        done <<< "$encoded"
+        if (( ${#rows[@]} )); then
+            _bundle_render_table 'Selected documents' 'No|Source' rows || return $?
+        fi
+        sgnd_print 'Actions: add, remove, move, auto, none, manual. Q returns to bundle menu.'
+        _bundle_prompt 'Document action' '' action _bundle_validate_doc_action || return 0
+        case "$action" in
+            add)
+                _bundle_prompt 'Source file (.sh, .py, .md)' '' filename _bundle_validate_doc_path 20 || return 0
+                local -a args=(add-document "$SGND_DOC_ACTIVE_BUNDLE" "$role" "$filename")
+                if [[ "$role" == page ]]; then
+                    _bundle_prompt 'Target product identifier' '' product _bundle_validate_nonempty || return 0
+                    _bundle_prompt 'Group (empty = product root)' '' group || return 0
+                    if [[ -n "$group" ]]; then
+                        _bundle_prompt 'Subgroup (optional)' '' subgroup || return 0
+                    fi
+                    _bundle_prompt 'Placement (page|preface|epilogue)' 'page' placement _bundle_validate_doc_role_or_page || return 0
+                    args+=(--product "$product" --group "$group" --subgroup "$subgroup" --placement "$placement")
+                fi
+                _bundle_python "${args[@]}"
+                ;;
+            remove)
+                _bundle_prompt 'Document position' '' position _bundle_validate_position || return 0
+                _bundle_python remove-document "$SGND_DOC_ACTIVE_BUNDLE" "$role" "$position"
+                ;;
+            move)
+                _bundle_prompt 'Current position' '' position _bundle_validate_position || return 0
+                _bundle_prompt 'New position' '' new_position _bundle_validate_position || return 0
+                _bundle_python move-document "$SGND_DOC_ACTIVE_BUNDLE" "$role" "$position" "$new_position"
+                ;;
+            auto|none|manual)
+                if [[ "$role" == page ]]; then
+                    saywarning 'Automatic discovery applies only to bundle prefaces and epilogues.'
+                    return 0
+                fi
+                _bundle_python document-mode "$SGND_DOC_ACTIVE_BUNDLE" "$role" "$action"
+                ;;
+        esac
     }
 
     # fn: _bundle_validate - Validate the active bundle
         # . Returns
         #   Backend status, or 1 if no bundle is selected.
         # . Usage
+        #   ```bash
         #   _bundle_validate
+        #   ```
     _bundle_validate() {
         _bundle_require_active || return $?
         _bundle_python validate "$SGND_DOC_ACTIVE_BUNDLE"
@@ -495,7 +610,9 @@ for key in ("title", "output_dir", "overwrite", "chapter0"):
         # . Returns
         #   Backend status, or 0 when cancelled.
         # . Usage
+        #   ```bash
         #   _bundle_delete
+        #   ```
     _bundle_delete() {
         local confirmation=""
         _bundle_require_active || return $?
@@ -513,7 +630,9 @@ for key in ("title", "output_dir", "overwrite", "chapter0"):
         # . Returns
         #   Generator or summary-rendering status.
         # . Usage
+        #   ```bash
         #   _bundle_generate
+        #   ```
     _bundle_generate() {
         local raw="" parsed="" label="" value=""
         local -a rows=()
@@ -545,7 +664,9 @@ for key, title in (("output", "Output directory"), ("products", "Products"),
         # . Returns
         #   0 on success; backend/table status otherwise.
         # . Usage
+        #   ```bash
         #   _bundle_sources_table
+        #   ```
     _bundle_sources_table() {
         _bundle_read_sources_table || return $?
         _bundle_render_table 'Sources in bundle' 'No|Identifier|Chapter|Directory' SGND_BUNDLE_SOURCE_ROWS
@@ -558,7 +679,9 @@ for key, title in (("output", "Output directory"), ("products", "Products"),
         # . Returns
         #   Backend status, or 0 on cancellation.
         # . Usage
+        #   ```bash
         #   _bundle_source_add
+        #   ```
     _bundle_source_add() {
         local id="" title="" source=""
         _bundle_prompt 'Product identifier' '' id _bundle_validate_nonempty || { saycancel 'Add source cancelled'; return 0; }
@@ -571,7 +694,9 @@ for key, title in (("output", "Output directory"), ("products", "Products"),
         # . Returns
         #   Backend status, or 0 on cancellation.
         # . Usage
+        #   ```bash
         #   _bundle_source_edit
+        #   ```
     _bundle_source_edit() {
         local selected="" raw="" encoded="" title="" source=""
         local -a values=()
@@ -598,7 +723,9 @@ for item in json.load(sys.stdin)["products"]:
         # . Returns
         #   Backend status, or 0 on cancellation.
         # . Usage
+        #   ```bash
         #   _bundle_source_move
+        #   ```
     _bundle_source_move() {
         local selected="" position=""
         _bundle_sources_table || return $?
@@ -611,7 +738,9 @@ for item in json.load(sys.stdin)["products"]:
         # . Returns
         #   Backend status, or 0 on cancellation.
         # . Usage
+        #   ```bash
         #   _bundle_source_remove
+        #   ```
     _bundle_source_remove() {
         local selected=""
         _bundle_sources_table || return $?
@@ -624,9 +753,11 @@ for item in json.load(sys.stdin)["products"]:
         # . Returns
         #   0, including when no bundle is selected.
         # . Usage
+        #   ```bash
         #   _bundle_print_active_summary
+        #   ```
     _bundle_print_active_summary() {
-        local raw="" name="" title="" output_dir="" overwrite="" chapter0="" source="" color="" reset="" encoded=""
+        local raw="" name="" title="" output_dir="" overwrite="" prefaces="" epilogues="" source="" color="" reset="" encoded=""
         local -a lines=()
         color="$(sgnd_sgr "${SGND_UI_VALUE:-yellow}")"
         reset="${RESET:-$'\e[0m'}"
@@ -645,8 +776,12 @@ import json, sys
 bundle = json.load(sys.stdin)
 def clean(value):
     return str(value if value is not None else "").replace("\n", " ").replace("\r", " ")
-for key in ("id", "title", "output_dir", "overwrite", "chapter0"):
+for key in ("id", "title", "output_dir", "overwrite"):
     print(clean(bundle.get(key, "")))
+for role, key in (("Prefaces", "bundle_prefaces"),("Epilogues", "bundle_epilogues")):
+    if key in bundle: print(str(len(bundle[key]))+" selected")
+    elif key == "bundle_prefaces" and bundle.get("chapter0"): print("Legacy Chapter 0")
+    else: print("Automatic")
 for product in bundle.get("products", []):
     print(clean(product.get("title") or product.get("id") or "?"))
 ' 2>&1)" || {
@@ -658,17 +793,19 @@ for product in bundle.get("products", []):
         title="${lines[1]:-}"
         output_dir="${lines[2]:-}"
         overwrite="${lines[3]:-}"
-        chapter0="${lines[4]:-}"
+        prefaces="${lines[4]:-}"
+        epilogues="${lines[5]:-}"
         sgnd_print_labeledvalue --label 'Active bundle' --value "${color}${name}${reset}" --labelwidth 19
         sgnd_print_labeledvalue --label 'Title' --value "${title:--}" --labelwidth 19
         sgnd_print_labeledvalue --label 'Output directory' --value "${output_dir:--}" --labelwidth 19
         sgnd_print_labeledvalue --label 'Overwrite policy' --value "${overwrite:--}" --labelwidth 19
-        sgnd_print_labeledvalue --label 'Chapter 0' --value "${chapter0:-(Automatically generated)}" --labelwidth 19
-        if (( ${#lines[@]} <= 5 )); then
+        sgnd_print_labeledvalue --label 'Bundle prefaces' --value "${prefaces:-Automatic}" --labelwidth 19
+        sgnd_print_labeledvalue --label 'Bundle epilogues' --value "${epilogues:-Automatic}" --labelwidth 19
+        if (( ${#lines[@]} <= 6 )); then
             sgnd_print_labeledvalue --label 'Sources' --value '(None)' --labelwidth 19
         else
-            sgnd_print_labeledvalue --label 'Sources' --value "${color}- ${lines[5]}${reset}" --labelwidth 19
-            for source in "${lines[@]:6}"; do
+            sgnd_print_labeledvalue --label 'Sources' --value "${color}- ${lines[6]}${reset}" --labelwidth 19
+            for source in "${lines[@]:7}"; do
                 sgnd_print "                      ${color}- ${source}${reset}"
             done
         fi
@@ -682,7 +819,9 @@ for product in bundle.get("products", []):
         # . Returns
         #   Framework rendering status.
         # . Usage
+        #   ```bash
         #   _bundle_show_menu
+        #   ```
     _bundle_show_menu() {
         local idx="" group_key="" builtin=0
         _sgnd_console_refresh_model_cache
@@ -710,7 +849,9 @@ for product in bundle.get("products", []):
         # . Returns
         #   Status of menu registration.
         # . Usage
+        #   ```bash
         #   _bundle_register_main_menu
+        #   ```
     _bundle_register_main_menu() {
         sgnd_menu_create 'Documentation Bundles' ' ' || return $?
         SGND_MENU_SHOW_TOGGLEBAR=0
@@ -723,6 +864,7 @@ for product in bundle.get("products", []):
         sgnd_menu_register_item 'bundle-create' 'bundle-management' 'Create bundle' '_bundle_create' '' 0 0 1 0 || return $?
         sgnd_menu_register_item 'bundle-configure' 'bundle-management' 'Configure bundle' '_bundle_configure' '' 0 0 1 0 || return $?
         sgnd_menu_register_item 'bundle-sources' 'bundle-management' 'Manage sources' '_bundle_manage_sources' '' 0 0 1 0 || return $?
+        sgnd_menu_register_item 'bundle-documents' 'bundle-management' 'Manage bundle documents' '_bundle_manage_documents' '' 0 0 1 0 || return $?
         sgnd_menu_register_item 'bundle-validate' 'bundle-management' 'Validate bundle' '_bundle_validate' '' 0 0 1 0 || return $?
         sgnd_menu_register_item 'bundle-delete' 'bundle-management' 'Delete bundle' '_bundle_delete' '' 0 0 1 0 || return $?
         sgnd_menu_register_group 'bundle-generation' 'Generation' '' 0 1 30 || return $?
@@ -733,7 +875,9 @@ for product in bundle.get("products", []):
         # . Returns
         #   Status of menu registration.
         # . Usage
+        #   ```bash
         #   _bundle_register_sources_menu
+        #   ```
     _bundle_register_sources_menu() {
         sgnd_menu_create 'Manage sources' ' ' || return $?
         SGND_MENU_SHOW_TOGGLEBAR=0
@@ -750,7 +894,9 @@ for product in bundle.get("products", []):
         # . Returns
         #   0 when user returns to bundle menu; nonzero on menu construction failure.
         # . Usage
+        #   ```bash
         #   _bundle_manage_sources
+        #   ```
     _bundle_manage_sources() {
         local choice="" rc=0
         _bundle_require_active || return $?
@@ -781,7 +927,9 @@ for product in bundle.get("products", []):
         # . Returns
         #   0 on normal exit; nonzero for bootstrap or menu failures.
         # . Usage
+        #   ```bash
         #   main "$@"
+        #   ```
     main() {
         local choice="" rc=0
         _framework_locator || return $?

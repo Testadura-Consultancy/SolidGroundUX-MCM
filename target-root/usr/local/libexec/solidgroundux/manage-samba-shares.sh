@@ -33,6 +33,13 @@
 #   - Business logic implementation (provided by the script author)
 #   - Library behavior (handled in /common modules)
 #
+# Usage:
+#   Run the executable from its shell command (or installed wrapper):
+#   ```bash
+#   manage-samba-shares --dryrun
+#   manage-samba-shares --verbose
+#   ```
+#
 # Attribution:
 #   Developers  : Mark Fieten
 #   Company     : Testadura Consultancy
@@ -73,7 +80,9 @@ set -uo pipefail
         #   be found, or the executable common library is unreadable.
         #
         # . Usage
+        #   ```bash
         #   _framework_locator || return $?
+        #   ```
     _framework_locator() {
         local script_file=""
         local path_without_root=""
@@ -296,6 +305,7 @@ set -uo pipefail
     DEFAULT_ACCESS_LEVEL="${DEFAULT_ACCESS_LEVEL:-Read / write}"
 
 # - Helpers -------------------------------------------------------------------------
+    # fn: _dryrun_complete - Report the dry-run result without executing the requested host change.
     _dryrun_complete() {
         sayok "DRYRUN complete. The changes shown above would have been applied; no changes were written."
     }
@@ -305,7 +315,9 @@ set -uo pipefail
         #   0 after SGND_SAMBA_SHARE_ROOT is refreshed.
         #
         # . Usage
+        #   ```bash
         #   _refresh_storage_paths
+        #   ```
     _refresh_storage_paths() {
         local mountpoint=""
         local device=""
@@ -485,7 +497,9 @@ set -uo pipefail
         #   Writes the configured path to stdout.
         #
         # . Usage
+        #   ```bash
         #   path="$(_share_path "Documents")"
+        #   ```
     _share_path() {
         sudo testparm -s --section-name "$1" --parameter-name path 2>/dev/null || true
     }
@@ -503,7 +517,9 @@ set -uo pipefail
         #   0 when the share root exists with mode 0711; 1 otherwise.
         #
         # . Usage
+        #   ```bash
         #   _share_root_traversable
+        #   ```
     _share_root_traversable() {
         [[ -d "$SGND_SAMBA_SHARE_ROOT" ]] || return 1
         [[ "$(stat -c '%a' "$SGND_SAMBA_SHARE_ROOT" 2>/dev/null || true)" == "711" ]]
@@ -517,7 +533,9 @@ set -uo pipefail
         #   0 when at least one managed share exists; 1 otherwise.
         #
         # . Usage
+        #   ```bash
         #   _list_managed_shares || return $?
+        #   ```
     _list_managed_shares() {
         local share=""
         local path=""
@@ -558,7 +576,9 @@ set -uo pipefail
         #   0 after selection; 1 when the user returns.
         #
         # . Usage
+        #   ```bash
         #   _select_shares || return $?
+        #   ```
     _select_shares() {
         _list_managed_shares || return $?
         SELECTED_SHARES=()
@@ -577,7 +597,9 @@ set -uo pipefail
         #   Writes GROUP|PERMISSIONS records.
         #
         # . Usage
+        #   ```bash
         #   _acl_groups_for_share "Documents"
+        #   ```
     _acl_groups_for_share() {
         local path=""
         local gid=""
@@ -606,7 +628,9 @@ set -uo pipefail
 
     # fn: _validate_share_name - Validate a managed Samba share name
         # . Usage
+        #   ```bash
         #   _validate_share_name "<arg1>"
+        #   ```
     _validate_share_name() {
         [[ "${1:-}" =~ ^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$ ]]
     }
@@ -617,7 +641,9 @@ set -uo pipefail
         # . Returns
         #   0 for a safe relative path; 1 otherwise.
         # . Usage
+        #   ```bash
         #   _validate_relative_path "Department/Files"
+        #   ```
     _validate_relative_path() {
         local relative_path="${1:-}"
         local part=""
@@ -635,7 +661,9 @@ set -uo pipefail
 
     # fn: _share_exists - Test whether a Samba share exists
         # . Usage
+        #   ```bash
         #   _share_exists "<share_name>"
+        #   ```
     _share_exists() {
         local share_name="${1:-}"
         [[ -r "$SGND_SAMBA_CONFIG" ]] || return 1
@@ -651,7 +679,9 @@ set -uo pipefail
         #   0 when another managed Samba share already uses PATH; 1 otherwise.
         #
         # . Usage
+        #   ```bash
         #   _share_path_in_use "/srv/storage/shares/Install"
+        #   ```
     _share_path_in_use() {
         local candidate_path="${1:-}"
         local share=""
@@ -679,7 +709,9 @@ set -uo pipefail
 
     # fn: _reload_samba - Validate and reload Samba configuration
         # . Usage
+        #   ```bash
         #   _reload_samba
+        #   ```
     _reload_samba() {
         sudo testparm -s >/dev/null 2>&1 || {
             sayfail "The Samba configuration is invalid."
@@ -697,7 +729,9 @@ set -uo pipefail
         # . Returns
         #   0 with an empty or resolvable group; 1 when the group cannot be resolved.
         # . Usage
+        #   ```bash
         #   _resolve_access_group_input "$DEFAULT_ACCESS_GROUP" resolved_group || return 1
+        #   ```
     _resolve_access_group_input() {
         local entered="${1:-}"
         local output_var="${2:?missing output variable}"
@@ -746,7 +780,9 @@ set -uo pipefail
         # . Returns
         #   0 after all selected shares are updated; non-zero on failure.
         # . Usage
+        #   ```bash
         #   _apply_group_access_to_groups write "domain users@testadura.hq"
+        #   ```
     _apply_group_access_to_groups() {
         local mode="${1:?missing access mode}"
         shift
@@ -795,7 +831,9 @@ set -uo pipefail
         # . Returns
         #   0 after returning to the manager; non-zero on creation/access failure.
         # . Usage
+        #   ```bash
         #   _create_share
+        #   ```
     _create_share() {
         local share_name=""
         local directory_path=""
@@ -954,7 +992,9 @@ set -uo pipefail
 
     # fn: _remove_share - Remove a managed share and optionally its directory
         # . Usage
+        #   ```bash
         #   _remove_share
+        #   ```
     _remove_share() {
         local share_name=""
         local share_path=""
@@ -1032,7 +1072,9 @@ set -uo pipefail
         # . Returns
         #   0 when a valid ticket cache exists; 1 otherwise.
         # . Usage
+        #   ```bash
         #   _ensure_kerberos_ticket
+        #   ```
     _ensure_kerberos_ticket() {
         local realm=""
         local principal=""
@@ -1096,7 +1138,9 @@ set -uo pipefail
         #   0 always.
         #
         # . Usage
+        #   ```bash
         #   _discover_ad_groups
+        #   ```
     _discover_ad_groups() {
         local realm=""
         local realm_lower=""
@@ -1203,7 +1247,9 @@ set -uo pipefail
         #   0 with one or more resolvable groups; 1 on cancellation or lookup failure.
         #
         # . Usage
+        #   ```bash
         #   _select_groups groups || return $?
+        #   ```
     _select_groups() {
         local output_var="${1:?missing output array variable}"
         local entered=""
@@ -1262,7 +1308,9 @@ set -uo pipefail
         #   Writes a quoted Samba group principal.
         #
         # . Usage
+        #   ```bash
         #   _samba_principal "domain admins@testadura.hq"
+        #   ```
     _samba_principal() {
         local group="${1//\"/}"
         printf '@"%s"' "$group"
@@ -1276,7 +1324,9 @@ set -uo pipefail
         #   0 when smb.conf validates and reload succeeds; non-zero otherwise.
         #
         # . Usage
+        #   ```bash
         #   _sync_share_samba_access "Documents"
+        #   ```
     _sync_share_samba_access() {
         local share="$1"
         local group=""
@@ -1367,7 +1417,9 @@ set -uo pipefail
         # . Returns
         #   0 after all selected shares are updated; non-zero on failure.
         # . Usage
+        #   ```bash
         #   _apply_group_access write
+        #   ```
     _apply_group_access() {
         local mode="${1:?missing access mode}"
         local -a groups=()
@@ -1388,7 +1440,9 @@ set -uo pipefail
         # . Returns
         #   0 with a selected group; 1 when none are assigned or the user returns.
         # . Usage
+        #   ```bash
         #   _select_assigned_group "<output_var>"
+        #   ```
     _select_assigned_group() {
         local output_var="${1:?missing output variable}"
         local share=""
@@ -1431,7 +1485,9 @@ set -uo pipefail
         #   0 after all selected shares are updated; non-zero on failure.
         #
         # . Usage
+        #   ```bash
         #   _remove_group_access
+        #   ```
     _remove_group_access() {
         local group=""
         local share=""
@@ -1481,7 +1537,9 @@ set -uo pipefail
         #   0 when selected shares validate; 1 otherwise.
         #
         # . Usage
+        #   ```bash
         #   _validate_selected
+        #   ```
     _validate_selected() {
         local share=""
         local path=""
@@ -1564,7 +1622,9 @@ set -uo pipefail
         # . Returns
         #   Writes "ad" for ADS security and "standalone" otherwise.
         # . Usage
+        #   ```bash
         #   mode="$(_smb_runtime_auth_mode)"
+        #   ```
     _smb_runtime_auth_mode() {
         local security=""
         security="$(sudo testparm -s --parameter-name security 2>/dev/null || true)"
@@ -1585,7 +1645,9 @@ set -uo pipefail
         # . Returns
         #   0 after enumeration.
         # . Usage
+        #   ```bash
         #   mapfile -t groups < <(_list_local_groups_raw)
+        #   ```
     _list_local_groups_raw() {
         local group=""
         local gid=""
@@ -1616,7 +1678,9 @@ set -uo pipefail
         # . Returns
         #   0 always.
         # . Usage
+        #   ```bash
         #   label="$(_local_group_display SambaUsers)"
+        #   ```
     _local_group_display() {
         local group="${1:?missing group}"
         local gid=""
@@ -1640,7 +1704,9 @@ set -uo pipefail
         # . Returns
         #   0 on selection; 1 on cancel or when no groups exist.
         # . Usage
+        #   ```bash
         #   _select_local_groups selected_groups || return 0
+        #   ```
     _select_local_groups() {
         local output_var="${1:?missing output array variable}"
         local group=""
@@ -1676,7 +1742,9 @@ set -uo pipefail
         # . Returns
         #   0 always.
         # . Usage
+        #   ```bash
         #   _pause_return_to_share_manager "Press Enter to return to share management."
+        #   ```
     _pause_return_to_share_manager() {
         local message="${1:-Press Enter to return to share management.}"
         sgnd_print_sectionheader ""
@@ -1695,7 +1763,9 @@ set -uo pipefail
         # . Returns
         #   0 with one or more resolvable groups; 1 on cancellation or lookup failure.
         # . Usage
+        #   ```bash
         #   _select_access_groups groups || return $?
+        #   ```
     _select_access_groups() {
         local output_var="${1:?missing output array variable}"
         local mode=""
@@ -1723,7 +1793,9 @@ set -uo pipefail
         # . Returns
         #   0 with exactly one resolvable group; non-zero on cancellation or lookup failure.
         # . Usage
+        #   ```bash
         #   _select_access_group target || return $?
+        #   ```
     _select_access_group() {
         local output_var="${1:?missing output variable}"
         local -a groups=()
@@ -1749,7 +1821,9 @@ set -uo pipefail
         # . Returns
         #   0 after displaying the overview.
         # . Usage
+        #   ```bash
         #   _show_shares_overview
+        #   ```
     _show_shares_overview() {
         local share="" path="" group="" perms="" access="" mode="" count=0
         local traversal="Blocked"
@@ -1800,7 +1874,9 @@ set -uo pipefail
         # . Returns
         #   0 after replacement; non-zero on failure or cancellation.
         # . Usage
+        #   ```bash
         #   _reconcile_access_group
+        #   ```
     _reconcile_access_group() {
         local source="" target="" share="" path="" group="" perms="" found=0
         _smb_menu_require_selection || return $?
@@ -1826,6 +1902,7 @@ set -uo pipefail
     }
 
 # - Share-management menu ----------------------------------------------------------
+    # fn: _smb_menu_require_selection - Require at least one Samba share before performing a selection-based action.
     _smb_menu_require_selection() {
         (( ${#SELECTED_SHARES[@]} > 0 )) || {
             saywarning "Select one or more shares first."
@@ -1833,34 +1910,44 @@ set -uo pipefail
         }
     }
 
+    # fn: _smb_menu_create_share - Open the create-share action in the Samba share manager.
     _smb_menu_create_share()        { _create_share; }
+    # fn: _smb_menu_show_shares - Show the overview of configured Samba shares.
     _smb_menu_show_shares()          { _show_shares_overview; }
+    # fn: _smb_menu_reconcile - Reconcile Samba access groups and return to the share menu.
     _smb_menu_reconcile() {
         _reconcile_access_group || return $?
         _pause_return_to_share_manager
     }
+    # fn: _smb_menu_remove_share - Open the Samba share-removal workflow.
     _smb_menu_remove_share()        { _remove_share; }
+    # fn: _smb_menu_select_shares - Prompt for the Samba shares to operate on.
     _smb_menu_select_shares()       { _select_shares; }
+    # fn: _smb_menu_grant_read - Read smb menu grant in the Samba workflow.
     _smb_menu_grant_read() {
         _smb_menu_require_selection || return $?
         _apply_group_access read || return $?
         _pause_return_to_share_manager
     }
+    # fn: _smb_menu_grant_write - Write smb menu grant in the Samba workflow.
     _smb_menu_grant_write() {
         _smb_menu_require_selection || return $?
         _apply_group_access write || return $?
         _pause_return_to_share_manager
     }
+    # fn: _smb_menu_remove_access - Remove group access from the selected shares and return to the menu.
     _smb_menu_remove_access() {
         _smb_menu_require_selection || return $?
         _remove_group_access || return $?
         _pause_return_to_share_manager
     }
+    # fn: _smb_menu_validate - Validate smb menu in the Samba workflow.
     _smb_menu_validate() {
         _smb_menu_require_selection || return $?
         _validate_selected
     }
 
+    # fn: _smb_menu_build - Build smb menu in the Samba workflow.
     _smb_menu_build() {
         local selection_state=2
         local selected_text="None selected"

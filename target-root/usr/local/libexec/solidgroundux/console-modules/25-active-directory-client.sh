@@ -41,7 +41,9 @@ set -uo pipefail
         #   Exits with code 2 when executed instead of sourced.
         #
         # . Usage
+        #   ```bash
         #   _sgnd_lib_guard
+        #   ```
     _sgnd_lib_guard() {
         local lib_base=""
         local guard=""
@@ -72,6 +74,7 @@ set -uo pipefail
     SGND_MODULE_ID="${SGND_AD_CLIENT_MODULE_ID}"
     SGND_MODULE_NAME="$SGND_AD_CLIENT_MODULE_NAME"
 # - Management dispatch -------------------------------------------------------------
+    # fn: _adc_run_action - Dispatch an Active Directory client-management action.
     _adc_run_action() { local action="${1:?missing action}"; _sgnd_run_module_script "manage-active-directory-client.sh" --action "$action"; }
 
     # fn: _adc_record_join_step - Persist one child-step result in the console action tracker
@@ -83,7 +86,9 @@ set -uo pipefail
         #   0 always; tracking is best-effort when the console tracker is unavailable.
         #
         # . Usage
+        #   ```bash
         #   _adc_record_join_step "adc-install" 0
+        #   ```
     _adc_record_join_step() {
         local item_key="${1:?missing item key}"
         local result_code="${2:-0}"
@@ -113,7 +118,9 @@ set -uo pipefail
         #   Otherwise the workflow failure code.
         #
         # . Usage
+        #   ```bash
         #   _adc_join_domain
+        #   ```
     _adc_join_domain() {
         local rc=0
 
@@ -201,17 +208,125 @@ set -uo pipefail
         return "$rc"
     }
 
+    # fn: _adc_step_install_packages - Call `_adc_run_action` with the `install` action.
+        #
+        # . Returns
+        #   The status returned by the delegated action.
+        #
+        # . Usage
+        #   ```bash
+        #   _adc_step_install_packages
+        #   ```
     _adc_step_install_packages()  { _adc_run_action install; }
+    # fn: _adc_step_preflight - Call `_adc_run_action` with the `preflight` action.
+        #
+        # . Returns
+        #   The status returned by the delegated action.
+        #
+        # . Usage
+        #   ```bash
+        #   _adc_step_preflight
+        #   ```
     _adc_step_preflight()         { _adc_run_action preflight; }
+    # fn: _adc_step_dns - Call `_adc_run_action` with the `dns` action.
+        #
+        # . Returns
+        #   The status returned by the delegated action.
+        #
+        # . Usage
+        #   ```bash
+        #   _adc_step_dns
+        #   ```
     _adc_step_dns()               { _adc_run_action dns; }
+    # fn: _adc_step_identity - Call `_adc_run_action` with the `identity` action.
+        #
+        # . Returns
+        #   The status returned by the delegated action.
+        #
+        # . Usage
+        #   ```bash
+        #   _adc_step_identity
+        #   ```
     _adc_step_identity()          { _adc_run_action identity; }
+    # fn: _adc_step_discover - Call `_adc_run_action` with the `discover` action.
+        #
+        # . Returns
+        #   The status returned by the delegated action.
+        #
+        # . Usage
+        #   ```bash
+        #   _adc_step_discover
+        #   ```
     _adc_step_discover()          { _adc_run_action discover; }
+    # fn: _adc_step_join - Call `_adc_run_action` with the `join` action.
+        #
+        # . Returns
+        #   The status returned by the delegated action.
+        #
+        # . Usage
+        #   ```bash
+        #   _adc_step_join
+        #   ```
     _adc_step_join()              { _adc_run_action join; }
+    # fn: _adc_step_sssd - Call `_adc_run_action` with the `sssd` action.
+        #
+        # . Returns
+        #   The status returned by the delegated action.
+        #
+        # . Usage
+        #   ```bash
+        #   _adc_step_sssd
+        #   ```
     _adc_step_sssd()              { _adc_run_action sssd; }
+    # fn: _adc_step_register_dns - Call `_adc_run_action` with the `register` action.
+        #
+        # . Returns
+        #   The status returned by the delegated action.
+        #
+        # . Usage
+        #   ```bash
+        #   _adc_step_register_dns
+        #   ```
     _adc_step_register_dns()      { _adc_run_action register; }
+    # fn: _adc_reconcile - Call `_adc_run_action` with the `reconcile` action.
+        #
+        # . Returns
+        #   The status returned by the delegated action.
+        #
+        # . Usage
+        #   ```bash
+        #   _adc_reconcile
+        #   ```
     _adc_reconcile()              { _adc_run_action reconcile; }
+    # fn: _adc_validate - Call `_adc_run_action` with the `validate` action.
+        #
+        # . Returns
+        #   The status returned by the delegated action.
+        #
+        # . Usage
+        #   ```bash
+        #   _adc_validate
+        #   ```
     _adc_validate()               { _adc_run_action validate; }
+    # fn: _adc_status - Call `_adc_run_action` with the `status` action.
+        #
+        # . Returns
+        #   The status returned by the delegated action.
+        #
+        # . Usage
+        #   ```bash
+        #   _adc_status
+        #   ```
     _adc_status()                 { _adc_run_action status; }
+    # fn: _adc_leave - Call `_adc_run_action` with the `leave` action.
+        #
+        # . Returns
+        #   The status returned by the delegated action.
+        #
+        # . Usage
+        #   ```bash
+        #   _adc_leave
+        #   ```
     _adc_leave()                  { _adc_run_action leave; }
 
 # - Module validation contract ------------------------------------------------------
@@ -223,6 +338,15 @@ set -uo pipefail
     #
     # Every validator sets SGND_MODULE_VALIDATION_MESSAGE to a concise result summary.
     # Detailed diagnostic output may be written by the validator or delegated action.
+    # fn: validate_module_active_directory_client - Validate the Active Directory module and record its status for the console.
+        #
+        # . Returns
+        #   A console validation status (0=pass, 1=fail, 2=warning, 3=skipped).
+        #
+        # . Usage
+        #   ```bash
+        #   validate_module_active_directory_client
+        #   ```
     validate_module_active_directory_client() {
         if ! command -v realm >/dev/null 2>&1 || [[ -z "$(realm list 2>/dev/null)" ]]; then
             SGND_MODULE_VALIDATION_MESSAGE="Host is not joined to an Active Directory realm through realmd."

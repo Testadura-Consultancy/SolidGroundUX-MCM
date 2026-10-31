@@ -15,6 +15,16 @@
 # Description:
 #   Install, configure, manage, validate, and inspect MariaDB.
 #
+# Usage:
+#   Run the executable from its shell command (or installed wrapper):
+#   ```bash
+#   manage-mariadb --action status
+#   manage-mariadb --dryrun --action storage
+#   ```
+#
+#   Script-specific options:
+#   - `--action NAME`, `-a`: Management action (supported actions: `prepare`, `repository`, `install`, `configure`, `storage`, `network`, `memory`, `access`, `service`, `firewall`, `tools`, `validate`, `status`, `logs`, `backup`).
+#
 # Attribution:
 #   Developers    : Mark Fieten
 #   Company       : Testadura Consultancy
@@ -56,7 +66,9 @@ set -uo pipefail
         #   be found, or the executable common library is unreadable.
         #
         # . Usage
+        #   ```bash
         #   _framework_locator || return $?
+        #   ```
     _framework_locator() {
         local script_file=""
         local path_without_root=""
@@ -254,6 +266,7 @@ CIDR_PY
     _db_check_port() { [[ "$1" =~ ^[0-9]+$ ]] && (( 10#$1 >= 1 && 10#$1 <= 65535 )); }
 
     # fn: _db_choose_service_action - Apply an explicitly selected systemd operation
+    # fn: _db_service - Manage the service for db in the MariaDB workflow.
     _db_service() {
         local choice="" operation=""
         sgnd_print_sectionheader "MariaDB service management"
@@ -349,10 +362,15 @@ CIDR_PY
         return 0
     }
 
-    # _db_package_datadir
-    # Purpose: Discover the initialized package directory rather than assuming its path.
-    # Returns: 0 and one absolute path, or 1 when no trustworthy location is known.
-    # Usage: _db_package_datadir
+    # fn: _db_package_datadir - Identify MariaDB’s active data directory or configured package default.
+        # . Purpose
+        #   Discover the initialized package directory rather than assuming its path.
+        # . Returns
+        #   0 and one absolute path, or 1 when no trustworthy location is known.
+        # . Usage
+        #   ```bash
+        #   _db_package_datadir
+        #   ```
     _db_package_datadir() {
         local found="" option="" candidate=""
         if systemctl is-active --quiet "$DB_SERVICE"; then
@@ -385,10 +403,15 @@ CIDR_PY
         printf '%s\n' "$found"
     }
 
-    # _db_ensure_initialized
-    # Purpose: Initialize only an empty and stopped package data directory.
-    # Returns: 0 if initialized, nonzero if state is ambiguous or unsafe.
-    # Usage: _db_ensure_initialized
+    # fn: _db_ensure_initialized - Check whether MariaDB data storage has been initialized and initialize it when appropriate.
+        # . Purpose
+        #   Initialize only an empty and stopped package data directory.
+        # . Returns
+        #   0 if initialized, nonzero if state is ambiguous or unsafe.
+        # . Usage
+        #   ```bash
+        #   _db_ensure_initialized
+        #   ```
     _db_ensure_initialized() {
         local data="" candidate="" count=0
         if systemctl is-active --quiet "$DB_SERVICE"; then
@@ -429,10 +452,15 @@ CIDR_PY
         sayend "MariaDB system tables initialized"
     }
 
-    # _db_apparmor_profile
-    # Purpose: Discover the distro-installed MariaDB AppArmor profile.
-    # Returns: 0 with the path, or 1 if none exists.
-    # Usage: _db_apparmor_profile
+    # fn: _db_apparmor_profile - Find an installed AppArmor profile for the MariaDB daemon.
+        # . Purpose
+        #   Discover the distro-installed MariaDB AppArmor profile.
+        # . Returns
+        #   0 with the path, or 1 if none exists.
+        # . Usage
+        #   ```bash
+        #   _db_apparmor_profile
+        #   ```
     _db_apparmor_profile() {
         local candidate=""
         for candidate in /etc/apparmor.d/mariadbd /etc/apparmor.d/usr.sbin.mariadbd /etc/apparmor.d/usr.sbin.mysqld; do
@@ -441,10 +469,15 @@ CIDR_PY
         return 1
     }
 
-    # _db_apparmor_prepare
-    # Purpose: Allow MariaDB to access a custom datadir in its active profile.
-    # Returns: Nonzero if an installed profile cannot be safely configured.
-    # Usage: _db_apparmor_prepare "/path/to/data" "/path/to/profile"
+    # fn: _db_apparmor_prepare - Prepare db apparmor in the MariaDB workflow.
+        # . Purpose
+        #   Allow MariaDB to access a custom datadir in its active profile.
+        # . Returns
+        #   Nonzero if an installed profile cannot be safely configured.
+        # . Usage
+        #   ```bash
+        #   _db_apparmor_prepare "/path/to/data" "/path/to/profile"
+        #   ```
     _db_apparmor_prepare() {
         local target="$1" profile="$2" local_file="" rule="" alias_entry="" old="$3"
         [[ -f "$profile" ]] || return 1
@@ -484,20 +517,30 @@ CIDR_PY
         _db_run_write apparmor_parser -r "$profile"
     }
 
-    # _db_apparmor_known_denial
-    # Purpose: Identify the tested Ubuntu mknod/c AppArmor denial since a start attempt.
-    # Returns: 0 only for a matching denial.
-    # Usage: _db_apparmor_known_denial "<unix seconds>"
+    # fn: _db_apparmor_known_denial - Detect the known MariaDB AppArmor mknod denial in recent kernel messages.
+        # . Purpose
+        #   Identify the tested Ubuntu mknod/c AppArmor denial since a start attempt.
+        # . Returns
+        #   0 only for a matching denial.
+        # . Usage
+        #   ```bash
+        #   _db_apparmor_known_denial "<unix seconds>"
+        #   ```
     _db_apparmor_known_denial() {
         local since="$1" messages=""
         messages="$(journalctl -k --since "@$since" --no-pager 2>/dev/null)" || return 1
         printf '%s\n' "$messages" | grep -E 'apparmor="DENIED".*operation="mknod".*profile="mariadbd".*denied_mask="c"' >/dev/null
     }
 
-    # _db_apparmor_recover
-    # Purpose: Offer explicit, profile-only complain mode as a tested compatibility workaround.
-    # Returns: 0 only if approved and MariaDB passes datadir verification.
-    # Usage: _db_apparmor_recover "/path/to/profile" "/selected/datadir" "<start timestamp>"
+    # fn: _db_apparmor_recover - Offer a targeted recovery for the recognized MariaDB AppArmor denial.
+        # . Purpose
+        #   Offer explicit, profile-only complain mode as a tested compatibility workaround.
+        # . Returns
+        #   0 only if approved and MariaDB passes datadir verification.
+        # . Usage
+        #   ```bash
+        #   _db_apparmor_recover "/path/to/profile" "/selected/datadir" "<start timestamp>"
+        #   ```
     _db_apparmor_recover() {
         local profile="$1" target="$2" since="$3" answer="NO" actual=""
         _db_apparmor_known_denial "$since" || return 1
@@ -518,10 +561,15 @@ CIDR_PY
         return 0
     }
 
-    # _db_custom_datadir
-    # Purpose: Relocate only freshly initialized package data to validated destination.
-    # Returns: 0 after live datadir verification, nonzero otherwise.
-    # Usage: _db_custom_datadir "/srv/storage/data/mysql"
+    # fn: _db_custom_datadir - Configure a custom MariaDB data directory and required service/security settings.
+        # . Purpose
+        #   Relocate only freshly initialized package data to validated destination.
+        # . Returns
+        #   0 after live datadir verification, nonzero otherwise.
+        # . Usage
+        #   ```bash
+        #   _db_custom_datadir "/srv/storage/data/mysql"
+        #   ```
     _db_custom_datadir() {
         local target="$1" old="" override="/etc/mysql/mariadb.conf.d/99-solidgroundux.cnf"
         local dropin="/etc/systemd/system/mariadb.service.d/90-solidgroundux-storage.conf"
@@ -705,7 +753,7 @@ CIDR_PY
     # Returns:
     #   0 on inspection, cancellation or successful configuration; nonzero on failure.
     # Usage:
-    #   _db_existing_install
+    # fn: _db_existing_install - Install db existing in the MariaDB workflow.
     _db_existing_install() {
         local choice="" port="" bind="" memory="" current_port="" current_bind=""
         local current_memory="" review="" access="No" rc=0
@@ -807,6 +855,7 @@ CIDR_PY
 # - MariaDB-specific operations -----------------------------------------------------
     # SolidGroundUX writes a dedicated override rather than patching distro files.
     DB_OVERRIDE="/etc/mysql/mariadb.conf.d/99-solidgroundux.cnf"
+    # fn: _db_option - Read a selected MariaDB server setting from the active service or configuration.
     _db_option() {
         local key="$1" value=""
         if command -v mariadb >/dev/null 2>&1 && systemctl is-active --quiet "$DB_SERVICE"; then
@@ -821,7 +870,17 @@ CIDR_PY
         [[ -n "$value" ]] || case "$key" in port) value=3306;; bind-address) value=127.0.0.1;; *) return 1;; esac
         printf '%s\n' "$value"
     }
+    # fn: _db_port - Call `_db_option` with the `port` action.
+        #
+        # . Returns
+        #   The status returned by the delegated action.
+        #
+        # . Usage
+        #   ```bash
+        #   _db_port
+        #   ```
     _db_port() { _db_option port; }
+    # fn: _db_set - Set db in the MariaDB workflow.
     _db_set() {
         local key="$1" value="$2" old="" tmp=""
         # Restrict keys and value syntax before an elevated file write.
@@ -844,6 +903,7 @@ CIDR_PY
         rm -f "$tmp"
         return "$rc"
     }
+    # fn: _db_configure - Configure db in the MariaDB workflow.
     _db_configure() {
         _db_installed || { sayfail "MariaDB not installed."; return 1; }
         if (( ${FLAG_DRYRUN:-0} == 1 )); then
@@ -857,11 +917,13 @@ CIDR_PY
             saywarning "mariadb-secure-installation unavailable; review user security manually."
         fi
     }
+    # fn: _db_storage_detail - Display the configured database data directory.
     _db_storage_detail() {
         local path=""
         path="$(_db_option datadir 2>/dev/null || printf '/var/lib/mysql')"
         sgnd_print_labeledvalue --label "Data directory" --value "$path" --labelwidth 22
     }
+    # fn: _db_network - Review or configure the MariaDB TCP port and bind address.
     _db_network() {
         local port="" address="" value=""
         _db_installed || return 1
@@ -877,6 +939,7 @@ CIDR_PY
         saywarning "Database accounts and host grants are not modified."
         _db_restart_active
     }
+    # fn: _db_memory - Review or configure the MariaDB InnoDB buffer-pool size.
     _db_memory() {
         local current="" value=""
         _db_installed || return 1
@@ -936,6 +999,7 @@ CIDR_PY
         sayend "MariaDB DBeaver access configured"
     }
 
+    # fn: _db_status - Inspect status for db in the MariaDB workflow.
     _db_status() {
         local bind="" port="" host="" addr=""
         port="$(_db_port 2>/dev/null || printf '3306')"
@@ -971,6 +1035,7 @@ CIDR_PY
             sayinfo "Remote connectivity also requires a matching MariaDB account host, valid password and firewall access."
         fi
     }
+    # fn: _db_validate - Validate db in the MariaDB workflow.
     _db_validate() {
         local failures=0 port=""
         _db_installed || { sayfail "MariaDB engine not installed."; return 1; }
@@ -1008,6 +1073,7 @@ CIDR_PY
     }
 
 # - Main ----------------------------------------------------------------------------
+    # fn: main - Dispatch command-line options to the appropriate management workflow.
     main() {
         _framework_locator || return $?
         sgnd_exe_start "$@" || return $?

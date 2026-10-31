@@ -1,14 +1,14 @@
 # ==================================================================================
-# SolidGroundUX SDK - Documentation Generator Overview
+# SolidGroundUX MCM - Documentation Bundles and Markdown Generation
 # ----------------------------------------------------------------------------------
 # Metadata:
 #   Version     : 2.1
 #   Build       : 2627700
 #   Checksum    : a2fd443bfa308d802e9a389e882d4e6f052f3c5d865af1f591b70faf11194f1e
-#   Source      : sdk-documentation_preface.sh
+#   Source      : mcm-documentation_preface.sh
 #   Type        : documentation
-#   Group       : Web Content Manager
-#   Subgroup    : Documentation Generator
+#   Group       : Role Managers
+#   Subgroup    : Web Content Management
 #   Purpose     : Subgroup preface
 #
 # Attribution:
@@ -18,66 +18,65 @@
 #   Copyright   : © 2025 - 2026 Testadura Consultancy
 #   License     : Licensed under the Testadura Non-Commercial License (TD-NC) v1.1.
 # ==================================================================================
-# - Documentation Generator ---------------------------------------------------------------
+# - Documentation Bundles and Markdown Generation ------------------------------------
 #
-# > Documentation-only sources may live in the canonical
-# > `usr/local/share/solidgroundux/doc-sources` directory of any product. Full recursive
-# > generation discovers them like other supported source files; their Product, Group, and
-# > Subgroup metadata controls logical placement rather than their physical directory.
-# > Product-prefixed basenames are recommended because module identity is basename-based.
+# > The Management Console Modules (MCM) own documentation bundle management and
+# > source-comment-to-Markdown generation. These tools are not part of the SDK's
+# > workspace utilities. The SDK supplies authoring samples and workspace support;
+# > MCM maintains saved bundles and generates the documentation tree.
+#
+# > A bundle is a named, persistent collection of one or more source repositories.
+# > Each repository has a chapter title and a source directory. Their ordering is
+# > explicit and remains stable between generation runs. A bundle also records its
+# > output directory, overwrite policy, and optional bundle-level documents.
+#
+# -- Bundle Management --------------------------------------------------------------
+#
+# > The `manage-bundles.sh` menu lets you create, select, configure, validate and
+# > delete bundles. Its source-management menu adds, edits, reorders and removes
+# > product chapters without changing their underlying repositories.
+#
+# > Bundle configuration is persisted as JSON beneath
+# > `~/.config/solidgroundux/documentation-bundles/`. The Python bundle manager
+# > (`sgnd_doc_bundles.py`) validates identifiers and paths, and writes changes
+# > atomically. Validation checks that chapter sources exist and the output directory
+# > is absolute and outside the source repositories.
+#
+# > A bundle can contain introductory and closing documents, either automatically
+# > discovered by naming convention or explicitly selected from any source
+# > repository. Bundle-specific `bundle-id_preface` / `bundle-id_epilogue`
+# > sources take precedence over generic `bundle_preface` / `bundle_epilogue`
+# > files. Explicit lists take precedence over automatic discovery, including when
+# > intentionally empty. Bundle prefaces appear before product chapters; bundle
+# > epilogues appear after the products and before appendices.
 # >
-# > The Documentation Generator subgroup contains the tools used to extract, process, render,
-# > and generate SolidGroundUX documentation.
+# > Ordinary `.md` source files are copied unchanged when explicitly selected.
+# > Their navigation placement is stored separately, without editing their
+# > front matter. Each source document appears only once in the bundle.
+# > Older saved Chapter 0 selections remain readable and are mapped back to the
+# > source preface on generation when possible.
 #
-# > The documentation system is built around the idea that documentation should live
-# > close to the code it describes. Instead of maintaining a separate manual by hand,
-# > source files contain structured comment blocks that can be converted into a
-# > navigable HTML documentation set.
+# -- Markdown Generation ------------------------------------------------------------
 #
-# > The file doc-sample.sh demonstrates the supported documentation conventions and
-# > should be treated as the practical reference for writing documentation comments.
+# > The `sgnd_doc_markdown.py` generator scans each source repository for structured
+# > documentation comments, reads module metadata, and writes a navigable Markdown
+# > tree. The bundle is the top level; configured products form ordered chapters;
+# > source directories, groups, sections and documented functions occupy subordinate
+# > levels. Empty or purely administrative sections are suppressed where possible.
 #
-# -- Documentation Workflow ---------------------------------------------------------
+# > Function documentation is read from `# fn:` and template declarations from
+# > `# fn$`, with `# . Purpose`, `# . Arguments`, `# . Returns`, and other structured
+# > field headings. Native Markdown, including fenced code blocks, is preserved.
+# > The generator also processes documentation-only prefaces and epilogues.
 #
-# > The generator coordinates product discovery, source collection, parsing, cached
-# > documentation data, rendering, and final output. One documentation collection can
-# > contain one or more selected products. A primary product is selected as the lead
-# > product and is processed first; the remaining products retain deterministic order.
+# > Documentation images, templates and styles are taken from the configured
+# > documentation resources and from the participating product source trees. Asset
+# > filenames must not collide with different contents across products.
 #
-# . Images
-#   sdk-documentation-generation.png :: Documentation generation pipeline
-#
-# > For each selected product, the generator resolves its source root and applies the
-# > configured source file masks. A per-product documentation ignore file is resolved
-# > from user configuration first and system configuration second. Ignored files are
-# > excluded before parsing, and duplicate module basenames are skipped with a warning.
-#
-# > The processor reads the selected source files and extracts module metadata, sections,
-# > items, documentation lines, attribution data, and integrity information into
-# > normalized tables. These tables are persisted as documentation cache data and form
-# > the input to the renderer.
-#
-# > The renderer turns the normalized data into HTML pages, navigation, appendices,
-# > glossary entries, branding, and supporting assets. Each selected product may also
-# > contribute documentation assets from its canonical usr/local/assets directory.
-#
-# > Four generation modes are available:
-# >
-# >     1 <> Full            <> Reparse all matching source files for the selected products
-# >     2 <> Selected        <> Reparse only explicitly selected matching files
-# >     3 <> Changed         <> Reparse matching Git changes relative to HEAD, plus untracked files
-# >     4 <> Render existing <> Rebuild HTML from the persisted renderer data only
-# >
-# > Creating a new collection in Full mode starts with a clean output directory. A Full
-# > update of an existing collection instead loads the existing cache and refreshes the
-# > selected products without clearing the collection. Selected and Changed modes also
-# > load the existing cache and replace or remove only the affected modules.
-# >
-# > Successful parse modes pass the normalized data to the renderer and persist the data
-# > required for later incremental or render-only runs. Render existing mode bypasses
-# > source parsing completely and regenerates renderer-owned output from cached data.
-# > The generated site can optionally be copied to the primary product repository's docs
-# > directory after rendering.
+# > Markdown generation is a distinct operation from website generation. The WCM
+# > converts Markdown content to a static HTML website and handles publishing,
+# > including remote website synchronization and GitHub Pages. A generated Markdown
+# > bundle is therefore not itself a finished HTML website.
 #
 # -- Module Headers -----------------------------------------------------------------
 #
@@ -135,8 +134,8 @@
 # > doc: use the same syntax in both languages. Python functions and class methods both
 # > use fn:; the containing cls: item supplies the class context.
 # >
-# > The file doc-sample.sh demonstrates the supported labels and should be treated
-# > as the practical reference for the documentation syntax.
+# > The SDK's `doc-sample.sh` illustrates these source-comment conventions and is
+# > a useful authoring reference. MCM performs the actual Markdown generation.
 #
 # -- Sections and Structure ---------------------------------------------------------
 #
@@ -164,141 +163,48 @@
 # > Good sectioning is especially important in larger modules, where a long list of
 # > functions would otherwise become difficult to read.
 #
-# -- Style Hints --------------------------------------------------------------------
+# -- Markdown Authoring -------------------------------------------------------------
 #
-# > Documentation lines may include an optional leading marker that either identifies
-# > plain documentation content or assigns a renderer style hint.
+# > Content beneath `# fn:`, `# fn$` and other documentation declarations uses
+# > Markdown. Write `# . Purpose`, `# . Arguments`, `# . Returns` and `# . Usage`
+# > as field headers when a function needs them. The generator turns these headers
+# > into corresponding Markdown headings.
 #
-# > The plain documentation marker is:
-#
-# >     >           Plain documentation line
-# >     >           When used without text, emits an intentional blank line
-#
-# > Style hints are presentation hints layered on top of the structural content type.
-# > The renderer reads the exported stylehint value for each documentation line.
-# > When the style hint is normal, no additional style class is added. When another
-# > value is supplied, the renderer adds a corresponding sh-<stylehint> CSS class.
-#
-# > The currently supported style hints are:
-#
-# >     normal      <> Standard rendered text
-# >     label       <> (:) Label or small subheader text
-# >     highlight   <> (.) Highlighted text
-# >     emphasis    <> (!) Emphasized text
-# >     underline   <> (_) Underlined text
-# >     quote       <> (~) Quoted or aside text
-# >     listitem    <> (-) Bullet-style list item
-# >     indent      <> Reserved indentation style
-#
-# > Marker characters are only interpreted when they are the first token after the
-# > comment marker. Leading whitespace after "# " is preserved as author layout and
-# > prevents marker interpretation.
-#
-# > These symbols are intended as visual cues and make it easier to identify the
-# > purpose of a line while scanning a page.
-#
-# > Style hints should be used for presentation only. They do not replace content
-# > labels such as fn:, fn$, var:, var$, doc:, or doc$.
-#
-# > The file doc-sample.sh should be treated as the practical reference for the
-# > supported documentation syntax.
-#
-# -- Aligned Documentation ----------------------------------------------------------
-#
-# > The renderer recognizes @ <> as an alignment token in ordinary documentation content.
-# > Consecutive lines containing @ <> form one aligned block. Corresponding fields share
-# > the same browser-calculated column width, so proportional fonts remain correctly aligned.
-# > The token is removed from rendered output.
-# > 
-# >     # > fn:  <> Function or method documentation
-# >     # > var: <> Variable documentation
-# >     # > cls: <> Class documentation
-# >     # > doc: <> General documentation
+# > Usage samples should be fenced so the generated site can apply syntax highlighting
+# > and preserve shell indentation:
 # >
-# > More than two columns are allowed by using @ <> more than once on each line. Alignment
-# > ends when the next rendered documentation line does not contain @ <>. The processor
-# > preserves the token as content; alignment is intentionally renderer-owned.
+# >     # . Usage
+# >     #   ```bash
+# >     #   sgnd-doc-example --help
+# >     #   ```
 #
-# -- Tables -------------------------------------------------------------------------
-#
-# > Documentation can embed tabular data directly in structured source comments. A
-# > table begins with a highlighted Table marker. The following documentation lines are
-# > collected as table rows until a blank documentation line ends the table.
-# >
-# > Table cells are separated by a double colon (::). The first table row is always the
-# > semantic header row and is rendered using <thead> and <th>; following rows are rendered
-# > using <tbody> and <td>. Column widths are left to the browser and stylesheet.
-# >
-# >     # . Table
-# >     # ! Name :: Description :: Status
-# >     # Framework :: Core SolidGroundUX framework :: Active
-# >     # Console :: Management console modules :: Active
-# >     #
-# >
-# > The first row may use the emphasis marker (!) as a visual style hint. This does not
-# > change its table semantics: the first row remains the header. Following rows use normal
-# > documentation lines so they remain part of the table. The processor preserves the ::
-# > separators as content; table recognition, cell splitting, and HTML semantics belong to
-# > the renderer.
+# > Write ordinary Markdown tables with pipe-separated cells, not the historical
+# > `::`-separated renderer table dialect. Markdown links, images and lists work in
+# > both documentation-only sources and function comments. The previous intermediate
+# > HTML renderer's style-hint tokens and alignment markers are not part of the
+# > current Markdown bundle generator's contract.
 #
 # -- Images -------------------------------------------------------------------------
 #
-# > Documentation can embed one image or a group of images directly from structured
-# > source comments. An image block begins with a label or highlight line whose content
-# > is exactly Image or Images, followed by one or more normal documentation lines.
-# > A blank documentation line ends the image block.
-# >
-# > The common construction is:
-# >
-# >     # : Images
-# >     # File name.png
-# >     # Another image.png :: Optional caption
-# >     #
-# >
-# > Singular Image is also accepted:
-# >
-# >     # : Image
-# >     # Architecture.png :: Framework architecture
-# >     #
-# >
-# > The marker may use either the label (:) or highlight (.) style hint. Image entries
-# > themselves must remain normal documentation lines. The optional caption is separated
-# > from the filename or source by a double colon (::). When no caption is supplied, the
-# > renderer derives alternative text from the filename.
-# >
-# > Relative filenames are resolved beneath the generated assets/images directory.
-# > Each selected documentation product may provide documentation assets beneath:
-# >
-# >     <product-source-root>/usr/local/assets
-# >
-# > The generator supplies these product asset directories to the renderer. Their flat
-# > contents are merged into the generated documentation assets/images directory without
-# > renaming files, so asset filenames are expected to be globally unique across products.
-# > Sources beginning with assets/ are resolved relative to the generated documentation
-# > asset root. Absolute paths, http/https URLs, and data URLs are also accepted by the
-# > renderer.
-# >
-# > Consecutive image entries are rendered as one responsive image group. The renderer
-# > selects layouts for one, two, three, or four-column groups automatically; larger
-# > groups continue using the four-column layout.
+# > Source comments can reference images in Markdown or image declarations. Assets
+# > are copied from the participating product's `doc-sources/assets` directory and
+# > other configured documentation resources. The output tree retains paths needed
+# > by the Markdown references, and the generator checks for missing image targets.
+#
+# > Repositories contributing different files with the same destination filename
+# > must resolve the collision before generation. The generator must not silently
+# > pick one image and discard the other.
 #
 # -- Generated Output ---------------------------------------------------------------
 #
-# > The generated documentation consists of an HTML index, content pages, stylesheet
-# > assets, images, appendices, glossary pages, integrity information, and renderer-owned
-# > site branding. Documented SolidGroundUX style modules can also receive generated
-# > semantic theme specimens derived from their actual style and palette assignments.
-# >
-# > Project-level appendices are supplied from repository/project sources such as the
-# > canonical architecture/conventions document, CHANGELOG, INSTALL guide, and license.
-# > These prose sources should be maintained alongside the project and regenerated into
-# > the HTML set rather than editing generated appendix pages directly.
+# > The bundle generator writes Markdown pages, chapter and section indexes,
+# > navigation metadata and referenced assets beneath the configured output root.
+# > It also incorporates available product reference documents such as release notes,
+# > README, license and changelog into appendix content.
 #
-# > The output is intentionally static HTML so it can be viewed in any browser
-# > without requiring a web server, database, or application runtime.
-#
-# > This makes the documentation easy to publish, archive, review, and distribute
-# > together with a release package.
+# > The generated Markdown can be inspected locally or passed to the WCM static-site
+# > generator. HTML layout, theme rendering and website deployment are WCM concerns;
+# > they do not belong to the bundle-managing Python CLI.
 #
 # -- Prefaces and Epilogues ---------------------------------------------------------
 #
@@ -329,7 +235,7 @@
 # > belong. Product-level sources belong directly to their product. Prefaces therefore
 # > affect the parent node's content reference; epilogues affect child ordering.
 #
-# > Filename recognition is also supported as a compatibility fallback. The renderer
+# > Filename recognition is also supported as a compatibility fallback. The generator
 # > recognizes conventional names based on the product, group, or subgroup name followed
 # > by a preface or epilogue suffix. Names are normalized for matching, so hyphens, spaces,
 # > and underscores in the logical name do not define the hierarchy themselves.
@@ -351,12 +257,9 @@
 #
 # > Example subgroup epilogue metadata:
 #
-# >     Group       : SDK
+# >     Group       : Web Content Manager
 # >     Subgroup    : Documentation Generator
 # >     Purpose     : Subgroup epilogue
-#
-# . Images
-#   sdk-documentation-system.png :: Documentation System overview
 #
 # -- Documentation Conventions ------------------------------------------------------
 #

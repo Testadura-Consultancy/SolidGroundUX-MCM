@@ -47,7 +47,9 @@ set -uo pipefail
         #   Exits with code 2 when executed instead of sourced.
         #
         # . Usage
+        #   ```bash
         #   _sgnd_lib_guard
+        #   ```
     _sgnd_lib_guard() {
         local lib_base=""
         local guard=""
@@ -79,11 +81,13 @@ set -uo pipefail
 
     SGND_MODULE_NAME="$SGND_STORAGE_MODULE_NAME"
 # - Management dispatch -------------------------------------------------------------
+    # fn: _storage_run_action - Run action in the storage workflow.
     _storage_run_action() {
         local action="${1:?missing action}"
         _sgnd_run_module_script "manage-storage.sh" --action "$action"
     }
 
+    # fn: _storage_run_compound_step - Run compound step in the storage workflow.
     _storage_run_compound_step() {
         local action="${1:?missing action}"
 
@@ -93,7 +97,25 @@ set -uo pipefail
         )
     }
 
+    # fn: _storage_step_provision - Call `_storage_run_compound_step` with the `provision` action.
+        #
+        # . Returns
+        #   The status returned by the delegated action.
+        #
+        # . Usage
+        #   ```bash
+        #   _storage_step_provision
+        #   ```
     _storage_step_provision() { _storage_run_compound_step provision; }
+    # fn: _storage_step_validate - Call `_storage_run_compound_step` with the `validate` action.
+        #
+        # . Returns
+        #   The status returned by the delegated action.
+        #
+        # . Usage
+        #   ```bash
+        #   _storage_step_validate
+        #   ```
     _storage_step_validate()  { _storage_run_compound_step validate; }
 
     # fn: storage_prepare - Provision and validate persistent SolidGroundUX storage
@@ -116,7 +138,9 @@ set -uo pipefail
         #   0 when provisioning and validation both succeed; otherwise the first failing child code.
         #
         # . Usage
+        #   ```bash
         #   storage_prepare
+        #   ```
     storage_prepare() {
         sgnd_print
         sgnd_print_sectionheader --text "Prepare Storage"
@@ -133,13 +157,85 @@ set -uo pipefail
         _storage_step_validate || return $?
     }
 
+    # fn: storage_provision - Call `_storage_run_action` with the `provision` action.
+        #
+        # . Returns
+        #   The status returned by the delegated action.
+        #
+        # . Usage
+        #   ```bash
+        #   storage_provision
+        #   ```
     storage_provision()                 { _storage_run_action provision; }
+    # fn: storage_mount - Call `_storage_run_action` with the `mount` action.
+        #
+        # . Returns
+        #   The status returned by the delegated action.
+        #
+        # . Usage
+        #   ```bash
+        #   storage_mount
+        #   ```
     storage_mount()                     { _storage_run_action mount; }
+    # fn: storage_unmount - Call `_storage_run_action` with the `unmount` action.
+        #
+        # . Returns
+        #   The status returned by the delegated action.
+        #
+        # . Usage
+        #   ```bash
+        #   storage_unmount
+        #   ```
     storage_unmount()                   { _storage_run_action unmount; }
+    # fn: storage_expand - Call `_storage_run_action` with the `expand` action.
+        #
+        # . Returns
+        #   The status returned by the delegated action.
+        #
+        # . Usage
+        #   ```bash
+        #   storage_expand
+        #   ```
     storage_expand()                    { _storage_run_action expand; }
+    # fn: storage_reconcile - Call `_storage_run_action` with the `reconcile` action.
+        #
+        # . Returns
+        #   The status returned by the delegated action.
+        #
+        # . Usage
+        #   ```bash
+        #   storage_reconcile
+        #   ```
     storage_reconcile()                 { _storage_run_action reconcile; }
+    # fn: storage_reconcile_persistence - Call `_storage_run_action` with the `reconcile-persistence` action.
+        #
+        # . Returns
+        #   The status returned by the delegated action.
+        #
+        # . Usage
+        #   ```bash
+        #   storage_reconcile_persistence
+        #   ```
     storage_reconcile_persistence()     { _storage_run_action reconcile-persistence; }
+    # fn: storage_validate_provisioning - Call `_storage_run_action` with the `validate` action.
+        #
+        # . Returns
+        #   The status returned by the delegated action.
+        #
+        # . Usage
+        #   ```bash
+        #   storage_validate_provisioning
+        #   ```
     storage_validate_provisioning()     { _storage_run_action validate; }
+    # fn: storage_status - Call `_storage_run_action` with the `status` action.
+        #
+        # . Returns
+        #   The status returned by the delegated action.
+        #
+        # . Usage
+        #   ```bash
+        #   storage_status
+        #   ```
     storage_status()                    { _storage_run_action status; }
 
     # fn: storage_manage_directories - Manage directories below a SolidGroundUX storage root
@@ -155,11 +251,40 @@ set -uo pipefail
         #   The return code from the storage directory-management action.
         #
         # . Usage
+        #   ```bash
         #   storage_manage_directories
+        #   ```
     storage_manage_directories()          { _storage_run_action directories; }
 
+    # fn: storage_access_status - Call `_storage_run_action` with the `access-status` action.
+        #
+        # . Returns
+        #   The status returned by the delegated action.
+        #
+        # . Usage
+        #   ```bash
+        #   storage_access_status
+        #   ```
     storage_access_status()             { _storage_run_action access-status; }
+    # fn: storage_set_access - Call `_storage_run_action` with the `set-access` action.
+        #
+        # . Returns
+        #   The status returned by the delegated action.
+        #
+        # . Usage
+        #   ```bash
+        #   storage_set_access
+        #   ```
     storage_set_access()                 { _storage_run_action set-access; }
+    # fn: storage_restore_access_defaults - Call `_storage_run_action` with the `restore-defaults` action.
+        #
+        # . Returns
+        #   The status returned by the delegated action.
+        #
+        # . Usage
+        #   ```bash
+        #   storage_restore_access_defaults
+        #   ```
     storage_restore_access_defaults()   { _storage_run_action restore-defaults; }
 
 # - Module validation contract ------------------------------------------------------
@@ -171,6 +296,15 @@ set -uo pipefail
     #
     # Every validator sets SGND_MODULE_VALIDATION_MESSAGE to a concise result summary.
     # Detailed diagnostic output may be written by the validator or delegated action.
+    # fn: validate_module_storage - Validate the storage module and record its status for the console.
+        #
+        # . Returns
+        #   A console validation status (0=pass, 1=fail, 2=warning, 3=skipped).
+        #
+        # . Usage
+        #   ```bash
+        #   validate_module_storage
+        #   ```
     validate_module_storage() {
         if [[ ! -s /etc/solidgroundux/storage.cfg ]] && ! grep -Eq '(^|[[:space:]])SGND_STORAGE([[:space:]]|$)' /etc/fstab 2>/dev/null; then
             SGND_MODULE_VALIDATION_MESSAGE="Storage is not configured on this host."

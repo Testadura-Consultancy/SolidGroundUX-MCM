@@ -41,6 +41,19 @@
 #   - Managing module-specific state beyond registration and dispatch
 #   - Providing a widget-based or cursor-addressed full-screen TUI
 #
+# Usage:
+#   Run the executable from its shell command (or installed wrapper):
+#   ```bash
+#   sgnd-console
+#   sgnd-console --appcfg ./10-sgnd-config.sh
+#   sgnd-console --appcfg ./20-machine-config.sh
+#   ```
+#
+#   Script-specific options:
+#   - `--appcfg VALUE`: Console module file or module directory.
+#   - `--maxrows VALUE`: Maximum menu rows per page.
+#   - `--title VALUE`: Override console title.
+#
 # Attribution:
 #   Developers  : Mark Fieten
 #   Company     : Testadura Consultancy
@@ -81,7 +94,9 @@ set -uo pipefail
         #   be found, or the executable common library is unreadable.
         #
         # . Usage
+        #   ```bash
         #   _framework_locator || return $?
+        #   ```
     _framework_locator() {
         local script_file=""
         local path_without_root=""
@@ -380,7 +395,9 @@ set -uo pipefail
         # . Returns
         #   0 when a user name is resolved.
         # . Usage
+        #   ```bash
         #   _sgnd_console_state_owner
+        #   ```
     _sgnd_console_state_owner() {
         if (( EUID == 0 )) && [[ -n "${SUDO_USER:-}" && "${SUDO_USER}" != "root" ]]; then
             printf '%s\n' "$SUDO_USER"
@@ -397,7 +414,9 @@ set -uo pipefail
         # . Returns
         #   0 when the directory is ready; non-zero on failure.
         # . Usage
+        #   ```bash
         #   _sgnd_console_prepare_state_directory "<directory>"
+        #   ```
     _sgnd_console_prepare_state_directory() {
         local directory="${1:?missing state directory}"
         local owner=""
@@ -421,7 +440,9 @@ set -uo pipefail
         # . Returns
         #   0 when ownership and mode are correct; non-zero on failure.
         # . Usage
+        #   ```bash
         #   _sgnd_console_finalize_state_file "<file>"
+        #   ```
     _sgnd_console_finalize_state_file() {
         local file="${1:?missing state file}"
         local owner=""
@@ -446,7 +467,10 @@ set -uo pipefail
         #   0 on success; 1 when SGND_FRAMEWORK_ROOT is unavailable.
         #
         # . Usage
+        #   ```bash
         #   _sgnd_console_init_paths || return $?
+        #   ```
+    # fn: _sgnd_console_init_paths - Initialize Management Console paths after checking the Framework root.
     _sgnd_console_init_paths() {
         [[ -n "${SGND_FRAMEWORK_ROOT:-}" ]] || {
             sayfail "SGND_FRAMEWORK_ROOT is not initialized"
@@ -485,7 +509,10 @@ set -uo pipefail
         #   Writes the resolved application root to stdout.
         #
         # . Usage
+        #   ```bash
         #   SGND_CONSOLE_APP_ROOT="$(_sgnd_console_resolve_app_root "$module_path")"
+        #   ```
+    # fn: _sgnd_console_resolve_app_root - Resolve app root in the Management Console workflow.
     _sgnd_console_resolve_app_root() {
         local source_path="${1:?missing application module source}"
         local path_without_root=""
@@ -534,7 +561,9 @@ set -uo pipefail
         #   - Leaves presentation of DEV context to the console index renderer.
         #
         # . Usage
+        #   ```bash
         #   _sgnd_console_set_app_context "$module_path"
+        #   ```
     _sgnd_console_set_app_context() {
         local module_path="${1:?missing application module source}"
 
@@ -572,7 +601,9 @@ set -uo pipefail
         #   126 module source does not exist or is not a readable .sh file/directory
         #
         # . Usage
+        #   ```bash
         #   _sgnd_console_load_config || return $?
+        #   ```
     _sgnd_console_load_config() {
         local module_path="${VAL_APPCFG-}"
 
@@ -616,7 +647,9 @@ set -uo pipefail
     # --- Action result tracking ------------------------------------------------------
     # fn: sgnd_console_action_status - Read persisted status for a menu action
         # . Usage
+        #   ```bash
         #   sgnd_console_action_status "<item_key>"
+        #   ```
     sgnd_console_action_status() {
         local item_key="${1:?missing item key}"
         local line=""
@@ -643,7 +676,9 @@ set -uo pipefail
 
     # fn: sgnd_console_record_action_result - Persist and display an action result
         # . Usage
+        #   ```bash
         #   sgnd_console_record_action_result "<item_key>" "<rc>"
+        #   ```
     sgnd_console_record_action_result() {
         local item_key="${1:?missing item key}"
         local rc="${2:-1}"
@@ -681,7 +716,9 @@ set -uo pipefail
 
     # fn: sgnd_console_run_tracked - Execute one registered action and track its result
         # . Usage
+        #   ```bash
         #   sgnd_console_run_tracked "<item_key>" "<handler>"
+        #   ```
     sgnd_console_run_tracked() {
         local item_key="${1:?missing item key}"
         local handler="${2:?missing handler}"
@@ -706,7 +743,9 @@ set -uo pipefail
         # . Returns
         #   Exit status from the executed handler.
         # . Usage
+        #   ```bash
         #   _sgnd_console_execute_menu_item "<item_key>" "<handler>" "<builtin>"
+        #   ```
     _sgnd_console_execute_menu_item() {
         local item_key="${1:?missing item key}"
         local handler="${2:?missing handler}"
@@ -722,7 +761,9 @@ set -uo pipefail
 
     # fn: _sgnd_console_refresh_action_statuses - Apply persisted statuses to menu items
         # . Usage
+        #   ```bash
         #   _sgnd_console_refresh_action_statuses "<NR>"
+        #   ```
     _sgnd_console_refresh_action_statuses() {
         local i
         local row_count="${#SGND_ITEM_ROWS[@]}"
@@ -755,7 +796,9 @@ set -uo pipefail
         #   1 when the action-state file cannot be rewritten.
         #
         # . Usage
+        #   ```bash
         #   _sgnd_console_reset_page_results
+        #   ```
     _sgnd_console_reset_page_results() {
         local active_source="${SGND_MENU_ACTIVE_SOURCE:-}"
         local i=0
@@ -830,7 +873,9 @@ set -uo pipefail
         #   0 when both built-in navigation items are registered; non-zero on failure.
         #
         # . Usage
+        #   ```bash
         #   _sgnd_console_register_builtin_items
+        #   ```
     _sgnd_console_register_builtin_items() {
         SGND_GROUP_NAVIGATION="navigation"
         sgnd_menu_register_group "$SGND_GROUP_NAVIGATION" "Navigation" "" 1 0 990
@@ -858,10 +903,12 @@ set -uo pipefail
         #   Non-zero if registration fails
         #
         # . Usage
+        #   ```bash
         #   _sgnd_console_register_fallback_group "module:devtools"
         #
         # Examples:
         #   _sgnd_console_register_fallback_group "module:devtools"
+        #   ```
     _sgnd_console_register_fallback_group() {
         local key="${1:?missing group key}"
         local label="Other"
@@ -906,10 +953,12 @@ set -uo pipefail
         #   1 if the group does not exist
         #
         # . Usage
+        #   ```bash
         #   _sgnd_console_group_exists "runtime" && printf 'Group exists\n'
         #
         # Examples:
         #   _sgnd_console_group_exists "runtime"
+        #   ```
     _sgnd_console_group_exists() {
         local key="${1:?missing group key}"
 
@@ -930,7 +979,9 @@ set -uo pipefail
         # . Returns
         #   0 after displaying metadata; 126 when not running as root or discovery fails.
         # . Usage
+        #   ```bash
         #   _sgnd_console_show_module_metadata
+        #   ```
     _sgnd_console_show_module_metadata() {
         local i=0
         local module_count=0
@@ -998,7 +1049,10 @@ set -uo pipefail
         #   0 after writing the normalized module ID to stdout.
         #
         # . Usage
+        #   ```bash
         #   _sgnd_console_module_id_from_filename "20-active-directory.sh"
+        #   ```
+    # fn: _sgnd_console_module_id_from_filename - Derive the module ID from a numbered module script filename.
     _sgnd_console_module_id_from_filename() {
         local module_name=""
 
@@ -1013,7 +1067,10 @@ set -uo pipefail
         #   Writes enabled or disabled. Missing entries default to enabled.
         #
         # . Usage
+        #   ```bash
         #   _sgnd_console_module_state_get "active-directory"
+        #   ```
+    # fn: _sgnd_console_module_state_get - Get module state in the Management Console workflow.
     _sgnd_console_module_state_get() {
         local module_id="${1:?missing module ID}"
         local state=""
@@ -1033,7 +1090,10 @@ set -uo pipefail
         #   0 when enabled or unspecified; 1 when explicitly disabled.
         #
         # . Usage
+        #   ```bash
         #   _sgnd_console_module_enabled "active-directory"
+        #   ```
+    # fn: _sgnd_console_module_enabled - Test whether a Management Console module is enabled in saved state.
     _sgnd_console_module_enabled() {
         local module_id="${1:?missing module ID}"
         [[ "$(_sgnd_console_module_state_get "$module_id")" == "enabled" ]]
@@ -1054,7 +1114,9 @@ set -uo pipefail
         #   0 when the state file is updated; 1 on filesystem failure; 2 for an invalid state.
         #
         # . Usage
+        #   ```bash
         #   _sgnd_console_module_state_set "storage" "disabled"
+        #   ```
     _sgnd_console_module_state_set() {
         local module_id="${1:?missing module ID}"
         local state="${2:?missing module state}"
@@ -1101,7 +1163,9 @@ set -uo pipefail
         #   0 when the user returns; 1 on discovery or state-write failure; 126 when not root.
         #
         # . Usage
+        #   ```bash
         #   _sgnd_console_manage_visibility
+        #   ```
     _sgnd_console_manage_visibility() {
         local choice=""
         local module=""
@@ -1195,7 +1259,10 @@ set -uo pipefail
         #   Writes sorted module paths to stdout.
         #
         # . Usage
+        #   ```bash
         #   mapfile -t modules < <(_sgnd_console_discover_module_files)
+        #   ```
+    # fn: _sgnd_console_discover_module_files - Discover module files in the Management Console workflow.
     _sgnd_console_discover_module_files() {
         local module_path="${SGND_CONSOLE_MODULE_PATH:?missing module source}"
 
@@ -1223,7 +1290,9 @@ set -uo pipefail
         #   0 after producing metadata, using a filename-derived name fallback when needed.
         #
         # . Usage
+        #   ```bash
         #   _sgnd_console_module_metadata "$module" name desc version build
+        #   ```
     _sgnd_console_module_metadata() {
         local module_file="${1:?missing module file}"
         local output_name="${2:?missing name output variable}"
@@ -1269,7 +1338,9 @@ set -uo pipefail
         #   0 on success; discovery errors are propagated.
         #
         # . Usage
+        #   ```bash
         #   _sgnd_console_register_pages || return $?
+        #   ```
     _sgnd_console_register_pages() {
         local module=""
         local module_id=""
@@ -1302,7 +1373,9 @@ set -uo pipefail
         #   0 on success; 1 for an invalid page; 126 when module loading fails.
         #
         # . Usage
+        #   ```bash
         #   _sgnd_console_open_page 0
+        #   ```
     _sgnd_console_open_page() {
         local page_index="${1:?missing page index}"
         local page_count="${#SGND_CONSOLE_PAGE_ROWS[@]}"
@@ -1338,7 +1411,9 @@ set -uo pipefail
         #   0 after rendering.
         #
         # . Usage
+        #   ```bash
         #   _sgnd_console_show_index
+        #   ```
     _sgnd_console_show_index() {
         local i=0
         local page_count="${#SGND_CONSOLE_PAGE_ROWS[@]}"
@@ -1487,7 +1562,9 @@ set -uo pipefail
         #   0 after restoring rows and invalidating model/layout caches.
         #
         # . Usage
+        #   ```bash
         #   _sgnd_console_rollback_module_registration "$group_count" "$item_count" "$module_count" "$title" "$desc"
+        #   ```
     _sgnd_console_rollback_module_registration() {
         local group_count="${1:-0}"
         local item_count="${2:-0}"
@@ -1543,7 +1620,9 @@ set -uo pipefail
         #   126 when the module cannot be loaded.
         #
         # . Usage
+        #   ```bash
         #   _sgnd_console_source_module "/usr/local/libexec/solidgroundux/console-modules/20-machine-config.sh"
+        #   ```
     _sgnd_console_source_module() {
         local module_file="${1:?missing module file}"
         local module_id=""
@@ -1648,7 +1727,9 @@ set -uo pipefail
         #   0 after populating the requested argument array.
         #
         # . Usage
+        #   ```bash
         #   _sgnd_build_command_args command_args "$@"
+        #   ```
     _sgnd_build_command_args() {
         local -n result_ref="${1:?missing result array}"
         shift
@@ -1667,7 +1748,9 @@ set -uo pipefail
         #   Exit status from the resolved command; 1 when the command cannot be found.
         #
         # . Usage
+        #   ```bash
         #   _sgnd_run_public_command "framework-smoketest"
+        #   ```
     _sgnd_run_public_command() {
         local command_name="${1:?missing command name}"
         shift || true
@@ -1710,8 +1793,11 @@ set -uo pipefail
         #   Returns 1 when the script cannot be found or is not executable.
         #
         # . Usage
+        #   ```bash
         #   _sgnd_run_module_script "manage-identity.sh"
         #   _sgnd_run_module_script "prepare-template.sh" --dryrun
+        #   ```
+    # fn: _sgnd_run_module_script - Invoke a management script through the console module dispatch helper.
     _sgnd_run_module_script() {
         local script_name="${1:?missing script name}"
         shift
@@ -1764,7 +1850,9 @@ set -uo pipefail
         #   - Does not replace the console process.
         #
         # . Usage
+        #   ```bash
         #   _sgnd_console_open_shell
+        #   ```
     _sgnd_console_open_shell() {
         local shell_path="${SHELL:-/bin/bash}"
 
@@ -1794,7 +1882,9 @@ set -uo pipefail
         #   Does not return after a successful relaunch; returns 1 on failure.
         #
         # . Usage
+        #   ```bash
         #   _sgnd_console_toggle_access
+        #   ```
     _sgnd_console_toggle_access() {
         local arg=""
         local -a relaunch_args=()
@@ -1865,7 +1955,9 @@ set -uo pipefail
         #   1 when the user chooses to remain in the console.
         #
         # . Usage
+        #   ```bash
         #   _sgnd_console_confirm_exit && return 0
+        #   ```
     _sgnd_console_confirm_exit() {
         local decision="NO"
 
@@ -1891,7 +1983,9 @@ set -uo pipefail
         #   0 after toggling the current mode.
         #
         # . Usage
+        #   ```bash
         #   _sgnd_console_toggle_dryrun
+        #   ```
     _sgnd_console_toggle_dryrun() {
         : "${FLAG_DRYRUN:=0}"
 
@@ -1913,7 +2007,9 @@ set -uo pipefail
         #   Prints the selected log-level name.
         #
         # . Usage
+        #   ```bash
         #   _sgnd_console_cycle_loglevel_value normal 1
+        #   ```
     _sgnd_console_cycle_loglevel_value() {
         local current="${1:-silent}"
         local direction="${2:-1}"
@@ -1940,7 +2036,9 @@ set -uo pipefail
         #   0 when no state file is configured; otherwise the sgnd_state_set status.
         #
         # . Usage
+        #   ```bash
         #   _sgnd_console_persist_framework_value
+        #   ```
     _sgnd_console_persist_framework_value() {
         local key="${1:?missing key}"
         local value="${2-}"
@@ -1956,7 +2054,9 @@ set -uo pipefail
         #   0 unless persistence fails.
         #
         # . Usage
+        #   ```bash
         #   _sgnd_console_cycle_console_loglevel
+        #   ```
     _sgnd_console_cycle_console_loglevel() {
         local direction="${1:-1}"
 
@@ -1972,7 +2072,9 @@ set -uo pipefail
         #   0 unless persistence fails.
         #
         # . Usage
+        #   ```bash
         #   _sgnd_console_cycle_file_loglevel
+        #   ```
     _sgnd_console_cycle_file_loglevel() {
         local direction="${1:-1}"
 
@@ -1989,7 +2091,9 @@ set -uo pipefail
         #   0 when the theme is applied; non-zero when no themes exist or loading fails.
         #
         # . Usage
+        #   ```bash
         #   _sgnd_console_cycle_theme
+        #   ```
     _sgnd_console_cycle_theme() {
         local direction="${1:-1}"
         local current_file="${SGND_UI_STYLE##*/}"
@@ -2062,7 +2166,9 @@ set -uo pipefail
         #   0 when handled.
         #   2 when the key is not a console execution-context control.
         # . Usage
+        #   ```bash
         #   _sgnd_console_handle_control "<control>"
+        #   ```
     _sgnd_console_handle_control() {
         local control="${1:-}"
 
@@ -2101,10 +2207,12 @@ set -uo pipefail
         #   1 on input or dispatch failure
         #
         # . Usage
+        #   ```bash
         #   _sgnd_console_run
         #
         # Examples:
         #   _sgnd_console_run
+        #   ```
     _sgnd_console_run() {
         local choice=""
         local rc=0
@@ -2228,7 +2336,9 @@ set -uo pipefail
         #   Exits with the resulting status from framework startup or console execution.
         #
         # . Usage
+        #   ```bash
         #   main "$@"
+        #   ```
     main() {
         SGND_CONSOLE_ORIGINAL_ARGS=("$@")
 

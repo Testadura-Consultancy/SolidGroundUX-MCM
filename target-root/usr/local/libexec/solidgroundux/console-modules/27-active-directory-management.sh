@@ -41,7 +41,9 @@ set -uo pipefail
         #   Exits with code 2 when executed instead of sourced.
         #
         # . Usage
+        #   ```bash
         #   _sgnd_lib_guard
+        #   ```
     _sgnd_lib_guard() {
         local lib_base=""
         local guard=""
@@ -72,26 +74,207 @@ set -uo pipefail
     SGND_MODULE_ID="${SGND_AD_MANAGEMENT_MODULE_ID}"
     SGND_MODULE_NAME="$SGND_AD_MANAGEMENT_MODULE_NAME"
 # - Management dispatch -------------------------------------------------------------
+    # fn: _admg_run_action - Forward an Active Directory management action to its management executable.
     _admg_run_action() { local action="${1:?missing action}"; _sgnd_run_module_script "manage-active-directory.sh" --action "$action"; }
+    # fn: _admg_validate - Forward the `validate` action to the AD management script.
+        #
+        # . Returns
+        #   The status returned by the delegated action.
+        #
+        # . Usage
+        #   ```bash
+        #   _admg_validate
+        #   ```
     _admg_validate() { _admg_run_action validate; }
+    # fn: _admg_status - Forward the `status` action to the AD management script.
+        #
+        # . Returns
+        #   The status returned by the delegated action.
+        #
+        # . Usage
+        #   ```bash
+        #   _admg_status
+        #   ```
     _admg_status() { _admg_run_action status; }
+    # fn: _admg_list_users - Forward the `user-list` action to the AD management script.
+        #
+        # . Returns
+        #   The status returned by the delegated action.
+        #
+        # . Usage
+        #   ```bash
+        #   _admg_list_users
+        #   ```
     _admg_list_users() { _admg_run_action user-list; }
+    # fn: _admg_show_user - Forward the `user-show` action to the AD management script.
+        #
+        # . Returns
+        #   The status returned by the delegated action.
+        #
+        # . Usage
+        #   ```bash
+        #   _admg_show_user
+        #   ```
     _admg_show_user() { _admg_run_action user-show; }
+    # fn: _admg_create_user - Forward the `user-create` action to the AD management script.
+        #
+        # . Returns
+        #   The status returned by the delegated action.
+        #
+        # . Usage
+        #   ```bash
+        #   _admg_create_user
+        #   ```
     _admg_create_user() { _admg_run_action user-create; }
+    # fn: _admg_toggle_user - Forward the `user-toggle` action to the AD management script.
+        #
+        # . Returns
+        #   The status returned by the delegated action.
+        #
+        # . Usage
+        #   ```bash
+        #   _admg_toggle_user
+        #   ```
     _admg_toggle_user() { _admg_run_action user-toggle; }
+    # fn: _admg_reset_user_password - Forward the `user-password` action to the AD management script.
+        #
+        # . Returns
+        #   The status returned by the delegated action.
+        #
+        # . Usage
+        #   ```bash
+        #   _admg_reset_user_password
+        #   ```
     _admg_reset_user_password() { _admg_run_action user-password; }
+    # fn: _admg_set_user_password_noexpiry - Forward the `user-noexpiry` action to the AD management script.
+        #
+        # . Returns
+        #   The status returned by the delegated action.
+        #
+        # . Usage
+        #   ```bash
+        #   _admg_set_user_password_noexpiry
+        #   ```
     _admg_set_user_password_noexpiry() { _admg_run_action user-noexpiry; }
+    # fn: _admg_user_add_groups - Forward the `user-addgroups` action to the AD management script.
+        #
+        # . Returns
+        #   The status returned by the delegated action.
+        #
+        # . Usage
+        #   ```bash
+        #   _admg_user_add_groups
+        #   ```
     _admg_user_add_groups() { _admg_run_action user-addgroups; }
+    # fn: _admg_user_remove_groups - Forward the `user-removegroups` action to the AD management script.
+        #
+        # . Returns
+        #   The status returned by the delegated action.
+        #
+        # . Usage
+        #   ```bash
+        #   _admg_user_remove_groups
+        #   ```
     _admg_user_remove_groups() { _admg_run_action user-removegroups; }
+    # fn: _admg_delete_user - Forward the `user-delete` action to the AD management script.
+        #
+        # . Returns
+        #   The status returned by the delegated action.
+        #
+        # . Usage
+        #   ```bash
+        #   _admg_delete_user
+        #   ```
     _admg_delete_user() { _admg_run_action user-delete; }
+    # fn: _admg_list_groups - Forward the `group-list` action to the AD management script.
+        #
+        # . Returns
+        #   The status returned by the delegated action.
+        #
+        # . Usage
+        #   ```bash
+        #   _admg_list_groups
+        #   ```
     _admg_list_groups() { _admg_run_action group-list; }
+    # fn: _admg_show_group - Forward the `group-show` action to the AD management script.
+        #
+        # . Returns
+        #   The status returned by the delegated action.
+        #
+        # . Usage
+        #   ```bash
+        #   _admg_show_group
+        #   ```
     _admg_show_group() { _admg_run_action group-show; }
+    # fn: _admg_create_group - Forward the `group-create` action to the AD management script.
+        #
+        # . Returns
+        #   The status returned by the delegated action.
+        #
+        # . Usage
+        #   ```bash
+        #   _admg_create_group
+        #   ```
     _admg_create_group() { _admg_run_action group-create; }
+    # fn: _admg_group_add_users - Forward the `group-addusers` action to the AD management script.
+        #
+        # . Returns
+        #   The status returned by the delegated action.
+        #
+        # . Usage
+        #   ```bash
+        #   _admg_group_add_users
+        #   ```
     _admg_group_add_users() { _admg_run_action group-addusers; }
+    # fn: _admg_group_remove_members - Forward the `group-removemembers` action to the AD management script.
+        #
+        # . Returns
+        #   The status returned by the delegated action.
+        #
+        # . Usage
+        #   ```bash
+        #   _admg_group_remove_members
+        #   ```
     _admg_group_remove_members() { _admg_run_action group-removemembers; }
+    # fn: _admg_delete_group - Forward the `group-delete` action to the AD management script.
+        #
+        # . Returns
+        #   The status returned by the delegated action.
+        #
+        # . Usage
+        #   ```bash
+        #   _admg_delete_group
+        #   ```
     _admg_delete_group() { _admg_run_action group-delete; }
+    # fn: _admg_list_computers - Forward the `computer-list` action to the AD management script.
+        #
+        # . Returns
+        #   The status returned by the delegated action.
+        #
+        # . Usage
+        #   ```bash
+        #   _admg_list_computers
+        #   ```
     _admg_list_computers() { _admg_run_action computer-list; }
+    # fn: _admg_show_computer - Forward the `computer-show` action to the AD management script.
+        #
+        # . Returns
+        #   The status returned by the delegated action.
+        #
+        # . Usage
+        #   ```bash
+        #   _admg_show_computer
+        #   ```
     _admg_show_computer() { _admg_run_action computer-show; }
+    # fn: _admg_delete_computer - Forward the `computer-delete` action to the AD management script.
+        #
+        # . Returns
+        #   The status returned by the delegated action.
+        #
+        # . Usage
+        #   ```bash
+        #   _admg_delete_computer
+        #   ```
     _admg_delete_computer() { _admg_run_action computer-delete; }
 
 # - Module validation contract ------------------------------------------------------
@@ -103,6 +286,15 @@ set -uo pipefail
     #
     # Every validator sets SGND_MODULE_VALIDATION_MESSAGE to a concise result summary.
     # Detailed diagnostic output may be written by the validator or delegated action.
+    # fn: validate_module_active_directory_management - Validate the Active Directory module and record its status for the console.
+        #
+        # . Returns
+        #   A console validation status (0=pass, 1=fail, 2=warning, 3=skipped).
+        #
+        # . Usage
+        #   ```bash
+        #   validate_module_active_directory_management
+        #   ```
     validate_module_active_directory_management() {
         if ! command -v samba-tool >/dev/null 2>&1; then
             SGND_MODULE_VALIDATION_MESSAGE="Active Directory management tools are not installed on this host."

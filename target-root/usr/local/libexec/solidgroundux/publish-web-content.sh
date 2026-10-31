@@ -15,6 +15,16 @@
 # Description:
 #   Publish local, remote, Git, and SolidGroundUX documentation content to Nginx sites.
 #
+# Usage:
+#   Run the executable from its shell command (or installed wrapper):
+#   ```bash
+#   publish-web-content --action publish-site
+#   publish-web-content --dryrun --action publish-documentation
+#   ```
+#
+#   Script-specific options:
+#   - `--action NAME`, `-a`: Publishing action (choices: `publish-site`, `publish-documentation`).
+#
 # Attribution:
 #   Developers    : Mark Fieten
 #   Company       : Testadura Consultancy
@@ -56,7 +66,9 @@ set -uo pipefail
         #   be found, or the executable common library is unreadable.
         #
         # . Usage
+        #   ```bash
         #   _framework_locator || return $?
+        #   ```
     _framework_locator() {
         local script_file=""
         local path_without_root=""
@@ -170,6 +182,7 @@ set -uo pipefail
 
     # Render a local numbered selector using the Web Server action layout.
     # The framework ask_selection API is intentionally left unchanged.
+    # fn: _web_ask_selection - Prompt for selection in the web server workflow.
     _web_ask_selection() {
         local label="Select an option"
         local var_name="selection"
@@ -212,18 +225,21 @@ set -uo pipefail
         done
     }
 
+    # fn: _web_server_load_state - Read web-management settings from the state file when available.
     _web_server_load_state() {
         if [[ -r "$SGND_WEB_SERVER_STATE_FILE" ]] && command -v sgnd_state_load_keys >/dev/null 2>&1; then
             sgnd_state_load_keys --file "$SGND_WEB_SERVER_STATE_FILE" --array SGND_WEB_SERVER_STATE_VARIABLES >/dev/null 2>&1 || true
         fi
     }
 
+    # fn: _web_server_save_state - Save web-management settings to the configured state file.
     _web_server_save_state() {
         command -v sgnd_state_save_keys >/dev/null 2>&1 || return 0
         mkdir -p "$(dirname -- "$SGND_WEB_SERVER_STATE_FILE")" || return 1
         sgnd_state_save_keys --file "$SGND_WEB_SERVER_STATE_FILE" --array SGND_WEB_SERVER_STATE_VARIABLES
     }
 
+    # fn: _dryrun_complete - Report the dry-run result without executing the requested host change.
     _dryrun_complete() {
         (( ${FLAG_DRYRUN:-0} == 1 )) || return 0
         sayok "DRYRUN complete. The changes shown above would have been applied; no changes were written."
@@ -232,7 +248,9 @@ set -uo pipefail
         # . Returns
         #   0 on success; non-zero when the operation cannot be completed.
         # . Usage
+        #   ```bash
         #   _web_server_storage_root
+        #   ```
     _web_server_storage_root() {
         local configured=""
         local storage_cfg="${SGND_SYSCFG_DIR:-/etc/solidgroundux}/storage.cfg"
@@ -249,7 +267,9 @@ set -uo pipefail
         # . Returns
         #   0 on success; non-zero when the operation cannot be completed.
         # . Usage
+        #   ```bash
         #   _web_server_root
+        #   ```
     _web_server_root() {
         local configured=""
 
@@ -287,7 +307,9 @@ set -uo pipefail
         # . Returns
         #   0 when a document root can be resolved; non-zero otherwise.
         # . Usage
+        #   ```bash
         #   _web_server_site_document_root <site>
+        #   ```
     _web_server_site_document_root() {
         local site="$1"
         local config_file="/etc/nginx/sites-available/$site"
@@ -303,7 +325,9 @@ set -uo pipefail
         # . Returns
         #   0 on success; non-zero when the operation cannot be completed.
         # . Usage
+        #   ```bash
         #   _web_server_remove_document_content <document-root>
+        #   ```
     _web_server_remove_document_content() {
         local document_root="$1"
 
@@ -330,7 +354,9 @@ set -uo pipefail
         # . Returns
         #   0 on success; non-zero when the operation cannot be completed.
         # . Usage
+        #   ```bash
         #   _web_server_ensure_directory
+        #   ```
     _web_server_ensure_directory() {
         local path="$1"
         local owner="${2:-www-data:www-data}"
@@ -357,6 +383,7 @@ set -uo pipefail
     # Resolve a local source directory to the directory that actually contains
     # the site's index file. If exactly one immediate child contains an index,
     # offer that child as the web root rather than silently publishing one level too high.
+    # fn: _web_server_resolve_local_web_root - Select the local website root for a remote publishing operation.
     _web_server_resolve_local_web_root() {
         local input_dir="$1"
         local var_name="$2"
@@ -391,7 +418,9 @@ set -uo pipefail
         # . Returns
         #   0 on success.
         # . Usage
+        #   ```bash
         #   _web_server_publish_key
+        #   ```
     _web_server_publish_key() {
         printf '%s\n' "${HOME}/.ssh/id_ed25519_sgnd_publish"
     }
@@ -400,7 +429,9 @@ set -uo pipefail
         # . Returns
         #   0 when passwordless access works; non-zero otherwise.
         # . Usage
+        #   ```bash
         #   _web_server_remote_access_ready <user@host>
+        #   ```
     _web_server_remote_access_ready() {
         local remote="$1"
         local key=""
@@ -414,7 +445,9 @@ set -uo pipefail
         # . Returns
         #   0 on success; non-zero when setup fails or is cancelled.
         # . Usage
+        #   ```bash
         #   _web_server_setup_remote_access <user@host>
+        #   ```
     _web_server_setup_remote_access() {
         local remote="$1"
         local key=""
@@ -461,7 +494,9 @@ set -uo pipefail
         # . Returns
         #   0 on success; non-zero when the operation cannot be completed.
         # . Usage
+        #   ```bash
         #   _web_server_publish_site
+        #   ```
     _web_server_publish_site() {
         local site="${SGND_WEB_PUBLISH_SITE:-}"
         local source_type="${SGND_WEB_PUBLISH_SOURCE_TYPE:-Remote machine}"
@@ -587,7 +622,9 @@ set -uo pipefail
         #   Publish documentation from the installed tree, a local/remote directory,
         #   or a GitHub repository into the configured documentation site.
         # . Usage
+        #   ```bash
         #   _web_server_publish_documentation
+        #   ```
     _web_server_publish_documentation() {
         local site="${SGND_WEB_DOC_SITE:-SolidGroundUX-Documentation}"
         local source_type="${SGND_WEB_DOC_SOURCE_TYPE:-Installed documentation}"
@@ -726,6 +763,7 @@ set -uo pipefail
     }
 
 # - Action dispatch -----------------------------------------------------------------
+    # fn: _run_action - Dispatch the requested management action to its implementation.
     _run_action() {
         local action="${1:?missing action}" rc=0
         case "$action" in
@@ -740,6 +778,7 @@ set -uo pipefail
     }
 
 # - Main ----------------------------------------------------------------------------
+    # fn: main - Dispatch command-line options to the appropriate management workflow.
     main() {
         local action=""
         _framework_locator || return $?

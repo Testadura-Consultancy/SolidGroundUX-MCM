@@ -103,9 +103,9 @@ def front(title: str, order: int = 1000, summary: str = '', *, section: bool = T
                               for key, value in values.items()) + '\n---\n\n'
 
 
-def write_index(folder: Path, title: str, body: str, order: int = 1000, summary: str = '', template: str = 'page') -> None:
+def write_index(folder: Path, title: str, body: str, order: int = 1000, summary: str = '', template: str = 'page', *, nav_title: str | None = None) -> None:
     folder.mkdir(parents=True, exist_ok=True)
-    (folder / f'{slug(title)}_Index_NL.md').write_text(front(title, order, summary, template=template) + body.strip() + '\n', encoding='utf-8')
+    (folder / f'{slug(title)}_Index_NL.md').write_text(front(title, order, summary, template=template, nav_title=nav_title) + body.strip() + '\n', encoding='utf-8')
 
 
 def _section_marker(text: str, inside_item: bool, in_fence: bool):
@@ -367,15 +367,31 @@ def collect(product, content: Path, order: int, counters: Counter, template_owne
     for path in paths:
         metadata, entries, loc = parse_source(path)
         records.append((path, metadata, entries, loc))
+    # Product-level prefaces and epilogues belong to the chapter index, not to
+    # a new group named after the product. Group/subgroup prefaces remain in their
+    # respective section indexes.
+    grouped_records = []
+    product_specials = []
+    for path, metadata, entries, loc in records:
+        special = source_document_template(path.name)
+        purpose = metadata.get('purpose', '').strip().casefold()
+        if special in ('preface', 'epilogue') and purpose == f'product {special}':
+            product_specials.append((special, entries, loc))
+        else:
+            grouped_records.append((path, metadata, entries, loc))
     # Legacy renderer sorted groups and subgroups alphabetically, within each product.
-    groups = sorted({metadata.get('group', '').strip() or 'Ungrouped' for _, metadata, _, _ in records}, key=str.casefold)
+    groups = sorted({metadata.get('group', '').strip() or 'Ungrouped' for _, metadata, _, _ in grouped_records}, key=str.casefold)
     route_names = set()
     special_pages = {}
+    for special, entries, loc in product_specials:
+        special_pages.setdefault(product_folder, {'preface': [], 'epilogue': []})[special].append(entries)
+        counters['files'] += 1
+        counters['lines'] += loc
     for group_index, group in enumerate(groups, 1):
         group_folder = product_folder / slug(group)
         group_body = []
         write_index(group_folder, group, '\n'.join(group_body), group_index, template='group')
-        group_records = [r for r in records if (r[1].get('group', '').strip() or 'Ungrouped') == group]
+        group_records = [r for r in grouped_records if (r[1].get('group', '').strip() or 'Ungrouped') == group]
         subgroup_names = sorted({r[1].get('subgroup', '').strip() for r in group_records if r[1].get('subgroup', '').strip()}, key=str.casefold)
         for subgroup_index, subgroup in enumerate(subgroup_names, 1):
             subfolder = group_folder / slug(subgroup)
@@ -487,8 +503,9 @@ def collect(product, content: Path, order: int, counters: Counter, template_owne
             # Remove structural headings whose section contains no documentation.
             # Apply this to the assembled overview (including header narrative).
             body = prune_empty_headings(body)
+            # Use the real source filename in navigation; retain its descriptive page title.
             write_index(source_folder, title, '\n'.join(body),
-                        summary=metadata.get('purpose', ''), template='source')
+                        summary=metadata.get('purpose', ''), template='source', nav_title=path.name)
     for section_folder, specials in special_pages.items():
         index_files = list(section_folder.glob('*_Index_NL.md'))
         if len(index_files) != 1:

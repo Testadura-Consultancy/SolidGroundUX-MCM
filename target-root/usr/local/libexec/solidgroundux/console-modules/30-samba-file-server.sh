@@ -44,7 +44,9 @@ set -uo pipefail
         #   Exits with code 2 when executed instead of sourced.
         #
         # . Usage
+        #   ```bash
         #   _sgnd_lib_guard
+        #   ```
     _sgnd_lib_guard() {
         local lib_base=""
         local guard=""
@@ -111,33 +113,39 @@ set -uo pipefail
             "$script_path" "${script_args[@]}"
     }
 
+    # fn: _smb_run_server_action - Forward a Samba Server action to its management executable.
     _smb_run_server_action() {
         local action="${1:?missing action}"
         _smb_run_project_script "manage-samba-file-server.sh" --action "$action"
     }
 
 # - Server management dispatchers --------------------------------------------------
+    # fn: _smb_step_install_packages - Run the Samba package-installation step.
     _smb_step_install_packages() {
         _smb_run_server_action install
     }
 
+    # fn: _smb_step_configure_authentication - Run the Samba authentication configuration step.
     _smb_step_configure_authentication() {
         _smb_run_server_action authentication
     }
 
+    # fn: _smb_step_validate_storage - Run the Samba storage validation step.
     _smb_step_validate_storage() {
         _smb_run_server_action storage
     }
 
+    # fn: _smb_step_prepare_share_root - Prepare the Samba share-root directory.
     _smb_step_prepare_share_root() {
         _smb_run_server_action share-root
     }
 
+    # fn: _smb_step_start_service - Manage the service for smb step start in the Samba workflow.
     _smb_step_start_service() {
         _smb_run_server_action service
     }
 
-    # fn: _smb_prepare_file_server - Run and track the complete Samba preparation sequence
+    # fn: _smb_prepare_file_server - Run the ordered Samba file-server preparation workflow.
         # . Purpose
         #   Execute the same registered child actions used by menu items 2-6 so composite
         #   preparation leaves each child menu status synchronized with its actual result.
@@ -153,7 +161,9 @@ set -uo pipefail
         #   0 when all child actions succeed; otherwise the first failing child return code.
         #
         # . Usage
+        #   ```bash
         #   _smb_prepare_file_server
+        #   ```
     _smb_prepare_file_server() {
         local rc=0
 
@@ -190,23 +200,28 @@ set -uo pipefail
         _smb_step_start_service
     }
 
+    # fn: _smb_validate - Validate smb in the Samba workflow.
     _smb_validate() {
         _smb_run_server_action validate
     }
 
+    # fn: _smb_status - Inspect status for smb in the Samba workflow.
     _smb_status() {
         _smb_run_server_action status
     }
 
 # - Share management dispatch ------------------------------------------------------
+    # fn: _smb_manage_shares - Launch the Samba share-management interface.
     _smb_manage_shares() {
         _smb_run_project_script "manage-samba-shares.sh"
     }
 
+    # fn: _smb_manage_directories - Launch the Samba directory-management interface.
     _smb_manage_directories() {
         _smb_run_project_script "manage-samba-directories.sh"
     }
 
+    # fn: _smb_manage_users - Launch the Samba user-management interface.
     _smb_manage_users() {
         _smb_run_project_script "manage-samba-users.sh"
     }
@@ -220,6 +235,15 @@ set -uo pipefail
     #
     # Every validator sets SGND_MODULE_VALIDATION_MESSAGE to a concise result summary.
     # Detailed diagnostic output may be written by the validator or delegated action.
+    # fn: validate_module_samba_file_server - Validate the Samba module and record its status for the console.
+        #
+        # . Returns
+        #   A console validation status (0=pass, 1=fail, 2=warning, 3=skipped).
+        #
+        # . Usage
+        #   ```bash
+        #   validate_module_samba_file_server
+        #   ```
     validate_module_samba_file_server() {
         if ! command -v smbd >/dev/null 2>&1; then
             SGND_MODULE_VALIDATION_MESSAGE="Samba file-server service is not installed on this host."

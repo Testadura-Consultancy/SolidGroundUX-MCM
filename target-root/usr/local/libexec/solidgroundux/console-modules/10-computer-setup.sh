@@ -40,7 +40,9 @@ set -uo pipefail
         #   Exits with code 2 when executed instead of sourced.
         #
         # . Usage
+        #   ```bash
         #   _sgnd_lib_guard
+        #   ```
     _sgnd_lib_guard() {
         local lib_base=""
         local guard=""
@@ -81,7 +83,9 @@ set -uo pipefail
         # . Returns
         #   Exit status from manage-identity.sh.
         # . Usage
+        #   ```bash
         #   _computer_set_identity "<args...>"
+        #   ```
     _computer_set_identity() {
         _sgnd_run_module_script "manage-identity.sh" "$@"
     }
@@ -99,14 +103,95 @@ set -uo pipefail
     }
 
     # fn: Computer Setup menu action proxies - Keep stable handler names and IDs.
+    # fn: _computer_generate_ssh_keys - Call `_computer_manage` with the `ssh-host-keys` action.
+        #
+        # . Returns
+        #   The status returned by the delegated action.
+        #
+        # . Usage
+        #   ```bash
+        #   _computer_generate_ssh_keys
+        #   ```
     _computer_generate_ssh_keys()    { _computer_manage ssh-host-keys; }
+    # fn: _computer_configure_ssh_service - Call `_computer_manage` with the `ssh-service` action.
+        #
+        # . Returns
+        #   The status returned by the delegated action.
+        #
+        # . Usage
+        #   ```bash
+        #   _computer_configure_ssh_service
+        #   ```
     _computer_configure_ssh_service(){ _computer_manage ssh-service; }
+    # fn: _computer_configure_sudoers - Call `_computer_manage` with the `sudoers` action.
+        #
+        # . Returns
+        #   The status returned by the delegated action.
+        #
+        # . Usage
+        #   ```bash
+        #   _computer_configure_sudoers
+        #   ```
     _computer_configure_sudoers()     { _computer_manage sudoers; }
+    # fn: _computer_status - Call `_computer_manage` with the `status` action.
+        #
+        # . Returns
+        #   The status returned by the delegated action.
+        #
+        # . Usage
+        #   ```bash
+        #   _computer_status
+        #   ```
     _computer_status()               { _computer_manage status; }
+    # fn: _computer_validate - Call `_computer_manage` with the `validate` action.
+        #
+        # . Returns
+        #   The status returned by the delegated action.
+        #
+        # . Usage
+        #   ```bash
+        #   _computer_validate
+        #   ```
     _computer_validate()             { _computer_manage validate; }
+    # fn: _computer_ssh_generate_user_key - Call `_computer_ssh_manage` with the `generate-key` action.
+        #
+        # . Returns
+        #   The status returned by the delegated action.
+        #
+        # . Usage
+        #   ```bash
+        #   _computer_ssh_generate_user_key
+        #   ```
     _computer_ssh_generate_user_key(){ _computer_ssh_manage generate-key; }
+    # fn: _computer_ssh_install_key - Call `_computer_ssh_manage` with the `install-key` action.
+        #
+        # . Returns
+        #   The status returned by the delegated action.
+        #
+        # . Usage
+        #   ```bash
+        #   _computer_ssh_install_key
+        #   ```
     _computer_ssh_install_key()      { _computer_ssh_manage install-key; }
+    # fn: _computer_ssh_unlock_key - Call `_computer_ssh_manage` with the `unlock-key` action.
+        #
+        # . Returns
+        #   The status returned by the delegated action.
+        #
+        # . Usage
+        #   ```bash
+        #   _computer_ssh_unlock_key
+        #   ```
     _computer_ssh_unlock_key()       { _computer_ssh_manage unlock-key; }
+    # fn: _computer_ssh_test_access - Call `_computer_ssh_manage` with the `test-access` action.
+        #
+        # . Returns
+        #   The status returned by the delegated action.
+        #
+        # . Usage
+        #   ```bash
+        #   _computer_ssh_test_access
+        #   ```
     _computer_ssh_test_access()      { _computer_ssh_manage test-access; }
 
     # fn: _computer_prepare
@@ -123,7 +208,9 @@ set -uo pipefail
         # . Returns
         #   0 when all steps succeed; otherwise the failing step status.
         # . Usage
+        #   ```bash
         #   _computer_prepare
+        #   ```
     _computer_prepare() {
         sgnd_console_run_tracked "setnetid" _computer_set_identity || return $?
         sgnd_console_run_tracked "sshkeys" _computer_generate_ssh_keys || return $?
@@ -141,6 +228,7 @@ set -uo pipefail
         #
         # . Returns
         #   0 on success; non-zero on failure.
+    # fn: _prepare_template - Prepare template in the management workflow.
     _prepare_template() {
         _sgnd_run_public_command "sgnd-prepare-template"
     }
@@ -154,6 +242,15 @@ set -uo pipefail
     #
     # Every validator sets SGND_MODULE_VALIDATION_MESSAGE to a concise result summary.
     # Detailed diagnostic output may be written by the validator or delegated action.
+    # fn: validate_module_computer_setup - Validate the management module and record its status for the console.
+        #
+        # . Returns
+        #   A console validation status (0=pass, 1=fail, 2=warning, 3=skipped).
+        #
+        # . Usage
+        #   ```bash
+        #   validate_module_computer_setup
+        #   ```
     validate_module_computer_setup() {
         if _computer_validate; then
             SGND_MODULE_VALIDATION_MESSAGE="Computer setup validation passed."

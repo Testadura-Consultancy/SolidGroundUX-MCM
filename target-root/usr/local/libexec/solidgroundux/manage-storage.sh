@@ -16,6 +16,17 @@
 #   Implements persistent local-storage management actions exposed by the
 #   15-storage Management Console module.
 #
+# Usage:
+#   Run the executable from its shell command (or installed wrapper):
+#   ```bash
+#   manage-storage --action status
+#   manage-storage --action reconcile
+#   manage-storage --dryrun --action reconcile
+#   ```
+#
+#   Script-specific options:
+#   - `--action NAME`, `-a`: Management action (supported actions: `provision`, `configure`, `mount`, `unmount`, `expand`, `reconcile`, `reconcile-persistence`, `validate`, `status`, `directories`, `access-status`, `set-access`, `restore-defaults`).
+#
 # Attribution:
 #   Developers    : Mark Fieten
 #   Company       : Testadura Consultancy
@@ -57,7 +68,9 @@ set -uo pipefail
         #   be found, or the executable common library is unreadable.
         #
         # . Usage
+        #   ```bash
         #   _framework_locator || return $?
+        #   ```
     _framework_locator() {
         local script_file=""
         local path_without_root=""
@@ -159,7 +172,9 @@ set -uo pipefail
         #   0 when the device is an unused disk, otherwise 1.
         #
         # . Usage
+        #   ```bash
         #   _storage_validate_device "/dev/sdb"
+        #   ```
     _storage_validate_device() {
         local device="${1:-}"
         local device_type=""
@@ -187,7 +202,9 @@ set -uo pipefail
         #   0 for a safe absolute path, otherwise 1.
         #
         # . Usage
+        #   ```bash
         #   _storage_validate_mountpoint "/srv/storage"
+        #   ```
     _storage_validate_mountpoint() {
         local mountpoint="${1:-}"
 
@@ -305,12 +322,14 @@ set -uo pipefail
     }
 
     # Backward-compatible helper: return first managed mount point, or the default.
+    # fn: _storage_get_mountpoint - Get mountpoint in the storage workflow.
     _storage_get_mountpoint() {
         local mountpoint=""
         mountpoint="$(_storage_list_mountpoints | head -n 1)"
         printf '%s\n' "${mountpoint:-$SGND_STORAGE_DEFAULT_MOUNTPOINT}"
     }
 
+    # fn: _storage_dryrun_complete - Report that a storage dry run made no changes.
     _storage_dryrun_complete() {
         sayok "DRYRUN complete. The changes shown above would have been applied; no changes were written."
     }
@@ -379,7 +398,9 @@ set -uo pipefail
         #   0 after scanning available disks.
         #
         # . Usage
+        #   ```bash
         #   _storage_list_unused_disks
+        #   ```
     _storage_list_unused_disks() {
         local disk_name=""
         local device=""
@@ -405,7 +426,9 @@ set -uo pipefail
         #   0 when a partition is found, otherwise 1.
         #
         # . Usage
+        #   ```bash
         #   _storage_partition_path "/dev/sdb"
+        #   ```
     _storage_partition_path() {
         local device="$1"
         local partition=""
@@ -435,7 +458,9 @@ set -uo pipefail
         #   0 when the account can be resolved through getent, otherwise 1.
         #
         # . Usage
+        #   ```bash
         #   _storage_validate_account "root"
+        #   ```
     _storage_validate_account() {
         local account="${1:-}"
         [[ -n "$account" ]] || return 1
@@ -453,7 +478,9 @@ set -uo pipefail
         #   0 when the group can be resolved through getent, otherwise 1.
         #
         # . Usage
+        #   ```bash
         #   _storage_validate_group "root"
+        #   ```
     _storage_validate_group() {
         local group="${1:-}"
         [[ -n "$group" ]] || return 1
@@ -471,7 +498,9 @@ set -uo pipefail
         #   0 when the mode is valid, otherwise 1.
         #
         # . Usage
+        #   ```bash
         #   _storage_validate_mode "0770"
+        #   ```
     _storage_validate_mode() {
         [[ "${1:-}" =~ ^[0-7]{3,4}$ ]]
     }
@@ -567,7 +596,9 @@ set -uo pipefail
         #   0 when the name is safe for a direct child path; otherwise 1.
         #
         # . Usage
+        #   ```bash
         #   _storage_validate_directory_name "application-data"
+        #   ```
     _storage_validate_directory_name() {
         local directory_name="${1:-}"
         [[ -n "$directory_name" ]] || return 1
@@ -590,7 +621,9 @@ set -uo pipefail
         #   0 after scanning the root; non-zero when the root cannot be scanned.
         #
         # . Usage
+        #   ```bash
         #   _storage_list_child_directories "/srv/storage"
+        #   ```
     _storage_list_child_directories() {
         local storage_root="${1:?missing storage root}"
         sudo find "$storage_root" -mindepth 1 -maxdepth 1 -type d -printf '%f\n' 2>/dev/null | LC_ALL=C sort
@@ -609,7 +642,9 @@ set -uo pipefail
         #   0 when a directory is selected; non-zero when none exist or selection is cancelled.
         #
         # . Usage
+        #   ```bash
         #   _storage_select_child_directory selected_name "/srv/storage" "Directory"
+        #   ```
     _storage_select_child_directory() {
         local output_var="${1:?missing output variable}"
         local storage_root="${2:?missing storage root}"
@@ -677,7 +712,9 @@ set -uo pipefail
         #   Non-zero when validation, partitioning, formatting, or mounting fails.
         #
         # . Usage
+        #   ```bash
         #   storage_provision
+        #   ```
     storage_provision() {
         local devices=()
         local device=""
@@ -846,7 +883,9 @@ set -uo pipefail
         #   0 when storage is mounted or already mounted, otherwise non-zero.
         #
         # . Usage
+        #   ```bash
         #   storage_mount
+        #   ```
     storage_mount() {
         local mountpoint=""
 
@@ -892,7 +931,9 @@ set -uo pipefail
         #   0 when storage is unmounted or already unmounted, otherwise non-zero.
         #
         # . Usage
+        #   ```bash
         #   storage_unmount
+        #   ```
     storage_unmount() {
         local mountpoint=""
 
@@ -936,7 +977,9 @@ set -uo pipefail
         #   0 when the partition and filesystem are expanded, otherwise non-zero.
         #
         # . Usage
+        #   ```bash
         #   storage_expand
+        #   ```
     storage_expand() {
         local mountpoint=""
         local source=""
@@ -1046,7 +1089,9 @@ set -uo pipefail
         #   0 when the directory manager is exited normally; non-zero on an operation failure.
         #
         # . Usage
+        #   ```bash
         #   storage_manage_directories
+        #   ```
     storage_manage_directories() {
         local storage_root=""
         local directory_action=""
@@ -1187,6 +1232,12 @@ set -uo pipefail
         sgnd_print_sectionheader ""
     }
 
+    # fn: storage_set_access - Set access in the storage workflow.
+        #
+        # . Usage
+        #   ```bash
+        #   storage_set_access
+        #   ```
     storage_set_access() {
         local target="" current_owner="root" current_group="root" current_mode="755"
         local owner="" group="" mode=""
@@ -1221,6 +1272,12 @@ set -uo pipefail
         sgnd_print_sectionheader ""
     }
 
+    # fn: storage_restore_access_defaults - Restore access defaults in the storage workflow.
+        #
+        # . Usage
+        #   ```bash
+        #   storage_restore_access_defaults
+        #   ```
     storage_restore_access_defaults() {
         local target="" decision="No"
         local -a targets=()
@@ -1301,7 +1358,9 @@ set -uo pipefail
         #   Non-zero when a requested repair/removal cannot be completed safely.
         #
         # . Usage
+        #   ```bash
         #   storage_reconcile_persistence
+        #   ```
     storage_reconcile_persistence() {
         local decision="Yes"
         local backup_file=""
@@ -1593,6 +1652,7 @@ set -uo pipefail
     }
 
 # - Action dispatch -----------------------------------------------------------------
+    # fn: _run_action - Dispatch the requested management action to its implementation.
     _run_action() {
         local action="${1:?missing action}"
 
@@ -1617,6 +1677,7 @@ set -uo pipefail
     }
 
 # - Main ----------------------------------------------------------------------------
+    # fn: main - Dispatch command-line options to the appropriate management workflow.
     main() {
         local action=""
 

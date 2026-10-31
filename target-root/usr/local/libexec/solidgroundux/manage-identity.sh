@@ -15,6 +15,24 @@
 # Description:
 #  This script sets the hostname and IPv4 network configuration for a VM.
 #
+# Usage:
+#   Run the executable from its shell command (or installed wrapper):
+#   ```bash
+#   manage-identity --dryrun
+#   manage-identity --verbose
+#   ```
+#
+#   Script-specific options:
+#   - `--Ipv4 VALUE`, `-i`: Target static IPv4 address with CIDR.
+#   - `--dhcp NAME`: Use DHCP for IPv4 configuration (choices: `yes`, `no`).
+#   - `--DNS VALUE`, `-d`: Target DNS server IP address.
+#   - `--DNS-search VALUE`: Target DNS search domain.
+#   - `--dns-only`: Update only the configured DNS server and search domain.
+#   - `--Gateway VALUE`, `-g`: Target gateway IP address.
+#   - `--Hostname VALUE`, `-n`: Target hostname for the VM.
+#   - `--Netplan VALUE`, `-p`: Path to the netplan configuration file.
+#   - `--Auto`, `-a`: Run in non-interactive mode, using defaults or provided values.
+#
 # Attribution:
 #   Developers  : Mark Fieten
 #   Company     : Testadura Consultancy
@@ -55,7 +73,9 @@ set -uo pipefail
         #   be found, or the executable common library is unreadable.
         #
         # . Usage
+        #   ```bash
         #   _framework_locator || return $?
+        #   ```
     _framework_locator() {
         local script_file=""
         local path_without_root=""
@@ -291,7 +311,9 @@ set -uo pipefail
         #   Returns the underlying command or workflow status.
         #
         # . Usage
+        #   ```bash
         #   _set_defaults
+        #   ```
     _set_defaults() {
         : "${TARGET_HOSTNAME:=}"
         : "${TARGET_IPV4:=}"
@@ -311,7 +333,9 @@ set -uo pipefail
         #   Returns the underlying command or workflow status.
         #
         # . Usage
+        #   ```bash
         #   _load_current_values
+        #   ```
     _load_current_values() {
         local detected=""
         local current_netplan=""
@@ -373,7 +397,9 @@ set -uo pipefail
         #   Returns the underlying command or workflow status.
         #
         # . Usage
+        #   ```bash
         #   _get_usr_input
+        #   ```
     _get_usr_input() {
         local mxw=80
         local lw=35
@@ -416,7 +442,9 @@ set -uo pipefail
         #   Returns the underlying command or workflow status.
         #
         # . Usage
+        #   ```bash
         #   _set_hostname
+        #   ```
     _set_hostname() {
         if (( ${FLAG_DRYRUN:-0} == 1 )); then
             sayinfo "DRYRUN: Would set hostname to '$TARGET_HOSTNAME'."
@@ -441,7 +469,9 @@ set -uo pipefail
         #   Returns the underlying command or workflow status.
         #
         # . Usage
+        #   ```bash
         #   _detect_primary_iface
+        #   ```
     _detect_primary_iface() {
         sayinfo 'Detecting primary network interface'
 
@@ -466,7 +496,9 @@ set -uo pipefail
         #   Returns the underlying command or workflow status.
         #
         # . Usage
+        #   ```bash
         #   _remove_other_netplan_files
+        #   ```
     _remove_other_netplan_files() {
         local file
 
@@ -486,7 +518,9 @@ set -uo pipefail
         #   Returns the underlying command or workflow status.
         #
         # . Usage
+        #   ```bash
         #   _static_ip_conflict_check
+        #   ```
     _static_ip_conflict_check() {
         local target_ip="${TARGET_IPV4%%/*}"
         local current_ip=""
@@ -560,7 +594,10 @@ set -uo pipefail
         #   Returns the underlying command or workflow status.
         #
         # . Usage
+        #   ```bash
         #   _network_config
+        #   ```
+    # fn: _network_config - Apply the chosen DHCP or static network configuration to the primary interface.
     _network_config() {
         _detect_primary_iface || return $?
 
@@ -585,7 +622,10 @@ set -uo pipefail
         #   Returns the underlying command or workflow status.
         #
         # . Usage
+        #   ```bash
         #   _set_static_ip
+        #   ```
+    # fn: _set_static_ip - Set static ip in the management workflow.
     _set_static_ip() {
         _apply_netplan_config static
     }
@@ -598,7 +638,10 @@ set -uo pipefail
         #   Returns the underlying command or workflow status.
         #
         # . Usage
+        #   ```bash
         #   _set_dhcp
+        #   ```
+    # fn: _set_dhcp - Set dhcp in the management workflow.
     _set_dhcp() {
         _apply_netplan_config dhcp
     }
@@ -611,7 +654,10 @@ set -uo pipefail
         #   Returns the underlying command or workflow status.
         #
         # . Usage
+        #   ```bash
         #   _write_netplan_static
+        #   ```
+    # fn: _write_netplan_static - Write netplan static in the management workflow.
     _write_netplan_static() {
         local output_file="${1:-$NETPLAN_FILE}"
 
@@ -645,7 +691,10 @@ set -uo pipefail
         #   Returns the underlying command or workflow status.
         #
         # . Usage
+        #   ```bash
         #   _write_netplan_dhcp
+        #   ```
+    # fn: _write_netplan_dhcp - Write netplan dhcp in the management workflow.
     _write_netplan_dhcp() {
         local output_file="${1:-$NETPLAN_FILE}"
 
@@ -679,7 +728,10 @@ set -uo pipefail
         #   Returns the underlying command or workflow status.
         #
         # . Usage
+        #   ```bash
         #   _netplan_has_other_files && printf 'Additional netplan files found\n'
+        #   ```
+    # fn: _netplan_has_other_files - Test whether additional Netplan YAML configuration files are present.
     _netplan_has_other_files() {
         local file=""
 
@@ -698,7 +750,10 @@ set -uo pipefail
         #   Returns the underlying command or workflow status.
         #
         # . Usage
+        #   ```bash
         #   _backup_netplan_files
+        #   ```
+    # fn: _backup_netplan_files - Manage backup for netplan files in the management workflow.
     _backup_netplan_files() {
         local backup_dir="${1:-}"
         local file=""
@@ -719,7 +774,10 @@ set -uo pipefail
         #   Returns the underlying command or workflow status.
         #
         # . Usage
+        #   ```bash
         #   _restore_netplan_files
+        #   ```
+    # fn: _restore_netplan_files - Restore netplan files in the management workflow.
     _restore_netplan_files() {
         local backup_dir="${1:-}"
         local file=""
@@ -743,7 +801,10 @@ set -uo pipefail
         #   Returns the underlying command or workflow status.
         #
         # . Usage
+        #   ```bash
         #   _apply_netplan_config
+        #   ```
+    # fn: _apply_netplan_config - Apply netplan config in the management workflow.
     _apply_netplan_config() {
         local mode="${1:-}"
         local candidate_file=""
@@ -898,7 +959,9 @@ set -uo pipefail
         #   Exits with the resulting status code from startup or script logic.
         #
         # . Usage
+        #   ```bash
         #   main "$@"
+        #   ```
     main() {
         _framework_locator || exit $?
 

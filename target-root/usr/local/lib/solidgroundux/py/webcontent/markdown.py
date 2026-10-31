@@ -18,6 +18,9 @@ _BLOCK_CLASS_RE = re.compile(r"^:::\s+(.+)$", re.MULTILINE)
 _CLASS_NAME_RE = re.compile(r"\.?([A-Za-z_][A-Za-z0-9_-]*)")
 
 
+# fn: referenced_style_classes - Find td- prefixed CSS class references in authored Markdown.
+# . Description
+#   Args: markdown_text: Input used by this operation.
 def referenced_style_classes(markdown_text: str, prefix: str) -> set[str]:
     """Handle referenced style classes for the web content workflow.
     
@@ -39,6 +42,7 @@ def referenced_style_classes(markdown_text: str, prefix: str) -> set[str]:
     return classes
 
 
+# fn: _safe_url - Validate and escape a link target for generated markup.
 def _safe_url(value: str) -> str:
     """Handle safe url for the web content workflow."""
     value = value.strip()
@@ -48,6 +52,9 @@ def _safe_url(value: str) -> str:
     return value
 
 
+# fn: _image_dimensions - Return safe inline image sizing; omit invalid or absent dimensions.
+# . Description
+#   Image size attributes use positive pixel counts. A single dimension keeps the intrinsic aspect ratio; both dimensions use contain to avoid cropping.
 def _image_dimensions(options: str) -> str:
     """Return safe inline image sizing; omit invalid or absent dimensions.
 
@@ -69,11 +76,15 @@ def _image_dimensions(options: str) -> str:
     return f' style="{html.escape("; ".join(rules), quote=True)}"'
 
 
+# fn: _render_inline - Render inline Markdown constructs into HTML while escaping content.
 def _render_inline(text: str) -> str:
     """Render inline Markdown constructs into HTML while escaping content."""
     escaped = html.escape(text, quote=False)
     tokens: dict[str, str] = {}
 
+    # fn: stash - Preserve an embedded fragment while Markdown text is transformed.
+    # . Description
+    #   Args: fragment: Input used by this operation.
     def stash(fragment: str) -> str:
         """Handle stash for the web content workflow.
         
@@ -86,6 +97,9 @@ def _render_inline(text: str) -> str:
         tokens[key] = fragment
         return key
 
+    # fn: code_repl - Replace a Markdown code-span match with protected HTML output.
+    # . Description
+    #   Args: match: Input used by this operation.
     def code_repl(match: re.Match[str]) -> str:
         """Handle code repl for the web content workflow.
         
@@ -100,6 +114,9 @@ def _render_inline(text: str) -> str:
 
     image_pattern = re.compile(r"!\[([^\]]*)\]\(([^)]+)\)(?:\{([^}]+)\})?")
 
+    # fn: image_repl - Replace a Markdown image reference with rendered image markup.
+    # . Description
+    #   Args: match: Input used by this operation.
     def image_repl(match: re.Match[str]) -> str:
         """Handle image repl for the web content workflow.
         
@@ -120,6 +137,9 @@ def _render_inline(text: str) -> str:
     # Optional {download} suffix forces a local link to download as a file.
     link_pattern = re.compile(r"\[([^\]]+)\]\(([^)]+)\)(?:\{(download)\})?")
 
+    # fn: link_repl - Render a Markdown link after checking and escaping its target.
+    # . Description
+    #   Args: match: Input used by this operation.
     def link_repl(match: re.Match[str]) -> str:
         """Handle link repl for the web content workflow.
         
@@ -137,6 +157,9 @@ def _render_inline(text: str) -> str:
 
     style_pattern = re.compile(r"\[([^\]]+)\]\{([^}]+)\}")
 
+    # fn: style_repl - Render supported inline style attributes on Markdown spans.
+    # . Description
+    #   Args: match: Input used by this operation.
     def style_repl(match: re.Match[str]) -> str:
         """Handle style repl for the web content workflow.
         
@@ -154,6 +177,7 @@ def _render_inline(text: str) -> str:
     escaped = style_pattern.sub(style_repl, escaped)
 
     # Angle-bracket autolinks use the same URL safety policy as ordinary links.
+    # fn: autolink_repl - Convert a recognized automatic URL to a link.
     def autolink_repl(match: re.Match[str]) -> str:
         url = html.unescape(match.group(1))
         href = html.escape(_safe_url(url), quote=True)
@@ -171,6 +195,7 @@ def _render_inline(text: str) -> str:
     return escaped
 
 
+# fn: _render_paragraph - Join soft lines and preserve CommonMark space/backslash hard breaks.
 def _render_paragraph(lines: list[str]) -> str:
     """Join soft lines and preserve CommonMark space/backslash hard breaks."""
     parts: list[str] = []
@@ -187,6 +212,7 @@ def _render_paragraph(lines: list[str]) -> str:
     return _render_inline("".join(parts)).replace("\n", "<br>\n")
 
 
+# fn: _heading_id - Create a predictable Unicode-friendly anchor from a heading's plain text.
 def _heading_id(title: str) -> str:
     """Create a predictable Unicode-friendly anchor from a heading's plain text."""
     plain = re.sub(r"[`*_~]", "", re.sub(r"\[([^]]+)\]\([^)]+\)", r"\1", title)).lower()
@@ -197,6 +223,7 @@ def _heading_id(title: str) -> str:
 _LIST_RE = re.compile(r"^(?P<indent>[ ]*)(?P<marker>[-*+]|[0-9]+[.)])\s+(?P<body>.*)$")
 
 
+# fn: _render_list - Render nested ordered/unordered lists using indentation and item boundaries.
 def _render_list(lines: list[str], start: int) -> tuple[str, int]:
     """Render nested ordered/unordered lists using indentation and item boundaries."""
     initial = _LIST_RE.match(lines[start])
@@ -240,17 +267,45 @@ def _render_list(lines: list[str], start: int) -> tuple[str, int]:
     return "\n".join(result), index
 
 
+# fn: _is_table_separator - Recognize the delimiter row that separates Markdown table headers.
 def _is_table_separator(line: str) -> bool:
     """Handle is table separator for the web content workflow."""
     cells = [cell.strip() for cell in line.strip().strip("|").split("|")]
     return bool(cells) and all(re.fullmatch(r":?-{3,}:?", cell) for cell in cells)
 
 
+# fn: _table_cells - Split one Markdown table row into its cell values.
 def _table_cells(line: str) -> list[str]:
-    """Handle table cells for the web content workflow."""
-    return [cell.strip() for cell in line.strip().strip("|").split("|")]
+    """Split Markdown table cells without splitting escaped literal pipes.
+
+    A Bash definition such as label|icon|symbol belongs in one cell, even
+    though the source Markdown escapes each separator as \\|.
+    """
+    content = line.strip()
+    if content.startswith('|'):
+        content = content[1:]
+    if content.endswith('|'):
+        content = content[:-1]
+    cells: list[str] = []
+    current: list[str] = []
+    index = 0
+    while index < len(content):
+        char = content[index]
+        if char == "\\" and index + 1 < len(content) and content[index + 1] == '|':
+            current.append('|')
+            index += 2
+            continue
+        if char == '|':
+            cells.append(''.join(current).strip())
+            current = []
+        else:
+            current.append(char)
+        index += 1
+    cells.append(''.join(current).strip())
+    return cells
 
 
+# fn: _starts_block - Check whether a Markdown line begins a block-level construct.
 def _starts_block(lines: list[str], index: int) -> bool:
     """Handle starts block for the web content workflow."""
     line = lines[index]
@@ -272,6 +327,9 @@ def _starts_block(lines: list[str], index: int) -> bool:
     return False
 
 
+# fn: _render_lines - Render a line range and optionally stop at the matching ``:::`` marker.
+# . Description
+#   Component rendering is recursive. A nested opener therefore consumes its own closing marker before control returns to the containing component, while
 def _render_lines(
     lines: list[str],
     start: int = 0,
@@ -418,20 +476,43 @@ def _render_lines(
                 rows.append(_table_cells(lines[index]))
                 index += 1
 
+            # Opt-in merged group column, used by generated # def: tables.
+            # Leave every other Markdown table unchanged, including empty cells.
+            grouped = bool(headers and headers[0].strip() == 'Group {rowspan}')
+            if grouped:
+                headers[0] = 'Group'
             head_cells: list[str] = []
             for i, cell in enumerate(headers):
                 style = f' style="text-align: {alignments[i]}"' if i < len(alignments) and alignments[i] else ""
                 head_cells.append(f"<th{style}>{_render_inline(cell)}</th>")
             body_rows: list[str] = []
-            for row in rows:
+            for row_index, row in enumerate(rows):
+                # A new group starts at each nonempty group cell. Mark its row
+                # so the documentation stylesheet can draw a single subtle
+                # separator across the group without boxing every cell.
+                group_start = grouped and bool(row and row[0])
                 rendered_cells: list[str] = []
                 for i in range(len(headers)):
                     value = row[i] if i < len(row) else ""
+                    if grouped and i == 0:
+                        # A blank first cell continues the preceding group's rowspan.
+                        if row_index > 0 and not value and rows[row_index - 1][0]:
+                            continue
+                        if row_index > 0 and not value:
+                            continue
+                        span = 1
+                        while row_index + span < len(rows) and not rows[row_index + span][0]:
+                            span += 1
+                        attrs = (f' rowspan="{span}"' if span > 1 else '') + ' class="doc-def-group" style="text-align:center;vertical-align:middle"'
+                        rendered_cells.append(f"<td{attrs}>{_render_inline(value)}</td>")
+                        continue
                     style = f' style="text-align: {alignments[i]}"' if i < len(alignments) and alignments[i] else ""
                     rendered_cells.append(f"<td{style}>{_render_inline(value)}</td>")
-                body_rows.append("<tr>" + "".join(rendered_cells) + "</tr>")
+                row_class = ' class="doc-def-group-start"' if group_start else ''
+                body_rows.append("<tr" + row_class + ">" + "".join(rendered_cells) + "</tr>")
+            table_class = ' class="doc-def-table"' if grouped else ''
             output.append(
-                '<div class="table-scroll"><table><thead><tr>'
+                '<div class="table-scroll"><table' + table_class + '><thead><tr>'
                 + "".join(head_cells)
                 + "</tr></thead><tbody>"
                 + "".join(body_rows)
@@ -449,6 +530,7 @@ def _render_lines(
     return "\n".join(output), index, False
 
 
+# fn: render_markdown - Render Markdown plus the nestable Testadura ``:::`` component extension.
 def render_markdown(markdown_text: str) -> str:
     """Render Markdown plus the nestable Testadura ``:::`` component extension."""
     lines = markdown_text.replace("\r\n", "\n").replace("\r", "\n").split("\n")

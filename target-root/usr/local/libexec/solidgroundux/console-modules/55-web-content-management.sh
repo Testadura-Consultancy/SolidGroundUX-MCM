@@ -48,7 +48,9 @@ set -uo pipefail
         #   Exits with code 2 when executed instead of sourced.
         #
         # . Usage
+        #   ```bash
         #   _sgnd_lib_guard
+        #   ```
     _sgnd_lib_guard() {
         local lib_base=""
         local guard=""
@@ -80,6 +82,7 @@ set -uo pipefail
     SGND_MODULE_NAME="$SGND_WEB_CONTENT_MODULE_NAME"
 
 # - Management dispatch -------------------------------------------------------------
+    # fn: _web_content_run_manage - Manage content run in the web server workflow.
     _web_content_run_manage() {
         local action="${1:?missing action}"
         _sgnd_run_module_script "manage-web-content.sh" --action "$action"
@@ -118,22 +121,121 @@ set -uo pipefail
         return "$rc"
     }
 
+    # fn: web_content_retrieve_incoming - Call `_web_content_run_manage` with the `retrieve-incoming` action.
+        #
+        # . Returns
+        #   The status returned by the delegated action.
+        #
+        # . Usage
+        #   ```bash
+        #   web_content_retrieve_incoming
+        #   ```
     web_content_retrieve_incoming()  { _web_content_run_manage retrieve-incoming; }
     # fn: web_content_import_local - Review and explicitly copy local files into incoming.
     web_content_import_local()     { _web_content_run_manage import-local; }
+    # fn: web_content_configure_source - Call `_web_content_run_manage` with the `configure-source` action.
+        #
+        # . Returns
+        #   The status returned by the delegated action.
+        #
+        # . Usage
+        #   ```bash
+        #   web_content_configure_source
+        #   ```
     web_content_configure_source()  { _web_content_run_manage configure-source; }
+    # fn: web_content_ingest_incoming - Call `_web_content_run_manage` with the `ingest-incoming` action.
+        #
+        # . Returns
+        #   The status returned by the delegated action.
+        #
+        # . Usage
+        #   ```bash
+        #   web_content_ingest_incoming
+        #   ```
     web_content_ingest_incoming() { _web_content_run_manage ingest-incoming; }
+    # fn: web_content_ingest - Call `_web_content_run_mutating_manage` with the `ingest` action.
+        #
+        # . Returns
+        #   The status returned by the delegated action.
+        #
+        # . Usage
+        #   ```bash
+        #   web_content_ingest
+        #   ```
     web_content_ingest()          { _web_content_run_mutating_manage ingest; }
+    # fn: web_content_delete - Call `_web_content_run_mutating_manage` with the `delete` action.
+        #
+        # . Returns
+        #   The status returned by the delegated action.
+        #
+        # . Usage
+        #   ```bash
+        #   web_content_delete
+        #   ```
     web_content_delete()          { _web_content_run_mutating_manage delete; }
+    # fn: web_content_edit_metadata - Call `_web_content_run_mutating_manage` with the `edit-metadata` action.
+        #
+        # . Returns
+        #   The status returned by the delegated action.
+        #
+        # . Usage
+        #   ```bash
+        #   web_content_edit_metadata
+        #   ```
     web_content_edit_metadata()   { _web_content_run_mutating_manage edit-metadata; }
+    # fn: web_content_move_page - Call `_web_content_run_mutating_manage` with the `move-page` action.
+        #
+        # . Returns
+        #   The status returned by the delegated action.
+        #
+        # . Usage
+        #   ```bash
+        #   web_content_move_page
+        #   ```
     web_content_move_page()       { _web_content_run_mutating_manage move-page; }
+    # fn: web_content_generate - Call `_web_content_run_manage` with the `generate` action.
+        #
+        # . Returns
+        #   The status returned by the delegated action.
+        #
+        # . Usage
+        #   ```bash
+        #   web_content_generate
+        #   ```
     web_content_generate()        { _web_content_run_manage generate; }
     # fn: web_content_publish - Preview and synchronize generated website files to a configured destination.
     web_content_publish()         { _web_content_run_manage publish; }
     # fn: web_content_publish_github_pages - Push generated documentation to GitHub Pages.
     web_content_publish_github_pages() { _web_content_run_manage publish-github-pages; }
+    # fn: web_content_validate - Call `_web_content_run_manage` with the `validate` action.
+        #
+        # . Returns
+        #   The status returned by the delegated action.
+        #
+        # . Usage
+        #   ```bash
+        #   web_content_validate
+        #   ```
     web_content_validate()        { _web_content_run_manage validate; }
+    # fn: web_content_prepare_social - Call `_web_content_run_manage` with the `prepare-social` action.
+        #
+        # . Returns
+        #   The status returned by the delegated action.
+        #
+        # . Usage
+        #   ```bash
+        #   web_content_prepare_social
+        #   ```
     web_content_prepare_social()  { _web_content_run_manage prepare-social; }
+    # fn: web_content_status - Call `_web_content_run_manage` with the `status` action.
+        #
+        # . Returns
+        #   The status returned by the delegated action.
+        #
+        # . Usage
+        #   ```bash
+        #   web_content_status
+        #   ```
     web_content_status()          { _web_content_run_manage status; }
 
     # fn$ web_content_assemble_bundle - Open the documentation bundle manager
@@ -146,6 +248,15 @@ set -uo pipefail
     web_content_manage_config()   { _web_content_run_mutating_manage manage-config; }
 
 # - Module validation contract ------------------------------------------------------
+    # fn: validate_module_web_content_management - Validate the web content module and record its status for the console.
+        #
+        # . Returns
+        #   A console validation status (0=pass, 1=fail, 2=warning, 3=skipped).
+        #
+        # . Usage
+        #   ```bash
+        #   validate_module_web_content_management
+        #   ```
     validate_module_web_content_management() {
         local python_root=""
         if ! command -v python3 >/dev/null 2>&1; then

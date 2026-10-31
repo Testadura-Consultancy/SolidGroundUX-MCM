@@ -1,0 +1,16 @@
+{{page_summary}}
+{{content}}
+<section class="sgnd-theme-gallery" id="sgnd-theme-gallery" aria-label="SolidGroundUX theme comparison">
+  <div class="sgnd-theme-toolbar" role="group" aria-label="View mode">
+    <button type="button" class="sgnd-theme-tab active" id="sgnd-themes-all" aria-pressed="true">All themes</button>
+    <button type="button" class="sgnd-theme-tab" id="sgnd-themes-compare" aria-pressed="false">Compare two</button>
+    <span class="sgnd-theme-count" id="sgnd-themes-count" role="status" aria-live="polite"></span>
+  </div>
+  <div class="sgnd-theme-toolbar sgnd-theme-choices" id="sgnd-themes-choices" hidden>
+    <label for="sgnd-themes-left">Theme A</label><select id="sgnd-themes-left"></select>
+    <label for="sgnd-themes-right">Theme B</label><select id="sgnd-themes-right"></select>
+  </div>
+  <div class="sgnd-theme-grid" id="sgnd-themes-results" aria-live="polite">Loading theme definitions…</div>
+  <p class="sgnd-theme-note">The specimens illustrate the current Bash theme definitions, including labels, semantic colors, progress and DataTable settings. They do not execute the source files or change the active console theme. Actual terminal rendering may differ.</p>
+</section>
+<script src="/js/sgnd-theme-gallery.js" defer></script>

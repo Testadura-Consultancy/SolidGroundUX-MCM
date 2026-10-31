@@ -45,7 +45,9 @@ set -uo pipefail
         #   Exits with code 2 when executed instead of sourced.
         #
         # . Usage
+        #   ```bash
         #   _sgnd_lib_guard
+        #   ```
     _sgnd_lib_guard() {
         local lib_base=""
         local guard=""
@@ -86,7 +88,9 @@ set -uo pipefail
         #   Returns the setup tool exit status.
         #
         # . Usage
+        #   ```bash
         #   _setup
+        #   ```
     _setup() {
         local setup="/var/lib/solidgroundux/sgnd-setup.sh"
         local legacy="/var/lib/solidgroundux/release-manager.sh"
@@ -211,35 +215,63 @@ set -uo pipefail
     }
 
 # - Framework logging actions ----------------------------------------------------
+    # fn: _framework_log_view - Log view in the Framework workflow.
     _framework_log_view() {
         _sgnd_run_module_script "manage-framework-logging.sh" --action view
     }
 
+    # fn: _framework_log_follow - Log follow in the Framework workflow.
     _framework_log_follow() {
         _sgnd_run_module_script "manage-framework-logging.sh" --action follow
     }
 
+    # fn: _framework_log_show_errors - Log show errors in the Framework workflow.
     _framework_log_show_errors() {
         _sgnd_run_module_script "manage-framework-logging.sh" --action errors
     }
 
+    # fn: _framework_log_rotate - Log rotate in the Framework workflow.
     _framework_log_rotate() {
         _sgnd_run_module_script "manage-framework-logging.sh" --action rotate
     }
 
 # - Framework state actions ------------------------------------------------------
+    # fn: framework_state_show - Display state in the Framework workflow.
+        #
+        # . Usage
+        #   ```bash
+        #   framework_state_show
+        #   ```
     framework_state_show() {
         _sgnd_run_module_script "manage-framework-state.sh" --action show
     }
 
+    # fn: framework_state_edit - Edit state in the Framework workflow.
+        #
+        # . Usage
+        #   ```bash
+        #   framework_state_edit
+        #   ```
     framework_state_edit() {
         _sgnd_run_module_script "manage-framework-state.sh" --action edit
     }
 
+    # fn: framework_state_save - Save state in the Framework workflow.
+        #
+        # . Usage
+        #   ```bash
+        #   framework_state_save
+        #   ```
     framework_state_save() {
         _sgnd_run_module_script "manage-framework-state.sh" --action save
     }
 
+    # fn: framework_state_reload - Invoke the Framework state manager’s reload operation.
+        #
+        # . Usage
+        #   ```bash
+        #   framework_state_reload
+        #   ```
     framework_state_reload() {
         _sgnd_run_module_script "manage-framework-state.sh" --action reload
     }
@@ -253,6 +285,15 @@ set -uo pipefail
     #
     # Every validator sets SGND_MODULE_VALIDATION_MESSAGE to a concise result summary.
     # Detailed diagnostic output may be written by the validator or delegated action.
+    # fn: validate_module_solidgroundux - Validate the management module and record its status for the console.
+        #
+        # . Returns
+        #   A console validation status (0=pass, 1=fail, 2=warning, 3=skipped).
+        #
+        # . Usage
+        #   ```bash
+        #   validate_module_solidgroundux
+        #   ```
     validate_module_solidgroundux() {
         SGND_MODULE_VALIDATION_MESSAGE="SolidGroundUX management module is loaded and registered."
         return 0

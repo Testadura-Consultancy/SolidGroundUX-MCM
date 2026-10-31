@@ -41,7 +41,9 @@ set -uo pipefail
         #   Exits with code 2 when executed instead of sourced.
         #
         # . Usage
+        #   ```bash
         #   _sgnd_lib_guard
+        #   ```
     _sgnd_lib_guard() {
         local lib_base=""
         local guard=""
@@ -100,33 +102,75 @@ set -uo pipefail
     }
 
 # - Shared validation --------------------------------------------------------------
+    # fn: sgnd_ad_validate_realm - Validate realm in the Active Directory workflow.
+        #
+        # . Usage
+        #   ```bash
+        #   sgnd_ad_validate_realm
+        #   ```
     sgnd_ad_validate_realm() {
         [[ "${1-}" =~ ^[A-Za-z0-9]([A-Za-z0-9-]*[A-Za-z0-9])?(\.[A-Za-z0-9]([A-Za-z0-9-]*[A-Za-z0-9])?)+$ ]]
     }
 
+    # fn: sgnd_ad_validate_netbios - Validate netbios in the Active Directory workflow.
+        #
+        # . Usage
+        #   ```bash
+        #   sgnd_ad_validate_netbios
+        #   ```
     sgnd_ad_validate_netbios() {
         [[ "${1-}" =~ ^[A-Za-z][A-Za-z0-9_-]{0,14}$ ]]
     }
 
+    # fn: sgnd_ad_validate_account - Validate account in the Active Directory workflow.
+        #
+        # . Usage
+        #   ```bash
+        #   sgnd_ad_validate_account
+        #   ```
     sgnd_ad_validate_account() {
         [[ "${1-}" =~ ^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$ ]]
     }
 
 # - Shared host/network discovery --------------------------------------------------
+    # fn: sgnd_ad_primary_ipv4 - Print the source IPv4 address selected by the system routing table.
+        #
+        # . Usage
+        #   ```bash
+        #   sgnd_ad_primary_ipv4
+        #   ```
     sgnd_ad_primary_ipv4() {
         ip -4 route get 1.1.1.1 2>/dev/null | awk '{ for (i=1;i<=NF;i++) if ($i=="src") { print $(i+1); exit } }'
     }
 
+    # fn: sgnd_ad_default_gateway - Print the first IPv4 default gateway from the routing table.
+        #
+        # . Usage
+        #   ```bash
+        #   sgnd_ad_default_gateway
+        #   ```
     sgnd_ad_default_gateway() {
         ip -4 route show default 2>/dev/null | awk 'NR==1 { print $3 }'
     }
 
+    # fn: sgnd_ad_current_dns - Print the first non-loopback DNS resolver address reported by resolvectl.
+        #
+        # . Usage
+        #   ```bash
+        #   sgnd_ad_current_dns
+        #   ```
     sgnd_ad_current_dns() {
         resolvectl dns 2>/dev/null | grep -Eo '([0-9]{1,3}\.){3}[0-9]{1,3}' | grep -v '^127\.' | head -n 1
     }
 
 # - Shared AD state ---------------------------------------------------------------
 
+    # fn: sgnd_ad_domain_controller_ipv4 - Resolve an Active Directory domain controller IPv4 address from DNS SRV records.
+        #
+        # . Usage
+        #   ```bash
+        #   sgnd_ad_domain_controller_ipv4
+        #   ```
     sgnd_ad_domain_controller_ipv4() {
         local realm="${1:?missing realm}"
         local target=""
@@ -137,6 +181,12 @@ set -uo pipefail
         host -t A "$target" 2>/dev/null | awk '/has address/ { print $NF; exit }'
     }
 
+    # fn: sgnd_ad_current_realm - Detect the currently configured domain realm from realm or Samba.
+        #
+        # . Usage
+        #   ```bash
+        #   sgnd_ad_current_realm
+        #   ```
     sgnd_ad_current_realm() {
         local realm=""
         if command -v realm >/dev/null 2>&1; then
@@ -163,7 +213,9 @@ set -uo pipefail
         #   0 when the short domain name can be discovered; 1 otherwise.
         #
         # . Usage
+        #   ```bash
         #   workgroup="$(sgnd_ad_current_netbios_domain)" || return 1
+        #   ```
     sgnd_ad_current_netbios_domain() {
         local realm="${1:-}"
         local workgroup=""
@@ -207,7 +259,9 @@ set -uo pipefail
         #   1 when the configuration cannot be read, validated, installed, or activated.
         #
         # . Usage
+        #   ```bash
         #   sgnd_ad_normalize_sssd_config
+        #   ```
     sgnd_ad_normalize_sssd_config() {
         local sssd_config="/etc/sssd/sssd.conf"
         local current_file=""
@@ -346,17 +400,35 @@ set -uo pipefail
         return 0
     }
 
+    # fn: sgnd_ad_is_domain_controller - Test whether the host is configured as a Samba AD domain controller.
+        #
+        # . Usage
+        #   ```bash
+        #   sgnd_ad_is_domain_controller
+        #   ```
     sgnd_ad_is_domain_controller() {
         command -v testparm >/dev/null 2>&1 || return 1
         [[ -s /var/lib/samba/private/sam.ldb ]] || return 1
         sudo testparm -s --parameter-name='server role' 2>/dev/null | grep -qi '^active directory domain controller$'
     }
 
+    # fn: sgnd_ad_is_domain_member - Test whether realmd reports an active realm membership.
+        #
+        # . Usage
+        #   ```bash
+        #   sgnd_ad_is_domain_member
+        #   ```
     sgnd_ad_is_domain_member() {
         command -v realm >/dev/null 2>&1 || return 1
         realm list --name-only 2>/dev/null | grep -q .
     }
 
+    # fn: sgnd_ad_require_dc - Require dc in the Active Directory workflow.
+        #
+        # . Usage
+        #   ```bash
+        #   sgnd_ad_require_dc
+        #   ```
     sgnd_ad_require_dc() {
         local realm=""
         command -v samba-tool >/dev/null 2>&1 || { sayfail "samba-tool is not installed."; return 1; }
@@ -367,6 +439,12 @@ set -uo pipefail
     }
 
 # - Shared discovery ---------------------------------------------------------------
+    # fn: sgnd_ad_discover_kerberos - Discover kerberos in the Active Directory workflow.
+        #
+        # . Usage
+        #   ```bash
+        #   sgnd_ad_discover_kerberos
+        #   ```
     sgnd_ad_discover_kerberos() {
         local realm="${1:?missing realm}"
         local dns_server="${2:-}"
@@ -377,6 +455,12 @@ set -uo pipefail
         fi
     }
 
+    # fn: sgnd_ad_discover_ldap - Discover ldap in the Active Directory workflow.
+        #
+        # . Usage
+        #   ```bash
+        #   sgnd_ad_discover_ldap
+        #   ```
     sgnd_ad_discover_ldap() {
         local realm="${1:?missing realm}"
         local dns_server="${2:-}"
@@ -387,6 +471,12 @@ set -uo pipefail
         fi
     }
 
+    # fn: sgnd_ad_dns_a_record_matches - Test whether DNS resolves a given hostname to the expected IPv4 address.
+        #
+        # . Usage
+        #   ```bash
+        #   sgnd_ad_dns_a_record_matches
+        #   ```
     sgnd_ad_dns_a_record_matches() {
         local fqdn="${1:?missing fqdn}"
         local ip="${2:?missing ip}"

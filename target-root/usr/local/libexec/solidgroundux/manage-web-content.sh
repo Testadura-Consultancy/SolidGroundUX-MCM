@@ -9,6 +9,7 @@
 #   Source      : manage-web-content.sh
 #   Type        : script
 #   Group       : Role Managers
+#   Subgroup    : Web Content Management
 #   Purpose     : Ingest, delete, generate, validate, and prepare static website content
 #
 #   Checksum : 39435352e09c9760df9ad0f5244f263d0eca89e66d0a5e23161d16f2c3f2cd48
@@ -20,6 +21,20 @@
 #   website repository, and archived after successful ingestion. Canonical pages can
 #   also be selected individually or in batches and removed recoverably by archiving them
 #   outside the active content tree.
+#
+# Usage:
+#   Run the executable from its shell command (or installed wrapper):
+#   ```bash
+#   manage-web-content --action ingest
+#   manage-web-content --action generate
+#   manage-web-content --action publish
+#   manage-web-content --action publish-github-pages
+#   manage-web-content --action validate
+#   ```
+#
+#   Script-specific options:
+#   - `--action NAME`, `-a`: Management action (supported actions: `ingest`, `delete`, `edit-metadata`, `move-page`, `manage-config`, `configure-source`, `retrieve-incoming`, `import-local`, `ingest-incoming`, `generate`, `publish`, `publish-github-pages`, `validate`, `prepare-social`, `status`).
+#   - `--ingest-dir VALUE`, `-i`: Override Markdown ingestion directory.
 #
 # Attribution:
 #   Developers    : Mark Fieten
@@ -62,7 +77,9 @@ set -uo pipefail
         #   be found, or the executable common library is unreadable.
         #
         # . Usage
+        #   ```bash
         #   _framework_locator || return $?
+        #   ```
     _framework_locator() {
         local script_file=""
         local path_without_root=""
@@ -1297,8 +1314,7 @@ PYCODE
         sgnd_print_labeledvalue --label "Ingest parent" --value "${SGND_WEB_CONTENT_INGEST_PARENT:-Not set}" --labelwidth 20
     }
 
-# fn: _web_content_manage_page - Browse existing content and edit metadata or move a page.
-    # Uses the shared Python content discovery logic; changes stay uncommitted in Git.
+# Page management uses shared Python content discovery; changes remain uncommitted in Git.
     # Metadata editing stays on a page until Done; the wrapper offers another page afterward.
     # fn: _web_content_manage_page_once - Select one page and edit metadata or move its canonical source file.
         # . Behavior
@@ -2407,7 +2423,9 @@ PYCODE
         # . Returns
         #   0 on completion; 2 when the operator cancels a prompt.
         # . Usage
+        #   ```bash
         #   _web_content_github_pages_configure
+        #   ```
     _web_content_github_pages_configure() {
         local selected_source="${SGND_WEB_GITHUB_SOURCE:-${SGND_WEB_CONTENT_OUTPUT%/}}"
         local selected_repo="${SGND_WEB_GITHUB_REPO:-}"
@@ -2432,7 +2450,9 @@ PYCODE
         # . Returns
         #   0 on success; nonzero if a present API search resource cannot be adapted.
         # . Usage
+        #   ```bash
         #   _web_content_github_pages_rebase "$docs_dir"
+        #   ```
     _web_content_github_pages_rebase() {
         local docs_dir="${1:?missing docs directory}"
         python3 - "$docs_dir" <<'PY_GITHUB_PAGES'
@@ -2479,7 +2499,9 @@ PY_GITHUB_PAGES
         # . Returns
         #   0 on success; nonzero for invalid paths or failed copy/commit/push.
         # . Usage
+        #   ```bash
         #   _web_content_github_pages_push
+        #   ```
     _web_content_github_pages_push() {
         local source="" repo="" docs="" branch="" origin=""
         local pending=""
@@ -2566,7 +2588,9 @@ PY_GITHUB_PAGES
         # . Returns
         #   0 on successful push or operator cancellation; nonzero on failure.
         # . Usage
+        #   ```bash
         #   _web_content_publish_github_pages
+        #   ```
     _web_content_publish_github_pages() {
         local choice="" rc=0
         if [[ -z "$SGND_WEB_GITHUB_SOURCE" || -z "$SGND_WEB_GITHUB_REPO" ]]; then

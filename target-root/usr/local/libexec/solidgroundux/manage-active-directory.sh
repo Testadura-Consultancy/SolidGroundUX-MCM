@@ -16,6 +16,17 @@
 #   Implements day-to-day directory administration exposed by the
 #   27-active-directory-management Management Console module.
 #
+# Usage:
+#   Run the executable from its shell command (or installed wrapper):
+#   ```bash
+#   manage-active-directory --action status
+#   manage-active-directory --action user-list
+#   manage-active-directory --action group-list
+#   ```
+#
+#   Script-specific options:
+#   - `--action NAME`, `-a`: Management action (supported actions: `status`, `validate`, `user-list`, `user-show`, `user-create`, `user-toggle`, `user-password`, `user-noexpiry`, `user-addgroups`, `user-removegroups`, `user-delete`, `group-list`, `group-show`, `group-create`, `group-addusers`, `group-removemembers`, `group-delete`, `computer-list`, `computer-show`, `computer-delete`).
+#
 # Attribution:
 #   Developers    : Mark Fieten
 #   Company       : Testadura Consultancy
@@ -57,7 +68,9 @@ set -uo pipefail
         #   be found, or the executable common library is unreadable.
         #
         # . Usage
+        #   ```bash
         #   _framework_locator || return $?
+        #   ```
     _framework_locator() {
         local script_file=""
         local path_without_root=""
@@ -119,6 +132,7 @@ set -uo pipefail
         # shellcheck source=/dev/null
         source "$exe_common"
     }
+    # fn: _load_ad_management_library - Load ad management library in the Active Directory workflow.
     _load_ad_management_library() {
         local script_file="" path_without_root="" component="" app_root="" lib_file=""
         local index=0 root_index=-1
@@ -180,8 +194,10 @@ set -uo pipefail
     SGND_STATE_SAVE=0
 
 # - Internal helpers ---------------------------------------------------------------
+    # fn: _admg_require_dc - Require dc in the Active Directory management workflow.
     _admg_require_dc() { sgnd_ad_require_dc; }
 
+    # fn: _admg_validate_sam_name - Validate sam name in the Active Directory management workflow.
     _admg_validate_sam_name() { sgnd_ad_validate_account "$@"; }
 
     # fn: _admg_list_users_raw - Return directory users
@@ -195,7 +211,9 @@ set -uo pipefail
         #   samba-tool user list status.
         #
         # . Usage
+        #   ```bash
         #   mapfile -t users < <(_admg_list_users_raw)
+        #   ```
     _admg_list_users_raw() {
         sudo samba-tool user list 2>/dev/null | LC_ALL=C sort
     }
@@ -211,7 +229,9 @@ set -uo pipefail
         #   samba-tool group list status.
         #
         # . Usage
+        #   ```bash
         #   mapfile -t groups < <(_admg_list_groups_raw)
+        #   ```
     _admg_list_groups_raw() {
         sudo samba-tool group list 2>/dev/null | LC_ALL=C sort
     }
@@ -227,7 +247,9 @@ set -uo pipefail
         #   samba-tool computer list status.
         #
         # . Usage
+        #   ```bash
         #   mapfile -t computers < <(_admg_list_computers_raw)
+        #   ```
     _admg_list_computers_raw() {
         sudo samba-tool computer list 2>/dev/null | LC_ALL=C sort
     }
@@ -243,7 +265,9 @@ set -uo pipefail
         #   0 on selection; 1 on cancel or unavailable users.
         #
         # . Usage
+        #   ```bash
         #   _admg_select_user selected_user
+        #   ```
     _admg_select_user() {
         local output_var="${1:?missing output variable}"
         local selected=""
@@ -270,7 +294,9 @@ set -uo pipefail
         #   0 on selection; 1 on cancel or unavailable groups.
         #
         # . Usage
+        #   ```bash
         #   _admg_select_group selected_group
+        #   ```
     _admg_select_group() {
         local output_var="${1:?missing output variable}"
         local selected=""
@@ -297,7 +323,9 @@ set -uo pipefail
         #   0 on selection; 1 on cancel or unavailable computers.
         #
         # . Usage
+        #   ```bash
         #   _admg_select_computer selected_computer
+        #   ```
     _admg_select_computer() {
         local output_var="${1:?missing output variable}"
         local selected=""
@@ -324,7 +352,9 @@ set -uo pipefail
         #   0 when disabled; 1 when enabled or the state cannot be read.
         #
         # . Usage
+        #   ```bash
         #   _admg_user_is_disabled Administrator
+        #   ```
     _admg_user_is_disabled() {
         local user="${1:?missing user}"
         local flags=""
@@ -346,7 +376,9 @@ set -uo pipefail
         #   0 on success or dry-run; samba-tool status otherwise.
         #
         # . Usage
+        #   ```bash
         #   _admg_add_member_to_group "File Server Users" jsmith
+        #   ```
     _admg_add_member_to_group() {
         local group="${1:?missing group}"
         local member="${2:?missing member}"
@@ -371,7 +403,9 @@ set -uo pipefail
         #   0 on success or dry-run; samba-tool status otherwise.
         #
         # . Usage
+        #   ```bash
         #   _admg_remove_member_from_group "File Server Users" jsmith
+        #   ```
     _admg_remove_member_from_group() {
         local group="${1:?missing group}"
         local member="${2:?missing member}"
@@ -392,7 +426,9 @@ set -uo pipefail
         #   0 for a protected account; 1 otherwise.
         #
         # . Usage
+        #   ```bash
         #   _admg_user_is_protected Administrator
+        #   ```
     _admg_user_is_protected() {
         case "${1,,}" in
             administrator|guest|krbtgt) return 0 ;;
@@ -408,7 +444,9 @@ set -uo pipefail
         #   0 for a protected group; 1 otherwise.
         #
         # . Usage
+        #   ```bash
         #   _admg_group_is_protected "Domain Admins"
+        #   ```
     _admg_group_is_protected() {
         case "${1,,}" in
             "domain admins"|"domain users"|"domain guests"|"domain computers"|administrators|users|guests) return 0 ;;
@@ -420,7 +458,9 @@ set -uo pipefail
         # . Returns
         #   0 when the value is Quit/Q (case-insensitive); 1 otherwise.
         # . Usage
+        #   ```bash
         #   _admg_decision_is_quit "<arg1>"
+        #   ```
     _admg_decision_is_quit() {
         [[ "${1^^}" == "QUIT" || "${1^^}" == "Q" ]]
     }
@@ -480,7 +520,9 @@ set -uo pipefail
         #   0 when status is displayed; 1 when no local AD domain is available.
         #
         # . Usage
+        #   ```bash
         #   _admg_status
+        #   ```
     _admg_status() {
         local realm=""
         local service_state="inactive"
@@ -533,7 +575,9 @@ set -uo pipefail
         #   0 after listing users; 1 when management is unavailable.
         #
         # . Usage
+        #   ```bash
         #   _admg_list_users
+        #   ```
     _admg_list_users() {
         local -a users=()
         _admg_require_dc || return 1
@@ -555,7 +599,9 @@ set -uo pipefail
         #   0 when displayed or cancelled; non-zero on query failure.
         #
         # . Usage
+        #   ```bash
         #   _admg_show_user
+        #   ```
     _admg_show_user() {
         local user=""
         local state="Enabled"
@@ -586,7 +632,9 @@ set -uo pipefail
         #   0 on success, dry-run, or cancellation; non-zero on creation failure.
         #
         # . Usage
+        #   ```bash
         #   _admg_create_user
+        #   ```
     _admg_create_user() {
         local username=""
         local password_never_expires="No"
@@ -651,7 +699,9 @@ set -uo pipefail
         #   0 on success, dry-run, or cancellation; non-zero on update failure.
         #
         # . Usage
+        #   ```bash
         #   _admg_toggle_user
+        #   ```
     _admg_toggle_user() {
         local user=""
         local action="disable"
@@ -693,7 +743,9 @@ set -uo pipefail
         #   0 on success, dry-run, or cancellation; non-zero on reset failure.
         #
         # . Usage
+        #   ```bash
         #   _admg_reset_user_password
+        #   ```
     _admg_reset_user_password() {
         local user=""
         local decision="No"
@@ -721,7 +773,9 @@ set -uo pipefail
         #   0 on success, dry-run, or cancellation; non-zero on update failure.
         #
         # . Usage
+        #   ```bash
         #   _admg_set_user_password_noexpiry
+        #   ```
     _admg_set_user_password_noexpiry() {
         local user=""
         local decision="No"
@@ -751,7 +805,9 @@ set -uo pipefail
         #   0 on success, dry-run, protected-account refusal, or cancellation; non-zero on deletion failure.
         #
         # . Usage
+        #   ```bash
         #   _admg_delete_user
+        #   ```
     _admg_delete_user() {
         local user=""
         local dlg_rc=0
@@ -797,7 +853,9 @@ set -uo pipefail
         #   0 after completion or cancellation; 1 when one or more membership updates fail.
         #
         # . Usage
+        #   ```bash
         #   _admg_user_add_groups
+        #   ```
     _admg_user_add_groups() {
         local user=""
         local group=""
@@ -831,7 +889,9 @@ set -uo pipefail
         #   0 after completion or cancellation; 1 when one or more removals fail.
         #
         # . Usage
+        #   ```bash
         #   _admg_user_remove_groups
+        #   ```
     _admg_user_remove_groups() {
         local user=""
         local group=""
@@ -887,7 +947,9 @@ set -uo pipefail
         #   0 after listing groups; 1 when management is unavailable.
         #
         # . Usage
+        #   ```bash
         #   _admg_list_groups
+        #   ```
     _admg_list_groups() {
         local -a groups=()
         _admg_require_dc || return 1
@@ -909,7 +971,9 @@ set -uo pipefail
         #   0 when displayed or cancelled; non-zero on query failure.
         #
         # . Usage
+        #   ```bash
         #   _admg_show_group
+        #   ```
     _admg_show_group() {
         local group=""
         local -a members=()
@@ -937,7 +1001,9 @@ set -uo pipefail
         #   0 on success, dry-run, or cancellation; non-zero on creation failure.
         #
         # . Usage
+        #   ```bash
         #   _admg_create_group
+        #   ```
     _admg_create_group() {
         local group=""
         local dlg_rc=0
@@ -983,7 +1049,9 @@ set -uo pipefail
         #   0 on success, dry-run, protected-group refusal, or cancellation; non-zero on deletion failure.
         #
         # . Usage
+        #   ```bash
         #   _admg_delete_group
+        #   ```
     _admg_delete_group() {
         local group=""
         local decision="No"
@@ -1039,7 +1107,9 @@ set -uo pipefail
         #   0 after completion or cancellation; 1 when one or more updates fail.
         #
         # . Usage
+        #   ```bash
         #   _admg_group_add_users
+        #   ```
     _admg_group_add_users() {
         local group=""
         local user=""
@@ -1094,7 +1164,9 @@ set -uo pipefail
         #   0 after completion or cancellation; 1 when one or more removals fail.
         #
         # . Usage
+        #   ```bash
         #   _admg_group_remove_members
+        #   ```
     _admg_group_remove_members() {
         local group=""
         local member=""
@@ -1150,7 +1222,9 @@ set -uo pipefail
         #   0 after listing computers; 1 when management is unavailable.
         #
         # . Usage
+        #   ```bash
         #   _admg_list_computers
+        #   ```
     _admg_list_computers() {
         local -a computers=()
         _admg_require_dc || return 1
@@ -1172,7 +1246,9 @@ set -uo pipefail
         #   0 when displayed or cancelled; non-zero on query failure.
         #
         # . Usage
+        #   ```bash
         #   _admg_show_computer
+        #   ```
     _admg_show_computer() {
         local computer=""
         _admg_require_dc || return 1
@@ -1190,7 +1266,9 @@ set -uo pipefail
         #   0 on success, dry-run, or cancellation; non-zero on deletion failure.
         #
         # . Usage
+        #   ```bash
         #   _admg_delete_computer
+        #   ```
     _admg_delete_computer() {
         local computer=""
         local decision="No"
@@ -1212,9 +1290,11 @@ set -uo pipefail
 
 
 # - Action dispatch -----------------------------------------------------------------
+    # fn: _admg_action_is_mutating - Identify AD management actions that change users, groups or computers.
     _admg_action_is_mutating() {
         case "${1:-}" in user-create|user-toggle|user-password|user-noexpiry|user-addgroups|user-removegroups|user-delete|group-create|group-addusers|group-removemembers|group-delete|computer-delete) return 0 ;; *) return 1 ;; esac
     }
+    # fn: _admg_run_action - Forward an Active Directory management action to its management executable.
     _admg_run_action() {
         local action="${1:?missing action}" rc=0
         case "$action" in
@@ -1244,6 +1324,7 @@ set -uo pipefail
         return "$rc"
     }
 # - Main ---------------------------------------------------------------------------
+    # fn: main - Dispatch command-line options to the appropriate management workflow.
     main() {
         local action=""
         _framework_locator || return $?

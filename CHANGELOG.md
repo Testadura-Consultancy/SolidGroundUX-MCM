@@ -6,6 +6,22 @@ The format is inspired by *Keep a Changelog* while remaining focused on practica
 
 ## Unreleased
 
+### Documentation site title bar and source breadcrumbs (2026-10-30)
+
+- Moved the contextual page title and breadcrumb from the article body into the documentation header, matching the Testadura page layout while keeping the existing sidebar and language controls.
+- Displayed source filenames (for example, `sgnd-setup.sh`) in documentation breadcrumbs instead of the source page's descriptive title; retained ordinary site navigation labels for other pages.
+- Added original `source_file` metadata to generated script documentation so filename breadcrumbs remain accurate without changing the displayed page title. Older source-overview pages remain supported through their existing `Source` line.
+
+
+### Documentation bundle composition (2026-10-30)
+
+- Replaced the Chapter 0 selection in the bundle manager with ordered **Bundle Prefaces**, **Bundle Epilogues**, and explicitly selected authored documents. Existing saved `chapter0` selections are interpreted as legacy bundle prefaces.
+- Added automatic discovery of bundle-prefixed `.sh`, `.py`, and `.md` documentation sources, preferring exact bundle-ID filenames over generic `bundle_*` filenames. Manual lists take precedence; deliberately empty lists disable discovery.
+- Added source-file selections from other repositories, section-level preface/epilogue placement and duplicate-source/route checks.
+- Published bundle introductions before product chapters and bundle closing remarks after all product chapters, before appendices. Product and section prefaces/epilogues now receive ordered pages rather than being concatenated into section indexes.
+- Copied authored Markdown byte-for-byte. The WCM content loader reads optional generated navigation-order metadata from `config/doc-nav-orders.json` rather than rewriting Markdown front matter.
+
+
 ### Web Content Management metadata editor (2026-10-29)
 
 - Added an explicit **Remove metadata field** action to the staged page editor. Removed front-matter keys fall back to computed defaults after Save; `:clear` continues to retain an empty explicit field. Mixed edits and removals are committed atomically, with the Markdown body preserved.
@@ -14,6 +30,7 @@ The format is inspired by *Keep a Changelog* while remaining focused on practica
 
 #### Added
 
+- Relocated the legacy documentation-generation diagrams from SDK into MCM documentation assets, with MCM-prefixed filenames; artwork is unchanged and awaits a separate content-accuracy review.
 - Added persistent documentation-bundle configuration for assembling Markdown from multiple source repositories (Framework, SDK, and MCM) into one documentation website, with optional designated Chapter 0.
 - Added remote Nginx website discovery to publishing: an existing website supplies its hostname and document root; when creating a new website, the tool suggests an appropriate root based on the remote server's configured websites, with manual entry available.
 - Added public HTTPS certificate export for the selected managed website, including the export path, SHA-256 fingerprint and an SCP retrieval command. Private keys are not exported.

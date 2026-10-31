@@ -1,7 +1,49 @@
 #!/usr/bin/env bash
-# SolidGroundUX SDK - Shared SSH deployment session and interactive recovery.
-# Source in the caller process: exported SSH_AUTH_SOCK must reach ssh and rsync.
-# Uses framework say*/ask helpers provided by the calling executable.
+# =====================================================================================
+# SolidGroundUX Management Console Modules - Shared SSH Deployment Helpers
+# -------------------------------------------------------------------------------------
+# Metadata:
+#   Version     : 2.1
+#   Source      : sgnd-ssh-deployment.sh
+#   Type        : library
+#   Group       : Common Core
+#   Purpose     : Provide shared SSH authentication sessions and connection recovery
+#
+# Description:
+#   Shared, source-only helpers for SSH-based deployment and publishing workflows.
+#   The library:
+#     - Discovers and reuses a working SSH authentication agent.
+#     - Starts or reconnects to a dedicated SSH agent when necessary.
+#     - Verifies non-interactive SSH access to a specified remote host.
+#     - Offers interactive recovery to unlock or install an SSH public key.
+#
+# Design principles:
+#   - Source in the caller process so SSH_AUTH_SOCK reaches ssh and rsync.
+#   - Attempt non-interactive authentication before prompting for recovery.
+#   - Do not prompt when input is not an interactive terminal.
+#   - Use the caller's SolidGroundUX say*/ask helpers for interaction.
+#
+# Role in framework:
+#   - Common Core support for MCM remote deployment and publishing actions.
+#   - Keeps SSH-agent and connection recovery behavior shared across callers.
+#
+# Non-goals:
+#   - A standalone command-line executable.
+#   - Managing remote deployment content or synchronization itself.
+#
+# Usage:
+#   Source this library in the calling executable; do not run it directly.
+#   ```bash
+#   source /usr/local/lib/solidgroundux/common/sgnd-ssh-deployment.sh
+#   sgnd_ssh_ensure_access "$remote_user" "$remote_host" "$remote_port" "$private_key"
+#   ```
+# =====================================================================================
+# fn: sgnd_ssh_agent_discover - Locate an existing usable SSH authentication agent and export its socket.
+    #
+    # . Usage
+    #   ```bash
+    #   sgnd_ssh_agent_discover
+    #   ```
 sgnd_ssh_agent_discover() {
     local candidate status
     for candidate in "${SSH_AUTH_SOCK:-}" "${HOME}/.ssh/solidgroundux-agent.sock"; do
@@ -16,6 +58,12 @@ sgnd_ssh_agent_discover() {
     return 1
 }
 
+# fn: sgnd_ssh_agent_start - Start or reconnect to a dedicated SSH authentication agent.
+    #
+    # . Usage
+    #   ```bash
+    #   sgnd_ssh_agent_start
+    #   ```
 sgnd_ssh_agent_start() {
     local socket="${HOME}/.ssh/solidgroundux-agent.sock"
     sgnd_ssh_agent_discover && return 0
@@ -33,6 +81,12 @@ sgnd_ssh_agent_start() {
 
 # Test with BatchMode; offer recovery only at an interactive terminal.
 # Inputs: remote user, hostname, port, optional private-key path.
+# fn: sgnd_ssh_ensure_access - Verify noninteractive SSH access, offering interactive key recovery when needed.
+    #
+    # . Usage
+    #   ```bash
+    #   sgnd_ssh_ensure_access
+    #   ```
 sgnd_ssh_ensure_access() {
     local user="$1" host="$2" port="$3" key="${4:-}" selection="" rc=0
     local -a args=(ssh -o BatchMode=yes -o ConnectTimeout=8 -p "$port")

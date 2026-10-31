@@ -16,6 +16,17 @@
 #   Implements persistent Active Directory server management actions exposed by the
 #   20-active-directory-server Management Console module.
 #
+# Usage:
+#   Run the executable from its shell command (or installed wrapper):
+#   ```bash
+#   manage-active-directory-server --action status
+#   manage-active-directory-server --action validate
+#   manage-active-directory-server --dryrun --action provision-all
+#   ```
+#
+#   Script-specific options:
+#   - `--action NAME`, `-a`: Management action (supported actions: `provision-all`, `join-additional`, `join-preflight`, `join-domain`, `join-replication`, `install`, `preflight`, `identity`, `provision`, `settings`, `kerberos`, `resolver`, `start`, `dns`, `validate`, `status`).
+#
 # Attribution:
 #   Developers    : Mark Fieten
 #   Company       : Testadura Consultancy
@@ -57,7 +68,9 @@ set -uo pipefail
         #   be found, or the executable common library is unreadable.
         #
         # . Usage
+        #   ```bash
         #   _framework_locator || return $?
+        #   ```
     _framework_locator() {
         local script_file=""
         local path_without_root=""
@@ -119,6 +132,7 @@ set -uo pipefail
         # shellcheck source=/dev/null
         source "$exe_common"
     }
+    # fn: _load_ad_management_library - Load ad management library in the Active Directory workflow.
     _load_ad_management_library() {
         local script_file="" path_without_root="" component="" app_root="" lib_file=""
         local index=0 root_index=-1
@@ -194,6 +208,7 @@ set -uo pipefail
     SGND_AD_HOSTNAME_FQDN=""
     SGND_AD_EXISTING_DC_IP=""
 
+    # fn: _adsvr_validate_realm - Validate realm in the Active Directory Server workflow.
     _adsvr_validate_realm() { sgnd_ad_validate_realm "$@"; }
 
     # fn: _adsvr_collect_context
@@ -204,7 +219,9 @@ set -uo pipefail
         #   0 when a complete provisioning context is available; non-zero on validation or cancellation.
         #
         # . Usage
+        #   ```bash
         #   _adsvr_collect_context
+        #   ```
     _adsvr_collect_context() {
         local current_domain=""
         SGND_AD_HOSTNAME_SHORT="$(hostname -s 2>/dev/null || true)"
@@ -247,7 +264,9 @@ set -uo pipefail
         #   0 when a configured realm can be loaded; 1 otherwise.
         #
         # . Usage
+        #   ```bash
         #   _adsvr_load_context
+        #   ```
     _adsvr_load_context() {
         local realm="" workgroup="" forwarder=""
         realm="$(sudo testparm -s --parameter-name='realm' 2>/dev/null || true)"
@@ -271,7 +290,9 @@ set -uo pipefail
         #   0 when existing or interactively collected context is available; non-zero otherwise.
         #
         # . Usage
+        #   ```bash
         #   _adsvr_require_context
+        #   ```
     _adsvr_require_context() {
         [[ -n "$SGND_AD_REALM" && -n "$SGND_AD_SERVER_IP" ]] && return 0
         _adsvr_load_context && return 0
@@ -287,7 +308,9 @@ set -uo pipefail
         #   0 when hostname -f resolves to the expected FQDN; non-zero on file or validation failure.
         #
         # . Usage
+        #   ```bash
         #   _adsvr_prepare_hosts
+        #   ```
     _adsvr_prepare_hosts() {
         local tmp_file=""
         tmp_file="$(mktemp)" || return 1
@@ -310,7 +333,9 @@ set -uo pipefail
         #   0 when smb.conf is updated; non-zero on temporary-file or install failure.
         #
         # . Usage
+        #   ```bash
         #   _adsvr_set_dns_forwarder
+        #   ```
     _adsvr_set_dns_forwarder() {
         local tmp_file=""
         tmp_file="$(mktemp)" || return 1
@@ -334,7 +359,9 @@ set -uo pipefail
         #   0 when Samba becomes configured before the timeout; 1 otherwise.
         #
         # . Usage
+        #   ```bash
         #   _adsvr_wait_configured
+        #   ```
     _adsvr_wait_configured() {
         local elapsed=0 timeout_seconds="${1:-20}" helper="/usr/share/samba/is-configured"
         [[ -x "$helper" ]] || { sayfail "Samba configuration helper unavailable: $helper"; return 1; }
@@ -354,7 +381,9 @@ set -uo pipefail
         #   0 when both IPv4 DNS ports are free before timeout; 1 otherwise.
         #
         # . Usage
+        #   ```bash
         #   _adsvr_wait_dns_port_free
+        #   ```
     _adsvr_wait_dns_port_free() {
         local elapsed=0 timeout_seconds="${1:-10}"
         local tcp="" udp=""
@@ -380,7 +409,9 @@ set -uo pipefail
         #   0 when both DNS listeners are detected before timeout; 1 otherwise.
         #
         # . Usage
+        #   ```bash
         #   _adsvr_wait_dns
+        #   ```
     _adsvr_wait_dns() {
         local elapsed=0 timeout_seconds="${1:-15}" pattern="${SGND_AD_SERVER_IP//./\\.}"
         local tcp="" udp=""
@@ -403,7 +434,9 @@ set -uo pipefail
         #   0 on success or dry-run; non-zero on package or command validation failure.
         #
         # . Usage
+        #   ```bash
         #   _adsvr_step_install_packages
+        #   ```
     _adsvr_step_install_packages() {
         if (( ${FLAG_DRYRUN:-0} == 1 )); then sayinfo "DRYRUN: Would install Samba AD server prerequisites."; return 0; fi
         sudo apt-get update || return 1
@@ -423,7 +456,9 @@ set -uo pipefail
         #   0 when provisioning may continue; non-zero otherwise.
         #
         # . Usage
+        #   ```bash
         #   _adsvr_step_preflight
+        #   ```
     _adsvr_step_preflight() {
         _adsvr_collect_context || return 1
         sgnd_ad_is_domain_controller && { sayfail "This machine already contains a provisioned AD domain."; return 1; }
@@ -439,7 +474,9 @@ set -uo pipefail
         #   0 when the configured FQDN is active; non-zero otherwise.
         #
         # . Usage
+        #   ```bash
         #   _adsvr_step_identity
+        #   ```
     _adsvr_step_identity() {
         _adsvr_require_context || return 1
         sayinfo "Target identity: /etc/hosts -> $SGND_AD_HOSTNAME_FQDN ($SGND_AD_SERVER_IP)."
@@ -456,7 +493,9 @@ set -uo pipefail
         #   0 when samba-tool domain provision completes; non-zero otherwise.
         #
         # . Usage
+        #   ```bash
         #   _adsvr_step_provision
+        #   ```
     _adsvr_step_provision() {
         local backup=""
         _adsvr_require_context || return 1
@@ -476,7 +515,9 @@ set -uo pipefail
         #   0 when the requested initial settings are applied; non-zero otherwise.
         #
         # . Usage
+        #   ```bash
         #   _adsvr_step_domain_settings
+        #   ```
     _adsvr_step_domain_settings() {
         _adsvr_require_context || return 1
         sgnd_ad_is_domain_controller || { sayfail "Provision the domain first."; return 1; }
@@ -497,7 +538,9 @@ set -uo pipefail
         #   0 when /etc/krb5.conf is installed and usable; non-zero otherwise.
         #
         # . Usage
+        #   ```bash
         #   _adsvr_step_kerberos
+        #   ```
     _adsvr_step_kerberos() {
         _adsvr_require_context || return 1
         [[ -s /var/lib/samba/private/krb5.conf ]] || { sayfail "Generated Kerberos configuration is missing."; return 1; }
@@ -515,7 +558,9 @@ set -uo pipefail
         #   0 when resolver configuration succeeds; non-zero otherwise.
         #
         # . Usage
+        #   ```bash
         #   _adsvr_step_resolver
+        #   ```
     _adsvr_step_resolver() {
         local dropin_dir="/etc/systemd/resolved.conf.d" dropin_file="/etc/systemd/resolved.conf.d/solidgroundux-samba-ad.conf"
         _adsvr_require_context || return 1
@@ -539,7 +584,9 @@ set -uo pipefail
         #   0 when the AD/DC service and DNS listeners become ready; non-zero otherwise.
         #
         # . Usage
+        #   ```bash
         #   _adsvr_step_start
+        #   ```
     _adsvr_step_start() {
         _adsvr_require_context || return 1
         (( ${FLAG_DRYRUN:-0} == 1 )) && { sayinfo "DRYRUN: Would start samba-ad-dc.service."; return 0; }
@@ -559,7 +606,9 @@ set -uo pipefail
         #   0 when the A, SOA, Kerberos, and LDAP records validate; non-zero otherwise.
         #
         # . Usage
+        #   ```bash
         #   _adsvr_step_register_dns
+        #   ```
     _adsvr_step_register_dns() {
         _adsvr_require_context || return 1
         systemctl is-active --quiet samba-ad-dc.service || { sayfail "AD/DC service is not active."; return 1; }
@@ -583,7 +632,9 @@ set -uo pipefail
         #   34-40 when the corresponding provisioning step fails.
         #
         # . Usage
+        #   ```bash
         #   _adsvr_provision_domain
+        #   ```
     _adsvr_provision_domain() {
         local decision="No"
 
@@ -705,7 +756,9 @@ set -uo pipefail
         #   0 when all checks pass; 1 when one or more checks fail.
         #
         # . Usage
+        #   ```bash
         #   _adsvr_validate
+        #   ```
     _adsvr_validate() {
         local failures=0 realm="" dns_domain="" ip="" tcp="" udp="" pattern=""
         _adsvr_load_context || { sayfail "No provisioned AD domain was found."; return 1; }
@@ -733,7 +786,9 @@ set -uo pipefail
         #   0 after displaying available status information.
         #
         # . Usage
+        #   ```bash
         #   _adsvr_status
+        #   ```
     _adsvr_status() {
         local role="" realm="" state="inactive"
         command -v testparm >/dev/null 2>&1 || { saywarning "Samba is not installed."; return 1; }
@@ -746,6 +801,7 @@ set -uo pipefail
     }
 
 # - Action dispatch -----------------------------------------------------------------
+    # fn: _adsvr_action_is_mutating - Identify AD Server actions that modify host or domain state.
     _adsvr_action_is_mutating() {
         case "${1:-}" in
             provision-all|join-additional|join-domain|install|identity|provision|settings|kerberos|resolver|start|dns) return 0 ;;
@@ -753,6 +809,7 @@ set -uo pipefail
         esac
     }
 
+    # fn: _adsvr_run_action - Run action in the Active Directory Server workflow.
     _adsvr_run_action() {
         local action="${1:?missing action}"
         local rc=0
@@ -784,6 +841,7 @@ set -uo pipefail
     }
 
 # - Main ---------------------------------------------------------------------------
+    # fn: main - Dispatch command-line options to the appropriate management workflow.
     main() {
         local action=""
         _framework_locator || return $?

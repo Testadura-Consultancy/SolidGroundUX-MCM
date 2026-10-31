@@ -4,9 +4,9 @@ Last reviewed: 2026-10-29
 
 Outstanding work is tracked here; completed implementation is recorded in [CHANGELOG.md](CHANGELOG.md). The PostgreSQL and MariaDB servers are working, Create Workspace is tested in the SDK, and WCM metadata-field removal is implemented.
 
-## Before the 2.1 release
+## Before the next release
 
-- [ ] **Source documentation audit:** review module function comments, file headers, prefaces and epilogues against their current behavior, especially the moved documentation-bundle generator and the latest WCM workflows.
+- [ ] **Review transferred documentation diagrams:** assess `mcm-documentation-generation.png`, `mcm-documentation-system.png` and `mcm-documentation-process.png` against the current MCM bundle/Markdown and WCM HTML/publishing pipeline. Artwork was moved unchanged from SDK and is deliberately not embedded in published documentation until reviewed.
 - [ ] **Consolidated regression:** test management flows, Nginx site listing and internal HTTPS fallback, standard post-action dialogs, WCM metadata removal, and documentation website generation/publication alongside the Framework and SDK.
 - [ ] **GitHub Pages end-to-end verification:** exercise the implemented `main/docs` publishing flow against an appropriate test repository. The presence of code alone is not an end-to-end test.
 

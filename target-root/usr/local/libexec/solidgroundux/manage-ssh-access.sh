@@ -14,6 +14,16 @@
 # Description:
 #   Standalone management actions dispatched from 10-computer-setup.sh.
 #   UI, reporting and errors use the SolidGroundUX framework.
+#
+# Usage:
+#   Run the executable from its shell command (or installed wrapper):
+#   ```bash
+#   manage-ssh-access --action generate-key
+#   ```
+#
+#   Script-specific options:
+#   - `--action NAME`, `-a`: Computer Setup action (choices: `generate-key`, `install-key`, `unlock-key`, `test-access`).
+#
 # ==================================================================================
 set -uo pipefail
 
@@ -49,7 +59,9 @@ set -uo pipefail
         #   be found, or the executable common library is unreadable.
         #
         # . Usage
+        #   ```bash
         #   _framework_locator || return $?
+        #   ```
     _framework_locator() {
         local script_file=""
         local path_without_root=""
@@ -291,6 +303,7 @@ SGND_STATE_SAVE=0
 
 
 # - Dispatch ------------------------------------------------------------------------
+# fn: _run_action - Dispatch the requested management action to its implementation.
 _run_action() {
     local action="${1:?missing action}"
     case "$action" in
@@ -302,6 +315,7 @@ _run_action() {
     esac
 }
 
+# fn: main - Dispatch command-line options to the appropriate management workflow.
 main() {
     _framework_locator || return $?
     sgnd_exe_start -- "$@" || return $?

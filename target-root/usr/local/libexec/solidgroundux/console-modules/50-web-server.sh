@@ -41,7 +41,9 @@ set -uo pipefail
         #   Exits with code 2 when executed instead of sourced.
         #
         # . Usage
+        #   ```bash
         #   _sgnd_lib_guard
+        #   ```
     _sgnd_lib_guard() {
         local lib_base=""
         local guard=""
@@ -72,7 +74,9 @@ set -uo pipefail
     SGND_MODULE_ID="$SGND_WEB_SERVER_MODULE_ID"
     SGND_MODULE_NAME="$SGND_WEB_SERVER_MODULE_NAME"
 # - Management dispatch -------------------------------------------------------------
+    # fn: _web_run_manage - Run manage in the web server workflow.
     _web_run_manage() { local action="${1:?missing action}"; _sgnd_run_module_script "manage-web-server.sh" --action "$action"; }
+    # fn: _web_run_publish - Run publish in the web server workflow.
     _web_run_publish() { local action="${1:?missing action}"; _sgnd_run_module_script "publish-web-content.sh" --action "$action"; }
 
     # fn: _web_record_prepare_step - Persist one child-step result in the console tracker
@@ -84,7 +88,9 @@ set -uo pipefail
         #   0 always; tracking is best-effort when the console tracker is unavailable.
         #
         # . Usage
+        #   ```bash
         #   _web_record_prepare_step "web-install" 0
+        #   ```
     _web_record_prepare_step() {
         local item_key="${1:?missing item key}"
         local result_code="${2:-0}"
@@ -110,7 +116,9 @@ set -uo pipefail
         #   manage-web-server.sh.
         #
         # . Usage
+        #   ```bash
         #   web_prepare
+        #   ```
     web_prepare() {
         local rc=0
 
@@ -136,18 +144,135 @@ set -uo pipefail
 
         return "$rc"
     }
+    # fn: web_install - Call `_web_run_manage` with the `install` action.
+        #
+        # . Returns
+        #   The status returned by the delegated action.
+        #
+        # . Usage
+        #   ```bash
+        #   web_install
+        #   ```
     web_install()                 { _web_run_manage install; }
+    # fn: web_start - Call `_web_run_manage` with the `start` action.
+        #
+        # . Returns
+        #   The status returned by the delegated action.
+        #
+        # . Usage
+        #   ```bash
+        #   web_start
+        #   ```
     web_start()                   { _web_run_manage start; }
+    # fn: web_configure_root - Call `_web_run_manage` with the `configure-root` action.
+        #
+        # . Returns
+        #   The status returned by the delegated action.
+        #
+        # . Usage
+        #   ```bash
+        #   web_configure_root
+        #   ```
     web_configure_root()          { _web_run_manage configure-root; }
+    # fn: web_manage_sites - Call `_web_run_manage` with the `manage-sites` action.
+        #
+        # . Returns
+        #   The status returned by the delegated action.
+        #
+        # . Usage
+        #   ```bash
+        #   web_manage_sites
+        #   ```
     web_manage_sites()            { _web_run_manage manage-sites; }
+    # fn: web_configure_default - Call `_web_run_manage` with the `configure-default` action.
+        #
+        # . Returns
+        #   The status returned by the delegated action.
+        #
+        # . Usage
+        #   ```bash
+        #   web_configure_default
+        #   ```
     web_configure_default()       { _web_run_manage configure-default; }
+    # fn: web_publish - Call `_web_run_publish` with the `publish-site` action.
+        #
+        # . Returns
+        #   The status returned by the delegated action.
+        #
+        # . Usage
+        #   ```bash
+        #   web_publish
+        #   ```
     web_publish()                 { _web_run_publish publish-site; }
+    # fn: web_doc_configure - Call `_web_run_manage` with the `configure-documentation` action.
+        #
+        # . Returns
+        #   The status returned by the delegated action.
+        #
+        # . Usage
+        #   ```bash
+        #   web_doc_configure
+        #   ```
     web_doc_configure()           { _web_run_manage configure-documentation; }
+    # fn: web_doc_publish - Call `_web_run_publish` with the `publish-documentation` action.
+        #
+        # . Returns
+        #   The status returned by the delegated action.
+        #
+        # . Usage
+        #   ```bash
+        #   web_doc_publish
+        #   ```
     web_doc_publish()             { _web_run_publish publish-documentation; }
+    # fn: web_doc_status - Call `_web_run_manage` with the `documentation-status` action.
+        #
+        # . Returns
+        #   The status returned by the delegated action.
+        #
+        # . Usage
+        #   ```bash
+        #   web_doc_status
+        #   ```
     web_doc_status()              { _web_run_manage documentation-status; }
+    # fn: web_service_manage - Call `_web_run_manage` with the `service` action.
+        #
+        # . Returns
+        #   The status returned by the delegated action.
+        #
+        # . Usage
+        #   ```bash
+        #   web_service_manage
+        #   ```
     web_service_manage()          { _web_run_manage service; }
+    # fn: web_firewall - Call `_web_run_manage` with the `firewall` action.
+        #
+        # . Returns
+        #   The status returned by the delegated action.
+        #
+        # . Usage
+        #   ```bash
+        #   web_firewall
+        #   ```
     web_firewall()                { _web_run_manage firewall; }
+    # fn: web_validate - Call `_web_run_manage` with the `validate` action.
+        #
+        # . Returns
+        #   The status returned by the delegated action.
+        #
+        # . Usage
+        #   ```bash
+        #   web_validate
+        #   ```
     web_validate()                { _web_run_manage validate; }
+    # fn: web_status - Call `_web_run_manage` with the `status` action.
+        #
+        # . Returns
+        #   The status returned by the delegated action.
+        #
+        # . Usage
+        #   ```bash
+        #   web_status
+        #   ```
     web_status()                  { _web_run_manage status; }
 
 # - Module validation contract ------------------------------------------------------
@@ -159,6 +284,15 @@ set -uo pipefail
     #
     # Every validator sets SGND_MODULE_VALIDATION_MESSAGE to a concise result summary.
     # Detailed diagnostic output may be written by the validator or delegated action.
+    # fn: validate_module_web_server - Validate the web server module and record its status for the console.
+        #
+        # . Returns
+        #   A console validation status (0=pass, 1=fail, 2=warning, 3=skipped).
+        #
+        # . Usage
+        #   ```bash
+        #   validate_module_web_server
+        #   ```
     validate_module_web_server() {
         if ! command -v nginx >/dev/null 2>&1; then
             SGND_MODULE_VALIDATION_MESSAGE="nginx is not installed on this host."

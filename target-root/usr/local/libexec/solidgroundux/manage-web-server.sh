@@ -15,6 +15,20 @@
 # Description:
 #   Configure, manage, validate, and inspect an Nginx web server.
 #
+# Usage:
+#   Run the executable from its shell command (or installed wrapper):
+#   ```bash
+#   manage-web-server --action status
+#   manage-web-server --dryrun --action configure-root
+#   ```
+#
+#   Script-specific options:
+#   - `--action NAME`, `-a`: Management action (supported actions: `prepare`, `install`, `start`, `configure-root`, `manage-sites`, `ensure-site`, `ensure-directory`, `configure-dns`, `configure-documentation`, `documentation-status`, `update-documentation`, `service`, `firewall`, `validate`, `status`).
+#   - `--site-name VALUE`: Nginx site identifier for ensure-site.
+#   - `--web-address VALUE`: Hostname for ensure-site.
+#   - `--document-root VALUE`: Absolute document root for ensure-site.
+#   - `--deployment-user VALUE`: Unprivileged SSH publishing account.
+#
 # Attribution:
 #   Developers    : Mark Fieten
 #   Company       : Testadura Consultancy
@@ -56,7 +70,9 @@ set -uo pipefail
         #   be found, or the executable common library is unreadable.
         #
         # . Usage
+        #   ```bash
         #   _framework_locator || return $?
+        #   ```
     _framework_locator() {
         local script_file=""
         local path_without_root=""
@@ -174,6 +190,7 @@ set -uo pipefail
 
     # Render a local numbered selector using the Web Server action layout.
     # The framework ask_selection API is intentionally left unchanged.
+    # fn: _web_ask_selection - Prompt for selection in the web server workflow.
     _web_ask_selection() {
         local label="Select an option"
         local var_name="selection"
@@ -216,18 +233,21 @@ set -uo pipefail
         done
     }
 
+    # fn: _web_server_load_state - Read web-management settings from the state file when available.
     _web_server_load_state() {
         if [[ -r "$SGND_WEB_SERVER_STATE_FILE" ]] && command -v sgnd_state_load_keys >/dev/null 2>&1; then
             sgnd_state_load_keys --file "$SGND_WEB_SERVER_STATE_FILE" --array SGND_WEB_SERVER_STATE_VARIABLES >/dev/null 2>&1 || true
         fi
     }
 
+    # fn: _web_server_save_state - Save web-management settings to the configured state file.
     _web_server_save_state() {
         command -v sgnd_state_save_keys >/dev/null 2>&1 || return 0
         mkdir -p "$(dirname -- "$SGND_WEB_SERVER_STATE_FILE")" || return 1
         sgnd_state_save_keys --file "$SGND_WEB_SERVER_STATE_FILE" --array SGND_WEB_SERVER_STATE_VARIABLES
     }
 
+    # fn: _dryrun_complete - Report the dry-run result without executing the requested host change.
     _dryrun_complete() {
         (( ${FLAG_DRYRUN:-0} == 1 )) || return 0
         sayok "DRYRUN complete. The changes shown above would have been applied; no changes were written."
@@ -236,7 +256,9 @@ set -uo pipefail
         # . Returns
         #   0 on success; non-zero when the operation cannot be completed.
         # . Usage
+        #   ```bash
         #   _web_server_package_installed
+        #   ```
     _web_server_package_installed() {
         dpkg-query -W -f='${Status}' nginx 2>/dev/null | grep -q '^install ok installed$'
     }
@@ -245,7 +267,9 @@ set -uo pipefail
         # . Returns
         #   0 on success; non-zero when the operation cannot be completed.
         # . Usage
+        #   ```bash
         #   _web_server_storage_root
+        #   ```
     _web_server_storage_root() {
         local configured=""
         local storage_cfg="${SGND_SYSCFG_DIR:-/etc/solidgroundux}/storage.cfg"
@@ -262,7 +286,9 @@ set -uo pipefail
         # . Returns
         #   0 on success; non-zero when the operation cannot be completed.
         # . Usage
+        #   ```bash
         #   _web_server_root
+        #   ```
     _web_server_root() {
         local configured=""
 
@@ -278,7 +304,9 @@ set -uo pipefail
         # . Returns
         #   0 on success; non-zero when the operation cannot be completed.
         # . Usage
+        #   ```bash
         #   _web_server_save_root
+        #   ```
     _web_server_save_root() {
         local root="$1"
         local config_dir=""
@@ -314,7 +342,9 @@ set -uo pipefail
         # . Returns
         #   0 on success; non-zero when the operation cannot be completed.
         # . Usage
+        #   ```bash
         #   _web_server_enabled_sites
+        #   ```
     _web_server_enabled_sites() {
         local entry=""
         [[ -d /etc/nginx/sites-enabled ]] || return 1
@@ -328,7 +358,9 @@ set -uo pipefail
         # . Returns
         #   0 on success; non-zero when the operation cannot be completed.
         # . Usage
+        #   ```bash
         #   _web_server_available_sites
+        #   ```
     _web_server_available_sites() {
         local entry=""
         [[ -d /etc/nginx/sites-available ]] || return 1
@@ -349,7 +381,9 @@ set -uo pipefail
         # . Returns
         #   0 when the configuration was read; non-zero otherwise.
         # . Usage
+        #   ```bash
         #   config="$(_web_server_read_site_config "$site")" || return $?
+        #   ```
     _web_server_read_site_config() {
         local site="${1:-}" config_file=""
         _web_server_validate_site_name "$site" || return 1
@@ -366,7 +400,9 @@ set -uo pipefail
         # . Returns
         #   0 on success; non-zero when the operation cannot be completed.
         # . Usage
+        #   ```bash
         #   _web_server_validate_site_name
+        #   ```
     _web_server_validate_site_name() {
         local value="$1"
         (( ${#value} >= 1 && ${#value} <= 64 )) || return 1
@@ -375,7 +411,9 @@ set -uo pipefail
 
     # fn: _web_server_current_dns - Resolve the first configured non-loopback DNS server
         # . Usage
+        #   ```bash
         #   _web_server_current_dns "<arg1>" "<dns>"
+        #   ```
     _web_server_current_dns() {
         local dns=""
         if command -v resolvectl >/dev/null 2>&1; then
@@ -389,14 +427,18 @@ set -uo pipefail
 
     # fn: _web_server_local_ipv4 - Resolve this server's primary IPv4 address
         # . Usage
+        #   ```bash
         #   _web_server_local_ipv4
+        #   ```
     _web_server_local_ipv4() {
         hostname -I 2>/dev/null | awk '{for (i=1; i<=NF; i++) if ($i ~ /^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$/ && $i !~ /^127\./) {print $i; exit}}'
     }
 
     # fn: _web_server_offer_dns_record - Optionally register an internal AD DNS A record
         # . Usage
+        #   ```bash
         #   _web_server_offer_dns_record "<web_address>"
+        #   ```
     _web_server_offer_dns_record() {
         local web_address="$1"
         local local_domain=""
@@ -468,7 +510,9 @@ set -uo pipefail
         #   During site removal, delete only a confirmed A record pointing at this host.
         #   Never remove unrelated records, aliases, or a hostname with multiple A values.
         # . Usage
+        #   ```bash
         #   _web_server_remove_dns_record "<saved site hostname>"
+        #   ```
     _web_server_remove_dns_record() {
         local web_address="${1%.}"
         local local_domain="" record_name="" dns_server="" local_ip=""
@@ -542,7 +586,9 @@ set -uo pipefail
         # . Returns
         #   0 when a document root can be resolved; non-zero otherwise.
         # . Usage
+        #   ```bash
         #   _web_server_site_document_root <site>
+        #   ```
     _web_server_site_document_root() {
         local site="$1"
         local config="" root=""
@@ -557,7 +603,9 @@ set -uo pipefail
         # . Returns
         #   0 on success; non-zero when the operation cannot be completed.
         # . Usage
+        #   ```bash
         #   _web_server_remove_document_content <document-root>
+        #   ```
     _web_server_remove_document_content() {
         local document_root="$1"
 
@@ -584,7 +632,9 @@ set -uo pipefail
         # . Returns
         #   0 on success; non-zero when the operation cannot be completed.
         # . Usage
+        #   ```bash
         #   _web_server_ensure_directory
+        #   ```
     _web_server_ensure_directory() {
         local path="$1"
         local owner="${2:-www-data:www-data}"
@@ -663,7 +713,9 @@ NGINX
         # . Returns
         #   0 on success; non-zero when the operation cannot be completed.
         # . Usage
+        #   ```bash
         #   _web_server_reload
+        #   ```
     _web_server_reload() {
         _web_server_ensure_https_fallback || return 1
         sudo nginx -t || return 1
@@ -679,7 +731,9 @@ NGINX
         # . Returns
         #   0 on success; non-zero when the operation cannot be completed.
         # . Usage
+        #   ```bash
         #   _web_server_step_install_packages
+        #   ```
     _web_server_step_install_packages() {
         if (( ${FLAG_DRYRUN:-0} == 1 )); then
             sayinfo "DRYRUN: Would install Nginx web-server prerequisites."
@@ -699,7 +753,9 @@ NGINX
         # . Returns
         #   0 on success; non-zero when the operation cannot be completed.
         # . Usage
+        #   ```bash
         #   _web_server_step_start
+        #   ```
     _web_server_step_start() {
         command -v nginx >/dev/null 2>&1 || { sayfail "Nginx is not installed."; return 1; }
         _web_server_ensure_https_fallback || return 1
@@ -725,7 +781,9 @@ NGINX
         #   42 when enabling or starting Nginx fails.
         #
         # . Usage
+        #   ```bash
         #   _web_server_prepare
+        #   ```
     _web_server_prepare() {
         # Distinct workflow codes let the console synchronize the child menu results
         # while keeping the complete preparation workflow inside this executable.
@@ -740,7 +798,9 @@ NGINX
         # . Returns
         #   0 on success; non-zero when the operation cannot be completed.
         # . Usage
+        #   ```bash
         #   _web_server_configure_root
+        #   ```
     _web_server_configure_root() {
         local storage_root=""
         local current_root=""
@@ -782,7 +842,9 @@ NGINX
         # . Returns
         #   0 on success; non-zero when the operation cannot be completed.
         # . Usage
+        #   ```bash
         #   _web_server_manage_service
+        #   ```
     _web_server_manage_service() {
         local action=""
         local service_state="Unavailable"
@@ -820,7 +882,9 @@ NGINX
         # . Returns
         #   0 on success; non-zero when the operation cannot be completed.
         # . Usage
+        #   ```bash
         #   _web_server_configure_firewall
+        #   ```
     _web_server_configure_firewall() {
         local firewall_state="Inactive"
         local nginx_profile_state="Not allowed"
@@ -850,7 +914,9 @@ NGINX
         # . Returns
         #   0 on success; non-zero when the operation cannot be completed.
         # . Usage
+        #   ```bash
         #   _web_server_create_site
+        #   ```
     _web_server_create_site() {
         local site_name=""
         local server_name=""
@@ -1009,7 +1075,9 @@ EOF
         # . Returns
         #   0 on success; non-zero when the operation cannot be completed.
         # . Usage
+        #   ```bash
         #   _web_server_enable_site
+        #   ```
     _web_server_enable_site() {
         local site="${1:-}"
         local -a sites=()
@@ -1027,7 +1095,9 @@ EOF
         # . Returns
         #   0 on success; non-zero when the operation cannot be completed.
         # . Usage
+        #   ```bash
         #   _web_server_disable_site
+        #   ```
     _web_server_disable_site() {
         local site="${1:-}"
         local -a sites=()
@@ -1045,7 +1115,9 @@ EOF
         # . Returns
         #   0 on success; non-zero when the operation cannot be completed.
         # . Usage
+        #   ```bash
         #   _web_server_change_document_root
+        #   ```
     _web_server_change_document_root() {
         local site="${1:-}"
         local config_file=""
@@ -1114,7 +1186,9 @@ EOF
         # . Returns
         #   0 on success; non-zero when the operation cannot be completed.
         # . Usage
+        #   ```bash
         #   _web_server_remove_site
+        #   ```
     _web_server_remove_site() {
         local site="${1:-}"
         local document_root=""
@@ -1171,7 +1245,9 @@ EOF
         # . Returns
         #   0 on success; non-zero when the operation cannot be completed.
         # . Usage
+        #   ```bash
         #   _web_server_remove_site_content
+        #   ```
     _web_server_remove_site_content() {
         local site="${1:-}"
         local document_root=""
@@ -1196,7 +1272,9 @@ EOF
         # . Returns
         #   0 on success; non-zero when the operation cannot be completed.
         # . Usage
+        #   ```bash
         #   _web_server_list_sites
+        #   ```
     _web_server_list_sites() {
         local -a sites=()
         local site=""
@@ -1380,7 +1458,9 @@ EOF
     # . Returns
     #   0 on success or cancellation; non-zero for invalid or inaccessible certificates.
     # . Usage
+    #   ```bash
     #   _web_server_export_https_certificate "sgndux"
+    #   ```
     _web_server_export_https_certificate() {
         local site="${1:-}" cfg="" cert="" address="" username="" home_dir=""
         local export_dir="" export_file="" temporary="" fingerprint="" server=""
@@ -1804,7 +1884,9 @@ UNIT
         # . Returns
         #   0 on completion.
         # . Usage
+        #   ```bash
         #   _web_server_site_summary "my-site"
+        #   ```
     _web_server_site_summary() {
         local site="$1" cfg="/etc/nginx/sites-available/$site"
         local address="" root="" enabled="Disabled" https="No" protected="No" upload="No" config=""
@@ -1831,7 +1913,9 @@ UNIT
         # . Returns
         #   0 on return to the calling menu; other action errors are shown in context.
         # . Usage
+        #   ```bash
         #   _web_server_manage_sites
+        #   ```
     _web_server_manage_sites() {
         local site="" action="" input="" address="" cfg=""
         local -a sites=()
@@ -1900,7 +1984,9 @@ UNIT
 # - SolidGroundUX documentation ----------------------------------------------------
     # fn: _web_server_default_docs_address - Return a sensible documentation web address
         # . Usage
+        #   ```bash
         #   _web_server_default_docs_address
+        #   ```
     _web_server_default_docs_address() {
         local domain=""
         domain="$(hostname -d 2>/dev/null || true)"
@@ -1915,7 +2001,9 @@ UNIT
         # . Purpose
         #   Create or select the Nginx site used to publish SolidGroundUX documentation.
         # . Usage
+        #   ```bash
         #   _web_server_configure_documentation_site "<existing_address>" "<existing_address>"
+        #   ```
     _web_server_configure_documentation_site() {
         local site="${SGND_WEB_DOC_SITE:-SolidGroundUX-Documentation}"
         local address="${SGND_WEB_DOC_ADDRESS:-}"
@@ -1988,7 +2076,9 @@ EOF
         #   Never sync a missing, nested, identical, or symlinked documentation root.
         #   An installed source needs index.html; publishing never creates a new Nginx site.
         # . Usage
+        #   ```bash
         #   _web_server_documentation_paths <source-var> <destination-var>
+        #   ```
     _web_server_documentation_paths() {
         local source_var="$1" destination_var="$2" site="${SGND_WEB_DOC_SITE:-SolidGroundUX-Documentation}"
         local src_inner="" dst_inner="" config_file="/etc/nginx/sites-available/$site"
@@ -2108,7 +2198,9 @@ EOF
         # . Returns
         #   0 on success; non-zero when the operation cannot be completed.
         # . Usage
+        #   ```bash
         #   _web_server_status
+        #   ```
     _web_server_status() {
         local package_state="not installed"
         local package_version="-"
@@ -2153,7 +2245,9 @@ EOF
         # . Returns
         #   0 on success; non-zero when the operation cannot be completed.
         # . Usage
+        #   ```bash
         #   _web_server_validate
+        #   ```
     _web_server_validate() {
         local failures=0
         local result=""
@@ -2188,6 +2282,7 @@ EOF
     }
 
 # - Action dispatch -----------------------------------------------------------------
+    # fn: _run_action - Dispatch the requested management action to its implementation.
     _run_action() {
         local action="${1:?missing action}" rc=0
         case "$action" in
@@ -2217,6 +2312,7 @@ EOF
     }
 
 # - Main ----------------------------------------------------------------------------
+    # fn: main - Dispatch command-line options to the appropriate management workflow.
     main() {
         local action=""
         _framework_locator || return $?

@@ -95,7 +95,7 @@ MCM owns the current, independent stages of static website production:
 - **Documentation website:** **Assemble Markdown → Generate Website → Publish Website**.
 - **Ordinary WWW website:** **Generate Website → Publish Website**.
 
-Documentation Bundles combines one or more source repositories under a saved bundle definition. An optional generated Chapter 0 becomes the bundle introduction **once**, after the source-to-Markdown stage. It is excluded from its original content location and generated indexes.
+Documentation Bundles combines one or more source repositories under a saved definition. Bundle prefaces precede all product chapters; bundle epilogues follow them and precede appendices. The manager supports automatic bundle-ID or generic filename discovery, explicitly ordered document lists, and authored Markdown copied without modification. Product- and section-level introductions and conclusions follow the same first/content/last ordering rule. Existing saved Chapter 0 selections remain compatible through source-preface mapping.
 
 Web Content Management reads a Markdown website source, renders static HTML, and publishes an explicitly chosen **generated HTML directory**. Publishing saves the HTML source directory, `user@host`, remote directory, website hostname and Update/Mirror synchronization mode. After selecting the destination server, it can discover existing Nginx websites and their document roots or suggest a new root for a new site. It then offers **Publish / Modify / Cancel**. It does not require the source Markdown repository during publishing or a separate destination-profile registry.
 
@@ -103,7 +103,7 @@ Nginx website management provides optional HTTPS configuration, including self-s
 
 ## Database management status
 
-The PostgreSQL and MariaDB modules are available alongside SQL Server. Their installation, service, storage and restart workflows still require live functional testing; module presence must not be confused with completed integration validation.
+The PostgreSQL and MariaDB modules are available alongside SQL Server. Live PostgreSQL and MariaDB server installations have been confirmed operational; specialized storage-relocation and recovery scenarios remain outside that validation.
 
 ## Framework integration
 

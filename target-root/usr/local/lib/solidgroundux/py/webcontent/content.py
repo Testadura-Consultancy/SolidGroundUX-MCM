@@ -5,6 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from pathlib import Path
 import configparser
+import json
 import re
 from typing import Any
 
@@ -13,6 +14,7 @@ _CONTENT_FILE_RE = re.compile(r"^(?P<name>.+)_(?P<language>[A-Za-z]{2})\.md$")
 _INDEX_FILE_RE = re.compile(r"^.+_Index_(?P<language>[A-Za-z]{2})\.md$")
 
 
+# fn: section_index - Find the one descriptive index for a section/language.
 def section_index(directory: Path, language: str) -> Path | None:
     """Find the one descriptive index for a section/language."""
     matches = sorted(path for path in directory.glob(f"*_Index_{language}.md") if _INDEX_FILE_RE.fullmatch(path.name))
@@ -22,6 +24,7 @@ def section_index(directory: Path, language: str) -> Path | None:
 
 
 
+# cls: SiteConfig - Resolved website source paths and site configuration settings.
 @dataclass(slots=True)
 class SiteConfig:
     """Resolved website source paths and site configuration settings."""
@@ -40,6 +43,7 @@ class SiteConfig:
     links: dict[str, str] = field(default_factory=dict)
 
 
+# cls: NavigationItem - One configured navigation entry and its display information.
 @dataclass(slots=True)
 class NavigationItem:
     """One configured navigation entry and its display information."""
@@ -50,6 +54,7 @@ class NavigationItem:
     labels: dict[str, str]
 
 
+# cls: FeaturedItem - One curated route shown in the home-page Featured slider.
 @dataclass(slots=True)
 class FeaturedItem:
     """One curated route shown in the home-page Featured slider."""
@@ -60,6 +65,7 @@ class FeaturedItem:
     image: str = ""
 
 
+# cls: ContentItem - Discovered Markdown page with route, language, and metadata.
 @dataclass(slots=True)
 class ContentItem:
     """Discovered Markdown page with route, language, and metadata."""
@@ -72,6 +78,7 @@ class ContentItem:
     route: str
     template: str = "page"
 
+    # fn: title - Return the effective title from the content item metadata.
     @property
     def title(self) -> str:
         """Handle title for the web content workflow.
@@ -80,6 +87,7 @@ class ContentItem:
             Operation result or None, as defined by the implementation."""
         return str(self.metadata.get("title", self.base_name))
 
+    # fn: summary - Return the effective summary from the content item metadata.
     @property
     def summary(self) -> str:
         """Handle summary for the web content workflow.
@@ -88,6 +96,7 @@ class ContentItem:
             Operation result or None, as defined by the implementation."""
         return str(self.metadata.get("summary", ""))
 
+    # fn: date - Read the effective article date from content metadata.
     @property
     def date(self) -> str:
         """Handle date for the web content workflow.
@@ -96,6 +105,7 @@ class ContentItem:
             Operation result or None, as defined by the implementation."""
         return str(self.metadata.get("published") or self.metadata.get("date") or "")
 
+    # fn: tags - Return the normalized tags associated with the content item.
     @property
     def tags(self) -> list[str]:
         """Handle tags for the web content workflow.
@@ -109,6 +119,7 @@ class ContentItem:
             return []
         return [part.strip() for part in str(value).split(",") if part.strip()]
 
+    # fn: draft - Determine whether the content item is marked as draft.
     @property
     def draft(self) -> bool:
         """Handle draft for the web content workflow.
@@ -117,6 +128,7 @@ class ContentItem:
             Operation result or None, as defined by the implementation."""
         return self.status == "draft"
 
+    # fn: status - Return the effective publication status of the content item.
     @property
     def status(self) -> str:
         """Handle status for the web content workflow.
@@ -126,6 +138,9 @@ class ContentItem:
         value = str(self.metadata.get("status", "")).strip().lower()
         return value if value in {"draft", "preview", "published"} else ("draft" if self.metadata.get("draft", False) else "published")
 
+    # fn: hidden - Whether a published page is omitted from normal discovery/navigation.
+    # . Description
+    #   Hidden is not an access-control mechanism: generated pages remain public.
     @property
     def hidden(self) -> bool:
         """Whether a published page is omitted from normal discovery/navigation.
@@ -134,6 +149,9 @@ class ContentItem:
         """
         return str(self.metadata.get("hidden", False)).strip().lower() in {"true", "yes", "1"}
 
+    # fn: private - Declare a URL requiring server-side access control.
+    # . Description
+    #   Metadata alone never creates authentication; the generator checks protected URL placement, and the web server must enforce the guard.
     @property
     def private(self) -> bool:
         """Declare a URL requiring server-side access control.
@@ -143,6 +161,7 @@ class ContentItem:
         """
         return str(self.metadata.get("private", False)).strip().lower() in {"true", "yes", "1"}
 
+    # fn: featured - Determine whether the content item appears in Featured content.
     @property
     def featured(self) -> bool:
         """Handle featured for the web content workflow.
@@ -151,6 +170,7 @@ class ContentItem:
             Operation result or None, as defined by the implementation."""
         return bool(self.metadata.get("featured", False))
 
+    # fn: order - Return the optional sibling-order hint used for section navigation.
     @property
     def order(self) -> int:
         """Return the optional sibling-order hint used for section navigation."""
@@ -161,6 +181,7 @@ class ContentItem:
             return 1000
 
 
+# fn: _parse_scalar - Parse a front-matter scalar value into its structured representation.
 def _parse_scalar(value: str) -> Any:
     """Handle parse scalar for the web content workflow."""
     value = value.strip()
@@ -181,11 +202,13 @@ def _parse_scalar(value: str) -> Any:
     return value
 
 
+# fn: _indent_of - Measure the indentation of a Markdown metadata line.
 def _indent_of(line: str) -> int:
     """Handle indent of for the web content workflow."""
     return len(line) - len(line.lstrip(" "))
 
 
+# fn: _parse_mapping - Parse a nested front-matter mapping and preserve its hierarchy.
 def _parse_mapping(lines: list[str], start: int = 0, indent: int = 0) -> tuple[dict[str, Any], int]:
     """Handle parse mapping for the web content workflow."""
     result: dict[str, Any] = {}
@@ -270,6 +293,9 @@ def _parse_mapping(lines: list[str], start: int = 0, indent: int = 0) -> tuple[d
     return result, index
 
 
+# fn: parse_front_matter - Parse a Markdown document into front-matter metadata and body.
+# . Description
+#   Args: text: Input used by this operation.
 def parse_front_matter(text: str) -> tuple[dict[str, Any], str]:
     """Parse a Markdown document into front-matter metadata and body.
     
@@ -296,6 +322,9 @@ def parse_front_matter(text: str) -> tuple[dict[str, Any], str]:
     return metadata, body
 
 
+# fn: load_site_config - Read and resolve website configuration from a source repository.
+# . Description
+#   Args: root: Input used by this operation.
 def load_site_config(root: Path) -> SiteConfig:
     """Read and resolve website configuration from a source repository.
     
@@ -362,6 +391,9 @@ def load_site_config(root: Path) -> SiteConfig:
     )
 
 
+# fn: is_ignored - Whether a source path is beneath a directory containing `.ignore`.
+# . Description
+#   The boundary is included, but ancestors outside it are never inspected.
 def is_ignored(path: Path, boundary: Path) -> bool:
     """Whether a source path is beneath a directory containing `.ignore`.
 
@@ -379,6 +411,9 @@ def is_ignored(path: Path, boundary: Path) -> bool:
         current = current.parent
 
 
+# fn: load_navigation - Discover root navigation from section indexes, never navigation.cfg.
+# . Description
+#   Dutch index metadata provides structural defaults; translated indexes supply translated labels. A section without an index is not navigation.
 def load_navigation(root: Path, *, include_drafts: bool = False) -> list[NavigationItem]:
     """Discover root navigation from section indexes, never navigation.cfg.
 
@@ -432,6 +467,9 @@ def load_navigation(root: Path, *, include_drafts: bool = False) -> list[Navigat
     return sorted(entries, key=lambda item: (item.order, item.key))
 
 
+# fn: load_featured - Load curated Featured routes from ``config/featured.cfg``.
+# . Description
+#   The configured route is language-neutral. During generation the route is resolved to the matching page in the language currently being rendered.
 def load_featured(root: Path) -> list[FeaturedItem]:
     """Load curated Featured routes from ``config/featured.cfg``.
 
@@ -473,6 +511,7 @@ def load_featured(root: Path) -> list[FeaturedItem]:
     return sorted(items, key=lambda item: (item.order, item.key))
 
 
+# fn: _base_route - Calculate the canonical public route for the chosen content item.
 def _base_route(relative_path: Path, base_name: str) -> str:
     """Handle base route for the web content workflow."""
     parent = relative_path.parent.as_posix()
@@ -487,6 +526,9 @@ def _base_route(relative_path: Path, base_name: str) -> str:
     return route
 
 
+# fn: language_route - Build the localized public route for a content item.
+# . Description
+#   Args: base_route: Input used by this operation.
 def language_route(base_route: str, language: str, default_language: str) -> str:
     """Handle language route for the web content workflow.
     
@@ -504,6 +546,7 @@ def language_route(base_route: str, language: str, default_language: str) -> str
     return f"/{language.lower()}{base_route}"
 
 
+# fn: _owning_navigation_item - Return the most specific main-navigation section that owns a content route.
 def _owning_navigation_item(base_route: str, navigation: list[NavigationItem]) -> NavigationItem | None:
     """Return the most specific main-navigation section that owns a content route."""
     matches = [
@@ -516,6 +559,9 @@ def _owning_navigation_item(base_route: str, navigation: list[NavigationItem]) -
     return max(matches, key=lambda item: (len(item.path), -item.order, item.key))
 
 
+# fn: discover_content - Discover content pages and resolve their routes and languages.
+# . Description
+#   Args: config: Input used by this operation.
 def discover_content(config: SiteConfig, navigation: list[NavigationItem]) -> list[ContentItem]:
     """Discover content pages and resolve their routes and languages.
     
@@ -527,6 +573,13 @@ def discover_content(config: SiteConfig, navigation: list[NavigationItem]) -> li
         Operation result or None, as defined by the implementation."""
     if not config.content_dir.is_dir():
         raise ValueError(f"Content directory not found: {config.content_dir}")
+
+    # Documentation bundles store ordering for copied Markdown in a separate
+    # manifest. This keeps authored Markdown files byte-for-byte unchanged.
+    order_file = config.content_dir.parent / 'config' / 'doc-nav-orders.json'
+    doc_order = json.loads(order_file.read_text(encoding='utf-8')) if order_file.is_file() else {}
+    if not isinstance(doc_order, dict):
+        raise ValueError(f'Invalid documentation order manifest: {order_file}')
 
     # Check for ambiguous index pages before resolving routes.
     for directory in [config.content_dir] + [d for d in config.content_dir.rglob("*") if d.is_dir() and not is_ignored(d, config.content_dir)]:
@@ -579,6 +632,13 @@ def discover_content(config: SiteConfig, navigation: list[NavigationItem]) -> li
         route = language_route(base_route, language, config.default_language)
 
         metadata, body = parse_front_matter(path.read_text(encoding="utf-8"))
+        selected_order = doc_order.get(relative.as_posix())
+        if selected_order is not None:
+            metadata['nav_order'] = int(selected_order)
+            if not metadata.get('title'):
+                heading = re.search(r'^#\s+(.+?)\s*$', body, re.M)
+                if heading:
+                    metadata['title'] = heading.group(1).strip()
         template = str(metadata.get("template", "")).strip()
         if not template:
             nav_item = nav_by_path.get(base_route)

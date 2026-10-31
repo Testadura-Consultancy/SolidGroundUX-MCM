@@ -12,7 +12,8 @@
 #   Checksum : 79d99e8d7edd64d888f645dcab8e419648e9827af9fb8f10c28a0d78d2e081b7
 # Description:
 #   Registers host-management actions. Database administration is out of scope.
-#   Live installation and integration validation are deferred to a test host.
+#   Installation and client connectivity have been validated on test servers;
+ #   broader recovery and multi-host scenarios remain separate checks.
 # ==================================================================================
 set -uo pipefail
 
@@ -39,7 +40,9 @@ set -uo pipefail
         #   Exits with code 2 when executed instead of sourced.
         #
         # . Usage
+        #   ```bash
         #   _sgnd_lib_guard
+        #   ```
     _sgnd_lib_guard() {
         local lib_base=""
         local guard=""
@@ -71,12 +74,14 @@ set -uo pipefail
     SGND_MODULE_NAME="$SGND_MARIADB_MODULE_NAME"
 
 # - Management dispatch -------------------------------------------------------------
+    # fn: _maria_run_manage - Manage maria run in the MariaDB workflow.
     _maria_run_manage() {
         local action="${1:?missing action}"
         _sgnd_run_module_script "manage-mariadb.sh" --action "$action"
     }
 
     # Mirror SQL Server composite-child tracking, including partial failures.
+    # fn: _maria_record_step - Record a MariaDB preparation step in the console action tracker.
     _maria_record_step() {
         if declare -F sgnd_console_record_action_result >/dev/null 2>&1; then
             sgnd_console_record_action_result "maria-$1" "$2" || true
@@ -92,7 +97,7 @@ set -uo pipefail
     # Returns:
     #   Installer exit status (nonzero when post-install verification fails).
     # Usage:
-    #   maria_prepare
+    # fn: maria_prepare - Prepare maria in the MariaDB workflow.
     maria_prepare() {
         local rc=0
         local had_instance=0
@@ -124,23 +129,158 @@ set -uo pipefail
         fi
         return 0
     }
+    # fn: maria_repository - Forward the `repository` action to the MariaDB manager.
+        #
+        # . Returns
+        #   The status returned by the delegated action.
+        #
+        # . Usage
+        #   ```bash
+        #   maria_repository
+        #   ```
     maria_repository() { _maria_run_manage repository; }
+    # fn: maria_install - Forward the `install` action to the MariaDB manager.
+        #
+        # . Returns
+        #   The status returned by the delegated action.
+        #
+        # . Usage
+        #   ```bash
+        #   maria_install
+        #   ```
     maria_install() { _maria_run_manage install; }
+    # fn: maria_configure - Forward the `configure` action to the MariaDB manager.
+        #
+        # . Returns
+        #   The status returned by the delegated action.
+        #
+        # . Usage
+        #   ```bash
+        #   maria_configure
+        #   ```
     maria_configure() { _maria_run_manage configure; }
+    # fn: maria_tools - Forward the `tools` action to the MariaDB manager.
+        #
+        # . Returns
+        #   The status returned by the delegated action.
+        #
+        # . Usage
+        #   ```bash
+        #   maria_tools
+        #   ```
     maria_tools() { _maria_run_manage tools; }
+    # fn: maria_storage - Forward the `storage` action to the MariaDB manager.
+        #
+        # . Returns
+        #   The status returned by the delegated action.
+        #
+        # . Usage
+        #   ```bash
+        #   maria_storage
+        #   ```
     maria_storage() { _maria_run_manage storage; }
+    # fn: maria_network - Forward the `network` action to the MariaDB manager.
+        #
+        # . Returns
+        #   The status returned by the delegated action.
+        #
+        # . Usage
+        #   ```bash
+        #   maria_network
+        #   ```
     maria_network() { _maria_run_manage network; }
+    # fn: maria_memory - Forward the `memory` action to the MariaDB manager.
+        #
+        # . Returns
+        #   The status returned by the delegated action.
+        #
+        # . Usage
+        #   ```bash
+        #   maria_memory
+        #   ```
     maria_memory() { _maria_run_manage memory; }
+    # fn: maria_access - Forward the `access` action to the MariaDB manager.
+        #
+        # . Returns
+        #   The status returned by the delegated action.
+        #
+        # . Usage
+        #   ```bash
+        #   maria_access
+        #   ```
     maria_access() { _maria_run_manage access; }
+    # fn: maria_service - Forward the `service` action to the MariaDB manager.
+        #
+        # . Returns
+        #   The status returned by the delegated action.
+        #
+        # . Usage
+        #   ```bash
+        #   maria_service
+        #   ```
     maria_service() { _maria_run_manage service; }
+    # fn: maria_firewall - Forward the `firewall` action to the MariaDB manager.
+        #
+        # . Returns
+        #   The status returned by the delegated action.
+        #
+        # . Usage
+        #   ```bash
+        #   maria_firewall
+        #   ```
     maria_firewall() { _maria_run_manage firewall; }
+    # fn: maria_validate - Forward the `validate` action to the MariaDB manager.
+        #
+        # . Returns
+        #   The status returned by the delegated action.
+        #
+        # . Usage
+        #   ```bash
+        #   maria_validate
+        #   ```
     maria_validate() { _maria_run_manage validate; }
+    # fn: maria_status - Forward the `status` action to the MariaDB manager.
+        #
+        # . Returns
+        #   The status returned by the delegated action.
+        #
+        # . Usage
+        #   ```bash
+        #   maria_status
+        #   ```
     maria_status() { _maria_run_manage status; }
+    # fn: maria_logs - Forward the `logs` action to the MariaDB manager.
+        #
+        # . Returns
+        #   The status returned by the delegated action.
+        #
+        # . Usage
+        #   ```bash
+        #   maria_logs
+        #   ```
     maria_logs() { _maria_run_manage logs; }
+    # fn: maria_backup - Forward the `backup` action to the MariaDB manager.
+        #
+        # . Returns
+        #   The status returned by the delegated action.
+        #
+        # . Usage
+        #   ```bash
+        #   maria_backup
+        #   ```
     maria_backup() { _maria_run_manage backup; }
 
 # - Module validation contract ------------------------------------------------------
     # 0=passed, 1=failed, 2=warning, 3=skipped/not applicable.
+    # fn: validate_module_mariadb - Validate the MariaDB module and record its status for the console.
+        #
+        # . Returns
+        #   A console validation status (0=pass, 1=fail, 2=warning, 3=skipped).
+        #
+        # . Usage
+        #   ```bash
+        #   validate_module_mariadb
+        #   ```
     validate_module_mariadb() {
         if ! dpkg-query -W -f='${Status}' mariadb-server 2>/dev/null | grep -q '^install ok installed$'; then
             SGND_MODULE_VALIDATION_MESSAGE="MariaDB is not installed on this host."

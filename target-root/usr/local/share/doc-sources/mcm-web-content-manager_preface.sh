@@ -7,7 +7,8 @@
 #   Checksum    : e45f0a3b2855451181c98dc0ba3a02bf92b3c5f01f0b6dc7142094906c936031
 #   Source      : web-content-manager_preface.sh
 #   Type        : documentation
-#   Group       : Web Content Manager
+#   Group       : Role Managers
+#   Subgroup    : Web Content Management
 #   Purpose     : Group preface
 #
 # Attribution:

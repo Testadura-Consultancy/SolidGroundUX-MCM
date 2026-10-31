@@ -16,6 +16,17 @@
 #   Implements persistent Active Directory client management actions exposed by the
 #   25-active-directory-client Management Console module.
 #
+# Usage:
+#   Run the executable from its shell command (or installed wrapper):
+#   ```bash
+#   manage-active-directory-client --action status
+#   manage-active-directory-client --action validate
+#   manage-active-directory-client --dryrun --action reconcile
+#   ```
+#
+#   Script-specific options:
+#   - `--action NAME`, `-a`: Management action (supported actions: `join-all`, `install`, `preflight`, `dns`, `identity`, `discover`, `join`, `sssd`, `register`, `reconcile`, `validate`, `status`, `leave`).
+#
 # Attribution:
 #   Developers    : Mark Fieten
 #   Company       : Testadura Consultancy
@@ -57,7 +68,9 @@ set -uo pipefail
         #   be found, or the executable common library is unreadable.
         #
         # . Usage
+        #   ```bash
         #   _framework_locator || return $?
+        #   ```
     _framework_locator() {
         local script_file=""
         local path_without_root=""
@@ -119,6 +132,7 @@ set -uo pipefail
         # shellcheck source=/dev/null
         source "$exe_common"
     }
+    # fn: _load_ad_management_library - Load ad management library in the Active Directory workflow.
     _load_ad_management_library() {
         local script_file="" path_without_root="" component="" app_root="" lib_file=""
         local index=0 root_index=-1
@@ -193,7 +207,9 @@ set -uo pipefail
     SGND_ADC_FQDN=""
 
 # - Internal helpers ---------------------------------------------------------------
+    # fn: _adc_validate_realm - Validate a realm name using the shared AD validation helper.
     _adc_validate_realm() { sgnd_ad_validate_realm "$@"; }
+    # fn: _adc_validate_account - Validate a domain account name using the shared AD validation helper.
     _adc_validate_account() { sgnd_ad_validate_account "$@"; }
 
     # fn: _adc_collect_context - Collect Active Directory client join context
@@ -242,7 +258,9 @@ set -uo pipefail
         #   0 when context exists or can be collected; non-zero otherwise.
         #
         # . Usage
+        #   ```bash
         #   _adc_require_context
+        #   ```
     _adc_require_context() {
         [[ -n "$SGND_ADC_REALM" && -n "$SGND_ADC_DNS_SERVER" && -n "$SGND_ADC_IP" ]] && return 0
         _adc_collect_context
@@ -256,7 +274,9 @@ set -uo pipefail
         #   0 on success or dry-run; non-zero on package or command validation failure.
         #
         # . Usage
+        #   ```bash
         #   _adc_step_install_packages
+        #   ```
     _adc_step_install_packages() {
         if (( ${FLAG_DRYRUN:-0} == 1 )); then sayinfo "DRYRUN: Would install Active Directory client prerequisites."; return 0; fi
         sudo apt-get update || return 1
@@ -273,7 +293,9 @@ set -uo pipefail
         #   0 when the join may continue; non-zero otherwise.
         #
         # . Usage
+        #   ```bash
         #   _adc_step_preflight
+        #   ```
     _adc_step_preflight() {
         _adc_collect_context || return 1
         if sgnd_ad_is_domain_member; then
@@ -291,7 +313,9 @@ set -uo pipefail
         #   0 when DNS is configured and authoritative; non-zero otherwise.
         #
         # . Usage
+        #   ```bash
         #   _adc_step_dns
+        #   ```
     _adc_step_dns() {
         _adc_require_context || return 1
         local identity_script=""
@@ -318,7 +342,9 @@ set -uo pipefail
         #   0 when hostname -f matches the expected client FQDN; non-zero otherwise.
         #
         # . Usage
+        #   ```bash
         #   _adc_step_identity
+        #   ```
     _adc_step_identity() {
         local tmp_file=""
         _adc_require_context || return 1
@@ -345,7 +371,9 @@ set -uo pipefail
         #   0 when all required services are discoverable; non-zero otherwise.
         #
         # . Usage
+        #   ```bash
         #   _adc_step_discover
+        #   ```
     _adc_step_discover() {
         _adc_require_context || return 1
         realm discover "$SGND_ADC_REALM" >/dev/null 2>&1 || { sayfail "The realm could not be discovered."; return 1; }
@@ -364,7 +392,9 @@ set -uo pipefail
         #   1 otherwise.
         #
         # . Usage
+        #   ```bash
         #   _adc_host_keytab_valid
+        #   ```
     _adc_host_keytab_valid() {
         sudo test -s /etc/krb5.keytab || return 1
         sudo klist -kte /etc/krb5.keytab >/dev/null 2>&1 || return 1
@@ -389,7 +419,9 @@ set -uo pipefail
         #   0 when the keytab is already valid or repaired successfully; non-zero otherwise.
         #
         # . Usage
+        #   ```bash
         #   _adc_ensure_host_keytab
+        #   ```
     _adc_ensure_host_keytab() {
         local realm=""
         local fqdn=""
@@ -452,7 +484,9 @@ set -uo pipefail
         #   0 when realm membership validates; non-zero or the realm command status otherwise.
         #
         # . Usage
+        #   ```bash
         #   _adc_step_join
+        #   ```
     _adc_step_join() {
         _adc_require_context || return 1
         (( ${FLAG_DRYRUN:-0} == 1 )) && { sayinfo "DRYRUN: Would join $SGND_ADC_REALM as $SGND_ADC_ACCOUNT."; return 0; }
@@ -475,7 +509,9 @@ set -uo pipefail
         #   0 when the SSSD configuration is valid and the service is active; non-zero otherwise.
         #
         # . Usage
+        #   ```bash
         #   _adc_step_sssd
+        #   ```
     _adc_step_sssd() {
         (( ${FLAG_DRYRUN:-0} == 1 )) && { sayinfo "DRYRUN: Would normalize, validate, and restart SSSD."; return 0; }
         sgnd_ad_normalize_sssd_config || return $?
@@ -485,6 +521,7 @@ set -uo pipefail
         sayok "SSSD is active."
     }
 
+    # fn: _adc_dns_record_matches - Verify that the client hostname resolves to its expected IPv4 address.
     _adc_dns_record_matches() { sgnd_ad_dns_a_record_matches "$SGND_ADC_FQDN" "$SGND_ADC_IP" "$SGND_ADC_DNS_SERVER"; }
 
     # fn: _adc_step_register_dns
@@ -495,7 +532,9 @@ set -uo pipefail
         #   0 when the record already exists or is successfully registered; non-zero otherwise.
         #
         # . Usage
+        #   ```bash
         #   _adc_step_register_dns
+        #   ```
     _adc_step_register_dns() {
         _adc_require_context || return 1
         _adc_dns_record_matches && { sayok "Client DNS record is already registered."; return 0; }
@@ -530,7 +569,9 @@ set -uo pipefail
         #   29 when client DNS registration fails.
         #
         # . Usage
+        #   ```bash
         #   _adc_join_domain
+        #   ```
     _adc_join_domain() {
         local decision="No"
 
@@ -727,7 +768,9 @@ set -uo pipefail
         #   0 after displaying available status information.
         #
         # . Usage
+        #   ```bash
         #   _adc_status
+        #   ```
     _adc_status() {
         local realm=""
         realm="$(realm list --name-only 2>/dev/null | head -n 1)"
@@ -746,7 +789,9 @@ set -uo pipefail
         #   0 when not joined, cancelled, dry-run, or leave succeeds; otherwise the realm command status.
         #
         # . Usage
+        #   ```bash
         #   _adc_leave
+        #   ```
     _adc_leave() {
         local realm="" decision="No"
         realm="$(realm list --name-only 2>/dev/null | head -n 1)"
@@ -759,10 +804,12 @@ set -uo pipefail
 
 
 # - Action dispatch ----------------------------------------------------------------
+    # fn: _adc_action_is_mutating - Identify AD client actions that change the host or domain configuration.
     _adc_action_is_mutating() {
         case "${1:-}" in join-all|install|dns|identity|join|sssd|register|reconcile|leave) return 0 ;; *) return 1 ;; esac
     }
 
+    # fn: _adc_run_action - Dispatch an Active Directory client-management action.
     _adc_run_action() {
         local action="${1:?missing action}" rc=0
         case "$action" in
@@ -788,6 +835,7 @@ set -uo pipefail
     }
 
 # - Main ---------------------------------------------------------------------------
+    # fn: main - Dispatch command-line options to the appropriate management workflow.
     main() {
         local action=""
         _framework_locator || return $?

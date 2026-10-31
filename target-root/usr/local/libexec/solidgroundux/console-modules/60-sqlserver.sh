@@ -41,7 +41,9 @@ set -uo pipefail
         #   Exits with code 2 when executed instead of sourced.
         #
         # . Usage
+        #   ```bash
         #   _sgnd_lib_guard
+        #   ```
     _sgnd_lib_guard() {
         local lib_base=""
         local guard=""
@@ -72,6 +74,7 @@ set -uo pipefail
     SGND_MODULE_ID="$SGND_SQLSERVER_MODULE_ID"
     SGND_MODULE_NAME="$SGND_SQLSERVER_MODULE_NAME"
 # - Management dispatch -------------------------------------------------------------
+    # fn: _sqlserver_run_manage - Run manage in the SQL Server workflow.
     _sqlserver_run_manage() {
         local action="${1:?missing action}"
         _sgnd_run_module_script "manage-sqlserver.sh" --action "$action"
@@ -86,7 +89,9 @@ set -uo pipefail
         #   0 always; tracking is best-effort when the console tracker is unavailable.
         #
         # . Usage
+        #   ```bash
         #   _sqlserver_record_prepare_step "sql-repo" 0
+        #   ```
     _sqlserver_record_prepare_step() {
         local item_key="${1:?missing item key}"
         local result_code="${2:-0}"
@@ -112,7 +117,9 @@ set -uo pipefail
         #   0 on success, 2 on user cancellation, or a workflow failure code.
         #
         # . Usage
+        #   ```bash
         #   sqlserver_prepare
+        #   ```
     sqlserver_prepare() {
         local rc=0
 
@@ -156,16 +163,115 @@ set -uo pipefail
 
         return "$rc"
     }
+    # fn: sqlserver_repository - Call `_sqlserver_run_manage` with the `repository` action.
+        #
+        # . Returns
+        #   The status returned by the delegated action.
+        #
+        # . Usage
+        #   ```bash
+        #   sqlserver_repository
+        #   ```
     sqlserver_repository()        { _sqlserver_run_manage repository; }
+    # fn: sqlserver_install - Call `_sqlserver_run_manage` with the `install` action.
+        #
+        # . Returns
+        #   The status returned by the delegated action.
+        #
+        # . Usage
+        #   ```bash
+        #   sqlserver_install
+        #   ```
     sqlserver_install()           { _sqlserver_run_manage install; }
+    # fn: sqlserver_configure - Call `_sqlserver_run_manage` with the `configure` action.
+        #
+        # . Returns
+        #   The status returned by the delegated action.
+        #
+        # . Usage
+        #   ```bash
+        #   sqlserver_configure
+        #   ```
     sqlserver_configure()         { _sqlserver_run_manage configure; }
+    # fn: sqlserver_storage - Call `_sqlserver_run_manage` with the `storage` action.
+        #
+        # . Returns
+        #   The status returned by the delegated action.
+        #
+        # . Usage
+        #   ```bash
+        #   sqlserver_storage
+        #   ```
     sqlserver_storage()           { _sqlserver_run_manage storage; }
+    # fn: sqlserver_network - Call `_sqlserver_run_manage` with the `network` action.
+        #
+        # . Returns
+        #   The status returned by the delegated action.
+        #
+        # . Usage
+        #   ```bash
+        #   sqlserver_network
+        #   ```
     sqlserver_network()           { _sqlserver_run_manage network; }
+    # fn: sqlserver_memory - Call `_sqlserver_run_manage` with the `memory` action.
+        #
+        # . Returns
+        #   The status returned by the delegated action.
+        #
+        # . Usage
+        #   ```bash
+        #   sqlserver_memory
+        #   ```
     sqlserver_memory()            { _sqlserver_run_manage memory; }
+    # fn: sqlserver_service - Call `_sqlserver_run_manage` with the `service` action.
+        #
+        # . Returns
+        #   The status returned by the delegated action.
+        #
+        # . Usage
+        #   ```bash
+        #   sqlserver_service
+        #   ```
     sqlserver_service()           { _sqlserver_run_manage service; }
+    # fn: sqlserver_firewall - Call `_sqlserver_run_manage` with the `firewall` action.
+        #
+        # . Returns
+        #   The status returned by the delegated action.
+        #
+        # . Usage
+        #   ```bash
+        #   sqlserver_firewall
+        #   ```
     sqlserver_firewall()          { _sqlserver_run_manage firewall; }
+    # fn: sqlserver_tools - Call `_sqlserver_run_manage` with the `tools` action.
+        #
+        # . Returns
+        #   The status returned by the delegated action.
+        #
+        # . Usage
+        #   ```bash
+        #   sqlserver_tools
+        #   ```
     sqlserver_tools()             { _sqlserver_run_manage tools; }
+    # fn: sqlserver_validate - Call `_sqlserver_run_manage` with the `validate` action.
+        #
+        # . Returns
+        #   The status returned by the delegated action.
+        #
+        # . Usage
+        #   ```bash
+        #   sqlserver_validate
+        #   ```
     sqlserver_validate()          { _sqlserver_run_manage validate; }
+    # fn: sqlserver_status - Call `_sqlserver_run_manage` with the `status` action.
+        #
+        # . Returns
+        #   The status returned by the delegated action.
+        #
+        # . Usage
+        #   ```bash
+        #   sqlserver_status
+        #   ```
     sqlserver_status()            { _sqlserver_run_manage status; }
 
 # - Module validation contract ------------------------------------------------------
@@ -177,6 +283,15 @@ set -uo pipefail
     #
     # Every validator sets SGND_MODULE_VALIDATION_MESSAGE to a concise result summary.
     # Detailed diagnostic output may be written by the validator or delegated action.
+    # fn: validate_module_sql_server - Validate the SQL Server module and record its status for the console.
+        #
+        # . Returns
+        #   A console validation status (0=pass, 1=fail, 2=warning, 3=skipped).
+        #
+        # . Usage
+        #   ```bash
+        #   validate_module_sql_server
+        #   ```
     validate_module_sql_server() {
         if [[ ! -x /opt/mssql/bin/sqlservr ]]; then
             SGND_MODULE_VALIDATION_MESSAGE="SQL Server is not installed on this host."

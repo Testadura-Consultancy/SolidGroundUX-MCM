@@ -3,6 +3,25 @@
   const shell = document.querySelector('.doc-shell');
   const nav = document.querySelector('.doc-nav');
   const grip = document.querySelector('.doc-nav-resizer');
+
+  // A section label opens its page (or first published descendant), while
+  // the chevron retains the native details expand/collapse behavior.
+  // Nested links inside <summary> alone are not a reliable click target for
+  // the entire label row, so make the two actions explicit.
+  if (nav) nav.addEventListener('click', event => {
+    if (!(event.target instanceof Element)) return;
+    const summary = event.target.closest('details.wc-nav-group > summary');
+    if (!summary || !nav.contains(summary)) return;
+    if (event.target.closest('.wc-nav-arrow')) return;
+    // Preserve keyboard operation and browser new-tab/modifier behavior.
+    if (event.detail === 0 || event.button !== 0 ||
+        event.ctrlKey || event.metaKey || event.altKey || event.shiftKey) return;
+    const destination = summary.querySelector('a[href]');
+    if (!destination) return;
+    event.preventDefault();
+    window.location.assign(destination.href);
+  });
+
   if (!shell || !nav || !grip) return;
   const key = 'solidgroundux-doc-sidebar-width';
   const defaultWidth = 350;

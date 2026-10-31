@@ -18,6 +18,17 @@
 #   remain in manage-samba-shares.sh; directory lifecycle/access remain in
 #   manage-samba-directories.sh.
 #
+# Usage:
+#   Run the executable from its shell command (or installed wrapper):
+#   ```bash
+#   manage-samba-file-server --action prepare
+#   manage-samba-file-server --dryrun --action prepare
+#   manage-samba-file-server --action validate
+#   ```
+#
+#   Script-specific options:
+#   - `--action NAME`, `-a`: Management action (supported actions: `prepare`, `install`, `authentication`, `storage`, `share-root`, `service`, `validate`, `status`).
+#
 # Attribution:
 #   Developers    : Mark Fieten
 #   Company       : Testadura Consultancy
@@ -59,7 +70,9 @@ set -uo pipefail
         #   be found, or the executable common library is unreadable.
         #
         # . Usage
+        #   ```bash
         #   _framework_locator || return $?
+        #   ```
     _framework_locator() {
         local script_file=""
         local path_without_root=""
@@ -127,7 +140,9 @@ set -uo pipefail
         #   0 when the project Active Directory management library is loaded.
         #
         # . Usage
+        #   ```bash
         #   _load_ad_management || return $?
+        #   ```
     _load_ad_management() {
         local app_root=""
         local lib_file=""
@@ -207,10 +222,12 @@ set -uo pipefail
     SGND_SSSD_CONFIG="/etc/sssd/sssd.conf"
 
 # - Helpers -------------------------------------------------------------------------
+    # fn: _dryrun_complete - Report the dry-run result without executing the requested host change.
     _dryrun_complete() {
         sayok "DRYRUN complete. The changes shown above would have been applied; no changes were written."
     }
 
+    # fn: _smb_refresh_storage_paths - Refresh Samba storage paths using the saved storage configuration.
     _smb_refresh_storage_paths() {
         local mountpoint=""
         local device=""
@@ -255,6 +272,7 @@ set -uo pipefail
         SGND_SAMBA_SHARE_ROOT="$mountpoint/shares"
     }
 
+    # fn: _smb_require_storage - Require the configured Samba storage mount to be available.
     _smb_require_storage() {
         _smb_refresh_storage_paths
         mountpoint -q "$SGND_SAMBA_STORAGE_ROOT" || {
@@ -264,6 +282,7 @@ set -uo pipefail
         return 0
     }
 
+    # fn: _smb_list_managed_shares_raw - Enumerate managed Samba shares from the current Samba configuration.
     _smb_list_managed_shares_raw() {
         _smb_refresh_storage_paths
         local share_name=""
@@ -427,7 +446,9 @@ set -uo pipefail
         #   0 always.
         #
         # . Usage
+        #   ```bash
         #   mode="$(_smb_auth_mode)"
+        #   ```
     _smb_auth_mode() {
         local security=""
 
@@ -452,7 +473,9 @@ set -uo pipefail
         #   0 when the FQDN resolves to the primary IPv4 address; non-zero otherwise.
         #
         # . Usage
+        #   ```bash
         #   _smb_validate_hostname_dns || return $?
+        #   ```
     _smb_validate_hostname_dns() {
         local fqdn=""
         local ip=""
@@ -490,7 +513,9 @@ set -uo pipefail
         #   0 when smb.conf is updated; non-zero on rewrite/install failure.
         #
         # . Usage
+        #   ```bash
         #   _smb_write_auth_config ad TESTADURA.HQ TESTADURA
+        #   ```
     _smb_write_auth_config() {
         local mode="${1:?missing authentication mode}"
         local realm="${2:-}"
@@ -519,6 +544,12 @@ set -uo pipefail
                     || key == "winbind refresh tickets" \
                     || key ~ /^idmap config[[:space:]].*/
             }
+            # fn: emit_settings - Write Samba configuration settings to the generated configuration output.
+                #
+                # . Usage
+                #   ```bash
+                #   emit_settings
+                #   ```
             function emit_settings() {
                 if (emitted) return
                 print ""
@@ -597,7 +628,9 @@ set -uo pipefail
         #   0 when the setting is present, validated, and active; non-zero otherwise.
         #
         # . Usage
+        #   ```bash
         #   _smb_enable_sssd_samba_password_sync TESTADURA.HQ
+        #   ```
     _smb_enable_sssd_samba_password_sync() {
         local realm="${1:?missing realm}"
         local domain_section="domain/${realm,,}"
@@ -660,6 +693,12 @@ set -uo pipefail
 
         awk -v section="[$domain_section]" '
             BEGIN { in_domain=0; saw_domain=0; found=0 }
+            # fn: emit_setting - Write one Samba configuration setting to the generated configuration output.
+                #
+                # . Usage
+                #   ```bash
+                #   emit_setting
+                #   ```
             function emit_setting() {
                 if (!found) {
                     print "ad_update_samba_machine_account_password = true"
@@ -814,7 +853,9 @@ set -uo pipefail
         #   0 when Samba validates its ADS machine trust; non-zero otherwise.
         #
         # . Usage
+        #   ```bash
         #   _smb_establish_ads_trust TESTADURA.HQ
+        #   ```
     _smb_establish_ads_trust() {
         local realm="${1:?missing realm}"
         local join_account="Administrator"
@@ -885,7 +926,9 @@ set -uo pipefail
         #   Non-zero when configuration, trust establishment, or validation fails.
         #
         # . Usage
+        #   ```bash
         #   _smb_configure_authentication
+        #   ```
     _smb_configure_authentication() {
         local mode="standalone"
         local realm=""
@@ -1030,6 +1073,7 @@ set -uo pipefail
     }
 
 # - Actions -------------------------------------------------------------------------
+    # fn: _smb_install_packages - Install packages needed for the selected Samba server role.
     _smb_install_packages() {
         local -a packages=(acl attr samba samba-common-bin smbclient)
 
@@ -1055,11 +1099,13 @@ set -uo pipefail
         sayok "Samba file-server prerequisites installed."
     }
 
+    # fn: _smb_validate_storage - Validate the configured storage mount before Samba provisioning.
     _smb_validate_storage() {
         _smb_require_storage || return 1
         sayok "Storage is mounted and available for Samba file services."
     }
 
+    # fn: _smb_prepare_share_root - Prepare the configured Samba share root with required permissions.
     _smb_prepare_share_root() {
         _smb_refresh_storage_paths
         _smb_require_storage || return 1
@@ -1080,6 +1126,7 @@ set -uo pipefail
         sayok "Samba share root prepared at $SGND_SAMBA_SHARE_ROOT."
     }
 
+    # fn: _smb_start_service - Manage the service for smb start in the Samba workflow.
     _smb_start_service() {
         if (( ${FLAG_DRYRUN:-0} == 1 )); then
             if command -v testparm >/dev/null 2>&1; then
@@ -1112,6 +1159,7 @@ set -uo pipefail
         sayok "Samba file-server service is active."
     }
 
+    # fn: _smb_prepare_file_server - Run the ordered Samba file-server preparation workflow.
     _smb_prepare_file_server() {
         sgnd_print
         sgnd_print_sectionheader --text "Prepare Samba File Server"
@@ -1287,6 +1335,7 @@ set -uo pipefail
         return 1
     }
 
+    # fn: _smb_status - Inspect status for smb in the Samba workflow.
     _smb_status() {
         _smb_refresh_storage_paths
         local service_state="not installed"
@@ -1344,6 +1393,7 @@ set -uo pipefail
         sgnd_print
     }
 
+    # fn: _run_action - Dispatch the requested management action to its implementation.
     _run_action() {
         local action="${1:?missing action}"
 
@@ -1364,6 +1414,7 @@ set -uo pipefail
     }
 
 # - Main ---------------------------------------------------------------------------
+    # fn: main - Dispatch command-line options to the appropriate management workflow.
     main() {
         local action=""
         local selection=""

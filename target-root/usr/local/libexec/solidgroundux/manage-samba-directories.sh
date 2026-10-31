@@ -18,6 +18,13 @@
 #   Samba configuration and displayed with their share names. Share-level access remains
 #   owned by manage-samba-shares.sh.
 #
+# Usage:
+#   Run the executable from its shell command (or installed wrapper):
+#   ```bash
+#   manage-samba-directories
+#   manage-samba-directories --dryrun
+#   ```
+#
 # Attribution:
 #   Developers    : Mark Fieten
 #   Company       : Testadura Consultancy
@@ -59,7 +66,9 @@ set -uo pipefail
         #   be found, or the executable common library is unreadable.
         #
         # . Usage
+        #   ```bash
         #   _framework_locator || return $?
+        #   ```
     _framework_locator() {
         local script_file=""
         local path_without_root=""
@@ -126,7 +135,9 @@ set -uo pipefail
         # . Returns
         #   0 when the project Active Directory management library is loaded.
         # . Usage
+        #   ```bash
         #   _load_ad_management || return $?
+        #   ```
     _load_ad_management() {
         local app_root=""
         local lib_file=""
@@ -207,7 +218,9 @@ set -uo pipefail
         # . Returns
         #   0 after SGND_SAMBA_SHARE_ROOT is refreshed.
         # . Usage
+        #   ```bash
         #   _refresh_storage_paths
+        #   ```
     _refresh_storage_paths() {
         local mountpoint=""
         local device=""
@@ -254,7 +267,9 @@ set -uo pipefail
         # . Returns
         #   0 when a matching share exists; 1 otherwise.
         # . Usage
+        #   ```bash
         #   share="$(_share_name_for_path "$path")"
+        #   ```
     _share_name_for_path() {
         local candidate="${1:?missing directory path}"
         local share=""
@@ -282,7 +297,9 @@ set -uo pipefail
         # . Returns
         #   0 when one or more directories exist; 1 otherwise.
         # . Usage
+        #   ```bash
         #   _refresh_directory_catalog || return 0
+        #   ```
     _refresh_directory_catalog() {
         local path=""
         local relative=""
@@ -315,7 +332,9 @@ set -uo pipefail
         # . Returns
         #   0 always.
         # . Usage
+        #   ```bash
         #   selected_text="$(_selected_directory_text)"
+        #   ```
     _selected_directory_text() {
         local path=""
         local text=""
@@ -332,7 +351,9 @@ set -uo pipefail
         # . Returns
         #   0 on selection; 1 on cancel or empty catalog.
         # . Usage
+        #   ```bash
         #   _select_directories || return 0
+        #   ```
     _select_directories() {
         local selected_label=""
         local index=0
@@ -357,7 +378,9 @@ set -uo pipefail
         # . Returns
         #   0 when selected; 1 otherwise.
         # . Usage
+        #   ```bash
         #   _require_directory_selection || return $?
+        #   ```
     _require_directory_selection() {
         (( ${#SELECTED_DIRECTORIES[@]} > 0 )) || { saywarning "Select one or more directories first."; return 1; }
     }
@@ -368,7 +391,9 @@ set -uo pipefail
         # . Returns
         #   0 when exported; 1 otherwise.
         # . Usage
+        #   ```bash
         #   _directory_is_share_root "$path"
+        #   ```
     _directory_is_share_root() {
         _share_name_for_path "${1:?missing directory path}" >/dev/null 2>&1
     }
@@ -380,7 +405,9 @@ set -uo pipefail
         # . Returns
         #   0 always.
         # . Usage
+        #   ```bash
         #   mode="$(_runtime_auth_mode)"
+        #   ```
     _runtime_auth_mode() {
         local security=""
         security="$(sudo testparm -s --parameter-name security 2>/dev/null || true)"
@@ -391,7 +418,9 @@ set -uo pipefail
         # . Returns
         #   0 when a usable ticket exists; 1 otherwise.
         # . Usage
+        #   ```bash
         #   _ensure_kerberos_ticket
+        #   ```
     _ensure_kerberos_ticket() {
         local realm=""
         local username="Administrator"
@@ -420,7 +449,9 @@ set -uo pipefail
         # . Returns
         #   0 with one or more identities; 1 on discovery failure.
         # . Usage
+        #   ```bash
         #   _discover_ad_identities group DISCOVERED_GROUPS
+        #   ```
     _discover_ad_identities() {
         local type="${1:?missing identity type}"
         local output_var="${2:?missing output array variable}"
@@ -474,7 +505,9 @@ set -uo pipefail
         # . Returns
         #   0 after enumeration.
         # . Usage
+        #   ```bash
         #   mapfile -t groups < <(_list_local_access_groups_raw)
+        #   ```
     _list_local_access_groups_raw() {
         local group=""
         local gid=""
@@ -502,7 +535,9 @@ set -uo pipefail
         # . Returns
         #   0 on selection; 1 on cancel/discovery failure.
         # . Usage
+        #   ```bash
         #   _select_identities user users || return 0
+        #   ```
     _select_identities() {
         local type="${1:?missing identity type}"
         local output_var="${2:?missing output array variable}"
@@ -561,7 +596,9 @@ set -uo pipefail
         # . Returns
         #   0 with a three-character permission mask; 1 on cancel.
         # . Usage
+        #   ```bash
         #   _select_permissions perms || return 0
+        #   ```
     _select_permissions() {
         local output_var="${1:?missing output variable}"
         local item=""
@@ -596,7 +633,9 @@ set -uo pipefail
         # . Returns
         #   0 after all selected ACLs are applied and verified; non-zero on any ACL failure.
         # . Usage
+        #   ```bash
         #   _grant_directory_access group
+        #   ```
     _grant_directory_access() {
         local type="${1:?missing identity type}"
         local identity=""
@@ -677,7 +716,9 @@ set -uo pipefail
         # . Returns
         #   0 always.
         # . Usage
+        #   ```bash
         #   mapfile -t identities < <(_assigned_identities group)
+        #   ```
     _assigned_identities() {
         local type="${1:?missing identity type}"
         local path=""
@@ -709,7 +750,9 @@ set -uo pipefail
         # . Returns
         #   0 after updates; non-zero on ACL failure.
         # . Usage
+        #   ```bash
         #   _remove_directory_access user
+        #   ```
     _remove_directory_access() {
         local type="${1:?missing identity type}"
         local identity=""
@@ -752,7 +795,9 @@ set -uo pipefail
         # . Returns
         #   0 always.
         # . Usage
+        #   ```bash
         #   access="$(_format_directory_permissions "rwx")"
+        #   ```
     _format_directory_permissions() {
         local perms="${1:----}"
         local access=""
@@ -781,7 +826,9 @@ set -uo pipefail
         # . Returns
         #   0 after display.
         # . Usage
+        #   ```bash
         #   _show_directory_access
+        #   ```
     _show_directory_access() {
         local path=""
         local share=""
@@ -856,7 +903,9 @@ set -uo pipefail
         # . Returns
         #   0 on success; non-zero on filesystem/ACL failure.
         # . Usage
+        #   ```bash
         #   _inherit_directory_access "$parent" "$child"
+        #   ```
     _inherit_directory_access() {
         local parent="${1:?missing parent directory}"
         local child="${2:?missing child directory}"
@@ -871,7 +920,9 @@ set -uo pipefail
         # . Returns
         #   0 when safe; 1 otherwise.
         # . Usage
+        #   ```bash
         #   _validate_relative_path "Files/Mark"
+        #   ```
     _validate_relative_path() {
         local relative_path="${1:-}"
         local part=""
@@ -890,7 +941,9 @@ set -uo pipefail
         # . Returns
         #   0 when the tree exists and newly created components inherited access.
         # . Usage
+        #   ```bash
         #   _create_directory_tree "$parent" "Files/Mark"
+        #   ```
     _create_directory_tree() {
         local parent="${1:?missing parent directory}"
         local relative="${2:?missing relative path}"
@@ -917,7 +970,9 @@ set -uo pipefail
         # . Returns
         #   0 on selection; 1 on cancel.
         # . Usage
+        #   ```bash
         #   _select_parent_directory parent || return 0
+        #   ```
     _select_parent_directory() {
         local output_var="${1:?missing output variable}"
         local selected=""
@@ -942,7 +997,9 @@ set -uo pipefail
         # . Returns
         #   0 after returning to manager; non-zero on creation failure.
         # . Usage
+        #   ```bash
         #   _create_directory
+        #   ```
     _create_directory() {
         local parent=""
         local relative=""
@@ -984,7 +1041,9 @@ set -uo pipefail
         # . Returns
         #   0 after returning to manager; non-zero on removal failure.
         # . Usage
+        #   ```bash
         #   _remove_directories
+        #   ```
     _remove_directories() {
         local path=""
         local decision="No"
@@ -1024,7 +1083,9 @@ set -uo pipefail
         # . Returns
         #   0 after display; 1 when no directories exist.
         # . Usage
+        #   ```bash
         #   _show_directories
+        #   ```
     _show_directories() {
         local label=""
         _refresh_directory_catalog || return 1
@@ -1043,7 +1104,9 @@ set -uo pipefail
         # . Returns
         #   0 when selected directories validate; 1 otherwise.
         # . Usage
+        #   ```bash
         #   _validate_selected_directories
+        #   ```
     _validate_selected_directories() {
         local path=""
         local result=""
@@ -1067,22 +1130,66 @@ set -uo pipefail
     }
 
 # - Menu ---------------------------------------------------------------------------
+    # fn: _dir_menu_show - Display dir menu in the Samba workflow.
     _dir_menu_show()          { _show_directories; }
+    # fn: _dir_menu_select - Select dir menu in the Samba workflow.
     _dir_menu_select()        { _select_directories; }
+    # fn: _dir_menu_create - Create dir menu in the Samba workflow.
     _dir_menu_create()        { _create_directory; }
+    # fn: _dir_menu_remove - Remove dir menu in the Samba workflow.
     _dir_menu_remove()        { _remove_directories; }
+    # fn: _dir_menu_show_access - Show access permissions for the selected Samba directory.
     _dir_menu_show_access()   { _show_directory_access; }
+    # fn: _dir_menu_grant_users - Call `_grant_directory_access` with the `user` action.
+        #
+        # . Returns
+        #   The status returned by the delegated action.
+        #
+        # . Usage
+        #   ```bash
+        #   _dir_menu_grant_users
+        #   ```
     _dir_menu_grant_users()   { _grant_directory_access user; }
+    # fn: _dir_menu_grant_groups - Call `_grant_directory_access` with the `group` action.
+        #
+        # . Returns
+        #   The status returned by the delegated action.
+        #
+        # . Usage
+        #   ```bash
+        #   _dir_menu_grant_groups
+        #   ```
     _dir_menu_grant_groups()  { _grant_directory_access group; }
+    # fn: _dir_menu_remove_users - Call `_remove_directory_access` with the `user` action.
+        #
+        # . Returns
+        #   The status returned by the delegated action.
+        #
+        # . Usage
+        #   ```bash
+        #   _dir_menu_remove_users
+        #   ```
     _dir_menu_remove_users()  { _remove_directory_access user; }
+    # fn: _dir_menu_remove_groups - Call `_remove_directory_access` with the `group` action.
+        #
+        # . Returns
+        #   The status returned by the delegated action.
+        #
+        # . Usage
+        #   ```bash
+        #   _dir_menu_remove_groups
+        #   ```
     _dir_menu_remove_groups() { _remove_directory_access group; }
+    # fn: _dir_menu_validate - Validate dir menu in the Samba workflow.
     _dir_menu_validate()      { _validate_selected_directories; }
 
     # fn: _build_menu - Build the directory-management menu for the current selection state
         # . Returns
         #   0 when menu registration succeeds.
         # . Usage
+        #   ```bash
         #   _build_menu
+        #   ```
     _build_menu() {
         local selection_state=2
         local selected_text=""
@@ -1118,7 +1225,9 @@ set -uo pipefail
         # . Returns
         #   0 after normal exit; non-zero on bootstrap or action failure.
         # . Usage
+        #   ```bash
         #   main "$@"
+        #   ```
     main() {
         local choice=""
         local dispatch_rc=0

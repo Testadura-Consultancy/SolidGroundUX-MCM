@@ -29,6 +29,17 @@
 #   - Business logic implementation (provided by the script author)
 #   - Library behavior (handled in /common modules)
 #
+# Usage:
+#   Run the executable from its shell command (or installed wrapper):
+#   ```bash
+#   manage-framework-state --action show
+#   manage-framework-state --action edit
+#   manage-framework-state --dryrun --action save
+#   ```
+#
+#   Script-specific options:
+#   - `--action NAME`, `-a`: Management action (choices: `show`, `edit`, `save`, `reload`).
+#
 # Attribution:
 #   Developers  : Mark Fieten
 #   Company     : Testadura Consultancy
@@ -69,7 +80,9 @@ set -uo pipefail
         #   be found, or the executable common library is unreadable.
         #
         # . Usage
+        #   ```bash
         #   _framework_locator || return $?
+        #   ```
     _framework_locator() {
         local script_file=""
         local path_without_root=""
@@ -296,6 +309,7 @@ set -uo pipefail
         #   - Reporting
         #   - Cleanup
 
+    # fn: _state_validate - Validate state in the Framework workflow.
     _state_validate() {
         [[ -n "${SGND_FRAMEWORK_STATEFILE:-}" ]] || {
             saywarning "SGND_FRAMEWORK_STATEFILE is not set"
@@ -307,6 +321,7 @@ set -uo pipefail
         }
     }
 
+    # fn: _state_show - Display state in the Framework workflow.
     _state_show() {
         local key=""
         _state_validate || return 1
@@ -319,6 +334,7 @@ set -uo pipefail
         done
     }
 
+    # fn: _state_edit - Edit state in the Framework workflow.
     _state_edit() {
         local key=""
         local -a fields=() original=()
@@ -341,6 +357,7 @@ set -uo pipefail
         sayok "Framework state saved"
     }
 
+    # fn: _state_save - Save state in the Framework workflow.
     _state_save() {
         _state_validate || return 1
         if (( ${FLAG_DRYRUN:-0} == 1 )); then
@@ -351,12 +368,14 @@ set -uo pipefail
         sayok "Framework state saved to $SGND_FRAMEWORK_STATEFILE"
     }
 
+    # fn: _state_reload - Reload saved Framework state into the configured state variables.
     _state_reload() {
         _state_validate || return 1
         sgnd_state_load_keys --file "$SGND_FRAMEWORK_STATEFILE" --array SGND_FRAMEWORK_STATE || return $?
         sayok "Framework state reloaded"
     }
 
+    # fn: _run_action - Dispatch the requested management action to its implementation.
     _run_action() {
         case "${1:?missing action}" in
             show)   _state_show ;;
@@ -386,7 +405,9 @@ set -uo pipefail
         #   Exits with the resulting status code from startup or script logic.
         #
         # . Usage
+        #   ```bash
         #   main "$@"
+        #   ```
     main() {
         local action=""
 

@@ -17,6 +17,13 @@
 #   standalone Samba share access. The overview shows Samba users together with their
 #   local group memberships so identity configuration can be reviewed at a glance.
 #
+# Usage:
+#   Run the executable from its shell command (or installed wrapper):
+#   ```bash
+#   manage-samba-users
+#   manage-samba-users --dryrun
+#   ```
+#
 # Attribution:
 #   Developers    : Mark Fieten
 #   Company       : Testadura Consultancy
@@ -58,7 +65,9 @@ set -uo pipefail
         #   be found, or the executable common library is unreadable.
         #
         # . Usage
+        #   ```bash
         #   _framework_locator || return $?
+        #   ```
     _framework_locator() {
         local script_file=""
         local path_without_root=""
@@ -151,7 +160,9 @@ set -uo pipefail
         # . Returns
         #   0 always.
         # . Usage
+        #   ```bash
         #   mode="$(_smb_runtime_auth_mode)"
+        #   ```
     _smb_runtime_auth_mode() {
         local security=""
         security="$(sudo testparm -s --parameter-name security 2>/dev/null || true)"
@@ -164,7 +175,9 @@ set -uo pipefail
         # . Returns
         #   0 for a supported name; 1 otherwise.
         # . Usage
+        #   ```bash
         #   _validate_identity_name "SambaUsers"
+        #   ```
     _validate_identity_name() {
         [[ "${1:-}" =~ ^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$ ]]
     }
@@ -175,7 +188,9 @@ set -uo pipefail
         # . Returns
         #   0 on selection; 1 on Q/back; 2 for invalid invocation.
         # . Usage
+        #   ```bash
         #   _smb_ask_selection --label "Select users" --var selected --multi --items "user1" "user2"
+        #   ```
     _smb_ask_selection() {
         local label="Select an option"
         local var_name="selection"
@@ -284,7 +299,9 @@ set -uo pipefail
         # . Returns
         #   pdbedit status.
         # . Usage
+        #   ```bash
         #   mapfile -t users < <(_list_local_samba_users_raw)
+        #   ```
     _list_local_samba_users_raw() {
         sudo pdbedit -L 2>/dev/null | cut -d: -f1 | LC_ALL=C sort -fu
     }
@@ -299,7 +316,9 @@ set -uo pipefail
         # . Returns
         #   0 after enumeration.
         # . Usage
+        #   ```bash
         #   mapfile -t groups < <(_list_local_groups_raw)
+        #   ```
     _list_local_groups_raw() {
         local group=""
         local gid=""
@@ -328,7 +347,9 @@ set -uo pipefail
         # . Returns
         #   0 always.
         # . Usage
+        #   ```bash
         #   groups="$(_user_group_memberships user1)"
+        #   ```
     _user_group_memberships() {
         local user="${1:?missing user}"
         local group_line=""
@@ -356,7 +377,9 @@ set -uo pipefail
         # . Returns
         #   0 on selection; 1 on back/no users.
         # . Usage
+        #   ```bash
         #   _select_local_samba_user user || return 0
+        #   ```
     _select_local_samba_user() {
         local output_var="${1:?missing output variable}"
         local selected=""
@@ -374,7 +397,9 @@ set -uo pipefail
         # . Returns
         #   0 on selection; 1 on back/no groups.
         # . Usage
+        #   ```bash
         #   _select_local_groups selected_groups || return 0
+        #   ```
     _select_local_groups() {
         local output_var="${1:?missing output array variable}"
         local -a available_groups=()
@@ -394,7 +419,9 @@ set -uo pipefail
         # . Returns
         #   0 on selection; 1 on back/no groups.
         # . Usage
+        #   ```bash
         #   _select_local_group group || return 0
+        #   ```
     _select_local_group() {
         local output_var="${1:?missing output variable}"
         local selected=""
@@ -412,7 +439,9 @@ set -uo pipefail
         # . Returns
         #   0 always.
         # . Usage
+        #   ```bash
         #   _pause_return
+        #   ```
     _pause_return() {
         local message="${1:-Press Enter to return to Samba user management.}"
         sgnd_print_sectionheader ""
@@ -429,7 +458,9 @@ set -uo pipefail
         # . Returns
         #   0 after rendering the overview.
         # . Usage
+        #   ```bash
         #   _show_identity_overview
+        #   ```
     _show_identity_overview() {
         local user=""
         local group=""
@@ -473,7 +504,9 @@ set -uo pipefail
         # . Returns
         #   0 after normal completion; non-zero on account-management failure.
         # . Usage
+        #   ```bash
         #   _create_samba_user
+        #   ```
     _create_samba_user() {
         local user=""
         local dlg_rc=0
@@ -508,7 +541,9 @@ set -uo pipefail
         # . Returns
         #   0 on success/back; non-zero on smbpasswd failure.
         # . Usage
+        #   ```bash
         #   _change_samba_password
+        #   ```
     _change_samba_password() {
         local user=""
         _select_local_samba_user user || return 0
@@ -521,7 +556,9 @@ set -uo pipefail
         # . Returns
         #   0 when all selected identities are removed/back; 1 when one or more removals fail.
         # . Usage
+        #   ```bash
         #   _remove_samba_users
+        #   ```
     _remove_samba_users() {
         local user=""
         local failures=0
@@ -550,7 +587,9 @@ set -uo pipefail
         # . Returns
         #   0 after normal completion; non-zero on groupadd failure.
         # . Usage
+        #   ```bash
         #   _create_local_group
+        #   ```
     _create_local_group() {
         local group=""
         local dlg_rc=0
@@ -583,7 +622,9 @@ set -uo pipefail
         # . Returns
         #   0 after success/back; 1 when one or more usermod operations fail.
         # . Usage
+        #   ```bash
         #   _add_users_to_group
+        #   ```
     _add_users_to_group() {
         local group=""
         local user=""
@@ -631,7 +672,9 @@ set -uo pipefail
         # . Returns
         #   0 after success/back; 1 when one or more gpasswd operations fail.
         # . Usage
+        #   ```bash
         #   _remove_users_from_group
+        #   ```
     _remove_users_from_group() {
         local group=""
         local member=""
@@ -686,7 +729,9 @@ set -uo pipefail
         # . Returns
         #   0 when all selected groups are removed/back; 1 when one or more removals fail.
         # . Usage
+        #   ```bash
         #   _remove_local_groups
+        #   ```
     _remove_local_groups() {
         local group=""
         local failures=0
@@ -707,20 +752,30 @@ set -uo pipefail
     }
 
 # - Menu ----------------------------------------------------------------------------
+    # fn: _smb_user_menu_overview - Display the Samba identity overview.
     _smb_user_menu_overview()       { _show_identity_overview; }
+    # fn: _smb_user_menu_create_user - Open the Samba user-creation workflow.
     _smb_user_menu_create_user()    { _create_samba_user; }
+    # fn: _smb_user_menu_password - Open the Samba user password-change workflow.
     _smb_user_menu_password()       { _change_samba_password; }
+    # fn: _smb_user_menu_remove_user - Open the Samba user-removal workflow.
     _smb_user_menu_remove_user()    { _remove_samba_users; }
+    # fn: _smb_user_menu_create_group - Open the local Samba group-creation workflow.
     _smb_user_menu_create_group()   { _create_local_group; }
+    # fn: _smb_user_menu_add_members - Add users to a selected Samba group through the menu action.
     _smb_user_menu_add_members()    { _add_users_to_group; }
+    # fn: _smb_user_menu_remove_members - Remove selected members from a Samba group.
     _smb_user_menu_remove_members() { _remove_users_from_group; }
+    # fn: _smb_user_menu_remove_group - Remove selected local groups through the menu action.
     _smb_user_menu_remove_group()   { _remove_local_groups; }
 
     # fn: _build_menu - Build the standalone Samba identity-management menu
         # . Returns
         #   0 when menu registration succeeds.
         # . Usage
+        #   ```bash
         #   _build_menu
+        #   ```
     _build_menu() {
         sgnd_menu_create "Manage Samba Users" "Standalone Samba users, groups, and memberships"
         SGND_MENU_SHOW_TOGGLEBAR=0
@@ -749,7 +804,9 @@ set -uo pipefail
         # . Returns
         #   0 after normal exit; non-zero on bootstrap/action failure.
         # . Usage
+        #   ```bash
         #   main "$@"
+        #   ```
     main() {
         local choice=""
         local dispatch_rc=0

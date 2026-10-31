@@ -15,6 +15,16 @@
 # Description:
 #   Install, configure, manage, validate, and inspect Microsoft SQL Server.
 #
+# Usage:
+#   Run the executable from its shell command (or installed wrapper):
+#   ```bash
+#   manage-sqlserver --action status
+#   manage-sqlserver --dryrun --action storage
+#   ```
+#
+#   Script-specific options:
+#   - `--action NAME`, `-a`: Management action (supported actions: `prepare`, `repository`, `install`, `configure`, `storage`, `network`, `memory`, `service`, `firewall`, `tools`, `validate`, `status`).
+#
 # Attribution:
 #   Developers    : Mark Fieten
 #   Company       : Testadura Consultancy
@@ -56,7 +66,9 @@ set -uo pipefail
         #   be found, or the executable common library is unreadable.
         #
         # . Usage
+        #   ```bash
         #   _framework_locator || return $?
+        #   ```
     _framework_locator() {
         local script_file=""
         local path_without_root=""
@@ -142,11 +154,13 @@ set -uo pipefail
     SGND_SQLSERVER_SERVICE="mssql-server.service"
     SGND_SQLSERVER_DEFAULT_STORAGE_ROOT="/srv/storage"
 
+    # fn: _dryrun_complete - Report the dry-run result without executing the requested host change.
     _dryrun_complete() {
         (( ${FLAG_DRYRUN:-0} == 1 )) || return 0
         sayok "DRYRUN complete. The changes shown above would have been applied; no changes were written."
     }
 
+    # fn: _sqlserver_ask_selection - Prompt for selection in the SQL Server workflow.
     _sqlserver_ask_selection() {
         local label="${1:?missing label}"
         local output_var="${2:?missing output variable}"
@@ -175,7 +189,9 @@ set -uo pipefail
         # . Returns
         #   0 on success; non-zero when the operation cannot be completed.
         # . Usage
+        #   ```bash
         #   _sqlserver_ubuntu_version
+        #   ```
     _sqlserver_ubuntu_version() {
         local os_id=""
         local version_id=""
@@ -192,7 +208,9 @@ set -uo pipefail
         # . Returns
         #   0 on success; non-zero when the operation cannot be completed.
         # . Usage
+        #   ```bash
         #   _sqlserver_validate_port
+        #   ```
     _sqlserver_validate_port() {
         [[ "$1" =~ ^[0-9]+$ ]] && (( $1 >= 1 && $1 <= 65535 ))
     }
@@ -201,7 +219,9 @@ set -uo pipefail
         # . Returns
         #   0 on success; non-zero when the operation cannot be completed.
         # . Usage
+        #   ```bash
         #   _sqlserver_engine_installed
+        #   ```
     _sqlserver_engine_installed() {
         dpkg-query -W -f='${Status}' mssql-server 2>/dev/null | grep -q '^install ok installed$'
     }
@@ -210,7 +230,9 @@ set -uo pipefail
         # . Returns
         #   0 on success; non-zero when the operation cannot be completed.
         # . Usage
+        #   ```bash
         #   _sqlserver_tools_installed
+        #   ```
     _sqlserver_tools_installed() {
         [[ -x /opt/mssql-tools18/bin/sqlcmd ]]
     }
@@ -219,7 +241,9 @@ set -uo pipefail
         # . Returns
         #   0 on success; non-zero when the setting cannot be read or is not configured.
         # . Usage
+        #   ```bash
         #   _sqlserver_conf_get
+        #   ```
     _sqlserver_conf_get() {
         local key="$1"
         local section=""
@@ -287,7 +311,9 @@ set -uo pipefail
         # . Returns
         #   0 on success; non-zero when the operation cannot be completed.
         # . Usage
+        #   ```bash
         #   _sqlserver_tcp_port
+        #   ```
     _sqlserver_tcp_port() {
         local port=""
         port="$(_sqlserver_conf_get network.tcpport 2>/dev/null || true)"
@@ -299,7 +325,9 @@ set -uo pipefail
         # . Returns
         #   0 on success; non-zero when the operation cannot be completed.
         # . Usage
+        #   ```bash
         #   _sqlserver_storage_root
+        #   ```
     _sqlserver_storage_root() {
         local configured=""
         local storage_cfg="${SGND_SYSCFG_DIR:-/etc/solidgroundux}/storage.cfg"
@@ -314,7 +342,9 @@ set -uo pipefail
         # . Returns
         #   0 on success; non-zero when the operation cannot be completed.
         # . Usage
+        #   ```bash
         #   _sqlserver_select_directory
+        #   ```
     _sqlserver_select_directory() {
         local label="$1"
         local default_path="$2"
@@ -347,7 +377,9 @@ set -uo pipefail
         # . Returns
         #   0 on success; non-zero when the operation cannot be completed.
         # . Usage
+        #   ```bash
         #   _sqlserver_ensure_directory
+        #   ```
     _sqlserver_ensure_directory() {
         local path="$1"
         local decision="Yes"
@@ -367,7 +399,9 @@ set -uo pipefail
         # . Returns
         #   0 on success; non-zero when the operation cannot be completed.
         # . Usage
+        #   ```bash
         #   _sqlserver_apply_conf
+        #   ```
     _sqlserver_apply_conf() {
         local key="$1"
         local value="$2"
@@ -395,7 +429,9 @@ set -uo pipefail
         # . Returns
         #   0 on success; non-zero when the operation cannot be completed.
         # . Usage
+        #   ```bash
         #   _sqlserver_restart_if_active
+        #   ```
     _sqlserver_restart_if_active() {
         systemctl is-active --quiet "$SGND_SQLSERVER_SERVICE" 2>/dev/null || return 0
         if (( ${FLAG_DRYRUN:-0} == 1 )); then sayinfo "DRYRUN: Would restart $SGND_SQLSERVER_SERVICE."; return 0; fi
@@ -407,7 +443,9 @@ set -uo pipefail
         # . Returns
         #   0 on success; non-zero when the operation cannot be completed.
         # . Usage
+        #   ```bash
         #   _sqlserver_step_repository
+        #   ```
     _sqlserver_step_repository() {
         local ubuntu_version=""
         local engine_list="/etc/apt/sources.list.d/mssql-server-2025.list"
@@ -437,7 +475,9 @@ set -uo pipefail
         # . Returns
         #   0 on success; non-zero when the operation cannot be completed.
         # . Usage
+        #   ```bash
         #   _sqlserver_step_install_engine
+        #   ```
     _sqlserver_step_install_engine() {
         _sqlserver_ubuntu_version >/dev/null || { sayfail "SQL Server 2025 role supports Ubuntu 22.04 and 24.04 only."; return 1; }
         if (( ${FLAG_DRYRUN:-0} == 1 )); then sayinfo "DRYRUN: Would install Microsoft SQL Server 2025."; return 0; fi
@@ -451,7 +491,9 @@ set -uo pipefail
         # . Returns
         #   0 on success; non-zero when the operation cannot be completed.
         # . Usage
+        #   ```bash
         #   _sqlserver_step_configure
+        #   ```
     _sqlserver_step_configure() {
         [[ -x /opt/mssql/bin/mssql-conf ]] || { sayfail "SQL Server is not installed."; return 1; }
         if (( ${FLAG_DRYRUN:-0} == 1 )); then sayinfo "DRYRUN: Would run mssql-conf setup."; return 0; fi
@@ -475,7 +517,9 @@ set -uo pipefail
         # . Returns
         #   0 on success; non-zero when the operation cannot be completed.
         # . Usage
+        #   ```bash
         #   _sqlserver_step_install_tools
+        #   ```
     _sqlserver_step_install_tools() {
         if (( ${FLAG_DRYRUN:-0} == 1 )); then sayinfo "DRYRUN: Would install mssql-tools18 and unixODBC development libraries."; return 0; fi
         sudo apt-get update || return 1
@@ -490,7 +534,7 @@ set -uo pipefail
     # Returns:
     #   0 when approved, 2 when cancelled, 1 on invalid input.
     # Usage:
-    #   _sqlserver_collect_install_configuration
+    # fn: _sqlserver_collect_install_configuration - Collect install configuration in the SQL Server workflow.
     _sqlserver_collect_install_configuration() {
         local edition="EnterpriseDeveloper" port="1433" memory_mb="2048"
         local action="" accepted="" password="" password_again=""
@@ -552,7 +596,9 @@ set -uo pipefail
         #   54 when tools installation fails.
         #
         # . Usage
+        #   ```bash
         #   _sqlserver_prepare
+        #   ```
     _sqlserver_prepare() {
         local collect_rc=0
         _sqlserver_collect_install_configuration || collect_rc=$?
@@ -576,7 +622,9 @@ set -uo pipefail
         # . Returns
         #   0 on success; non-zero when the operation cannot be completed.
         # . Usage
+        #   ```bash
         #   _sqlserver_configure_storage
+        #   ```
     _sqlserver_configure_storage() {
         local storage_root=""
         local data_dir=""
@@ -641,7 +689,9 @@ set -uo pipefail
         # . Returns
         #   0 on success; non-zero when the operation cannot be completed.
         # . Usage
+        #   ```bash
         #   _sqlserver_configure_network
+        #   ```
     _sqlserver_configure_network() {
         local port=""
         local current_port=""
@@ -668,7 +718,9 @@ set -uo pipefail
         # . Returns
         #   0 on success; non-zero when the operation cannot be completed.
         # . Usage
+        #   ```bash
         #   _sqlserver_configure_memory
+        #   ```
     _sqlserver_configure_memory() {
         local memory_mb=""
         memory_mb="$(_sqlserver_conf_get memory.memorylimitmb 2>/dev/null || true)"
@@ -691,7 +743,9 @@ set -uo pipefail
         # . Returns
         #   0 on success; non-zero when the operation cannot be completed.
         # . Usage
+        #   ```bash
         #   _sqlserver_manage_service
+        #   ```
     _sqlserver_manage_service() {
         local action=""
         local service_state="inactive"
@@ -721,7 +775,9 @@ set -uo pipefail
         # . Returns
         #   0 on success; non-zero when the operation cannot be completed.
         # . Usage
+        #   ```bash
         #   _sqlserver_configure_firewall
+        #   ```
     _sqlserver_configure_firewall() {
         local port=""
         local firewall_state="Inactive"
@@ -749,7 +805,9 @@ set -uo pipefail
         # . Returns
         #   0 on success; non-zero when the operation cannot be completed.
         # . Usage
+        #   ```bash
         #   _sqlserver_status
+        #   ```
     _sqlserver_status() {
         local ubuntu_version="unsupported"
         local package_state="not installed"
@@ -801,7 +859,9 @@ set -uo pipefail
         # . Returns
         #   0 on success; non-zero when the operation cannot be completed.
         # . Usage
+        #   ```bash
         #   _sqlserver_validate
+        #   ```
     _sqlserver_validate() {
         local failures=0
         local result=""
@@ -851,6 +911,7 @@ set -uo pipefail
     }
 
 # - Action dispatch ----------------------------------------------------------------
+    # fn: _run_action - Dispatch the requested management action to its implementation.
     _run_action() {
         local action="${1:?missing action}" rc=0
         case "$action" in
@@ -879,6 +940,7 @@ set -uo pipefail
     }
 
 # - Main ----------------------------------------------------------------------------
+    # fn: main - Dispatch command-line options to the appropriate management workflow.
     main() {
         local action=""
         _framework_locator || return $?

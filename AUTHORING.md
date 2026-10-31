@@ -232,3 +232,50 @@ Tekst links van het logo.
 ```
 
 Afmetingen zijn positieve pixels (`1` tot `10000`). Zonder parameters blijft de standaardopmaak behouden. Met één afmeting blijft de beeldverhouding behouden; met twee afmetingen past de afbeelding zonder bijsnijden in het opgegeven vlak. De breedte wordt begrensd door de beschikbare schermruimte. Bij galerijen en sliders blijft de containerlay-out gehandhaafd; afmetingen gelden voor de afbeelding, niet voor de kaart of de schuifpositie. Featured-afbeeldingen behouden afzonderlijk `featured_image_fit: cover|contain`.
+
+## Documentation bundle composition
+
+The Documentation Bundles manager in MCM assembles source documentation into a WCM
+Markdown site. Bundle introductions and closing material are no longer part of a
+special Chapter 0. The output order is:
+
+1. Bundle prefaces (**Introduction**)
+2. Product chapters, each with its own prefaces, ordinary pages and epilogues
+3. Bundle epilogues (**Closing Remarks**)
+4. Appendices
+
+The **Manage bundle documents** action accepts three roles: `preface`, `epilogue`,
+and `page`. Preface and epilogue lists can be set independently to **auto**,
+**manual** or **none**. An explicit list, including an empty one, takes precedence
+over automatic discovery. `page` entries are always explicitly selected and are
+assigned to a target product, and optionally a group and subgroup. An ordinary
+page can be positioned as a section preface or epilogue when adding it.
+
+Automatic discovery searches the participating products' `doc-sources`
+directories for `.md`, `.sh` and `.py` sources. For bundle ID `solidgroundux-full`:
+
+- `solidgroundux-full_preface.md` and `solidgroundux-full_architecture_preface.sh`
+  take precedence over generic `bundle_preface.md` and
+  `bundle_architecture_preface.sh`.
+- The same independent convention applies to `*_epilogue` files.
+- When no bundle-specific files exist, generic `bundle_*_preface` or
+  `bundle_*_epilogue` files are used.
+- Automatic files are ordered by optional `nav_order` metadata, then by
+  filename. Explicit lists use their saved order.
+
+The source filename is unrestricted for **explicit** selections. A selected
+source may come from any repository, including the source repository for another
+bundle. A file is identified by its full source path, not merely its basename.
+The same source file cannot appear twice in a generated bundle.
+
+Structured `.sh`/`.py` documentation is converted from its comment markers.
+Explicitly selected `.md` files are **copied byte-for-byte**, preserving authored
+front matter and prose. Navigation order and inferred titles are recorded or
+resolved at generation time; the generator never injects YAML into the Markdown
+source. Generated websites use `config/doc-nav-orders.json` to preserve the
+configured navigation order without modifying those copied files.
+
+Saved bundles with a legacy `chapter0` value remain readable: the generator
+resolves the previously selected introduction to its original source when
+possible, emits that source as a bundle preface, and excludes it from its product
+chapter. Selecting new bundle prefaces supersedes the legacy setting.
