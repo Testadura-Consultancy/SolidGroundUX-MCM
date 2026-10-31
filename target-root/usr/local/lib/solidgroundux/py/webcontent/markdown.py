@@ -411,9 +411,22 @@ def _render_lines(
                 # Native accessible disclosure, with nested Markdown in its body.
                 options = component_spec[len("td-details"):].strip()
                 is_open = bool(re.search(r"(?:^|\s)open(?:=true)?(?:\s|$)", options, re.I))
-                title = re.sub(r"(?:^|\s)open(?:=true)?(?:\s|$)", " ", options, flags=re.I).strip() or "Meer informatie"
+                options = re.sub(r"(?:^|\s)open(?:=true)?(?:\s|$)", " ", options, flags=re.I).strip()
+                # An optional heading level makes the disclosure label part of
+                # the document outline while keeping it clickable and closed
+                # by default. Existing td-details syntax is unchanged.
+                heading_match = re.match(r"^heading=([2-6])(?:\s+|$)", options, re.I)
+                heading_level = int(heading_match.group(1)) if heading_match else None
+                title = options[heading_match.end():].strip() if heading_match else options
+                title = title or "Meer informatie"
                 open_attr = " open" if is_open else ""
-                output.append(f'<details class="td-details"{open_attr}><summary>{html.escape(title)}</summary>\n<div class="td-details-body">{inner}</div></details>')
+                if heading_level is None:
+                    summary = html.escape(title)
+                    css_class = "td-details"
+                else:
+                    summary = f'<h{heading_level}>{html.escape(title)}</h{heading_level}>'
+                    css_class = "td-details td-details-heading"
+                output.append(f'<details class="{css_class}"{open_attr}><summary>{summary}</summary>\n<div class="td-details-body">{inner}</div></details>')
             elif "td-example" in classes.split():
                 # The displayed Markdown is extracted from the actual example
                 # body, so examples cannot drift away from their source.

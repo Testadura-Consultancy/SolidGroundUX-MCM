@@ -16,10 +16,19 @@ from pathlib import Path
 DECL = re.compile(r'^\s*#\s+(fn|cls|var|mod|exe|lib|doc)(:|\$)\s+([A-Za-z_][\w.:-]*)(?:\s+-\s+(.+))?\s*$')
 FIELD = re.compile(r'^\s*#\s*\.\s+(.+?)\s*$')
 COMMENT = re.compile(r'^\s*#(?: ?)(.*)$')
+DEF_START = re.compile(r'^\s*#\s*def:\s*(.+?)\s*$')
+DEF_END = re.compile(r'^\s*#\s*def\$\s*$')
 SECTION = re.compile(r'^\s*#\s(-{1,3})\s+(.+?)\s*$')
-HEADER_TITLE = re.compile(r'^#\s+([^-]+?)\s+-\s+(.+?)\s*$')
+HEADER_TITLE = re.compile(r'^#\s+([^\s-][^-]*?)\s+-\s+(.+?)\s*$')
 USELESS_TITLE = re.compile(r'^[#=\-_*~ ]+$')
 META = re.compile(r'^\s*#\s*(Version|Build|Purpose|Description|Group|Subgroup|Title|Type)\s*:\s*(.*?)\s*$', re.I)
+# A script section is a script-level heading regardless of how many dashes
+# precede it in the legacy comment marker (# -, # --, or # ---).
+SCRIPT_SECTION_HEADING = '## '
+HEADER_CATEGORIES = re.compile(
+    r'^(Description|Design principles|Role in framework|Non-goals|'
+    r'Documentation|Introduction|Overview|Usage):\s*$', re.I)
+EXAMPLE_SECTION = re.compile(r'^-{1,3}\s+(Example:\s*.+?)\s*$', re.I)
 IDENTITY = re.compile(r'[^a-z0-9]+')
 SKIP_DIRS = {'.git', '.cache', '__pycache__', 'node_modules', '.venv', 'venv', 'www-html', 'www-md'}
 
@@ -64,25 +73,67 @@ def build_template_owners(products: list[dict]) -> dict[str, tuple[str, str]]:
 
 
 def prune_empty_headings(lines: list[str]) -> list[str]:
-    cleaned: list[str] = []
-    i = 0
-    heading = re.compile(r'^#{2,6}\s+')
-    while i < len(lines):
-        line = lines[i]
-        if heading.match(line.strip()):
-            j = i + 1
-            block: list[str] = []
-            while j < len(lines) and not heading.match(lines[j].strip()):
-                block.append(lines[j])
-                j += 1
-            meaningful = any(item.strip() and not re.fullmatch(r'[`*_=-]{3,}', item.strip()) for item in block)
-            if meaningful:
-                cleaned.append(line)
-                cleaned.extend(block)
-            i = j
+    """Remove headings without body text or meaningful child sections.
+
+    A WCM td-details disclosure with heading=N is an independent document
+    section at that level, not content belonging to the preceding heading.
+    Treat it as a boundary so an empty heading such as ``## Bootstrap``
+    cannot borrow the following Script metadata disclosure as its body.
+    """
+    markdown_heading = re.compile(r'^(#{2,6})\s+')
+    details_heading = re.compile(r'^:::\s+td-details\b[^\n]*?\bheading=([2-6])\b')
+    boundaries: list[int | None] = []
+    fence_marker = ''
+
+    for line in lines:
+        stripped = line.strip()
+        fence = re.match(r'^(`{3,}|~{3,})', stripped)
+        if fence:
+            marker = fence.group(1)
+            if not fence_marker:
+                fence_marker = marker
+            elif marker[0] == fence_marker[0] and len(marker) >= len(fence_marker):
+                fence_marker = ''
+            boundaries.append(None)
             continue
-        cleaned.append(line)
-        i += 1
+        if fence_marker:
+            boundaries.append(None)
+            continue
+        match = markdown_heading.match(stripped)
+        if match:
+            boundaries.append(len(match.group(1)))
+            continue
+        match = details_heading.match(stripped)
+        boundaries.append(int(match.group(1)) if match else None)
+
+    # An authored heading is meaningful when it contains actual content or
+    # a meaningful, deeper subsection. Same-level disclosures are siblings.
+    keep_heading: dict[int, bool] = {}
+    for i in range(len(lines) - 1, -1, -1):
+        level = boundaries[i]
+        if level is None or not markdown_heading.match(lines[i].strip()):
+            continue
+        meaningful = False
+        j = i + 1
+        while j < len(lines):
+            child_level = boundaries[j]
+            if child_level is not None:
+                if child_level <= level:
+                    break
+                # A populated nested heading or disclosure gives its parent
+                # useful content; an empty nested heading does not.
+                if details_heading.match(lines[j].strip()) or keep_heading.get(j, False):
+                    meaningful = True
+                j += 1
+                continue
+            value = lines[j].strip()
+            if value and not re.fullmatch(r'[`*_=-]{3,}', value):
+                meaningful = True
+            j += 1
+        keep_heading[i] = meaningful
+
+    cleaned = [line for i, line in enumerate(lines)
+               if i not in keep_heading or keep_heading[i]]
     result: list[str] = []
     previous_blank = False
     for line in cleaned:
@@ -120,10 +171,15 @@ def _section_marker(text: str, inside_item: bool, in_fence: bool):
     ruled = re.search(r'\s-{4,}\s*$', label)
     if ruled:
         label = label[:ruled.start()].strip()
-    elif inside_item:
-        # Within a documentation item, '# - ...' is ordinary Markdown.
+    elif inside_item or len(marks) == 1:
+        # Unruled '# - ...' lines are Markdown bullets, not sections.
+        # '# --' and '# ---' are unambiguous structural markers.
         return None
     if not label or label.startswith(('-', '*', '[', '!')):
+        return None
+    # Metadata examples such as '# --- Example: Arguments' are labels, not
+    # structural sections. Preserve them within their existing section.
+    if re.match(r'^Example\s*:', label, re.I):
         return None
     title = label.split(':', 1)[1].strip() if ':' in label else label
     return {'kind': 'section', 'name': label, 'title': title,
@@ -154,13 +210,47 @@ def parse_source(path: Path):
     header_category = ''
     header_narrative = []
     in_code = False
+    definition = None
+
+    def header_line(text: str) -> str:
+        # Header prose is conventionally indented by two spaces after '# '.
+        # Remove only that shared margin so nested list bullets and code fences
+        # retain their own Markdown structure.
+        return text[2:] if text.startswith('  ') else text
     for line in lines:
+        # # def: blocks document the *actual* following shell definitions.
+        # Retain source lines verbatim; never source or evaluate Bash here.
+        start = DEF_START.match(line)
+        if start:
+            declaration = start.group(1).strip()
+            title, _, modifiers = declaration.partition(' | ')
+            definition = {'kind': 'def', 'name': title, 'title': title,
+                          'pivot': modifiers.removeprefix('pivot=') if modifiers.startswith('pivot=') else '',
+                          'raw': [], 'lines': []}
+            entries.append(definition)
+            current = None
+            in_header = False
+            in_code = False
+            continue
+        if DEF_END.match(line):
+            definition = None
+            current = None
+            continue
+        if definition is not None:
+            definition['raw'].append(line)
+            continue
         comment = COMMENT.match(line)
         if not comment:
             if line.strip() and not line.lstrip().startswith('#'):
                 in_header = False
                 in_code = True
-                current = None
+                # Script metadata consists of documentary comment blocks
+                # interleaved with actual Bash assignments. Keep the section
+                # open across those assignments; otherwise the comments for
+                # all but the first variable disappear from the output.
+                if not (current is not None and current['kind'] == 'section'
+                        and current['title'].casefold().startswith('script metadata')):
+                    current = None
                 fence = False
             continue
         value = comment.group(1).rstrip()
@@ -171,7 +261,7 @@ def parse_source(path: Path):
             if current:
                 current['lines'].append(value)
             elif in_header or header_category:
-                header_narrative.append(value)
+                header_narrative.append(header_line(value))
             continue
 
         if not fence:
@@ -191,6 +281,20 @@ def parse_source(path: Path):
                 in_header = False
                 in_code = False
                 continue
+            # Example labels may occur within comments surrounding executable
+            # script metadata. They are documentary notes, not section headings.
+            example = EXAMPLE_SECTION.match(stripped)
+            if example:
+                text = '**' + example.group(1) + '**'
+                if current is None:
+                    current = {'kind': 'narrative', 'name': '', 'title': '',
+                               'lines': [text, '']}
+                    entries.append(current)
+                else:
+                    current['lines'].extend(['', text, ''])
+                in_header = False
+                in_code = False
+                continue
 
         if current is not None:
             # Field headers are legacy structural markup, not Markdown paragraphs.
@@ -205,7 +309,7 @@ def parse_source(path: Path):
             # Retain free-form header descriptions, but not scaffolding or raw metadata.
             if re.match(r'^[-=]{6,}$', stripped):
                 continue
-            category = re.match(r'^(Description|Design principles|Role in framework|Non-goals|Documentation|Introduction|Overview):\s*$', stripped, re.I)
+            category = HEADER_CATEGORIES.match(stripped)
             if category:
                 header_category = category.group(1)
                 header_narrative.extend(['', '## ' + header_category, ''])
@@ -216,7 +320,7 @@ def parse_source(path: Path):
                 header_category = ''
                 continue
             if header_category:
-                header_narrative.append(value)
+                header_narrative.append(header_line(value))
         elif not in_code and stripped and (stripped.startswith(('>', '|', '#', ':::', '![', '[', '*', '-'))):
             # Standalone documentation outside structured items.
             header_narrative.append(value)
@@ -269,10 +373,240 @@ def markdown_documentation(lines: list[str]) -> list[str]:
     return result
 
 
+def script_metadata_markdown(lines: list[str]) -> list[str]:
+    """Render source metadata comments without losing alignment or examples.
+
+    These comments alternate with live SGND_* assignments. They are not
+    function headers and their indentation often describes Bash syntax or
+    column-aligned field definitions, which ordinary Markdown collapses.
+    Only script-metadata sections use this rendering; authored Markdown in
+    other sections and function documentation is left unchanged.
+    """
+    import textwrap
+
+    result: list[str] = []
+    literal: list[str] = []
+    author_fence = False
+    in_explanation = False
+
+    def close_explanation() -> None:
+        nonlocal in_explanation
+        if in_explanation:
+            result.extend(["", ":::", ""])
+            in_explanation = False
+
+    def flush_literal() -> None:
+        if literal:
+            # Dedent the shared comment margin, not alignment within the sample.
+            sample = textwrap.dedent('\n'.join(literal)).strip('\n')
+            if result and result[-1] != '':
+                result.append('')
+            language = 'bash' if re.search(r'\bSGND_[A-Z0-9_]+\s*=\s*\(', sample) else 'text'
+            result.extend([f'```{language}', sample, '```', ''])
+            literal.clear()
+
+    for line in lines:
+        value = line.rstrip()
+        stripped = value.strip()
+        if stripped.startswith(('```', '~~~')):
+            flush_literal()
+            author_fence = not author_fence
+            result.append(value)
+            continue
+        if author_fence:
+            result.append(value)
+            continue
+        if not stripped:
+            flush_literal()
+            if result and result[-1] != '':
+                result.append('')
+            continue
+        if re.fullmatch(r'SGND_[A-Z][A-Z0-9_]*', stripped):
+            flush_literal()
+            close_explanation()
+            # Keep the metadata variables as subsections. Enclose their prose,
+            # lists and code examples in a themed explanation card. A card is
+            # ordinary Markdown content, not a preformatted code block.
+            result.extend(['', f'### {stripped}', '', '::: sgnd-metadata-card', ''])
+            in_explanation = True
+            continue
+        if stripped.startswith('### '):
+            flush_literal()
+            # Canonical '# . Purpose' and '# . Behavior' fields are plain
+            # labels in script metadata, just like 'Use this to:' and 'Only list:'.
+            # A blank line before and after gives the label breathing room.
+            result.extend(['', stripped[4:].strip().rstrip(':') + ':', ''])
+            continue
+        if re.fullmatch(r'\*\*[^*]+\*\*', stripped):
+            flush_literal()
+            # Example labels emitted by parse_source should not look like
+            # a higher-priority heading than other metadata explanations.
+            result.extend(['', stripped[2:-2], ''])
+            continue
+        if re.match(r'^#{2,6}\s+', stripped):
+            flush_literal()
+            result.extend(['', stripped, ''])
+            continue
+        # Indented explanations of fields and command examples are literal
+        # samples, while list items are still ordinary Markdown lists.
+        if ((len(value) - len(value.lstrip()) >= 2 or re.match(r'^var:\s*=', stripped))
+                and not re.match(r'^[-*+]\s+', stripped)):
+            literal.append(value)
+            continue
+        flush_literal()
+        if re.match(r'^[-*+]\s+', stripped):
+            result.append(stripped)
+        else:
+            # Preserve explicit source-comment line breaks where Markdown
+            # would otherwise merge separate metadata statements into prose.
+            result.append(stripped + '  ')
+    flush_literal()
+    close_explanation()
+    return markdown_documentation(result)
+
+
+DEF_ASSIGN = re.compile(r'^\s*(?:export\s+|readonly\s+)?([A-Za-z_][A-Za-z0-9_]*)=(.*)$')
+
+
+def _def_cell(value: str) -> str:
+    """Escape table delimiters without interpreting shell syntax."""
+    return value.strip().replace('\\', '\\\\').replace('|', '\\|').replace('\n', '<br>')
+
+
+def _def_literal(value: str) -> str:
+    value = value.strip()
+    if len(value) >= 2 and value[0] == value[-1] and value[0] in ('"', "'"):
+        return value[1:-1]
+    return value
+
+
+def _def_assignments(lines: list[str]) -> list[tuple[str, str, str, list[str] | None]]:
+    """Read literal assignments, including multiline Bash arrays, without evaluation."""
+    assignments = []
+    position = 0
+    while position < len(lines):
+        match = DEF_ASSIGN.match(lines[position])
+        if not match:
+            position += 1
+            continue
+        name, text = match.groups()
+        # Only comments separated by whitespace from the value are descriptions.
+        value, divider, comment = re.split(r'\s+#\s*', text, maxsplit=1)[0], '', ''
+        fragments = re.split(r'\s+#\s*', text, maxsplit=1)
+        if len(fragments) == 2:
+            value, comment = fragments
+        value = value.strip()
+        if value.startswith('('):
+            data = []
+            remainder = value[1:].strip()
+            if remainder.endswith(')'):
+                remainder = remainder[:-1].strip()
+                if remainder:
+                    data.append(remainder)
+            else:
+                if remainder:
+                    data.append(remainder)
+                position += 1
+                while position < len(lines):
+                    item = lines[position].strip()
+                    if item == ')':
+                        break
+                    # An inline Bash comment after an array literal is not
+                    # part of that value (including a comment after its quote).
+                    item = re.split(r'\s+#\s*', item, maxsplit=1)[0].rstrip()
+                    if item.endswith(')') and not item.startswith('#'):
+                        if item[:-1].strip():
+                            data.append(item[:-1].strip())
+                        break
+                    if item and not item.startswith('#'):
+                        data.append(item)
+                    position += 1
+            assignments.append((name, 'array', comment, data))
+        else:
+            assignments.append((name, value, comment, None))
+        position += 1
+    return assignments
+
+
+def definition_markdown(entry: dict) -> list[str]:
+    """Render the established # def: blocks as tables from literal source.
+
+    `pivot=LBL:Label,ICO:Icon` combines assignments sharing a suffix into
+    one row, matching the existing style/palette definition convention.
+    """
+    assignments = _def_assignments(entry['raw'])
+    if not assignments:
+        return []
+    result = ['### ' + entry['title'], '']
+    pivot = []
+    if entry.get('pivot'):
+        for field in entry['pivot'].split(','):
+            prefix, sep, heading = field.partition(':')
+            if sep and prefix.strip() and heading.strip():
+                pivot.append((prefix.strip() + '_', heading.strip()))
+    if pivot:
+        combined = {}
+        order = []
+        for name, value, comment, array in assignments:
+            for prefix, title in pivot:
+                if name.startswith(prefix):
+                    key = name[len(prefix):]
+                    if key not in combined:
+                        combined[key] = {}
+                        order.append(key)
+                    combined[key][prefix] = value
+                    break
+        if order:
+            result.extend(['| Group {rowspan} | ' + ' | '.join(title for _, title in pivot) + ' |',
+                           '| --- | ' + ' | '.join('---' for _ in pivot) + ' |'])
+            for key in order:
+                cells = [_def_cell(key)] + [_def_cell(_def_literal(combined[key].get(prefix, ''))) for prefix, _ in pivot]
+                result.append('| ' + ' | '.join(cells) + ' |')
+            result.append('')
+    others = []
+    for name, value, note, array in assignments:
+        if pivot and any(name.startswith(prefix) for prefix, _ in pivot):
+            continue
+        if array is not None:
+            # Registry rows use the literal pipe-separated tuple format.
+            structured = [_def_literal(item) for item in array]
+            if structured and all('|' in item for item in structured):
+                width = max(len(item.split('|')) for item in structured)
+                empty_final = width == 4 and all(item.split('|')[-1] == '' for item in structured)
+                if empty_final:
+                    # The registry tuple's optional final slot is empty.
+                    # Do not render an entire blank table column.
+                    width = 3
+                    headings = ['Scope', 'Variable', 'Description']
+                elif width == 4:
+                    headings = ['Scope', 'Variable', 'Description', 'Default']
+                else:
+                    headings = [f'Field {n}' for n in range(1, width + 1)]
+                result += ['#### `' + name + '`', '', '| ' + ' | '.join(headings) + ' |',
+                           '| ' + ' | '.join('---' for _ in headings) + ' |']
+                for item in structured:
+                    cells = item.split('|')[:width]
+                    result.append('| ' + ' | '.join(_def_cell(cell) for cell in cells + [''] * (width-len(cells))) + ' |')
+                result.append('')
+            else:
+                result += ['#### `' + name + '`', '', '| # | Item |', '| ---: | --- |']
+                for ix, item in enumerate(structured, 1):
+                    result.append('| ' + str(ix) + ' | `' + _def_cell(item) + '` |')
+                result.append('')
+        else:
+            others.append((name, value, note))
+    if others:
+        result += ['| Variable | Value | Notes |', '| --- | --- | --- |']
+        for name, value, note in others:
+            result.append('| `' + name + '` | `' + _def_cell(value) + '` | ' + _def_cell(note) + ' |')
+        result.append('')
+    return result
+
+
 def append_preface(target: list[str], entries: list[dict]) -> None:
     for entry in entries:
         if entry['kind'] == 'section':
-            target.extend(['#' * min(entry['level'] + 2, 6) + ' ' + entry['title'], ''])
+            target.extend([SCRIPT_SECTION_HEADING + entry['title'], ''])
         elif entry['kind'] not in ('narrative',):
             target.extend(['### ' + entry['title'], ''])
         target.extend(markdown_documentation(entry['lines']))
@@ -455,7 +789,11 @@ def collect(product, content: Path, order: int, counters: Counter, template_owne
                     body.append(f'- [{entry["title"]}]({page_slug}/)')
                 body.append('')
             if internal:
-                body += ['## Internal functions', '', '| Function | Purpose | Arguments | Output |',
+                # WCM's native details component renders Markdown inside a
+                # closed-by-default disclosure. Keep the internal API table
+                # accessible without overwhelming the source overview.
+                body += ['::: td-details heading=2 Internal functions', '',
+                         '| Function | Purpose | Arguments | Output |',
                          '| --- | --- | --- | --- |']
                 for entry in internal:
                     def field_value(label):
@@ -472,7 +810,7 @@ def collect(product, content: Path, order: int, counters: Counter, template_owne
                     if purpose == '—' and entry['title'] != entry['name']:
                         purpose = entry['title'].replace('|', r'\|')
                     body.append(f'| `{entry["name"]}` | {purpose} | {field_value("Arguments")} | {field_value("Output")} |')
-                body.append('')
+                body += ['', ':::', '']
             # Public functions receive full pages. All other documentation
             # remains on the source overview; internal functions appear only in the table.
             used_public_slugs = set()
@@ -480,9 +818,28 @@ def collect(product, content: Path, order: int, counters: Counter, template_owne
                 kind = entry['kind']
                 if kind == 'narrative':
                     body += markdown_documentation(entry['lines']) + ['']
+                elif kind == 'def':
+                    definitions = definition_markdown(entry)
+                    # A # def: label matching the immediately preceding
+                    # script section is its content, not another heading.
+                    last = next((line.strip() for line in reversed(body) if line.strip()), '')
+                    if (definitions and last.casefold() == ('## ' + entry['title']).casefold()
+                            and definitions[0].startswith('### ')):
+                        definitions = definitions[2:]
+                    body += definitions
                 elif kind == 'section':
-                    body += ['#' * min(2 + entry['level'], 6) + ' ' + entry['title'], '']
-                    body += markdown_documentation(entry['lines']) + ['']
+                    if entry['title'].casefold().startswith('script metadata'):
+                        # Script metadata is extensive but useful to have visible
+                        # initially. Use WCM's native disclosure, expanded by
+                        # default, and preserve its proper h2 document level.
+                        metadata_lines = script_metadata_markdown(entry['lines'])
+                        if any(line.strip() for line in metadata_lines):
+                            body += [f'::: td-details heading=2 open {entry["title"]}', '',
+                                     '::: sgnd-script-metadata', '']
+                            body += metadata_lines + ['', ':::', '', ':::', '']
+                    else:
+                        body += [SCRIPT_SECTION_HEADING + entry['title'], '']
+                        body += markdown_documentation(entry['lines']) + ['']
                 elif kind.startswith('fn') and entry['name'].startswith('_'):
                     continue
                 elif kind.startswith('fn'):
@@ -612,23 +969,17 @@ def build_appendices(products: list[dict], content: Path, root: Path) -> dict:
             sections.append(f'| [`{row["name"]}`]({row["url"]}) | {description} | {row["product"]} | `{row["source"]}` |')
         write_index(appendix / 'global-variables', 'Global Variables', '\n'.join(sections), 2, template='page')
     license_lines = []
-    changes_lines = []
     attribution_lines = []
     for product in products:
         source = Path(product['source_dir']).expanduser().resolve()
-        for name, target in [('LICENSE', license_lines), ('CHANGELOG.md', changes_lines)]:
-            files = _product_reference_files(source, name)
-            if not files:
-                continue
-            document = files[0].read_text(encoding='utf-8', errors='replace').strip()
-            if not document:
-                continue
-            target.extend(['## ' + product['title'], '', f'**Source:** `{files[0].relative_to(source)}`', ''])
-            if name == 'LICENSE':
-                target.extend('> ' + line if line.strip() else '>' for line in document.splitlines())
-            else:
-                target.append(document)
-            target.append('')
+        license_files = _product_reference_files(source, 'LICENSE')
+        if license_files:
+            document = license_files[0].read_text(encoding='utf-8', errors='replace').strip()
+            if document:
+                license_lines.extend(['## ' + product['title'], '',
+                                      f'**Source:** `{license_files[0].relative_to(source)}`', ''])
+                license_lines.extend('> ' + line if line.strip() else '>' for line in document.splitlines())
+                license_lines.append('')
         identities = set()
         for path in source.rglob('*.sh'):
             if any(part in SKIP_DIRS for part in path.relative_to(source).parts):
@@ -643,12 +994,32 @@ def build_appendices(products: list[dict], content: Path, root: Path) -> dict:
             attribution_lines.append('')
     if license_lines:
         write_index(appendix / 'licenses', 'Licenses', '\n'.join(license_lines), 3, template='page')
-    if changes_lines:
-        write_index(appendix / 'change-logs', 'Change Logs', '\n'.join(changes_lines), 4, template='page')
+
+    # Each product owns its changelog. Keep a stable navigation page for every
+    # product, even when its configured source tree does not include CHANGELOG.md.
+    # This avoids silently merging releases or hiding an absent changelog.
+    change_logs = appendix / 'change-logs'
+    write_index(change_logs, 'Change Logs',
+                'Release history for each product in this documentation bundle.',
+                4, template='group')
+    available_change_logs = 0
+    for order, product in enumerate(products, 1):
+        source = Path(product['source_dir']).expanduser().resolve()
+        files = _product_reference_files(source, 'CHANGELOG.md')
+        document = files[0].read_text(encoding='utf-8', errors='replace').strip() if files else ''
+        if document:
+            body = f'**Source:** `{files[0].relative_to(source)}`\n\n{document}'
+            available_change_logs += 1
+        else:
+            body = 'No `CHANGELOG.md` was found in this product\'s configured source tree.'
+        write_index(change_logs / slug(product['id']), product['title'], body,
+                    order, template='page')
+
     if attribution_lines:
         write_index(appendix / 'attribution', 'Attribution', '\n'.join(attribution_lines), 5, template='page')
     return {'api_functions': len(entries), 'global_variables': len(variables),
-            'licenses': bool(license_lines), 'change_logs': bool(changes_lines), 'attribution': bool(attribution_lines)}
+            'licenses': bool(license_lines), 'change_logs': bool(available_change_logs),
+            'attribution': bool(attribution_lines)}
 
 
 def split_wcm_document(markdown: str) -> tuple[dict[str, str], str]:

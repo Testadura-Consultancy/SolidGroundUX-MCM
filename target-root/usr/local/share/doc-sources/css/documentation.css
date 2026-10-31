@@ -115,3 +115,22 @@
 .sgnd-theme-gallery .sgnd-theme-foot{padding:.5rem .85rem;font:11px monospace;color:#9fb0c3}
 .sgnd-theme-gallery .sgnd-theme-note{margin-top:1.2rem;color:#586a88;font-size:.87rem}
 @media(max-width:850px){.sgnd-theme-gallery .sgnd-theme-grid-compare{grid-template-columns:1fr}.sgnd-theme-gallery .sgnd-theme-count{margin-left:0}}
+
+/* Generated script metadata: emphasize the named SGND_* contracts while
+   preserving their h3 hierarchy beneath the Script metadata section. */
+.doc-main .sgnd-script-metadata > h3{font-size:1.35rem;line-height:1.3;margin:1.7rem 0 .7rem}
+
+/* Explanations of individual SGND_* metadata contracts are prose cards,
+   distinct from literal examples. Scope styling to generated script metadata. */
+.doc-main .sgnd-script-metadata .sgnd-metadata-card{background:#f5f7fa;border:1px solid #dce1e8;border-radius:6px;padding:.9rem 1.2rem;margin:.3rem 0 1.5rem}
+.doc-main .sgnd-script-metadata .sgnd-metadata-card > :first-child{margin-top:0}
+.doc-main .sgnd-script-metadata .sgnd-metadata-card > :last-child{margin-bottom:0}
+.doc-main .sgnd-script-metadata .sgnd-metadata-card pre{background:#fff}
+
+/* Opt-in heading-sized disclosure summaries. Ordinary td-details remain as-is. */
+.doc-main .td-details-heading > summary{cursor:pointer;margin:1.7rem 0 .7rem}
+.doc-main .td-details-heading > summary > h2,
+.doc-main .td-details-heading > summary > h3,
+.doc-main .td-details-heading > summary > h4,
+.doc-main .td-details-heading > summary > h5,
+.doc-main .td-details-heading > summary > h6{display:inline;margin:0}

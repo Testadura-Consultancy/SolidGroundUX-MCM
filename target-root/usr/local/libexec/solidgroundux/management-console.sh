@@ -408,6 +408,10 @@ set -uo pipefail
     }
 
     # fn: _sgnd_console_prepare_state_directory - Ensure a writable per-user state directory
+        # . Purpose
+        #   Create a per-user state directory with restricted permissions and ensure
+        #   it belongs to the invoking user when running under sudo.
+        #
         # . Arguments
         #   $1  DIRECTORY - State directory to prepare.
         #
@@ -434,6 +438,10 @@ set -uo pipefail
     }
 
     # fn: _sgnd_console_finalize_state_file - Normalize ownership and permissions of a state file
+        # . Purpose
+        #   Restrict a state file to its owner and restore the invoking user's ownership
+        #   when the console runs with elevated privileges.
+        #
         # . Arguments
         #   $1  FILE - State file that was just created or replaced.
         #
@@ -459,7 +467,7 @@ set -uo pipefail
     }
 
     # --- Console paths ---------------------------------------------------------------
-    # _sgnd_console_init_paths
+    # fn: _sgnd_console_init_paths - Initialize Management Console paths after checking the Framework root
         # . Purpose
         #   Derive console host paths from SGND_FRAMEWORK_ROOT.
         #
@@ -470,7 +478,6 @@ set -uo pipefail
         #   ```bash
         #   _sgnd_console_init_paths || return $?
         #   ```
-    # fn: _sgnd_console_init_paths - Initialize Management Console paths after checking the Framework root.
     _sgnd_console_init_paths() {
         [[ -n "${SGND_FRAMEWORK_ROOT:-}" ]] || {
             sayfail "SGND_FRAMEWORK_ROOT is not initialized"
@@ -490,7 +497,7 @@ set -uo pipefail
     }
 
     # --- Console application context -------------------------------------------------
-    # fn$: _sgnd_console_resolve_app_root - Resolve the application root from a module source
+    # fn: _sgnd_console_resolve_app_root - Resolve the application root from a module source
         # . Purpose
         #   Derive the root of the management application tree independently from the
         #   SolidGroundUX framework root. This allows an installed management console to
@@ -508,11 +515,13 @@ set -uo pipefail
         # . Output
         #   Writes the resolved application root to stdout.
         #
+        # . Arguments
+        #   $1  MODULE_PATH - Selected module file or directory.
+        #
         # . Usage
         #   ```bash
         #   SGND_CONSOLE_APP_ROOT="$(_sgnd_console_resolve_app_root "$module_path")"
         #   ```
-    # fn: _sgnd_console_resolve_app_root - Resolve app root in the Management Console workflow.
     _sgnd_console_resolve_app_root() {
         local source_path="${1:?missing application module source}"
         local path_without_root=""
@@ -559,6 +568,9 @@ set -uo pipefail
         #   - Keeps framework/runtime ownership and management-application ownership separate.
         #   - Makes module-owned bin, sbin, and libexec locations available to dispatchers.
         #   - Leaves presentation of DEV context to the console index renderer.
+        #
+        # . Arguments
+        #   $1  MODULE_PATH - Selected module source used to resolve application directories.
         #
         # . Usage
         #   ```bash
@@ -646,6 +658,13 @@ set -uo pipefail
 
     # --- Action result tracking ------------------------------------------------------
     # fn: sgnd_console_action_status - Read persisted status for a menu action
+        # . Purpose
+        #   Read the last persisted result for a menu action, treating expired
+        #   successful results as never run.
+        #
+        # . Arguments
+        #   $1  ITEM_KEY - Registered menu item key.
+        #
         # . Usage
         #   ```bash
         #   sgnd_console_action_status "<item_key>"
@@ -675,6 +694,14 @@ set -uo pipefail
     }
 
     # fn: sgnd_console_record_action_result - Persist and display an action result
+        # . Purpose
+        #   Save the status and timestamp of a completed action and reflect the
+        #   result in the current menu.
+        #
+        # . Arguments
+        #   $1  ITEM_KEY - Registered menu item key.
+        #   $2  RC       - Handler exit status (defaults to 1).
+        #
         # . Usage
         #   ```bash
         #   sgnd_console_record_action_result "<item_key>" "<rc>"
@@ -715,6 +742,15 @@ set -uo pipefail
     }
 
     # fn: sgnd_console_run_tracked - Execute one registered action and track its result
+        # . Purpose
+        #   Run a registered handler, persist its result and return the handler's
+        #   original exit status.
+        #
+        # . Arguments
+        #   $1  ITEM_KEY - Registered menu item key.
+        #   $2  HANDLER  - Function to execute.
+        #   $3+          - Optional arguments forwarded to the handler.
+        #
         # . Usage
         #   ```bash
         #   sgnd_console_run_tracked "<item_key>" "<handler>"
@@ -760,9 +796,13 @@ set -uo pipefail
     }
 
     # fn: _sgnd_console_refresh_action_statuses - Apply persisted statuses to menu items
+        # . Purpose
+        #   Populate the current menu items with their previously persisted
+        #   action statuses, skipping built-in controls.
+        #
         # . Usage
         #   ```bash
-        #   _sgnd_console_refresh_action_statuses "<NR>"
+        #   _sgnd_console_refresh_action_statuses
         #   ```
     _sgnd_console_refresh_action_statuses() {
         local i
@@ -1044,7 +1084,14 @@ set -uo pipefail
     }
 
     # --- Module visibility ----------------------------------------------------------
-    # fn$: _sgnd_console_module_id_from_filename - Derive module ID from filename
+    # fn: _sgnd_console_module_id_from_filename - Derive the module ID from a numbered module filename
+        # . Purpose
+        #   Strip the optional two-digit prefix and .sh extension from a module's
+        #   basename to derive its stable console identifier.
+        #
+        # . Arguments
+        #   $1  MODULE_FILE - Path or filename of a numbered module.
+        #
         # . Returns
         #   0 after writing the normalized module ID to stdout.
         #
@@ -1052,7 +1099,6 @@ set -uo pipefail
         #   ```bash
         #   _sgnd_console_module_id_from_filename "20-active-directory.sh"
         #   ```
-    # fn: _sgnd_console_module_id_from_filename - Derive the module ID from a numbered module script filename.
     _sgnd_console_module_id_from_filename() {
         local module_name=""
 
@@ -1062,7 +1108,14 @@ set -uo pipefail
         printf '%s\n' "$module_name"
     }
 
-    # fn$: _sgnd_console_module_state_get - Read module visibility state
+    # fn: _sgnd_console_module_state_get - Read saved module visibility state
+        # . Purpose
+        #   Read the module's persisted enabled/disabled state, defaulting to
+        #   enabled when no saved state exists.
+        #
+        # . Arguments
+        #   $1  MODULE_ID - Filename-derived module identifier.
+        #
         # . Returns
         #   Writes enabled or disabled. Missing entries default to enabled.
         #
@@ -1070,7 +1123,6 @@ set -uo pipefail
         #   ```bash
         #   _sgnd_console_module_state_get "active-directory"
         #   ```
-    # fn: _sgnd_console_module_state_get - Get module state in the Management Console workflow.
     _sgnd_console_module_state_get() {
         local module_id="${1:?missing module ID}"
         local state=""
@@ -1085,7 +1137,14 @@ set -uo pipefail
         esac
     }
 
-    # fn$: _sgnd_console_module_enabled - Test whether a module is enabled
+    # fn: _sgnd_console_module_enabled - Test whether a module is enabled
+        # . Purpose
+        #   Return success when a module is enabled (or has no saved state),
+        #   and failure when it has explicitly been disabled.
+        #
+        # . Arguments
+        #   $1  MODULE_ID - Filename-derived module identifier.
+        #
         # . Returns
         #   0 when enabled or unspecified; 1 when explicitly disabled.
         #
@@ -1093,7 +1152,6 @@ set -uo pipefail
         #   ```bash
         #   _sgnd_console_module_enabled "active-directory"
         #   ```
-    # fn: _sgnd_console_module_enabled - Test whether a Management Console module is enabled in saved state.
     _sgnd_console_module_enabled() {
         local module_id="${1:?missing module ID}"
         [[ "$(_sgnd_console_module_state_get "$module_id")" == "enabled" ]]
@@ -1254,7 +1312,11 @@ set -uo pipefail
         done
     }
 
-    # fn$: _sgnd_console_discover_module_files - Discover configured module files
+    # fn: _sgnd_console_discover_module_files - Discover the configured module files
+        # . Purpose
+        #   List the selected module file or enumerate .sh files in the selected
+        #   module directory in stable filename order.
+        #
         # . Returns
         #   Writes sorted module paths to stdout.
         #
@@ -1262,7 +1324,6 @@ set -uo pipefail
         #   ```bash
         #   mapfile -t modules < <(_sgnd_console_discover_module_files)
         #   ```
-    # fn: _sgnd_console_discover_module_files - Discover module files in the Management Console workflow.
     _sgnd_console_discover_module_files() {
         local module_path="${SGND_CONSOLE_MODULE_PATH:?missing module source}"
 
@@ -1602,6 +1663,10 @@ set -uo pipefail
     }
 
     # fn: _sgnd_console_source_module - Source one console module
+        # . Purpose
+        #   Load a selected console module and register its page only after
+        #   checking that module loading and registration have succeeded.
+        #
         # . Arguments
         #   $1  MODULE_FILE
         #       Readable .sh file to source.
@@ -1723,6 +1788,10 @@ set -uo pipefail
         #   Copy caller arguments into a target array and prepend --dryrun when the console
         #   is currently in dry-run mode.
         #
+        # . Arguments
+        #   $1  RESULT_ARRAY - Name of the array receiving arguments.
+        #   $2+              - Arguments appended to that array.
+        #
         # . Returns
         #   0 after populating the requested argument array.
         #
@@ -1743,6 +1812,10 @@ set -uo pipefail
         # . Purpose
         #   Resolve a command from the console bin/sbin roots or PATH, propagate console
         #   dry-run state, and execute it with the supplied arguments.
+        #
+        # . Arguments
+        #   $1  COMMAND - Public SolidGroundUX command name.
+        #   $2+         - Optional arguments forwarded to the command.
         #
         # . Returns
         #   Exit status from the resolved command; 1 when the command cannot be found.
@@ -1779,7 +1852,7 @@ set -uo pipefail
         "$resolved" "${command_args[@]}"
     }
 
-    # _sgnd_run_module_script
+    # fn: _sgnd_run_module_script - Invoke a module helper script through the console dispatcher
         # . Purpose
         #   Locates and executes a console helper script from the canonical
         #   SolidGroundUX executable or library directories.
@@ -1797,7 +1870,6 @@ set -uo pipefail
         #   _sgnd_run_module_script "manage-identity.sh"
         #   _sgnd_run_module_script "prepare-template.sh" --dryrun
         #   ```
-    # fn: _sgnd_run_module_script - Invoke a management script through the console module dispatch helper.
     _sgnd_run_module_script() {
         local script_name="${1:?missing script name}"
         shift
@@ -1999,6 +2071,10 @@ set -uo pipefail
         SGND_LAST_WAITSECS=0
     }
     # fn: _sgnd_console_cycle_loglevel_value - Resolve the adjacent framework log level
+        # . Purpose
+        #   Resolve and print the adjacent supported framework log level,
+        #   wrapping around the available levels when needed.
+        #
         # . Arguments
         #   $1  Current log level.
         #   $2  Direction: 1 forward, -1 backward.
@@ -2032,12 +2108,16 @@ set -uo pipefail
         #   Save a quick-access setting to SGND_FRAMEWORK_STATEFILE when framework state
         #   persistence is available.
         #
+        # . Arguments
+        #   $1  KEY   - Framework state variable name.
+        #   $2  VALUE - Value to persist (defaults to empty).
+        #
         # . Returns
         #   0 when no state file is configured; otherwise the sgnd_state_set status.
         #
         # . Usage
         #   ```bash
-        #   _sgnd_console_persist_framework_value
+        #   _sgnd_console_persist_framework_value SGND_CONSOLE_LOG_LEVEL "$SGND_CONSOLE_LOG_LEVEL"
         #   ```
     _sgnd_console_persist_framework_value() {
         local key="${1:?missing key}"
@@ -2049,6 +2129,9 @@ set -uo pipefail
     # fn: _sgnd_console_cycle_console_loglevel - Cycle and persist console log level
         # . Purpose
         #   Select the adjacent console log level, persist it, and redraw immediately.
+        #
+        # . Arguments
+        #   $1  DIRECTION - Optional: 1 forward (default), -1 backward.
         #
         # . Returns
         #   0 unless persistence fails.
@@ -2068,6 +2151,9 @@ set -uo pipefail
         # . Purpose
         #   Select the adjacent file log level, persist it, and redraw immediately.
         #
+        # . Arguments
+        #   $1  DIRECTION - Optional: 1 forward (default), -1 backward.
+        #
         # . Returns
         #   0 unless persistence fails.
         #
@@ -2086,6 +2172,9 @@ set -uo pipefail
         # . Purpose
         #   Select the adjacent installed style file, apply it through sgnd_theme, and
         #   redraw immediately.
+        #
+        # . Arguments
+        #   $1  DIRECTION - Optional: 1 forward (default), -1 backward.
         #
         # . Returns
         #   0 when the theme is applied; non-zero when no themes exist or loading fails.
@@ -2156,8 +2245,11 @@ set -uo pipefail
 
     # fn: _sgnd_console_handle_control - Handle console-owned direct controls
         # . Purpose
-        #   Apply execution-context controls that belong to management-console rather than
-        #   the reusable menu library.
+        #   Handle console-wide direct controls before index or module-page dispatch.
+        #
+        # . Behavior
+        #   - L/l opens the shared lines-per-page dialog from either console view.
+        #   - Cancellation or invalid dialog input is treated as a handled control.
         #
         # . Arguments
         #   $1  CONTROL - Normalized key returned by sgnd_menu_read_choice.
@@ -2173,6 +2265,7 @@ set -uo pipefail
         local control="${1:-}"
 
         case "$control" in
+            L|l) _sgnd_console_set_lines_per_page || true ;;
             M|m) _sgnd_console_toggle_dryrun ;;
             A|a) _sgnd_console_toggle_access ;;
             S)   _sgnd_console_open_shell ;;

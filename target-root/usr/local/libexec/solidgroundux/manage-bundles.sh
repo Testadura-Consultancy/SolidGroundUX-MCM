@@ -29,7 +29,7 @@
 # Attribution:
 #   Developers  : Mark Fieten
 #   Company     : Testadura Consultancy
-#   Copyright   : (c) 2025 - 2026 Testadura Consultancy
+#   Copyright   : © 2025 - 2026 Testadura Consultancy
 #   License     : Testadura Non-Commercial License (TD-NC) v1.1.
 # =====================================================================================
 set -uo pipefail
