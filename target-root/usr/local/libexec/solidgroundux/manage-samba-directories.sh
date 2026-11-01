@@ -8,7 +8,8 @@
 #   Shortname   : MANAGE_SAMBA_DIRECTORIES
 #   Source      : manage-samba-directories.sh
 #   Type        : script
-#   Group       : Role Managers
+#   Group       : Modules
+#   Subgroup    : Samba File Server
 #   Purpose     : Manage directories and directory-level access beneath Samba share storage
 #
 #   Checksum : 30b638a94f491c0c1a6de2a594a1754505964b7559d90de07f1fa106868ff8d0
@@ -53,7 +54,7 @@ set -uo pipefail
         #     present, falls back to the installed framework copy without changing
         #     SGND_FRAMEWORK_ROOT.
         #
-        # . Globals (write)
+        # . Globals (Write)
         #   SGND_FRAMEWORK_ROOT
         #
         # . Output
@@ -61,8 +62,8 @@ set -uo pipefail
         #   helpers are not available until sgnd-exe-common.sh has been loaded.
         #
         # . Returns
-        #   0 when the framework root was resolved and executable common library loaded.
-        #   126 when the script path cannot be resolved, no canonical root component can
+        #   - 0 when the framework root was resolved and executable common library loaded.
+        #   - 126 when the script path cannot be resolved, no canonical root component can
         #   be found, or the executable common library is unreadable.
         #
         # . Usage
@@ -131,9 +132,12 @@ set -uo pipefail
         source "$exe_common"
     }
 
-    # fn$ _load_ad_management - Load shared Active Directory discovery APIs
+    # fn: _load_ad_management - Load shared Active Directory discovery APIs
+        # . Purpose
+        #   Load shared Active Directory discovery APIs.
+        #
         # . Returns
-        #   0 when the project Active Directory management library is loaded.
+        #   - 0 when the project Active Directory management library is loaded.
         # . Usage
         #   ```bash
         #   _load_ad_management || return $?
@@ -215,8 +219,11 @@ set -uo pipefail
 
 # - Storage and Samba discovery ----------------------------------------------------
     # fn: _refresh_storage_paths - Resolve the configured SolidGroundUX share root
+        # . Purpose
+        #   Resolve the configured SolidGroundUX share root.
+        #
         # . Returns
-        #   0 after SGND_SAMBA_SHARE_ROOT is refreshed.
+        #   - 0 after SGND_SAMBA_SHARE_ROOT is refreshed.
         # . Usage
         #   ```bash
         #   _refresh_storage_paths
@@ -260,12 +267,15 @@ set -uo pipefail
     }
 
     # fn: _share_name_for_path - Return the Samba share name exported from one exact directory path
+        # . Purpose
+        #   Return the Samba share name exported from one exact directory path.
+        #
         # . Arguments
-        #   $1  Absolute directory path.
+        #   - $1  Absolute directory path.
         # . Output
         #   Writes the share name when the path is an effective Samba share root.
         # . Returns
-        #   0 when a matching share exists; 1 otherwise.
+        #   - 0 when a matching share exists; 1 otherwise.
         # . Usage
         #   ```bash
         #   share="$(_share_name_for_path "$path")"
@@ -292,10 +302,11 @@ set -uo pipefail
     # fn: _refresh_directory_catalog - Enumerate directories beneath the Samba share root
         # . Purpose
         #   Build selectable directory paths and labels, marking effective Samba share roots.
-        # . Outputs (globals)
+        # . Outputs
+        #   (globals)
         #   DIRECTORY_PATHS, DIRECTORY_LABELS
         # . Returns
-        #   0 when one or more directories exist; 1 otherwise.
+        #   - 0 when one or more directories exist; 1 otherwise.
         # . Usage
         #   ```bash
         #   _refresh_directory_catalog || return 0
@@ -327,10 +338,13 @@ set -uo pipefail
     }
 
     # fn: _selected_directory_text - Format current directory selection for the menu subtitle
+        # . Purpose
+        #   Format current directory selection for the menu subtitle.
+        #
         # . Output
         #   Writes a comma-separated relative path list.
         # . Returns
-        #   0 always.
+        #   - 0 always.
         # . Usage
         #   ```bash
         #   selected_text="$(_selected_directory_text)"
@@ -346,10 +360,14 @@ set -uo pipefail
     }
 
     # fn: _select_directories - Select one or more directories from the current catalog
-        # . Outputs (globals)
+        # . Purpose
+        #   Select one or more directories from the current catalog.
+        #
+        # . Outputs
+        #   (globals)
         #   SELECTED_DIRECTORIES
         # . Returns
-        #   0 on selection; 1 on cancel or empty catalog.
+        #   - 0 on selection; 1 on cancel or empty catalog.
         # . Usage
         #   ```bash
         #   _select_directories || return 0
@@ -375,8 +393,11 @@ set -uo pipefail
     }
 
     # fn: _require_directory_selection - Require one or more selected directories
+        # . Purpose
+        #   Require one or more selected directories.
+        #
         # . Returns
-        #   0 when selected; 1 otherwise.
+        #   - 0 when selected; 1 otherwise.
         # . Usage
         #   ```bash
         #   _require_directory_selection || return $?
@@ -386,10 +407,13 @@ set -uo pipefail
     }
 
     # fn: _directory_is_share_root - Test whether a directory is itself exported as a Samba share
+        # . Purpose
+        #   Test whether a directory is itself exported as a Samba share.
+        #
         # . Arguments
-        #   $1  Absolute directory path.
+        #   - $1  Absolute directory path.
         # . Returns
-        #   0 when exported; 1 otherwise.
+        #   - 0 when exported; 1 otherwise.
         # . Usage
         #   ```bash
         #   _directory_is_share_root "$path"
@@ -400,10 +424,13 @@ set -uo pipefail
 
 # - Identity discovery -------------------------------------------------------------
     # fn: _runtime_auth_mode - Return Samba's configured authentication mode
+        # . Purpose
+        #   Return Samba's configured authentication mode.
+        #
         # . Output
         #   Writes ad for ADS security, otherwise standalone.
         # . Returns
-        #   0 always.
+        #   - 0 always.
         # . Usage
         #   ```bash
         #   mode="$(_runtime_auth_mode)"
@@ -415,8 +442,11 @@ set -uo pipefail
     }
 
     # fn: _ensure_kerberos_ticket - Ensure a TGT is available for direct AD discovery
+        # . Purpose
+        #   Ensure a TGT is available for direct AD discovery.
+        #
         # . Returns
-        #   0 when a usable ticket exists; 1 otherwise.
+        #   - 0 when a usable ticket exists; 1 otherwise.
         # . Usage
         #   ```bash
         #   _ensure_kerberos_ticket
@@ -443,11 +473,14 @@ set -uo pipefail
     }
 
     # fn: _discover_ad_identities - Discover AD users or groups through LDAP/GSSAPI
+        # . Purpose
+        #   Discover AD users or groups through LDAP/GSSAPI.
+        #
         # . Arguments
-        #   $1  Identity type: user or group.
-        #   $2  Output array variable name.
+        #   - $1  Identity type: user or group.
+        #   - $2  Output array variable name.
         # . Returns
-        #   0 with one or more identities; 1 on discovery failure.
+        #   - 0 with one or more identities; 1 on discovery failure.
         # . Usage
         #   ```bash
         #   _discover_ad_identities group DISCOVERED_GROUPS
@@ -503,7 +536,7 @@ set -uo pipefail
         # . Output
         #   Writes one local access-group name per line.
         # . Returns
-        #   0 after enumeration.
+        #   - 0 after enumeration.
         # . Usage
         #   ```bash
         #   mapfile -t groups < <(_list_local_access_groups_raw)
@@ -529,11 +562,14 @@ set -uo pipefail
     }
 
     # fn: _select_identities - Select one or more users/groups appropriate to the active Samba mode
+        # . Purpose
+        #   Select one or more users/groups appropriate to the active Samba mode.
+        #
         # . Arguments
-        #   $1  Identity type: user or group.
-        #   $2  Output array variable name.
+        #   - $1  Identity type: user or group.
+        #   - $2  Output array variable name.
         # . Returns
-        #   0 on selection; 1 on cancel/discovery failure.
+        #   - 0 on selection; 1 on cancel/discovery failure.
         # . Usage
         #   ```bash
         #   _select_identities user users || return 0
@@ -591,10 +627,13 @@ set -uo pipefail
 
 # - Directory ACL helpers -----------------------------------------------------------
     # fn: _select_permissions - Select directory ACL permissions and return an rwx mask
+        # . Purpose
+        #   Select directory ACL permissions and return an rwx mask.
+        #
         # . Arguments
-        #   $1  Output variable name.
+        #   - $1  Output variable name.
         # . Returns
-        #   0 with a three-character permission mask; 1 on cancel.
+        #   - 0 with a three-character permission mask; 1 on cancel.
         # . Usage
         #   ```bash
         #   _select_permissions perms || return 0
@@ -622,8 +661,11 @@ set -uo pipefail
     }
 
     # fn: _grant_directory_access - Grant selected users/groups ACL access to selected directories
+        # . Purpose
+        #   Grant selected users/groups ACL access to selected directories.
+        #
         # . Arguments
-        #   $1  Identity type: user or group.
+        #   - $1  Identity type: user or group.
         # . Behavior
         #   - Resolves the selected principal through NSS before changing ACLs.
         #   - Applies immediate and default ACL entries using the numeric UID/GID so AD names
@@ -631,7 +673,7 @@ set -uo pipefail
         #   - Verifies both ACL entries after writing them and reports the failing principal/path.
         #   - Skips Samba share roots because share-level access is owned by Manage shares.
         # . Returns
-        #   0 after all selected ACLs are applied and verified; non-zero on any ACL failure.
+        #   - 0 after all selected ACLs are applied and verified; non-zero on any ACL failure.
         # . Usage
         #   ```bash
         #   _grant_directory_access group
@@ -709,12 +751,15 @@ set -uo pipefail
     }
 
     # fn: _assigned_identities - Return named ACL identities across selected directories
+        # . Purpose
+        #   Return named ACL identities across selected directories.
+        #
         # . Arguments
-        #   $1  Identity type: user or group.
+        #   - $1  Identity type: user or group.
         # . Output
         #   Writes one resolved identity per line.
         # . Returns
-        #   0 always.
+        #   - 0 always.
         # . Usage
         #   ```bash
         #   mapfile -t identities < <(_assigned_identities group)
@@ -745,10 +790,13 @@ set -uo pipefail
     }
 
     # fn: _remove_directory_access - Remove selected named user/group ACL entries
+        # . Purpose
+        #   Remove selected named user/group ACL entries.
+        #
         # . Arguments
-        #   $1  Identity type: user or group.
+        #   - $1  Identity type: user or group.
         # . Returns
-        #   0 after updates; non-zero on ACL failure.
+        #   - 0 after updates; non-zero on ACL failure.
         # . Usage
         #   ```bash
         #   _remove_directory_access user
@@ -788,12 +836,15 @@ set -uo pipefail
     }
 
     # fn: _format_directory_permissions - Format an ACL permission mask for display
+        # . Purpose
+        #   Format an ACL permission mask for display.
+        #
         # . Arguments
-        #   $1  Three-character ACL permission mask.
+        #   - $1  Three-character ACL permission mask.
         # . Output
         #   Writes a compact human-readable access description.
         # . Returns
-        #   0 always.
+        #   - 0 always.
         # . Usage
         #   ```bash
         #   access="$(_format_directory_permissions "rwx")"
@@ -816,6 +867,9 @@ set -uo pipefail
     }
 
     # fn: _show_directory_access - Display ownership and explicit ACL access for selected directories
+        # . Purpose
+        #   Display ownership and explicit ACL access for selected directories.
+        #
         # . Behavior
         #   - Uses the compact principal-to-rights presentation used by Samba share management.
         #   - Reads numeric ACL qualifiers and resolves them through NSS so local and Active
@@ -824,7 +878,7 @@ set -uo pipefail
         #   - Shows named default user and group ACL entries together under Default access.
         #   - Omits an access section when it contains no named entries.
         # . Returns
-        #   0 after display.
+        #   - 0 after display.
         # . Usage
         #   ```bash
         #   _show_directory_access
@@ -897,11 +951,14 @@ set -uo pipefail
 
 # - Directory lifecycle ------------------------------------------------------------
     # fn: _inherit_directory_access - Copy ownership, mode, and ACL model from parent to child
+        # . Purpose
+        #   Copy ownership, mode, and ACL model from parent to child.
+        #
         # . Arguments
-        #   $1  Parent directory.
-        #   $2  Child directory.
+        #   - $1  Parent directory.
+        #   - $2  Child directory.
         # . Returns
-        #   0 on success; non-zero on filesystem/ACL failure.
+        #   - 0 on success; non-zero on filesystem/ACL failure.
         # . Usage
         #   ```bash
         #   _inherit_directory_access "$parent" "$child"
@@ -915,10 +972,13 @@ set -uo pipefail
     }
 
     # fn: _validate_relative_path - Validate a safe relative directory path
+        # . Purpose
+        #   Validate a safe relative directory path.
+        #
         # . Arguments
-        #   $1  Relative path.
+        #   - $1  Relative path.
         # . Returns
-        #   0 when safe; 1 otherwise.
+        #   - 0 when safe; 1 otherwise.
         # . Usage
         #   ```bash
         #   _validate_relative_path "Files/Mark"
@@ -935,11 +995,14 @@ set -uo pipefail
     }
 
     # fn: _create_directory_tree - Create a relative tree beneath one parent with inherited ACLs
+        # . Purpose
+        #   Create a relative tree beneath one parent with inherited ACLs.
+        #
         # . Arguments
-        #   $1  Parent directory.
-        #   $2  Relative path.
+        #   - $1  Parent directory.
+        #   - $2  Relative path.
         # . Returns
-        #   0 when the tree exists and newly created components inherited access.
+        #   - 0 when the tree exists and newly created components inherited access.
         # . Usage
         #   ```bash
         #   _create_directory_tree "$parent" "Files/Mark"
@@ -965,10 +1028,13 @@ set -uo pipefail
     }
 
     # fn: _select_parent_directory - Select the share root or one existing directory as parent
+        # . Purpose
+        #   Select the share root or one existing directory as parent.
+        #
         # . Arguments
-        #   $1  Output variable name.
+        #   - $1  Output variable name.
         # . Returns
-        #   0 on selection; 1 on cancel.
+        #   - 0 on selection; 1 on cancel.
         # . Usage
         #   ```bash
         #   _select_parent_directory parent || return 0
@@ -994,8 +1060,11 @@ set -uo pipefail
     }
 
     # fn: _create_directory - Create one directory tree beneath a selected parent
+        # . Purpose
+        #   Create one directory tree beneath a selected parent.
+        #
         # . Returns
-        #   0 after returning to manager; non-zero on creation failure.
+        #   - 0 after returning to manager; non-zero on creation failure.
         # . Usage
         #   ```bash
         #   _create_directory
@@ -1038,8 +1107,11 @@ set -uo pipefail
     }
 
     # fn: _remove_directories - Remove selected non-share-root directories
+        # . Purpose
+        #   Remove selected non-share-root directories.
+        #
         # . Returns
-        #   0 after returning to manager; non-zero on removal failure.
+        #   - 0 after returning to manager; non-zero on removal failure.
         # . Usage
         #   ```bash
         #   _remove_directories
@@ -1080,8 +1152,11 @@ set -uo pipefail
     }
 
     # fn: _show_directories - Display all directories and share-root markers
+        # . Purpose
+        #   Display all directories and share-root markers.
+        #
         # . Returns
-        #   0 after display; 1 when no directories exist.
+        #   - 0 after display; 1 when no directories exist.
         # . Usage
         #   ```bash
         #   _show_directories
@@ -1101,8 +1176,11 @@ set -uo pipefail
     }
 
     # fn: _validate_selected_directories - Validate selected directory paths and ACL readability
+        # . Purpose
+        #   Validate selected directory paths and ACL readability.
+        #
         # . Returns
-        #   0 when selected directories validate; 1 otherwise.
+        #   - 0 when selected directories validate; 1 otherwise.
         # . Usage
         #   ```bash
         #   _validate_selected_directories
@@ -1131,16 +1209,53 @@ set -uo pipefail
 
 # - Menu ---------------------------------------------------------------------------
     # fn: _dir_menu_show - Display dir menu in the Samba workflow.
+        # . Purpose
+        #   Display managed Samba directories and their current state.
+        #
+        # . Usage
+        #   ```bash
+        #   _dir_menu_show
+        #   ```
     _dir_menu_show()          { _show_directories; }
     # fn: _dir_menu_select - Select dir menu in the Samba workflow.
+        # . Purpose
+        #   Prompt the user to select an existing Samba directory.
+        #
+        # . Usage
+        #   ```bash
+        #   _dir_menu_select
+        #   ```
     _dir_menu_select()        { _select_directories; }
     # fn: _dir_menu_create - Create dir menu in the Samba workflow.
+        # . Purpose
+        #   Collect settings for creating a Samba directory.
+        #
+        # . Usage
+        #   ```bash
+        #   _dir_menu_create
+        #   ```
     _dir_menu_create()        { _create_directory; }
     # fn: _dir_menu_remove - Remove dir menu in the Samba workflow.
+        # . Purpose
+        #   Confirm and remove a selected Samba directory.
+        #
+        # . Usage
+        #   ```bash
+        #   _dir_menu_remove
+        #   ```
     _dir_menu_remove()        { _remove_directories; }
     # fn: _dir_menu_show_access - Show access permissions for the selected Samba directory.
+        # . Purpose
+        #   Show access permissions for the selected Samba directory.
+        #
+        # . Usage
+        #   ```bash
+        #   _dir_menu_show_access
+        #   ```
     _dir_menu_show_access()   { _show_directory_access; }
     # fn: _dir_menu_grant_users - Call `_grant_directory_access` with the `user` action.
+        # . Purpose
+        #   Invoke the user action through the module manager.
         #
         # . Returns
         #   The status returned by the delegated action.
@@ -1151,6 +1266,8 @@ set -uo pipefail
         #   ```
     _dir_menu_grant_users()   { _grant_directory_access user; }
     # fn: _dir_menu_grant_groups - Call `_grant_directory_access` with the `group` action.
+        # . Purpose
+        #   Invoke the group action through the module manager.
         #
         # . Returns
         #   The status returned by the delegated action.
@@ -1161,6 +1278,8 @@ set -uo pipefail
         #   ```
     _dir_menu_grant_groups()  { _grant_directory_access group; }
     # fn: _dir_menu_remove_users - Call `_remove_directory_access` with the `user` action.
+        # . Purpose
+        #   Invoke the user action through the module manager.
         #
         # . Returns
         #   The status returned by the delegated action.
@@ -1171,6 +1290,8 @@ set -uo pipefail
         #   ```
     _dir_menu_remove_users()  { _remove_directory_access user; }
     # fn: _dir_menu_remove_groups - Call `_remove_directory_access` with the `group` action.
+        # . Purpose
+        #   Invoke the group action through the module manager.
         #
         # . Returns
         #   The status returned by the delegated action.
@@ -1181,11 +1302,21 @@ set -uo pipefail
         #   ```
     _dir_menu_remove_groups() { _remove_directory_access group; }
     # fn: _dir_menu_validate - Validate dir menu in the Samba workflow.
+        # . Purpose
+        #   Validate the managed Samba directories and access settings.
+        #
+        # . Usage
+        #   ```bash
+        #   _dir_menu_validate
+        #   ```
     _dir_menu_validate()      { _validate_selected_directories; }
 
     # fn: _build_menu - Build the directory-management menu for the current selection state
+        # . Purpose
+        #   Build the directory-management menu for the current selection state.
+        #
         # . Returns
-        #   0 when menu registration succeeds.
+        #   - 0 when menu registration succeeds.
         # . Usage
         #   ```bash
         #   _build_menu
@@ -1220,10 +1351,13 @@ set -uo pipefail
 
 # - Main ---------------------------------------------------------------------------
     # fn: main - Run interactive Samba directory management
+        # . Purpose
+        #   Run interactive Samba directory management.
+        #
         # . Arguments
         #   $@  Framework and script-specific arguments.
         # . Returns
-        #   0 after normal exit; non-zero on bootstrap or action failure.
+        #   - 0 after normal exit; non-zero on bootstrap or action failure.
         # . Usage
         #   ```bash
         #   main "$@"

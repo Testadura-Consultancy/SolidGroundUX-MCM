@@ -8,7 +8,8 @@
 #   Checksum    : 199a18849f6a1b6d708b3eb7ff84d1c0d95df4a0a6be8b4aaa84411862d0e6f2
 #   Source      : 90-development.sh
 #   Type        : module
-#   Group       : Module Registration
+#   Group       : Modules
+#   Subgroup    : Development
 #   Purpose     : Tools for workspace creation, deployment, release preparation, wrapper generation, and documentation.
 # Description:
 #   Provides SolidGroundUX SDK development tooling for workspace creation,
@@ -17,25 +18,26 @@
 set -uo pipefail
 
 # - Library guard ------------------------------------------------------------------
-    # fn$ _sgnd_lib_guard - Enforce source-only, single-load library initialization
+    # fn: _sgnd_lib_guard - Enforce source-only, source-only library guard
         # . Purpose
-        #   Ensure the file is sourced as a library and initialized only once.
+        #   Ensure the file is sourced as a library and marked as loaded.
         #
         # . Behavior
         #   - Derives a unique guard variable name from the current filename.
         #   - Aborts execution when the file is run directly instead of sourced.
         #   - Sets the guard variable on first load.
-        #   - Returns immediately when the library was already loaded.
+        #   - Returns from the guard helper when the file is already marked loaded; it does not skip subsequent top-level statements.
         #
-        # Inputs
+        # . Inputs
         #   BASH_SOURCE[0]
-        #   $0
+        #   - $0
         #
-        # Outputs (globals)
+        # . Outputs
+        #   (globals)
         #   SGND_<MODULE>_LOADED
         #
         # . Returns
-        #   0 when already loaded or successfully initialized.
+        #   - 0 when already loaded or successfully initialized.
         #   Exits with code 2 when executed instead of sourced.
         #
         # . Usage
@@ -78,7 +80,8 @@ set -uo pipefail
         #   Launch the canonical SolidGroundUX workspace-creation tool.
         #
         # . Returns
-        #   Returns the underlying public-command status.
+        #   . Returns
+        #     the underlying public-command status.
         #
         # . Usage
         #   ```bash
@@ -93,7 +96,8 @@ set -uo pipefail
         #   Launch the canonical SolidGroundUX workspace-deployment tool.
         #
         # . Returns
-        #   Returns the underlying public-command status.
+        #   . Returns
+        #     the underlying public-command status.
         #
         # . Usage
         #   ```bash
@@ -108,7 +112,8 @@ set -uo pipefail
         #   Launch the canonical SolidGroundUX release-preparation tool.
         #
         # . Returns
-        #   Returns the underlying public-command status.
+        #   . Returns
+        #     the underlying public-command status.
         #
         # . Usage
         #   ```bash
@@ -123,7 +128,8 @@ set -uo pipefail
         #   Launch the canonical SolidGroundUX wrapper-creation tool.
         #
         # . Returns
-        #   Returns the underlying public-command status.
+        #   . Returns
+        #     the underlying public-command status.
         #
         # . Usage
         #   ```bash
@@ -145,6 +151,8 @@ set -uo pipefail
     # Every validator sets SGND_MODULE_VALIDATION_MESSAGE to a concise result summary.
     # Detailed diagnostic output may be written by the validator or delegated action.
     # fn: validate_module_development - Validate the management module and record its status for the console.
+        # . Purpose
+        #   Validate the management module and record its status for the console.
         #
         # . Returns
         #   A console validation status (0=pass, 1=fail, 2=warning, 3=skipped).

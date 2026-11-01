@@ -8,7 +8,8 @@
 #   Checksum    : c1fbd7e0415e3fe9bb7744d5844742e7d274250e87f7d01847573c20202747d6
 #   Source      : 27-active-directory-management.sh
 #   Type        : module
-#   Group       : Module Registration
+#   Group       : Modules
+#   Subgroup    : Active Directory Management
 #   Purpose     : Register Active Directory object-management actions
 #
 # Description:
@@ -19,25 +20,26 @@
 set -uo pipefail
 
 # - Library guard ------------------------------------------------------------------
-    # fn$ _sgnd_lib_guard - Enforce source-only, single-load library initialization
+    # fn: _sgnd_lib_guard - Enforce source-only, source-only library guard
         # . Purpose
-        #   Ensure the file is sourced as a library and initialized only once.
+        #   Ensure the file is sourced as a library and marked as loaded.
         #
         # . Behavior
         #   - Derives a unique guard variable name from the current filename.
         #   - Aborts execution when the file is run directly instead of sourced.
         #   - Sets the guard variable on first load.
-        #   - Returns immediately when the library was already loaded.
+        #   - Returns from the guard helper when the file is already marked loaded; it does not skip subsequent top-level statements.
         #
-        # Inputs
+        # . Inputs
         #   BASH_SOURCE[0]
-        #   $0
+        #   - $0
         #
-        # Outputs (globals)
+        # . Outputs
+        #   (globals)
         #   SGND_<MODULE>_LOADED
         #
         # . Returns
-        #   0 when already loaded or successfully initialized.
+        #   - 0 when already loaded or successfully initialized.
         #   Exits with code 2 when executed instead of sourced.
         #
         # . Usage
@@ -75,8 +77,17 @@ set -uo pipefail
     SGND_MODULE_NAME="$SGND_AD_MANAGEMENT_MODULE_NAME"
 # - Management dispatch -------------------------------------------------------------
     # fn: _admg_run_action - Forward an Active Directory management action to its management executable.
+        # . Purpose
+        #   Forward an Active Directory management action to its management executable.
+        #
+        # . Usage
+        #   ```bash
+        #   _admg_run_action "status"
+        #   ```
     _admg_run_action() { local action="${1:?missing action}"; _sgnd_run_module_script "manage-active-directory.sh" --action "$action"; }
     # fn: _admg_validate - Forward the `validate` action to the AD management script.
+        # . Purpose
+        #   Forward the `validate` action to the AD management script.
         #
         # . Returns
         #   The status returned by the delegated action.
@@ -87,6 +98,8 @@ set -uo pipefail
         #   ```
     _admg_validate() { _admg_run_action validate; }
     # fn: _admg_status - Forward the `status` action to the AD management script.
+        # . Purpose
+        #   Forward the `status` action to the AD management script.
         #
         # . Returns
         #   The status returned by the delegated action.
@@ -97,6 +110,8 @@ set -uo pipefail
         #   ```
     _admg_status() { _admg_run_action status; }
     # fn: _admg_list_users - Forward the `user-list` action to the AD management script.
+        # . Purpose
+        #   Forward the `user-list` action to the AD management script.
         #
         # . Returns
         #   The status returned by the delegated action.
@@ -107,6 +122,8 @@ set -uo pipefail
         #   ```
     _admg_list_users() { _admg_run_action user-list; }
     # fn: _admg_show_user - Forward the `user-show` action to the AD management script.
+        # . Purpose
+        #   Forward the `user-show` action to the AD management script.
         #
         # . Returns
         #   The status returned by the delegated action.
@@ -117,6 +134,8 @@ set -uo pipefail
         #   ```
     _admg_show_user() { _admg_run_action user-show; }
     # fn: _admg_create_user - Forward the `user-create` action to the AD management script.
+        # . Purpose
+        #   Forward the `user-create` action to the AD management script.
         #
         # . Returns
         #   The status returned by the delegated action.
@@ -127,6 +146,8 @@ set -uo pipefail
         #   ```
     _admg_create_user() { _admg_run_action user-create; }
     # fn: _admg_toggle_user - Forward the `user-toggle` action to the AD management script.
+        # . Purpose
+        #   Forward the `user-toggle` action to the AD management script.
         #
         # . Returns
         #   The status returned by the delegated action.
@@ -137,6 +158,8 @@ set -uo pipefail
         #   ```
     _admg_toggle_user() { _admg_run_action user-toggle; }
     # fn: _admg_reset_user_password - Forward the `user-password` action to the AD management script.
+        # . Purpose
+        #   Forward the `user-password` action to the AD management script.
         #
         # . Returns
         #   The status returned by the delegated action.
@@ -147,6 +170,8 @@ set -uo pipefail
         #   ```
     _admg_reset_user_password() { _admg_run_action user-password; }
     # fn: _admg_set_user_password_noexpiry - Forward the `user-noexpiry` action to the AD management script.
+        # . Purpose
+        #   Forward the `user-noexpiry` action to the AD management script.
         #
         # . Returns
         #   The status returned by the delegated action.
@@ -157,6 +182,8 @@ set -uo pipefail
         #   ```
     _admg_set_user_password_noexpiry() { _admg_run_action user-noexpiry; }
     # fn: _admg_user_add_groups - Forward the `user-addgroups` action to the AD management script.
+        # . Purpose
+        #   Forward the `user-addgroups` action to the AD management script.
         #
         # . Returns
         #   The status returned by the delegated action.
@@ -167,6 +194,8 @@ set -uo pipefail
         #   ```
     _admg_user_add_groups() { _admg_run_action user-addgroups; }
     # fn: _admg_user_remove_groups - Forward the `user-removegroups` action to the AD management script.
+        # . Purpose
+        #   Forward the `user-removegroups` action to the AD management script.
         #
         # . Returns
         #   The status returned by the delegated action.
@@ -177,6 +206,8 @@ set -uo pipefail
         #   ```
     _admg_user_remove_groups() { _admg_run_action user-removegroups; }
     # fn: _admg_delete_user - Forward the `user-delete` action to the AD management script.
+        # . Purpose
+        #   Forward the `user-delete` action to the AD management script.
         #
         # . Returns
         #   The status returned by the delegated action.
@@ -187,6 +218,8 @@ set -uo pipefail
         #   ```
     _admg_delete_user() { _admg_run_action user-delete; }
     # fn: _admg_list_groups - Forward the `group-list` action to the AD management script.
+        # . Purpose
+        #   Forward the `group-list` action to the AD management script.
         #
         # . Returns
         #   The status returned by the delegated action.
@@ -197,6 +230,8 @@ set -uo pipefail
         #   ```
     _admg_list_groups() { _admg_run_action group-list; }
     # fn: _admg_show_group - Forward the `group-show` action to the AD management script.
+        # . Purpose
+        #   Forward the `group-show` action to the AD management script.
         #
         # . Returns
         #   The status returned by the delegated action.
@@ -207,6 +242,8 @@ set -uo pipefail
         #   ```
     _admg_show_group() { _admg_run_action group-show; }
     # fn: _admg_create_group - Forward the `group-create` action to the AD management script.
+        # . Purpose
+        #   Forward the `group-create` action to the AD management script.
         #
         # . Returns
         #   The status returned by the delegated action.
@@ -217,6 +254,8 @@ set -uo pipefail
         #   ```
     _admg_create_group() { _admg_run_action group-create; }
     # fn: _admg_group_add_users - Forward the `group-addusers` action to the AD management script.
+        # . Purpose
+        #   Forward the `group-addusers` action to the AD management script.
         #
         # . Returns
         #   The status returned by the delegated action.
@@ -227,6 +266,8 @@ set -uo pipefail
         #   ```
     _admg_group_add_users() { _admg_run_action group-addusers; }
     # fn: _admg_group_remove_members - Forward the `group-removemembers` action to the AD management script.
+        # . Purpose
+        #   Forward the `group-removemembers` action to the AD management script.
         #
         # . Returns
         #   The status returned by the delegated action.
@@ -237,6 +278,8 @@ set -uo pipefail
         #   ```
     _admg_group_remove_members() { _admg_run_action group-removemembers; }
     # fn: _admg_delete_group - Forward the `group-delete` action to the AD management script.
+        # . Purpose
+        #   Forward the `group-delete` action to the AD management script.
         #
         # . Returns
         #   The status returned by the delegated action.
@@ -247,6 +290,8 @@ set -uo pipefail
         #   ```
     _admg_delete_group() { _admg_run_action group-delete; }
     # fn: _admg_list_computers - Forward the `computer-list` action to the AD management script.
+        # . Purpose
+        #   Forward the `computer-list` action to the AD management script.
         #
         # . Returns
         #   The status returned by the delegated action.
@@ -257,6 +302,8 @@ set -uo pipefail
         #   ```
     _admg_list_computers() { _admg_run_action computer-list; }
     # fn: _admg_show_computer - Forward the `computer-show` action to the AD management script.
+        # . Purpose
+        #   Forward the `computer-show` action to the AD management script.
         #
         # . Returns
         #   The status returned by the delegated action.
@@ -267,6 +314,8 @@ set -uo pipefail
         #   ```
     _admg_show_computer() { _admg_run_action computer-show; }
     # fn: _admg_delete_computer - Forward the `computer-delete` action to the AD management script.
+        # . Purpose
+        #   Forward the `computer-delete` action to the AD management script.
         #
         # . Returns
         #   The status returned by the delegated action.
@@ -287,6 +336,8 @@ set -uo pipefail
     # Every validator sets SGND_MODULE_VALIDATION_MESSAGE to a concise result summary.
     # Detailed diagnostic output may be written by the validator or delegated action.
     # fn: validate_module_active_directory_management - Validate the Active Directory module and record its status for the console.
+        # . Purpose
+        #   Validate the Active Directory module and record its status for the console.
         #
         # . Returns
         #   A console validation status (0=pass, 1=fail, 2=warning, 3=skipped).

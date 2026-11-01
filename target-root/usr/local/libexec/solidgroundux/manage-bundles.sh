@@ -6,7 +6,7 @@
 #   Version     : 2.1
 #   Source      : manage-bundles.sh
 #   Type        : script
-#   Group       : Role Managers
+#   Group       : Modules
 #   Subgroup    : Web Content Management
 #   Purpose     : Manage documentation bundles through the SolidGroundUX interface.
 #
@@ -21,10 +21,13 @@
 # Usage:
 #   Run the executable from its shell command (or installed wrapper):
 #   ```bash
-#   manage-bundles
+#   sgnd-manage-bundles
+#   sgnd-manage-bundles --generate
 #   ```
 #
-#   Opens the interactive documentation-bundle menu.
+#   - With no mode: open the interactive documentation-bundle manager.
+#   - With `--generate`: choose a saved bundle and generate its Markdown documentation.
+#   - Select Q at the bundle selector to return without generating anything.
 #
 # Attribution:
 #   Developers  : Mark Fieten
@@ -53,7 +56,7 @@ set -uo pipefail
         #     present, falls back to the installed framework copy without changing
         #     SGND_FRAMEWORK_ROOT.
         #
-        # . Globals (write)
+        # . Globals (Write)
         #   SGND_FRAMEWORK_ROOT
         #
         # . Output
@@ -61,8 +64,8 @@ set -uo pipefail
         #   helpers are not available until sgnd-exe-common.sh has been loaded.
         #
         # . Returns
-        #   0 when the framework root was resolved and executable common library loaded.
-        #   126 when the script path cannot be resolved, no canonical root component can
+        #   - 0 when the framework root was resolved and executable common library loaded.
+        #   - 126 when the script path cannot be resolved, no canonical root component can
         #   be found, or the executable common library is unreadable.
         #
         # . Usage
@@ -145,7 +148,7 @@ set -uo pipefail
         sgnd-menu.sh
     )
     SGND_ARGS_SPEC=()
-    SGND_SCRIPT_EXAMPLES=("  $SGND_SCRIPT_NAME")
+    SGND_SCRIPT_EXAMPLES=("  $SGND_SCRIPT_NAME" "  $SGND_SCRIPT_NAME --generate")
     SGND_SCRIPT_GLOBALS=()
     SGND_STATE_VARIABLES=("SGND_DOC_ACTIVE_BUNDLE|Active documentation bundle||")
     SGND_ON_EXIT_HANDLERS=()
@@ -161,6 +164,9 @@ set -uo pipefail
 
 # - Backend access --------------------------------------------------------------------
     # fn: _bundle_python - Call the existing bundle Python CLI without changing its API
+        # . Purpose
+        #   Call the existing bundle Python CLI without changing its API.
+        #
         # . Arguments
         #   $@ - Command and arguments from the original doc-bundles.sh implementation.
         # . Output
@@ -188,8 +194,11 @@ set -uo pipefail
     }
 
     # fn: _bundle_markdown_python - Invoke the existing Markdown generator and report JSON
+        # . Purpose
+        #   Invoke the existing Markdown generator and report JSON.
+        #
         # . Arguments
-        #   $1 - Bundle identifier.
+        #   - `$1` — Bundle identifier.
         # . Output
         #   JSON summary from the Markdown generator.
         # . Returns
@@ -222,13 +231,16 @@ set -uo pipefail
 
 # - Input and view helpers ------------------------------------------------------------
     # fn: _bundle_prompt - Read a value using the framework's ask facility
+        # . Purpose
+        #   Read a value using the framework's ask facility.
+        #
         # . Arguments
-        #   $1 label, $2 default, $3 output variable, $4 optional validator, $5 width.
+        #   - $1 label, $2 default, $3 output variable, $4 optional validator, $5 width.
         # . Returns
         #   ask status (Q with --back returns 1).
         # . Usage
         #   ```bash
-        #   _bundle_prompt 'Bundle title' '' title _bundle_validate_nonempty
+        #   _bundle_prompt "Bundle title" "" title _bundle_validate_nonempty "30"
         #   ```
     _bundle_prompt() {
         local prompt_label="$1" prompt_default="${2:-}" prompt_target="$3"
@@ -238,41 +250,56 @@ set -uo pipefail
         ask "${options[@]}"
     }
 
-    # fn$ _bundle_validate_nonempty - Reject empty required values
+    # fn: _bundle_validate_nonempty - Reject empty required values
+        # . Purpose
+        #   Reject empty required values.
+        #
         # . Returns
-        #   0 for nonempty input, 1 otherwise.
+        #   - 0 for nonempty input, 1 otherwise.
         # . Usage
         #   ```bash
         #   _bundle_validate_nonempty "value"
         #   ```
     _bundle_validate_nonempty() { [[ -n "${1//[[:space:]]/}" ]]; }
-    # fn$ _bundle_validate_directory - Validate an existing source directory
+    # fn: _bundle_validate_directory - Validate an existing source directory
+        # . Purpose
+        #   Validate an existing source directory.
+        #
         # . Returns
-        #   0 if directory exists.
+        #   - 0 if directory exists.
         # . Usage
         #   ```bash
         #   _bundle_validate_directory /tmp
         #   ```
     _bundle_validate_directory() { [[ -d "$1" ]]; }
-    # fn$ _bundle_validate_output - Require an absolute output directory
+    # fn: _bundle_validate_output - Require an absolute output directory
+        # . Purpose
+        #   Require an absolute output directory.
+        #
         # . Returns
-        #   0 for absolute paths.
+        #   - 0 for absolute paths.
         # . Usage
         #   ```bash
         #   _bundle_validate_output /tmp/docs
         #   ```
     _bundle_validate_output() { [[ "$1" == /* ]]; }
-    # fn$ _bundle_validate_overwrite - Accept supported overwrite policies
+    # fn: _bundle_validate_overwrite - Accept supported overwrite policies
+        # . Purpose
+        #   Accept supported overwrite policies.
+        #
         # . Returns
-        #   0 for replace or fail.
+        #   - 0 for replace or fail.
         # . Usage
         #   ```bash
         #   _bundle_validate_overwrite replace
         #   ```
     _bundle_validate_overwrite() { [[ "$1" == replace || "$1" == fail ]]; }
-    # fn$ _bundle_validate_position - Require a positive one-based position
+    # fn: _bundle_validate_position - Require a positive one-based position
+        # . Purpose
+        #   Require a positive one-based position.
+        #
         # . Returns
-        #   0 for positive integers.
+        #   - 0 for positive integers.
         # . Usage
         #   ```bash
         #   _bundle_validate_position 2
@@ -280,8 +307,11 @@ set -uo pipefail
     _bundle_validate_position() { [[ "$1" =~ ^[1-9][0-9]*$ ]]; }
 
     # fn: _bundle_require_active - Reject an operation without a selected bundle
+        # . Purpose
+        #   Reject an operation without a selected bundle.
+        #
         # . Returns
-        #   0 if a bundle is selected; 1 otherwise.
+        #   - 0 if a bundle is selected; 1 otherwise.
         # . Usage
         #   ```bash
         #   _bundle_require_active || return $?
@@ -293,8 +323,11 @@ set -uo pipefail
     }
 
     # fn: _bundle_render_table - Render a framework datatable with a named section
+        # . Purpose
+        #   Render a framework datatable with a named section.
+        #
         # . Arguments
-        #   $1 section title, $2 schema, $3 table array name.
+        #   - $1 section title, $2 schema, $3 table array name.
         # . Returns
         #   The status from sgnd_dt_print_table.
         # . Usage
@@ -308,12 +341,16 @@ set -uo pipefail
     }
 
     # fn: _bundle_read_bundle_table - Populate a datatable from list-json
+        # . Purpose
+        #   Populate a datatable from list-json.
+        #
         # . Behavior
         #   Preserves original JSON CLI and numbered selection semantics.
-        # . Outputs (globals)
+        # . Outputs
+        #   (globals)
         #   SGND_BUNDLE_IDS and SGND_BUNDLE_ROWS.
         # . Returns
-        #   0 on success; nonzero if the backend or JSON response fails.
+        #   - 0 on success; nonzero if the backend or JSON response fails.
         # . Usage
         #   ```bash
         #   _bundle_read_bundle_table
@@ -342,10 +379,14 @@ for item in items:
     }
 
     # fn: _bundle_read_sources_table - Populate a datatable from a bundle's products
-        # . Outputs (globals)
+        # . Purpose
+        #   Populate a datatable from a bundle's products.
+        #
+        # . Outputs
+        #   (globals)
         #   SGND_BUNDLE_SOURCE_IDS and SGND_BUNDLE_SOURCE_ROWS.
         # . Returns
-        #   0 on success; nonzero if backend or JSON parsing fails.
+        #   - 0 on success; nonzero if backend or JSON parsing fails.
         # . Usage
         #   ```bash
         #   _bundle_read_sources_table
@@ -374,10 +415,13 @@ for source in item["products"]:
     }
 
     # fn: _bundle_choose_row - Resolve a numbered selection from a provided ID array
+        # . Purpose
+        #   Resolve a numbered selection from a provided ID array.
+        #
         # . Arguments
-        #   $1 output variable, $2 nameref array variable.
+        #   - $1 output variable, $2 nameref array variable.
         # . Returns
-        #   0 on selection; 1 for Q/cancellation.
+        #   - 0 on selection; 1 for Q/cancellation.
         # . Usage
         #   ```bash
         #   _bundle_choose_row selected SGND_BUNDLE_IDS
@@ -401,8 +445,11 @@ for source in item["products"]:
     }
 
     # fn: _bundle_continue - Print a spacer and wait for Enter before returning to the menu
+        # . Purpose
+        #   Print a spacer and wait for Enter before returning to the menu.
+        #
         # . Returns
-        #   0 after the prompt completes.
+        #   - 0 after the prompt completes.
         # . Usage
         #   ```bash
         #   _bundle_continue
@@ -417,6 +464,9 @@ for source in item["products"]:
 
 # - Bundle actions --------------------------------------------------------------------
     # fn: _bundle_list - List saved documentation bundles as a datatable
+        # . Purpose
+        #   List saved documentation bundles as a datatable.
+        #
         # . Returns
         #   Backend or table rendering status.
         # . Usage
@@ -432,8 +482,11 @@ for source in item["products"]:
     }
 
     # fn: _bundle_select - Select a bundle by its displayed table number
+        # . Purpose
+        #   Select a bundle by its displayed table number.
+        #
         # . Returns
-        #   0 on selection or cancellation; nonzero on loading error.
+        #   - 0 on selection or cancellation; nonzero on loading error.
         # . Usage
         #   ```bash
         #   _bundle_select
@@ -448,6 +501,9 @@ for source in item["products"]:
     }
 
     # fn: _bundle_create - Create a saved bundle through the existing CLI
+        # . Purpose
+        #   Create a saved bundle through the existing CLI.
+        #
         # . Returns
         #   Backend status, or 0 when an input is cancelled.
         # . Usage
@@ -465,6 +521,9 @@ for source in item["products"]:
     }
 
     # fn: _bundle_configure - Modify the bundle configuration using original CLI fields
+        # . Purpose
+        #   Modify the bundle configuration using original CLI fields.
+        #
         # . Returns
         #   Backend status, or 0 on cancellation.
         # . Usage
@@ -512,27 +571,55 @@ for key in ("title", "output_dir", "overwrite"):
         _bundle_render_table 'Bundle configuration' 'Setting|Value' rows
     }
 
-    # fn$ _bundle_validate_doc_role - Accept the three bundle document placement roles.
+    # fn: _bundle_validate_doc_role - Accept the three bundle document placement roles.
+        # . Purpose
+        #   Accept the three bundle document placement roles.
+        #
+        # . Usage
+        #   ```bash
+        #   _bundle_validate_doc_role "example-value"
+        #   ```
     _bundle_validate_doc_role() { [[ "$1" == preface || "$1" == epilogue || "$1" == page ]]; }
 
-    # fn$ _bundle_validate_doc_action - Accept document-management commands.
+    # fn: _bundle_validate_doc_action - Accept document-management commands.
+        # . Purpose
+        #   Accept document-management commands.
+        #
+        # . Usage
+        #   ```bash
+        #   _bundle_validate_doc_action "example-value"
+        #   ```
     _bundle_validate_doc_action() { [[ "$1" == add || "$1" == remove || "$1" == move || "$1" == auto || "$1" == none || "$1" == manual ]]; }
 
-    # fn$ _bundle_validate_doc_role_or_page - Accept section-level document placement.
+    # fn: _bundle_validate_doc_role_or_page - Accept section-level document placement.
+        # . Purpose
+        #   Accept section-level document placement.
+        #
+        # . Usage
+        #   ```bash
+        #   _bundle_validate_doc_role_or_page "example-value"
+        #   ```
     _bundle_validate_doc_role_or_page() { [[ "$1" == page || "$1" == preface || "$1" == epilogue ]]; }
 
-    # fn$ _bundle_validate_doc_path - Check documentation source file extensions.
+    # fn: _bundle_validate_doc_path - Check documentation source file extensions.
+        # . Purpose
+        #   Check documentation source file extensions.
+        #
+        # . Usage
+        #   ```bash
+        #   _bundle_validate_doc_path "/srv/storage/example"
+        #   ```
     _bundle_validate_doc_path() { [[ -f "$1" && ( "$1" == *.sh || "$1" == *.py || "$1" == *.md ) ]]; }
 
     # fn: _bundle_manage_documents - Manage ordered introductory, closing and authored pages.
-    # . Purpose
-    #   Show explicit document selections and allow manual or automatic modes.
-    # . Returns
-    #   0 on cancellation, nonzero if a backend operation fails.
-    # . Usage
-    #   ```bash
-    #   _bundle_manage_documents
-    #   ```
+        # . Purpose
+        #   Show explicit document selections and allow manual or automatic modes.
+        # . Returns
+        #   - 0 on cancellation, nonzero if a backend operation fails.
+        # . Usage
+        #   ```bash
+        #   _bundle_manage_documents
+        #   ```
     _bundle_manage_documents() {
         local role="" action="" filename="" position="" new_position="" product="" group="" subgroup="" placement="" raw="" encoded="" line=""
         local -a rows=()
@@ -595,6 +682,9 @@ for index, entry in enumerate(b.get(k, []), 1):
     }
 
     # fn: _bundle_validate - Validate the active bundle
+        # . Purpose
+        #   Validate the active bundle.
+        #
         # . Returns
         #   Backend status, or 1 if no bundle is selected.
         # . Usage
@@ -607,6 +697,9 @@ for index, entry in enumerate(b.get(k, []), 1):
     }
 
     # fn: _bundle_delete - Confirm and delete a saved bundle
+        # . Purpose
+        #   Confirm and delete a saved bundle.
+        #
         # . Returns
         #   Backend status, or 0 when cancelled.
         # . Usage
@@ -627,8 +720,12 @@ for index, entry in enumerate(b.get(k, []), 1):
     }
 
     # fn: _bundle_generate - Validate bundle and prepare the Markdown WWW root
+        # . Purpose
+        #   Validate bundle and prepare the Markdown WWW root.
+        #
         # . Returns
-        #   Generator or summary-rendering status.
+        #   Generator or summary-rendering status; writes the optional console
+        #   completion marker only after successful Markdown preparation.
         # . Usage
         #   ```bash
         #   _bundle_generate
@@ -656,13 +753,55 @@ for key, title in (("output", "Output directory"), ("products", "Products"),
             [[ -n "$label" ]] || continue
             sgnd_dt_append 'Metric|Value' rows "$label" "$value" || return $?
         done <<< "$parsed"
-        _bundle_render_table 'Markdown prepared' 'Metric|Value' rows
+        _bundle_render_table 'Markdown prepared' 'Metric|Value' rows || return $?
+        # The console uses this marker to distinguish completed generation from
+        # the bundle selector's successful (exit 0) cancellation path.
+        if [[ -n "${SGND_DOC_BUNDLE_GENERATION_MARKER_FILE:-}" ]]; then
+            printf '%s\n' generated > "$SGND_DOC_BUNDLE_GENERATION_MARKER_FILE" ||
+                saywarning "Could not record successful documentation generation for menu status updates."
+        fi
+        return 0
+    }
+
+    # fn: _bundle_generate_selected - Select a saved bundle before generating Markdown
+        # . Purpose
+        #   Show the saved bundles, require an explicit selection, and generate only
+        #   the chosen bundle using the existing validation and generator workflow.
+        #
+        # . Behavior
+        #   - Displays the numbered table of available bundles without a default selection.
+        #   - Q cancels without invoking the generator.
+        #   - Shows the selected bundle's details before generating Markdown.
+        #
+        # . Returns
+        #   Generator status, 0 when the selector is cancelled or the store is empty.
+        #
+        # . Usage
+        #   ```bash
+        #   _bundle_generate_selected
+        #   ```
+    _bundle_generate_selected() {
+        local selected=""
+        sgnd_print
+        sgnd_print_sectionheader 'Generate documentation bundle' --padend 0
+        _bundle_list || return $?
+        (( ${#SGND_BUNDLE_IDS[@]} > 0 )) || return 0
+        _bundle_choose_row selected SGND_BUNDLE_IDS || {
+            saycancel 'Bundle generation cancelled'
+            return 0
+        }
+        SGND_DOC_ACTIVE_BUNDLE="$selected"
+        _bundle_print_active_summary || return $?
+        _bundle_generate
     }
 
 # - Source management -----------------------------------------------------------------
     # fn: _bundle_sources_table - Display the ordered product/source datatable
+        # . Purpose
+        #   Display the ordered product/source datatable.
+        #
         # . Returns
-        #   0 on success; backend/table status otherwise.
+        #   - 0 on success; backend/table status otherwise.
         # . Usage
         #   ```bash
         #   _bundle_sources_table
@@ -676,6 +815,9 @@ for key, title in (("output", "Output directory"), ("products", "Products"),
     }
 
     # fn: _bundle_source_add - Add a source repository to the active bundle
+        # . Purpose
+        #   Add a source repository to the active bundle.
+        #
         # . Returns
         #   Backend status, or 0 on cancellation.
         # . Usage
@@ -691,6 +833,9 @@ for key, title in (("output", "Output directory"), ("products", "Products"),
     }
 
     # fn: _bundle_source_edit - Edit the chapter title and source directory
+        # . Purpose
+        #   Edit the chapter title and source directory.
+        #
         # . Returns
         #   Backend status, or 0 on cancellation.
         # . Usage
@@ -720,6 +865,9 @@ for item in json.load(sys.stdin)["products"]:
     }
 
     # fn: _bundle_source_move - Reorder a source repository chapter
+        # . Purpose
+        #   Reorder a source repository chapter.
+        #
         # . Returns
         #   Backend status, or 0 on cancellation.
         # . Usage
@@ -735,6 +883,9 @@ for item in json.load(sys.stdin)["products"]:
     }
 
     # fn: _bundle_source_remove - Remove a source repository from the bundle
+        # . Purpose
+        #   Remove a source repository from the bundle.
+        #
         # . Returns
         #   Backend status, or 0 on cancellation.
         # . Usage
@@ -750,6 +901,9 @@ for item in json.load(sys.stdin)["products"]:
 
 # - Active bundle status --------------------------------------------------------------
     # fn: _bundle_print_active_summary - Show active bundle below the title bar
+        # . Purpose
+        #   Show active bundle below the title bar.
+        #
         # . Returns
         #   0, including when no bundle is selected.
         # . Usage
@@ -846,6 +1000,9 @@ for product in bundle.get("products", []):
 
 # - Framework menus -------------------------------------------------------------------
     # fn: _bundle_register_main_menu - Register bundle actions through sgnd-menu
+        # . Purpose
+        #   Register bundle actions through sgnd-menu.
+        #
         # . Returns
         #   Status of menu registration.
         # . Usage
@@ -866,12 +1023,13 @@ for product in bundle.get("products", []):
         sgnd_menu_register_item 'bundle-sources' 'bundle-management' 'Manage sources' '_bundle_manage_sources' '' 0 0 1 0 || return $?
         sgnd_menu_register_item 'bundle-documents' 'bundle-management' 'Manage bundle documents' '_bundle_manage_documents' '' 0 0 1 0 || return $?
         sgnd_menu_register_item 'bundle-validate' 'bundle-management' 'Validate bundle' '_bundle_validate' '' 0 0 1 0 || return $?
-        sgnd_menu_register_item 'bundle-delete' 'bundle-management' 'Delete bundle' '_bundle_delete' '' 0 0 1 0 || return $?
-        sgnd_menu_register_group 'bundle-generation' 'Generation' '' 0 1 30 || return $?
-        sgnd_menu_register_item 'bundle-generate' 'bundle-generation' 'Prepare Markdown' '_bundle_generate' '' 0 0 1 0
+        sgnd_menu_register_item 'bundle-delete' 'bundle-management' 'Delete bundle' '_bundle_delete' '' 0 0 1 0
     }
 
     # fn: _bundle_register_sources_menu - Register the source-management submenu
+        # . Purpose
+        #   Register the source-management submenu.
+        #
         # . Returns
         #   Status of menu registration.
         # . Usage
@@ -891,8 +1049,11 @@ for product in bundle.get("products", []):
     }
 
     # fn: _bundle_manage_sources - Show nested source menu with per-action continue
+        # . Purpose
+        #   Show nested source menu with per-action continue.
+        #
         # . Returns
-        #   0 when user returns to bundle menu; nonzero on menu construction failure.
+        #   - 0 when user returns to bundle menu; nonzero on menu construction failure.
         # . Usage
         #   ```bash
         #   _bundle_manage_sources
@@ -921,22 +1082,41 @@ for product in bundle.get("products", []):
     }
 
 # - Main ------------------------------------------------------------------------------
-    # fn: main - Start SolidGroundUX and manage documentation bundles
+    # fn: main - Start bundle management or an explicit bundle-generation workflow
+        # . Purpose
+        #   Start bundle management or an explicit bundle-generation workflow.
+        #
         # . Arguments
-        #   $@ Framework/script arguments.
+        #   - `--generate`: Show a bundle selector and generate the chosen bundle.
+        #   - Other arguments: Forwarded to framework startup.
+        #
         # . Returns
-        #   0 on normal exit; nonzero for bootstrap or menu failures.
+        #   - 0 on normal exit or user cancellation; nonzero for workflow errors.
+        #
         # . Usage
         #   ```bash
         #   main "$@"
+        #   main --generate
         #   ```
     main() {
-        local choice="" rc=0
+        local choice="" argument="" mode="manage" rc=0
+        local -a startup_args=()
+        for argument in "$@"; do
+            case "$argument" in
+                --generate) mode="generate" ;;
+                *) startup_args+=("$argument") ;;
+            esac
+        done
         _framework_locator || return $?
-        sgnd_exe_start --autostate -- "$@" || return $?
+        sgnd_exe_start --autostate -- "${startup_args[@]}" || return $?
+        if [[ "$mode" == "generate" ]]; then
+            _bundle_generate_selected
+            return $?
+        fi
         while true; do
             _bundle_register_main_menu || return $?
             _bundle_show_menu || return $?
+            sgnd_print '   Q) Return to menu'
             sgnd_print
             printf 'Selection : ' >/dev/tty
             sgnd_menu_read_choice choice || return $?

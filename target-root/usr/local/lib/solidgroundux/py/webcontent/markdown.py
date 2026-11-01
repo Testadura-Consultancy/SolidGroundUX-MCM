@@ -18,18 +18,22 @@ _BLOCK_CLASS_RE = re.compile(r"^:::\s+(.+)$", re.MULTILINE)
 _CLASS_NAME_RE = re.compile(r"\.?([A-Za-z_][A-Za-z0-9_-]*)")
 
 
+
+# --- Public functions ------------------------------------------------------------
 # fn: referenced_style_classes - Find td- prefixed CSS class references in authored Markdown.
 # . Description
-#   Args: markdown_text: Input used by this operation.
+#   Args: markdown_text: Markdown source to analyze or render.
 def referenced_style_classes(markdown_text: str, prefix: str) -> set[str]:
-    """Handle referenced style classes for the web content workflow.
-    
-    Args:
-        markdown_text: Input used by this operation.
-        prefix: Input used by this operation.
-    
-    Returns:
-        Operation result or None, as defined by the implementation."""
+    """Find td- prefixed CSS class references in authored Markdown.
+        
+        Args:
+            markdown_text: Markdown source to analyze or render.
+            prefix: Configured class or style prefix.
+        
+        Usage:
+            ```python
+            referenced_style_classes(markdown_text, prefix)
+            ```"""
     classes = {name for name in _STYLE_CLASS_RE.findall(markdown_text) if name.startswith(prefix)}
     for block_spec in _BLOCK_CLASS_RE.findall(markdown_text):
         if block_spec.startswith("td-image-text "):
@@ -42,9 +46,16 @@ def referenced_style_classes(markdown_text: str, prefix: str) -> set[str]:
     return classes
 
 
+
+# --- Internal functions ------------------------------------------------------------
 # fn: _safe_url - Validate and escape a link target for generated markup.
 def _safe_url(value: str) -> str:
-    """Handle safe url for the web content workflow."""
+    """Validate and escape a link target for generated markup.
+    
+    Usage:
+        ```python
+        _safe_url(value)
+        ```"""
     value = value.strip()
     parsed = urlparse(value)
     if parsed.scheme.lower() in {"javascript", "data"}:
@@ -57,10 +68,14 @@ def _safe_url(value: str) -> str:
 #   Image size attributes use positive pixel counts. A single dimension keeps the intrinsic aspect ratio; both dimensions use contain to avoid cropping.
 def _image_dimensions(options: str) -> str:
     """Return safe inline image sizing; omit invalid or absent dimensions.
-
+    
     Image size attributes use positive pixel counts. A single dimension keeps
     the intrinsic aspect ratio; both dimensions use contain to avoid cropping.
-    """
+    
+    Usage:
+        ```python
+        _image_dimensions(options)
+        ```"""
     dimensions: dict[str, int] = {}
     for key, raw in re.findall(r"(?<![\w-])(width|height)\s*=\s*([^\s}]+)", options):
         if raw.isdecimal() and 0 < int(raw) <= 10000:
@@ -78,36 +93,45 @@ def _image_dimensions(options: str) -> str:
 
 # fn: _render_inline - Render inline Markdown constructs into HTML while escaping content.
 def _render_inline(text: str) -> str:
-    """Render inline Markdown constructs into HTML while escaping content."""
+    """Render inline Markdown constructs into HTML while escaping content.
+    
+    Usage:
+        ```python
+        _render_inline(text)
+        ```"""
     escaped = html.escape(text, quote=False)
     tokens: dict[str, str] = {}
 
     # fn: stash - Preserve an embedded fragment while Markdown text is transformed.
     # . Description
-    #   Args: fragment: Input used by this operation.
+    #   Args: fragment: Rendered text fragment to preserve during substitution.
     def stash(fragment: str) -> str:
-        """Handle stash for the web content workflow.
-        
-        Args:
-            fragment: Input used by this operation.
-        
-        Returns:
-            Operation result or None, as defined by the implementation."""
+        """Preserve an embedded fragment while Markdown text is transformed.
+                        
+                        Args:
+                            fragment: Rendered text fragment to preserve during substitution.
+                        
+                        Usage:
+                            ```python
+                            stash(fragment)
+                            ```"""
         key = f"\x00WC{len(tokens)}\x00"
         tokens[key] = fragment
         return key
 
     # fn: code_repl - Replace a Markdown code-span match with protected HTML output.
     # . Description
-    #   Args: match: Input used by this operation.
+    #   Args: match: Regular-expression match for the current substitution.
     def code_repl(match: re.Match[str]) -> str:
-        """Handle code repl for the web content workflow.
-        
-        Args:
-            match: Input used by this operation.
-        
-        Returns:
-            Operation result or None, as defined by the implementation."""
+        """Replace a Markdown code-span match with protected HTML output.
+                        
+                        Args:
+                            match: Regular-expression match for the current substitution.
+                        
+                        Usage:
+                            ```python
+                            code_repl(match)
+                            ```"""
         return stash(f"<code>{html.escape(match.group(1), quote=False)}</code>")
 
     escaped = re.sub(r"`([^`]+)`", code_repl, escaped)
@@ -116,15 +140,17 @@ def _render_inline(text: str) -> str:
 
     # fn: image_repl - Replace a Markdown image reference with rendered image markup.
     # . Description
-    #   Args: match: Input used by this operation.
+    #   Args: match: Regular-expression match for the current substitution.
     def image_repl(match: re.Match[str]) -> str:
-        """Handle image repl for the web content workflow.
-        
-        Args:
-            match: Input used by this operation.
-        
-        Returns:
-            Operation result or None, as defined by the implementation."""
+        """Replace a Markdown image reference with rendered image markup.
+                        
+                        Args:
+                            match: Regular-expression match for the current substitution.
+                        
+                        Usage:
+                            ```python
+                            image_repl(match)
+                            ```"""
         alt = match.group(1)
         src = html.escape(_safe_url(html.unescape(match.group(2))), quote=True)
         classes = " ".join(_STYLE_CLASS_RE.findall(match.group(3) or ""))
@@ -139,15 +165,17 @@ def _render_inline(text: str) -> str:
 
     # fn: link_repl - Render a Markdown link after checking and escaping its target.
     # . Description
-    #   Args: match: Input used by this operation.
+    #   Args: match: Regular-expression match for the current substitution.
     def link_repl(match: re.Match[str]) -> str:
-        """Handle link repl for the web content workflow.
-        
-        Args:
-            match: Input used by this operation.
-        
-        Returns:
-            Operation result or None, as defined by the implementation."""
+        """Render a Markdown link after checking and escaping its target.
+                        
+                        Args:
+                            match: Regular-expression match for the current substitution.
+                        
+                        Usage:
+                            ```python
+                            link_repl(match)
+                            ```"""
         label = match.group(1)
         href = html.escape(_safe_url(html.unescape(match.group(2))), quote=True)
         download_attr = " download" if match.group(3) and href != "#" else ""
@@ -159,15 +187,17 @@ def _render_inline(text: str) -> str:
 
     # fn: style_repl - Render supported inline style attributes on Markdown spans.
     # . Description
-    #   Args: match: Input used by this operation.
+    #   Args: match: Regular-expression match for the current substitution.
     def style_repl(match: re.Match[str]) -> str:
-        """Handle style repl for the web content workflow.
-        
-        Args:
-            match: Input used by this operation.
-        
-        Returns:
-            Operation result or None, as defined by the implementation."""
+        """Render supported inline style attributes on Markdown spans.
+                        
+                        Args:
+                            match: Regular-expression match for the current substitution.
+                        
+                        Usage:
+                            ```python
+                            style_repl(match)
+                            ```"""
         label = match.group(1)
         classes = " ".join(_STYLE_CLASS_RE.findall(match.group(2)))
         if not classes:
@@ -179,6 +209,12 @@ def _render_inline(text: str) -> str:
     # Angle-bracket autolinks use the same URL safety policy as ordinary links.
     # fn: autolink_repl - Convert a recognized automatic URL to a link.
     def autolink_repl(match: re.Match[str]) -> str:
+        """Convert a recognized automatic URL to a link.
+                
+                Usage:
+                    ```python
+                    autolink_repl(match)
+                    ```"""
         url = html.unescape(match.group(1))
         href = html.escape(_safe_url(url), quote=True)
         return stash(f'<a href="{href}">{html.escape(url, quote=False)}</a>')
@@ -197,7 +233,12 @@ def _render_inline(text: str) -> str:
 
 # fn: _render_paragraph - Join soft lines and preserve CommonMark space/backslash hard breaks.
 def _render_paragraph(lines: list[str]) -> str:
-    """Join soft lines and preserve CommonMark space/backslash hard breaks."""
+    """Join soft lines and preserve CommonMark space/backslash hard breaks.
+    
+    Usage:
+        ```python
+        _render_paragraph(lines)
+        ```"""
     parts: list[str] = []
     for line in lines[:-1]:
         hard_spaces = len(line) - len(line.rstrip(" ")) >= 2
@@ -214,7 +255,12 @@ def _render_paragraph(lines: list[str]) -> str:
 
 # fn: _heading_id - Create a predictable Unicode-friendly anchor from a heading's plain text.
 def _heading_id(title: str) -> str:
-    """Create a predictable Unicode-friendly anchor from a heading's plain text."""
+    """Create a predictable Unicode-friendly anchor from a heading's plain text.
+    
+    Usage:
+        ```python
+        _heading_id(title)
+        ```"""
     plain = re.sub(r"[`*_~]", "", re.sub(r"\[([^]]+)\]\([^)]+\)", r"\1", title)).lower()
     plain = re.sub(r"[^\w\s-]", "", plain, flags=re.UNICODE)
     return re.sub(r"[\s_-]+", "-", plain).strip("-")
@@ -225,7 +271,12 @@ _LIST_RE = re.compile(r"^(?P<indent>[ ]*)(?P<marker>[-*+]|[0-9]+[.)])\s+(?P<body
 
 # fn: _render_list - Render nested ordered/unordered lists using indentation and item boundaries.
 def _render_list(lines: list[str], start: int) -> tuple[str, int]:
-    """Render nested ordered/unordered lists using indentation and item boundaries."""
+    """Render nested ordered/unordered lists using indentation and item boundaries.
+    
+    Usage:
+        ```python
+        _render_list(lines, start)
+        ```"""
     initial = _LIST_RE.match(lines[start])
     assert initial is not None
     base = len(initial.group("indent"))
@@ -269,18 +320,27 @@ def _render_list(lines: list[str], start: int) -> tuple[str, int]:
 
 # fn: _is_table_separator - Recognize the delimiter row that separates Markdown table headers.
 def _is_table_separator(line: str) -> bool:
-    """Handle is table separator for the web content workflow."""
+    """Recognize the delimiter row that separates Markdown table headers.
+    
+    Usage:
+        ```python
+        _is_table_separator(line)
+        ```"""
     cells = [cell.strip() for cell in line.strip().strip("|").split("|")]
     return bool(cells) and all(re.fullmatch(r":?-{3,}:?", cell) for cell in cells)
 
 
 # fn: _table_cells - Split one Markdown table row into its cell values.
 def _table_cells(line: str) -> list[str]:
-    """Split Markdown table cells without splitting escaped literal pipes.
-
-    A Bash definition such as label|icon|symbol belongs in one cell, even
-    though the source Markdown escapes each separator as \\|.
-    """
+    """Split one Markdown table row into its cell values.
+        
+        A Bash definition such as label|icon|symbol belongs in one cell, even
+        though the source Markdown escapes each separator as \\|.
+        
+        Usage:
+            ```python
+            _table_cells(line)
+            ```"""
     content = line.strip()
     if content.startswith('|'):
         content = content[1:]
@@ -307,7 +367,12 @@ def _table_cells(line: str) -> list[str]:
 
 # fn: _starts_block - Check whether a Markdown line begins a block-level construct.
 def _starts_block(lines: list[str], index: int) -> bool:
-    """Handle starts block for the web content workflow."""
+    """Check whether a Markdown line begins a block-level construct.
+    
+    Usage:
+        ```python
+        _starts_block(lines, index)
+        ```"""
     line = lines[index]
     stripped = line.strip()
     if not stripped:
@@ -337,11 +402,15 @@ def _render_lines(
     stop_at_component_end: bool = False,
 ) -> tuple[str, int, bool]:
     """Render a line range and optionally stop at the matching ``:::`` marker.
-
+    
     Component rendering is recursive. A nested opener therefore consumes its own
     closing marker before control returns to the containing component, while
     fenced code blocks continue to treat ``:::`` as ordinary code text.
-    """
+    
+    Usage:
+        ```python
+        _render_lines(lines, start, stop_at_component_end=stop_at_component_end)
+        ```"""
     output: list[str] = []
     index = start
 
@@ -543,9 +612,16 @@ def _render_lines(
     return "\n".join(output), index, False
 
 
+
+# --- Public functions ------------------------------------------------------------
 # fn: render_markdown - Render Markdown plus the nestable Testadura ``:::`` component extension.
 def render_markdown(markdown_text: str) -> str:
-    """Render Markdown plus the nestable Testadura ``:::`` component extension."""
+    """Render Markdown plus the nestable Testadura ``:::`` component extension.
+    
+    Usage:
+        ```python
+        html = render_markdown("# Introduction\\n\\nHello world.")
+        ```"""
     lines = markdown_text.replace("\r\n", "\n").replace("\r", "\n").split("\n")
     rendered, _index, _closed = _render_lines(lines)
     return rendered

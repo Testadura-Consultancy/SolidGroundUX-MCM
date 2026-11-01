@@ -10,7 +10,7 @@
 #   Source      : management-console.sh
 #   Wrapper     : sgnd-console
 #   Type        : script
-#   Group       : Console
+#   Group       : /
 #   Purpose     : Provide a modular console interface for SolidGroundUX tooling
 #
 # Description:
@@ -81,7 +81,7 @@ set -uo pipefail
         #     present, falls back to the installed framework copy without changing
         #     SGND_FRAMEWORK_ROOT.
         #
-        # . Globals (write)
+        # . Globals (Write)
         #   SGND_FRAMEWORK_ROOT
         #
         # . Output
@@ -89,8 +89,8 @@ set -uo pipefail
         #   helpers are not available until sgnd-exe-common.sh has been loaded.
         #
         # . Returns
-        #   0 when the framework root was resolved and executable common library loaded.
-        #   126 when the script path cannot be resolved, no canonical root component can
+        #   - 0 when the framework root was resolved and executable common library loaded.
+        #   - 126 when the script path cannot be resolved, no canonical root component can
         #   be found, or the executable common library is unreadable.
         #
         # . Usage
@@ -393,7 +393,7 @@ set -uo pipefail
         #   Writes the target user name to stdout.
         #
         # . Returns
-        #   0 when a user name is resolved.
+        #   - 0 when a user name is resolved.
         # . Usage
         #   ```bash
         #   _sgnd_console_state_owner
@@ -413,10 +413,10 @@ set -uo pipefail
         #   it belongs to the invoking user when running under sudo.
         #
         # . Arguments
-        #   $1  DIRECTORY - State directory to prepare.
+        #   - $1  DIRECTORY - State directory to prepare.
         #
         # . Returns
-        #   0 when the directory is ready; non-zero on failure.
+        #   - 0 when the directory is ready; non-zero on failure.
         # . Usage
         #   ```bash
         #   _sgnd_console_prepare_state_directory "<directory>"
@@ -443,10 +443,10 @@ set -uo pipefail
         #   when the console runs with elevated privileges.
         #
         # . Arguments
-        #   $1  FILE - State file that was just created or replaced.
+        #   - $1  FILE - State file that was just created or replaced.
         #
         # . Returns
-        #   0 when ownership and mode are correct; non-zero on failure.
+        #   - 0 when ownership and mode are correct; non-zero on failure.
         # . Usage
         #   ```bash
         #   _sgnd_console_finalize_state_file "<file>"
@@ -472,7 +472,7 @@ set -uo pipefail
         #   Derive console host paths from SGND_FRAMEWORK_ROOT.
         #
         # . Returns
-        #   0 on success; 1 when SGND_FRAMEWORK_ROOT is unavailable.
+        #   - 0 on success; 1 when SGND_FRAMEWORK_ROOT is unavailable.
         #
         # . Usage
         #   ```bash
@@ -516,7 +516,7 @@ set -uo pipefail
         #   Writes the resolved application root to stdout.
         #
         # . Arguments
-        #   $1  MODULE_PATH - Selected module file or directory.
+        #   - $1  MODULE_PATH - Selected module file or directory.
         #
         # . Usage
         #   ```bash
@@ -570,7 +570,7 @@ set -uo pipefail
         #   - Leaves presentation of DEV context to the console index renderer.
         #
         # . Arguments
-        #   $1  MODULE_PATH - Selected module source used to resolve application directories.
+        #   - $1  MODULE_PATH - Selected module source used to resolve application directories.
         #
         # . Usage
         #   ```bash
@@ -601,16 +601,18 @@ set -uo pipefail
         #   - With --appcfg pointing to a directory, loads every .sh file in it.
         #   - Normalizes the selected path to an absolute path.
         #
-        # Inputs (globals):
+        # . Inputs
+        #   (globals):
         #   VAL_APPCFG
         #   SGND_SCRIPT_DIR
         #
-        # Outputs (globals):
+        # . Outputs
+        #   (globals):
         #   SGND_CONSOLE_MODULE_PATH
         #
         # . Returns
-        #   0   success
-        #   126 module source does not exist or is not a readable .sh file/directory
+        #   - 0   success
+        #   - 126 module source does not exist or is not a readable .sh file/directory
         #
         # . Usage
         #   ```bash
@@ -663,7 +665,7 @@ set -uo pipefail
         #   successful results as never run.
         #
         # . Arguments
-        #   $1  ITEM_KEY - Registered menu item key.
+        #   - $1  ITEM_KEY - Registered menu item key.
         #
         # . Usage
         #   ```bash
@@ -699,8 +701,8 @@ set -uo pipefail
         #   result in the current menu.
         #
         # . Arguments
-        #   $1  ITEM_KEY - Registered menu item key.
-        #   $2  RC       - Handler exit status (defaults to 1).
+        #   - $1  ITEM_KEY - Registered menu item key.
+        #   - $2  RC       - Handler exit status (defaults to 1).
         #
         # . Usage
         #   ```bash
@@ -747,9 +749,9 @@ set -uo pipefail
         #   original exit status.
         #
         # . Arguments
-        #   $1  ITEM_KEY - Registered menu item key.
-        #   $2  HANDLER  - Function to execute.
-        #   $3+          - Optional arguments forwarded to the handler.
+        #   - $1  ITEM_KEY - Registered menu item key.
+        #   - $2  HANDLER  - Function to execute.
+        #   - $3+          - Optional arguments forwarded to the handler.
         #
         # . Usage
         #   ```bash
@@ -772,9 +774,9 @@ set -uo pipefail
         #   builtin console controls untracked.
         #
         # . Arguments
-        #   $1  ITEM_KEY - Registered menu item key.
-        #   $2  HANDLER  - Registered handler function.
-        #   $3  BUILTIN  - 1 for console builtin items, otherwise 0.
+        #   - $1  ITEM_KEY - Registered menu item key.
+        #   - $2  HANDLER  - Registered handler function.
+        #   - $3  BUILTIN  - 1 for console builtin items, otherwise 0.
         #
         # . Returns
         #   Exit status from the executed handler.
@@ -832,8 +834,8 @@ set -uo pipefail
         #   - Performs no configuration or business-logic changes.
         #
         # . Returns
-        #   0 when reset or when no module page is active.
-        #   1 when the action-state file cannot be rewritten.
+        #   - 0 when reset or when no module page is active.
+        #   - 1 when the action-state file cannot be rewritten.
         #
         # . Usage
         #   ```bash
@@ -910,7 +912,7 @@ set -uo pipefail
         #   Add the hidden previous/next page controls used by the menu dispatcher.
         #
         # . Returns
-        #   0 when both built-in navigation items are registered; non-zero on failure.
+        #   - 0 when both built-in navigation items are registered; non-zero on failure.
         #
         # . Usage
         #   ```bash
@@ -935,18 +937,18 @@ set -uo pipefail
         #   - Registers the derived group as a non-builtin visible group.
         #
         # . Arguments
-        #   $1  GROUP_KEY
+        #   - $1  GROUP_KEY
         #       Missing group key to register.
         #
         # . Returns
-        #   0 on success
-        #   Non-zero if registration fails
+        #   - 0 on success
+        #   - Non-zero if registration fails
         #
         # . Usage
         #   ```bash
         #   _sgnd_console_register_fallback_group "module:devtools"
         #
-        # Examples:
+        # . Examples
         #   _sgnd_console_register_fallback_group "module:devtools"
         #   ```
     _sgnd_console_register_fallback_group() {
@@ -985,18 +987,18 @@ set -uo pipefail
         #   Test whether a group key already exists in the console group model.
         #
         # . Arguments
-        #   $1  GROUP_KEY
+        #   - $1  GROUP_KEY
         #       Group key to test.
         #
         # . Returns
-        #   0 if the group exists
-        #   1 if the group does not exist
+        #   - 0 if the group exists
+        #   - 1 if the group does not exist
         #
         # . Usage
         #   ```bash
         #   _sgnd_console_group_exists "runtime" && printf 'Group exists\n'
         #
-        # Examples:
+        # . Examples
         #   _sgnd_console_group_exists "runtime"
         #   ```
     _sgnd_console_group_exists() {
@@ -1017,7 +1019,7 @@ set -uo pipefail
         #   - Displays ID, name, version, description, visibility state, and source file.
         #
         # . Returns
-        #   0 after displaying metadata; 126 when not running as root or discovery fails.
+        #   - 0 after displaying metadata; 126 when not running as root or discovery fails.
         # . Usage
         #   ```bash
         #   _sgnd_console_show_module_metadata
@@ -1090,10 +1092,10 @@ set -uo pipefail
         #   basename to derive its stable console identifier.
         #
         # . Arguments
-        #   $1  MODULE_FILE - Path or filename of a numbered module.
+        #   - $1  MODULE_FILE - Path or filename of a numbered module.
         #
         # . Returns
-        #   0 after writing the normalized module ID to stdout.
+        #   - 0 after writing the normalized module ID to stdout.
         #
         # . Usage
         #   ```bash
@@ -1114,7 +1116,7 @@ set -uo pipefail
         #   enabled when no saved state exists.
         #
         # . Arguments
-        #   $1  MODULE_ID - Filename-derived module identifier.
+        #   - $1  MODULE_ID - Filename-derived module identifier.
         #
         # . Returns
         #   Writes enabled or disabled. Missing entries default to enabled.
@@ -1143,10 +1145,10 @@ set -uo pipefail
         #   and failure when it has explicitly been disabled.
         #
         # . Arguments
-        #   $1  MODULE_ID - Filename-derived module identifier.
+        #   - $1  MODULE_ID - Filename-derived module identifier.
         #
         # . Returns
-        #   0 when enabled or unspecified; 1 when explicitly disabled.
+        #   - 0 when enabled or unspecified; 1 when explicitly disabled.
         #
         # . Usage
         #   ```bash
@@ -1162,14 +1164,14 @@ set -uo pipefail
         #   Save one module's enabled/disabled state without sourcing that module.
         #
         # . Arguments
-        #   $1  MODULE_ID - Filename-derived console module ID.
-        #   $2  STATE     - Either enabled or disabled.
+        #   - $1  MODULE_ID - Filename-derived console module ID.
+        #   - $2  STATE     - Either enabled or disabled.
         #
-        # Side effects:
+        # . Side effects
         #   Rewrites SGND_CONSOLE_MODULE_STATE_FILE atomically.
         #
         # . Returns
-        #   0 when the state file is updated; 1 on filesystem failure; 2 for an invalid state.
+        #   - 0 when the state file is updated; 1 on filesystem failure; 2 for an invalid state.
         #
         # . Usage
         #   ```bash
@@ -1218,7 +1220,7 @@ set -uo pipefail
         #   - The caller rebuilds the lightweight index immediately after this dialog returns.
         #
         # . Returns
-        #   0 when the user returns; 1 on discovery or state-write failure; 126 when not root.
+        #   - 0 when the user returns; 1 on discovery or state-write failure; 126 when not root.
         #
         # . Usage
         #   ```bash
@@ -1341,14 +1343,14 @@ set -uo pipefail
         #   Read lightweight page identity plus canonical header version and description.
         #
         # . Arguments
-        #   $1  MODULE_FILE - Console module file.
-        #   $2  OUTPUT_NAME - Variable receiving the display name.
-        #   $3  OUTPUT_DESC - Variable receiving the canonical Description section.
-        #   $4  OUTPUT_VERSION - Optional variable receiving Metadata/Version.
-        #   $5  OUTPUT_BUILD - Optional variable receiving Metadata/Build.
+        #   - $1  MODULE_FILE - Console module file.
+        #   - $2  OUTPUT_NAME - Variable receiving the display name.
+        #   - $3  OUTPUT_DESC - Variable receiving the canonical Description section.
+        #   - $4  OUTPUT_VERSION - Optional variable receiving Metadata/Version.
+        #   - $5  OUTPUT_BUILD - Optional variable receiving Metadata/Build.
         #
         # . Returns
-        #   0 after producing metadata, using a filename-derived name fallback when needed.
+        #   - 0 after producing metadata, using a filename-derived name fallback when needed.
         #
         # . Usage
         #   ```bash
@@ -1396,7 +1398,7 @@ set -uo pipefail
         #   - Defers module parsing and menu registration until the page is opened.
         #
         # . Returns
-        #   0 on success; discovery errors are propagated.
+        #   - 0 on success; discovery errors are propagated.
         #
         # . Usage
         #   ```bash
@@ -1428,10 +1430,10 @@ set -uo pipefail
         #   Source a module the first time its index page is selected and activate its menu rows.
         #
         # . Arguments
-        #   $1  PAGE_INDEX - Zero-based row index in SGND_CONSOLE_PAGE_ROWS.
+        #   - $1  PAGE_INDEX - Zero-based row index in SGND_CONSOLE_PAGE_ROWS.
         #
         # . Returns
-        #   0 on success; 1 for an invalid page; 126 when module loading fails.
+        #   - 0 on success; 1 for an invalid page; 126 when module loading fails.
         #
         # . Usage
         #   ```bash
@@ -1469,7 +1471,7 @@ set -uo pipefail
         #   Show all enabled console pages without loading their implementation modules.
         #
         # . Returns
-        #   0 after rendering.
+        #   - 0 after rendering.
         #
         # . Usage
         #   ```bash
@@ -1613,14 +1615,14 @@ set -uo pipefail
         #   fails while sourcing or fails metadata validation after registering rows.
         #
         # . Arguments
-        #   $1  GROUP_COUNT   Group-row count before module loading.
-        #   $2  ITEM_COUNT    Item-row count before module loading.
-        #   $3  MODULE_COUNT  Loaded-module row count before module loading.
-        #   $4  TITLE         Console title before module loading.
-        #   $5  DESCRIPTION   Console description before module loading.
+        #   - $1  GROUP_COUNT   Group-row count before module loading.
+        #   - $2  ITEM_COUNT    Item-row count before module loading.
+        #   - $3  MODULE_COUNT  Loaded-module row count before module loading.
+        #   - $4  TITLE         Console title before module loading.
+        #   - $5  DESCRIPTION   Console description before module loading.
         #
         # . Returns
-        #   0 after restoring rows and invalidating model/layout caches.
+        #   - 0 after restoring rows and invalidating model/layout caches.
         #
         # . Usage
         #   ```bash
@@ -1668,10 +1670,11 @@ set -uo pipefail
         #   checking that module loading and registration have succeeded.
         #
         # . Arguments
-        #   $1  MODULE_FILE
+        #   - $1  MODULE_FILE
         #       Readable .sh file to source.
         #
-        # Outputs (globals):
+        # . Outputs
+        #   (globals):
         #   SGND_CURRENT_MODULE
         #   SGND_CURRENT_MODULE_DIR
         #   SGND_MODULE_ROWS - Adds one loaded-module registry row with load timestamp.
@@ -1681,8 +1684,8 @@ set -uo pipefail
         #   - Failed sourcing or metadata validation restores the pre-load registration model.
         #
         # . Returns
-        #   0 on success.
-        #   126 when the module cannot be loaded.
+        #   - 0 on success.
+        #   - 126 when the module cannot be loaded.
         #
         # . Usage
         #   ```bash
@@ -1789,11 +1792,11 @@ set -uo pipefail
         #   is currently in dry-run mode.
         #
         # . Arguments
-        #   $1  RESULT_ARRAY - Name of the array receiving arguments.
-        #   $2+              - Arguments appended to that array.
+        #   - $1  RESULT_ARRAY - Name of the array receiving arguments.
+        #   - $2+              - Arguments appended to that array.
         #
         # . Returns
-        #   0 after populating the requested argument array.
+        #   - 0 after populating the requested argument array.
         #
         # . Usage
         #   ```bash
@@ -1814,8 +1817,8 @@ set -uo pipefail
         #   dry-run state, and execute it with the supplied arguments.
         #
         # . Arguments
-        #   $1  COMMAND - Public SolidGroundUX command name.
-        #   $2+         - Optional arguments forwarded to the command.
+        #   - $1  COMMAND - Public SolidGroundUX command name.
+        #   - $2+         - Optional arguments forwarded to the command.
         #
         # . Returns
         #   Exit status from the resolved command; 1 when the command cannot be found.
@@ -1858,12 +1861,14 @@ set -uo pipefail
         #   SolidGroundUX executable or library directories.
         #
         # . Arguments
-        #   $1  Script filename.
+        #   - $1  Script filename.
         #   $@  Optional arguments passed to the script.
         #
         # . Returns
-        #   Returns the exit status of the executed script.
-        #   Returns 1 when the script cannot be found or is not executable.
+        #   . Returns
+        #     the exit status of the executed script.
+        #   . Returns
+        #     - 1 when the script cannot be found or is not executable.
         #
         # . Usage
         #   ```bash
@@ -2023,8 +2028,8 @@ set -uo pipefail
         #   - Defaults to NO so an accidental Esc does not end the console session.
         #
         # . Returns
-        #   0 when the user confirms exit.
-        #   1 when the user chooses to remain in the console.
+        #   - 0 when the user confirms exit.
+        #   - 1 when the user chooses to remain in the console.
         #
         # . Usage
         #   ```bash
@@ -2047,12 +2052,13 @@ set -uo pipefail
         # . Purpose
         #   Switch FLAG_DRYRUN between dry-run and commit mode and redraw immediately.
         #
-        # . Outputs (globals)
+        # . Outputs
+        #   (globals)
         #   FLAG_DRYRUN
         #   SGND_LAST_WAITSECS=0
         #
         # . Returns
-        #   0 after toggling the current mode.
+        #   - 0 after toggling the current mode.
         #
         # . Usage
         #   ```bash
@@ -2076,8 +2082,8 @@ set -uo pipefail
         #   wrapping around the available levels when needed.
         #
         # . Arguments
-        #   $1  Current log level.
-        #   $2  Direction: 1 forward, -1 backward.
+        #   - $1  Current log level.
+        #   - $2  Direction: 1 forward, -1 backward.
         #
         # . Returns
         #   Prints the selected log-level name.
@@ -2109,11 +2115,11 @@ set -uo pipefail
         #   persistence is available.
         #
         # . Arguments
-        #   $1  KEY   - Framework state variable name.
-        #   $2  VALUE - Value to persist (defaults to empty).
+        #   - $1  KEY   - Framework state variable name.
+        #   - $2  VALUE - Value to persist (defaults to empty).
         #
         # . Returns
-        #   0 when no state file is configured; otherwise the sgnd_state_set status.
+        #   - 0 when no state file is configured; otherwise the sgnd_state_set status.
         #
         # . Usage
         #   ```bash
@@ -2131,10 +2137,10 @@ set -uo pipefail
         #   Select the adjacent console log level, persist it, and redraw immediately.
         #
         # . Arguments
-        #   $1  DIRECTION - Optional: 1 forward (default), -1 backward.
+        #   - $1  DIRECTION - Optional: 1 forward (default), -1 backward.
         #
         # . Returns
-        #   0 unless persistence fails.
+        #   - 0 unless persistence fails.
         #
         # . Usage
         #   ```bash
@@ -2152,10 +2158,10 @@ set -uo pipefail
         #   Select the adjacent file log level, persist it, and redraw immediately.
         #
         # . Arguments
-        #   $1  DIRECTION - Optional: 1 forward (default), -1 backward.
+        #   - $1  DIRECTION - Optional: 1 forward (default), -1 backward.
         #
         # . Returns
-        #   0 unless persistence fails.
+        #   - 0 unless persistence fails.
         #
         # . Usage
         #   ```bash
@@ -2174,10 +2180,10 @@ set -uo pipefail
         #   redraw immediately.
         #
         # . Arguments
-        #   $1  DIRECTION - Optional: 1 forward (default), -1 backward.
+        #   - $1  DIRECTION - Optional: 1 forward (default), -1 backward.
         #
         # . Returns
-        #   0 when the theme is applied; non-zero when no themes exist or loading fails.
+        #   - 0 when the theme is applied; non-zero when no themes exist or loading fails.
         #
         # . Usage
         #   ```bash
@@ -2252,11 +2258,11 @@ set -uo pipefail
         #   - Cancellation or invalid dialog input is treated as a handled control.
         #
         # . Arguments
-        #   $1  CONTROL - Normalized key returned by sgnd_menu_read_choice.
+        #   - $1  CONTROL - Normalized key returned by sgnd_menu_read_choice.
         #
         # . Returns
-        #   0 when handled.
-        #   2 when the key is not a console execution-context control.
+        #   - 0 when handled.
+        #   - 2 when the key is not a console execution-context control.
         # . Usage
         #   ```bash
         #   _sgnd_console_handle_control "<control>"
@@ -2296,14 +2302,14 @@ set -uo pipefail
         #   - Normal registered actions use at least 15 seconds; host controls may set the wait to 0.
         #
         # . Returns
-        #   0 on normal console exit
-        #   1 on input or dispatch failure
+        #   - 0 on normal console exit
+        #   - 1 on input or dispatch failure
         #
         # . Usage
         #   ```bash
         #   _sgnd_console_run
         #
-        # Examples:
+        # . Examples
         #   _sgnd_console_run
         #   ```
     _sgnd_console_run() {

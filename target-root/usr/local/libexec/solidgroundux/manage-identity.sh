@@ -9,7 +9,8 @@
 #   Checksum    : 75a2fd3062300859dbcf1430ba6ac1898409025c663232ff514c0e958f9f6f4f
 #   Source      : manage-identity.sh
 #   Type        : script
-#   Group       : Role Managers
+#   Group       : Modules
+#   Subgroup    : Computer Setup
 #   Purpose     : Sets the hostname and IPv4 network configuration for a VM
 #
 # Description:
@@ -60,7 +61,7 @@ set -uo pipefail
         #     present, falls back to the installed framework copy without changing
         #     SGND_FRAMEWORK_ROOT.
         #
-        # . Globals (write)
+        # . Globals (Write)
         #   SGND_FRAMEWORK_ROOT
         #
         # . Output
@@ -68,8 +69,8 @@ set -uo pipefail
         #   helpers are not available until sgnd-exe-common.sh has been loaded.
         #
         # . Returns
-        #   0 when the framework root was resolved and executable common library loaded.
-        #   126 when the script path cannot be resolved, no canonical root component can
+        #   - 0 when the framework root was resolved and executable common library loaded.
+        #   - 126 when the script path cannot be resolved, no canonical root component can
         #   be found, or the executable common library is unreadable.
         #
         # . Usage
@@ -305,10 +306,11 @@ set -uo pipefail
 # - Local script functions ----------------------------------------------------------
     # fn: _set_defaults - Set defaults
         # . Purpose
-        #   Set defaults.
+        #   Initialize missing identity and network settings with the wizard defaults.
         #
         # . Returns
-        #   Returns the underlying command or workflow status.
+        #   . Returns
+        #     the underlying command or workflow status.
         #
         # . Usage
         #   ```bash
@@ -330,7 +332,8 @@ set -uo pipefail
         #   Load current values.
         #
         # . Returns
-        #   Returns the underlying command or workflow status.
+        #   . Returns
+        #     the underlying command or workflow status.
         #
         # . Usage
         #   ```bash
@@ -391,10 +394,11 @@ set -uo pipefail
 
     # fn: _get_usr_input - Get usr input
         # . Purpose
-        #   Get usr input.
+        #   Collect identity and network values using the shared prompt functions.
         #
         # . Returns
-        #   Returns the underlying command or workflow status.
+        #   . Returns
+        #     the underlying command or workflow status.
         #
         # . Usage
         #   ```bash
@@ -436,10 +440,11 @@ set -uo pipefail
 
     # fn: _set_hostname - Set hostname
         # . Purpose
-        #   Set hostname.
+        #   Apply the selected hostname to the current machine.
         #
         # . Returns
-        #   Returns the underlying command or workflow status.
+        #   . Returns
+        #     the underlying command or workflow status.
         #
         # . Usage
         #   ```bash
@@ -466,7 +471,8 @@ set -uo pipefail
         #   Detect primary iface.
         #
         # . Returns
-        #   Returns the underlying command or workflow status.
+        #   . Returns
+        #     the underlying command or workflow status.
         #
         # . Usage
         #   ```bash
@@ -493,7 +499,8 @@ set -uo pipefail
         #   Remove other netplan files.
         #
         # . Returns
-        #   Returns the underlying command or workflow status.
+        #   . Returns
+        #     the underlying command or workflow status.
         #
         # . Usage
         #   ```bash
@@ -515,7 +522,8 @@ set -uo pipefail
         #   Static ip conflict check.
         #
         # . Returns
-        #   Returns the underlying command or workflow status.
+        #   . Returns
+        #     the underlying command or workflow status.
         #
         # . Usage
         #   ```bash
@@ -586,18 +594,14 @@ set -uo pipefail
         return 0
     }
 
-    # _network_config
+    # fn: _network_config - Apply the chosen DHCP or static network configuration to the primary interface.
         # . Purpose
-        #   Network config.
-        #
-        # . Returns
-        #   Returns the underlying command or workflow status.
+        #   Configure the selected network interface using the chosen network settings.
         #
         # . Usage
         #   ```bash
         #   _network_config
         #   ```
-    # fn: _network_config - Apply the chosen DHCP or static network configuration to the primary interface.
     _network_config() {
         _detect_primary_iface || return $?
 
@@ -614,50 +618,42 @@ set -uo pipefail
         esac
     }
 
-    # _set_static_ip
+    # fn: _set_static_ip - Set static ip in the management workflow.
         # . Purpose
-        #   Set static ip.
-        #
-        # . Returns
-        #   Returns the underlying command or workflow status.
+        #   Write network configuration for the selected static IPv4 address.
         #
         # . Usage
         #   ```bash
         #   _set_static_ip
         #   ```
-    # fn: _set_static_ip - Set static ip in the management workflow.
     _set_static_ip() {
         _apply_netplan_config static
     }
 
-    # _set_dhcp
+    # fn: _set_dhcp - Set dhcp in the management workflow.
         # . Purpose
-        #   Set dhcp.
-        #
-        # . Returns
-        #   Returns the underlying command or workflow status.
+        #   Switch the selected network interface to DHCP addressing.
         #
         # . Usage
         #   ```bash
         #   _set_dhcp
         #   ```
-    # fn: _set_dhcp - Set dhcp in the management workflow.
     _set_dhcp() {
         _apply_netplan_config dhcp
     }
 
-    # _write_netplan_static
+    # fn: _write_netplan_static - Render a static IPv4 Netplan configuration to a file.
         # . Purpose
-        #   Write netplan static.
+        #   Write a networkd Netplan YAML file using the chosen interface, address,
+        #   gateway, DNS addresses and optional DNS search domain.
         #
-        # . Returns
-        #   Returns the underlying command or workflow status.
+        # . Arguments
+        #   - `$1`: Optional output path; defaults to NETPLAN_FILE.
         #
         # . Usage
         #   ```bash
-        #   _write_netplan_static
+        #   _write_netplan_static "/tmp/sgnd-static-netplan.yaml"
         #   ```
-    # fn: _write_netplan_static - Write netplan static in the management workflow.
     _write_netplan_static() {
         local output_file="${1:-$NETPLAN_FILE}"
 
@@ -683,18 +679,16 @@ set -uo pipefail
         } > "$output_file"
     }
 
-    # _write_netplan_dhcp
+    # fn: _write_netplan_dhcp - Write netplan dhcp in the management workflow.
         # . Purpose
-        #   Write netplan dhcp.
+        #   Write a Netplan configuration that enables DHCP for the chosen interface.
         #
-        # . Returns
-        #   Returns the underlying command or workflow status.
-        #
+        # . Arguments
+        #   - `$1`: Optional: output file path.
         # . Usage
         #   ```bash
-        #   _write_netplan_dhcp
+        #   _write_netplan_dhcp "/tmp/sgnd-dhcp-netplan.yaml"
         #   ```
-    # fn: _write_netplan_dhcp - Write netplan dhcp in the management workflow.
     _write_netplan_dhcp() {
         local output_file="${1:-$NETPLAN_FILE}"
 
@@ -720,18 +714,14 @@ set -uo pipefail
         } > "$output_file"
     }
 
-    # _netplan_has_other_files
+    # fn: _netplan_has_other_files - Test whether additional Netplan YAML configuration files are present.
         # . Purpose
-        #   Netplan has other files.
-        #
-        # . Returns
-        #   Returns the underlying command or workflow status.
+        #   Test whether additional Netplan YAML configuration files are present.
         #
         # . Usage
         #   ```bash
-        #   _netplan_has_other_files && printf 'Additional netplan files found\n'
+        #   _netplan_has_other_files
         #   ```
-    # fn: _netplan_has_other_files - Test whether additional Netplan YAML configuration files are present.
     _netplan_has_other_files() {
         local file=""
 
@@ -742,18 +732,16 @@ set -uo pipefail
         return 1
     }
 
-    # _backup_netplan_files
+    # fn: _backup_netplan_files - Preserve the current Netplan YAML files before changing networking.
         # . Purpose
-        #   Backup netplan files.
+        #   Copy all existing /etc/netplan/*.yaml files into the specified backup directory.
         #
-        # . Returns
-        #   Returns the underlying command or workflow status.
-        #
+        # . Arguments
+        #   - `$1`: Required directory path for the backup.
         # . Usage
         #   ```bash
-        #   _backup_netplan_files
+        #   _backup_netplan_files "/tmp/sgnd-netplan-backup"
         #   ```
-    # fn: _backup_netplan_files - Manage backup for netplan files in the management workflow.
     _backup_netplan_files() {
         local backup_dir="${1:-}"
         local file=""
@@ -766,18 +754,17 @@ set -uo pipefail
         done < <(find /etc/netplan -maxdepth 1 -type f -name '*.yaml' -print0 2>/dev/null)
     }
 
-    # _restore_netplan_files
+    # fn: _restore_netplan_files - Restore backed-up Netplan configuration files.
         # . Purpose
-        #   Restore netplan files.
+        #   Remove current /etc/netplan/*.yaml files and restore the YAML files from
+        #   the specified backup directory.
         #
-        # . Returns
-        #   Returns the underlying command or workflow status.
-        #
+        # . Arguments
+        #   - `$1`: Required directory path containing the previous YAML files.
         # . Usage
         #   ```bash
-        #   _restore_netplan_files
+        #   _restore_netplan_files "/tmp/sgnd-netplan-backup"
         #   ```
-    # fn: _restore_netplan_files - Restore netplan files in the management workflow.
     _restore_netplan_files() {
         local backup_dir="${1:-}"
         local file=""
@@ -793,18 +780,17 @@ set -uo pipefail
         done < <(find "$backup_dir" -maxdepth 1 -type f -name '*.yaml' -print0 2>/dev/null)
     }
 
-    # _apply_netplan_config
+    # fn: _apply_netplan_config - Apply Netplan changes with backup and rollback handling.
         # . Purpose
-        #   Apply netplan config.
+        #   Render and compare a static or DHCP network configuration, back up existing
+        #   YAML files, and apply the change with the module's dry-run and failure handling.
         #
-        # . Returns
-        #   Returns the underlying command or workflow status.
-        #
+        # . Arguments
+        #   - `$1`: Required configuration mode, `static` or `dhcp`.
         # . Usage
         #   ```bash
-        #   _apply_netplan_config
+        #   _apply_netplan_config "dhcp"
         #   ```
-    # fn: _apply_netplan_config - Apply netplan config in the management workflow.
     _apply_netplan_config() {
         local mode="${1:-}"
         local candidate_file=""
@@ -934,6 +920,11 @@ set -uo pipefail
         #
         # . Returns
         #   Always returns 0.
+        #
+        # . Usage
+        #   ```bash
+        #   _dryrun_complete
+        #   ```
     _dryrun_complete() {
         (( ${FLAG_DRYRUN:-0} == 1 )) || return 0
         sayok "DRYRUN complete. The changes shown above would have been applied; no changes were written."

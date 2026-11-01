@@ -8,7 +8,8 @@
 #   Shortname   : MANAGE_SOLIDGROUNDUX
 #   Source      : manage-solidgroundux.sh
 #   Type        : script
-#   Group       : Role Managers
+#   Group       : Modules
+#   Subgroup    : SolidGroundUX Framework
 #   Purpose     : Apply persistent SolidGroundUX framework management actions
 #
 #   Checksum : 3f6a8ce90ba7fe95aa9abc24cf8e7a6e0e1a8f22dc4d407c8002fb07a86f1a3e
@@ -55,7 +56,7 @@ set -uo pipefail
         #     present, falls back to the installed framework copy without changing
         #     SGND_FRAMEWORK_ROOT.
         #
-        # . Globals (write)
+        # . Globals (Write)
         #   SGND_FRAMEWORK_ROOT
         #
         # . Output
@@ -63,8 +64,8 @@ set -uo pipefail
         #   helpers are not available until sgnd-exe-common.sh has been loaded.
         #
         # . Returns
-        #   0 when the framework root was resolved and executable common library loaded.
-        #   126 when the script path cannot be resolved, no canonical root component can
+        #   - 0 when the framework root was resolved and executable common library loaded.
+        #   - 126 when the script path cannot be resolved, no canonical root component can
         #   be found, or the executable common library is unreadable.
         #
         # . Usage
@@ -153,6 +154,15 @@ set -uo pipefail
 
 # - Helpers -----------------------------------------------------------------------
     # fn: _framework_config_validator - Choose a validator for a Framework configuration key.
+        # . Purpose
+        #   Choose a validator for a Framework configuration key.
+        #
+        # . Arguments
+        #   - `$1`: Optional: configuration or response-field key.
+        # . Usage
+        #   ```bash
+        #   _framework_config_validator "SGND_CONSOLE_LOG_LEVEL"
+        #   ```
     _framework_config_validator() {
         local key="${1:-}"
 
@@ -173,6 +183,13 @@ set -uo pipefail
     }
 
     # fn: _framework_config_validate_log_level - Accept one of the supported Framework logging levels.
+        # . Purpose
+        #   Accept one of the supported Framework logging levels.
+        #
+        # . Usage
+        #   ```bash
+        #   _framework_config_validate_log_level
+        #   ```
     _framework_config_validate_log_level() {
         case "${1,,}" in
             silent|quiet|normal|verbose|debug|trace) return 0 ;;
@@ -181,6 +198,17 @@ set -uo pipefail
     }
 
     # fn: _framework_config_write_value - Write a configuration key and value back to the selected configuration file.
+        # . Purpose
+        #   Write a configuration key and value back to the selected configuration file.
+        #
+        # . Arguments
+        #   - `$1`: Configuration file path.
+        #   - `$2`: Configuration or response-field key.
+        #   - `$3`: Value to inspect or write.
+        # . Usage
+        #   ```bash
+        #   _framework_config_write_value "/srv/storage/example.txt" "example-key" "example-value"
+        #   ```
     _framework_config_write_value() {
         local file="${1:?missing cfg file}"
         local key="${2:?missing cfg key}"
@@ -230,6 +258,16 @@ set -uo pipefail
     }
 
     # fn: _framework_config_edit_file - Open a Framework configuration file in the selected external editor.
+        # . Purpose
+        #   Open a Framework configuration file in the selected external editor.
+        #
+        # . Arguments
+        #   - `$1`: Title of the configuration-editing screen.
+        #   - `$2`: Configuration file path.
+        # . Usage
+        #   ```bash
+        #   _framework_config_edit_file "<title>" "/srv/storage/example.txt"
+        #   ```
     _framework_config_edit_file() {
         local title="$1"
         local file="$2"
@@ -270,6 +308,15 @@ set -uo pipefail
     }
 
     # fn: _framework_configure_file - Configure file in the Framework workflow.
+        # . Purpose
+        #   Open the selected Framework configuration file for guided editing.
+        #
+        # . Arguments
+        #   - `$1`: Optional: configuration file path.
+        # . Usage
+        #   ```bash
+        #   _framework_configure_file "/srv/storage/example.txt"
+        #   ```
     _framework_configure_file() {
         local cfg_file="${1:-${SGND_FRAMEWORK_SYSCFG_FILE:-}}"
         local spec=""
@@ -344,6 +391,13 @@ set -uo pipefail
     }
 
     # fn: _framework_log_validate - Log validate in the Framework workflow.
+        # . Purpose
+        #   Check the Framework logging configuration and file accessibility.
+        #
+        # . Usage
+        #   ```bash
+        #   _framework_log_validate
+        #   ```
     _framework_log_validate() {
         [[ -n "${SGND_LOG_PATH:-}" ]] || {
             saywarning "SGND_LOG_PATH is not set"
@@ -357,6 +411,13 @@ set -uo pipefail
     }
 
     # fn: _framework_log_rotate - Log rotate in the Framework workflow.
+        # . Purpose
+        #   Run the Framework log-rotation action.
+        #
+        # . Usage
+        #   ```bash
+        #   _framework_log_rotate
+        #   ```
     _framework_log_rotate() {
         local logfile="${SGND_LOG_PATH:-}"
         local keep="${SGND_LOG_KEEP:-5}"
@@ -415,6 +476,15 @@ set -uo pipefail
 
 # - Actions -----------------------------------------------------------------------
     # fn: _run_action - Dispatch the requested management action to its implementation.
+        # . Purpose
+        #   Dispatch the requested management action to its implementation.
+        #
+        # . Arguments
+        #   - `$1`: Management action to execute.
+        # . Usage
+        #   ```bash
+        #   _run_action "config-system-configure"
+        #   ```
     _run_action() {
         local action="${1:?missing action}"
 
@@ -444,6 +514,13 @@ set -uo pipefail
 
 # - Main --------------------------------------------------------------------------
     # fn: main - Dispatch command-line options to the appropriate management workflow.
+        # . Purpose
+        #   Dispatch command-line options to the appropriate management workflow.
+        #
+        # . Usage
+        #   ```bash
+        #   main "$@"
+        #   ```
     main() {
         local action=""
         local selection=""

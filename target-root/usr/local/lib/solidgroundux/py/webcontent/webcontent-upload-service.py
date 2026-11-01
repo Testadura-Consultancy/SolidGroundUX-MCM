@@ -24,12 +24,18 @@ ALLOWED_EXTENSIONS = {".md", ".zip", ".png", ".jpg", ".jpeg", ".gif", ".webp", "
 SAFE_NAME = re.compile(r"[A-Za-z0-9][A-Za-z0-9_.-]*\Z")
 
 
+
+# --- Public functions ------------------------------------------------------------
 def validate_upload(filename: str, payload: bytes) -> None:
     """Validate staged files, including ZIP paths and expansion limits.
-
+    
     This is not ingestion: archive entries remain unextracted until the WCM
     ingestion planner reviews them on the receiving machine.
-    """
+    
+    Usage:
+        ```python
+        validate_upload(filename, payload)
+        ```"""
     if not SAFE_NAME.fullmatch(filename) or filename in {".", ".."}:
         raise ValueError("Unsafe filename")
     extension = Path(filename).suffix.lower()
@@ -73,11 +79,24 @@ def validate_upload(filename: str, payload: bytes) -> None:
 
 
 
+
+# --- Internal classes ------------------------------------------------------------
 class Handler(BaseHTTPRequestHandler):
+    """Serve the WCM upload endpoint, validating and staging submissions.
+
+    Requests are dispatched by BaseHTTPRequestHandler; callers should not
+    invoke these methods as standalone content-ingestion operations.
+    """
     directory: Path
     hostname: str
 
     def respond(self, code: int, message: str):
+        """Send an HTTP response with the requested status and diagnostic message.
+        
+        Usage:
+            ```python
+            handler.respond(code, message)
+            ```"""
         body = json.dumps({"message": message}, ensure_ascii=False).encode("utf-8")
         self.send_response(code)
         self.send_header("Content-Type", "application/json; charset=utf-8")
@@ -88,6 +107,12 @@ class Handler(BaseHTTPRequestHandler):
         self.wfile.write(body)
 
     def do_POST(self):
+        """Accept and validate an uploaded package through the HTTP POST endpoint.
+        
+        Usage:
+            ```python
+            handler.do_POST()
+            ```"""
         if self.path != "/api/markdown-upload":
             return self.respond(404, "Unknown endpoint")
         # Require an explicit JavaScript request from our own origin; prevents a
@@ -149,6 +174,12 @@ class Handler(BaseHTTPRequestHandler):
         self.respond(201, f"Stored {len(created)} file(s)")
 
     def do_GET(self):
+        """Respond to supported HTTP GET requests from the upload service.
+        
+        Usage:
+            ```python
+            handler.do_GET()
+            ```"""
         self.respond(405, "POST only")
 
 

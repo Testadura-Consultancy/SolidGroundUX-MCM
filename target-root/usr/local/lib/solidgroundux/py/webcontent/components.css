@@ -198,6 +198,12 @@
     }
 }
 
+/* Optional compact image gallery; keeps example images readable without
+ * resizing every gallery on authored websites. */
+.td-gallery.td-gallery-compact > p {
+    flex-basis: min(72%, 16rem);
+}
+
 /*
  * IMSD cards used on the Testadura home page.
  *

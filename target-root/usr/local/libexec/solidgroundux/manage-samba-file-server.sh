@@ -8,7 +8,8 @@
 #   Shortname   : MANAGE_SAMBA_SERVER
 #   Source      : manage-samba-file-server.sh
 #   Type        : script
-#   Group       : Role Managers
+#   Group       : Modules
+#   Subgroup    : Samba File Server
 #   Purpose     : Prepare, validate, and inspect the Samba file-server service
 #
 #   Checksum : 4a8880accee6a7db6ad40f2ec0c23b5620953c6d27f0b411c0e40670c70445c1
@@ -57,7 +58,7 @@ set -uo pipefail
         #     present, falls back to the installed framework copy without changing
         #     SGND_FRAMEWORK_ROOT.
         #
-        # . Globals (write)
+        # . Globals (Write)
         #   SGND_FRAMEWORK_ROOT
         #
         # . Output
@@ -65,8 +66,8 @@ set -uo pipefail
         #   helpers are not available until sgnd-exe-common.sh has been loaded.
         #
         # . Returns
-        #   0 when the framework root was resolved and executable common library loaded.
-        #   126 when the script path cannot be resolved, no canonical root component can
+        #   - 0 when the framework root was resolved and executable common library loaded.
+        #   - 126 when the script path cannot be resolved, no canonical root component can
         #   be found, or the executable common library is unreadable.
         #
         # . Usage
@@ -135,9 +136,12 @@ set -uo pipefail
         source "$exe_common"
     }
 # - Project libraries ---------------------------------------------------------------
-    # fn$ _load_ad_management - Load shared Active Directory discovery APIs
+    # fn: _load_ad_management - Load shared Active Directory discovery APIs
+        # . Purpose
+        #   Load shared Active Directory discovery APIs.
+        #
         # . Returns
-        #   0 when the project Active Directory management library is loaded.
+        #   - 0 when the project Active Directory management library is loaded.
         #
         # . Usage
         #   ```bash
@@ -223,11 +227,25 @@ set -uo pipefail
 
 # - Helpers -------------------------------------------------------------------------
     # fn: _dryrun_complete - Report the dry-run result without executing the requested host change.
+        # . Purpose
+        #   Report the dry-run result without executing the requested host change.
+        #
+        # . Usage
+        #   ```bash
+        #   _dryrun_complete
+        #   ```
     _dryrun_complete() {
         sayok "DRYRUN complete. The changes shown above would have been applied; no changes were written."
     }
 
     # fn: _smb_refresh_storage_paths - Refresh Samba storage paths using the saved storage configuration.
+        # . Purpose
+        #   Refresh Samba storage paths using the saved storage configuration.
+        #
+        # . Usage
+        #   ```bash
+        #   _smb_refresh_storage_paths "/srv/storage/example" "/srv/storage/example"
+        #   ```
     _smb_refresh_storage_paths() {
         local mountpoint=""
         local device=""
@@ -273,6 +291,13 @@ set -uo pipefail
     }
 
     # fn: _smb_require_storage - Require the configured Samba storage mount to be available.
+        # . Purpose
+        #   Require the configured Samba storage mount to be available.
+        #
+        # . Usage
+        #   ```bash
+        #   _smb_require_storage
+        #   ```
     _smb_require_storage() {
         _smb_refresh_storage_paths
         mountpoint -q "$SGND_SAMBA_STORAGE_ROOT" || {
@@ -283,6 +308,13 @@ set -uo pipefail
     }
 
     # fn: _smb_list_managed_shares_raw - Enumerate managed Samba shares from the current Samba configuration.
+        # . Purpose
+        #   Enumerate managed Samba shares from the current Samba configuration.
+        #
+        # . Usage
+        #   ```bash
+        #   _smb_list_managed_shares_raw
+        #   ```
     _smb_list_managed_shares_raw() {
         _smb_refresh_storage_paths
         local share_name=""
@@ -312,13 +344,18 @@ set -uo pipefail
         #   final option and the Selection prompt.
         #
         # . Arguments
-        #   --label TEXT
-        #   --var NAME
-        #   --multi
-        #   --items ITEM...
+        #   - --label TEXT
+        #   - --var NAME
+        #   - --multi
+        #   - --items ITEM...
         #
         # . Returns
-        #   0 on selection; 1 when Q is entered; 2 on invalid invocation.
+        #   - 0 on selection; 1 when Q is entered; 2 on invalid invocation.
+        #
+        # . Usage
+        #   ```bash
+        #   _smb_ask_selection --label "Choose share" --var share --items "Public" "Private"
+        #   ```
     _smb_ask_selection() {
         local label="Select an option"
         local var_name="selection"
@@ -443,7 +480,7 @@ set -uo pipefail
         #   Writes "ad" when Samba security is ADS, otherwise "standalone".
         #
         # . Returns
-        #   0 always.
+        #   - 0 always.
         #
         # . Usage
         #   ```bash
@@ -470,7 +507,7 @@ set -uo pipefail
         #   - Does not create or modify DNS records; AD-client provisioning owns DNS registration.
         #
         # . Returns
-        #   0 when the FQDN resolves to the primary IPv4 address; non-zero otherwise.
+        #   - 0 when the FQDN resolves to the primary IPv4 address; non-zero otherwise.
         #
         # . Usage
         #   ```bash
@@ -505,12 +542,12 @@ set -uo pipefail
         #   authentication and identity-mapping settings.
         #
         # . Arguments
-        #   $1  Authentication mode: ad or standalone.
-        #   $2  AD realm when mode is ad.
-        #   $3  AD short/NetBIOS domain when mode is ad.
+        #   - $1  Authentication mode: ad or standalone.
+        #   - $2  AD realm when mode is ad.
+        #   - $3  AD short/NetBIOS domain when mode is ad.
         #
         # . Returns
-        #   0 when smb.conf is updated; non-zero on rewrite/install failure.
+        #   - 0 when smb.conf is updated; non-zero on rewrite/install failure.
         #
         # . Usage
         #   ```bash
@@ -545,6 +582,8 @@ set -uo pipefail
                     || key ~ /^idmap config[[:space:]].*/
             }
             # fn: emit_settings - Write Samba configuration settings to the generated configuration output.
+                # . Purpose
+                #   Write Samba configuration settings to the generated configuration output.
                 #
                 # . Usage
                 #   ```bash
@@ -622,10 +661,10 @@ set -uo pipefail
         #   - Restores the original configuration when a changed file cannot be activated successfully.
         #
         # . Arguments
-        #   $1  Joined AD realm.
+        #   - $1  Joined AD realm.
         #
         # . Returns
-        #   0 when the setting is present, validated, and active; non-zero otherwise.
+        #   - 0 when the setting is present, validated, and active; non-zero otherwise.
         #
         # . Usage
         #   ```bash
@@ -694,6 +733,8 @@ set -uo pipefail
         awk -v section="[$domain_section]" '
             BEGIN { in_domain=0; saw_domain=0; found=0 }
             # fn: emit_setting - Write one Samba configuration setting to the generated configuration output.
+                # . Purpose
+                #   Write one Samba configuration setting to the generated configuration output.
                 #
                 # . Usage
                 #   ```bash
@@ -847,10 +888,10 @@ set -uo pipefail
         #   - Leaves hostname DNS registration to the AD-client module.
         #
         # . Arguments
-        #   $1  Joined Active Directory realm.
+        #   - $1  Joined Active Directory realm.
         #
         # . Returns
-        #   0 when Samba validates its ADS machine trust; non-zero otherwise.
+        #   - 0 when Samba validates its ADS machine trust; non-zero otherwise.
         #
         # . Usage
         #   ```bash
@@ -922,8 +963,8 @@ set -uo pipefail
         #     hostname A record separately after Samba trust is established.
         #
         # . Returns
-        #   0 when Samba matches the detected host identity state and validates successfully.
-        #   Non-zero when configuration, trust establishment, or validation fails.
+        #   - 0 when Samba matches the detected host identity state and validates successfully.
+        #   - Non-zero when configuration, trust establishment, or validation fails.
         #
         # . Usage
         #   ```bash
@@ -1074,6 +1115,13 @@ set -uo pipefail
 
 # - Actions -------------------------------------------------------------------------
     # fn: _smb_install_packages - Install packages needed for the selected Samba server role.
+        # . Purpose
+        #   Install packages needed for the selected Samba server role.
+        #
+        # . Usage
+        #   ```bash
+        #   _smb_install_packages
+        #   ```
     _smb_install_packages() {
         local -a packages=(acl attr samba samba-common-bin smbclient)
 
@@ -1100,12 +1148,26 @@ set -uo pipefail
     }
 
     # fn: _smb_validate_storage - Validate the configured storage mount before Samba provisioning.
+        # . Purpose
+        #   Validate the configured storage mount before Samba provisioning.
+        #
+        # . Usage
+        #   ```bash
+        #   _smb_validate_storage
+        #   ```
     _smb_validate_storage() {
         _smb_require_storage || return 1
         sayok "Storage is mounted and available for Samba file services."
     }
 
     # fn: _smb_prepare_share_root - Prepare the configured Samba share root with required permissions.
+        # . Purpose
+        #   Prepare the configured Samba share root with required permissions.
+        #
+        # . Usage
+        #   ```bash
+        #   _smb_prepare_share_root
+        #   ```
     _smb_prepare_share_root() {
         _smb_refresh_storage_paths
         _smb_require_storage || return 1
@@ -1127,6 +1189,13 @@ set -uo pipefail
     }
 
     # fn: _smb_start_service - Manage the service for smb start in the Samba workflow.
+        # . Purpose
+        #   Start or enable the Samba file-server service through the service manager.
+        #
+        # . Usage
+        #   ```bash
+        #   _smb_start_service
+        #   ```
     _smb_start_service() {
         if (( ${FLAG_DRYRUN:-0} == 1 )); then
             if command -v testparm >/dev/null 2>&1; then
@@ -1160,6 +1229,13 @@ set -uo pipefail
     }
 
     # fn: _smb_prepare_file_server - Run the ordered Samba file-server preparation workflow.
+        # . Purpose
+        #   Run the ordered Samba file-server preparation workflow.
+        #
+        # . Usage
+        #   ```bash
+        #   _smb_prepare_file_server
+        #   ```
     _smb_prepare_file_server() {
         sgnd_print
         sgnd_print_sectionheader --text "Prepare Samba File Server"
@@ -1178,6 +1254,9 @@ set -uo pipefail
     }
 
     # fn: _smb_validate - Validate Samba file-server configuration and runtime state
+        # . Purpose
+        #   Validate Samba file-server configuration and runtime state.
+        #
         # . Behavior
         #   - Validates Samba tools, smb.conf, smbd, storage, share-root traversal, and configured shares.
         #   - On AD members, validates ADS realm/workgroup settings, the Samba machine trust,
@@ -1185,7 +1264,12 @@ set -uo pipefail
         #   - Validates that SSSD Samba machine-account password synchronization remains enabled.
         #
         # . Returns
-        #   0 when all checks pass; non-zero when one or more checks fail.
+        #   - 0 when all checks pass; non-zero when one or more checks fail.
+        #
+        # . Usage
+        #   ```bash
+        #   _smb_validate
+        #   ```
     _smb_validate() {
         _smb_refresh_storage_paths
         local failures=0
@@ -1336,6 +1420,13 @@ set -uo pipefail
     }
 
     # fn: _smb_status - Inspect status for smb in the Samba workflow.
+        # . Purpose
+        #   Display Samba package, service and configuration status.
+        #
+        # . Usage
+        #   ```bash
+        #   _smb_status
+        #   ```
     _smb_status() {
         _smb_refresh_storage_paths
         local service_state="not installed"
@@ -1394,6 +1485,15 @@ set -uo pipefail
     }
 
     # fn: _run_action - Dispatch the requested management action to its implementation.
+        # . Purpose
+        #   Dispatch the requested management action to its implementation.
+        #
+        # . Arguments
+        #   - `$1`: Management action to execute.
+        # . Usage
+        #   ```bash
+        #   _run_action "status"
+        #   ```
     _run_action() {
         local action="${1:?missing action}"
 
@@ -1415,6 +1515,13 @@ set -uo pipefail
 
 # - Main ---------------------------------------------------------------------------
     # fn: main - Dispatch command-line options to the appropriate management workflow.
+        # . Purpose
+        #   Dispatch command-line options to the appropriate management workflow.
+        #
+        # . Usage
+        #   ```bash
+        #   main "$@"
+        #   ```
     main() {
         local action=""
         local selection=""

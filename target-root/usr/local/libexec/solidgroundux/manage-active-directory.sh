@@ -8,7 +8,8 @@
 #   Shortname   : MANAGE_AD
 #   Source      : manage-active-directory.sh
 #   Type        : script
-#   Group       : Role Managers
+#   Group       : Modules
+#   Subgroup    : Active Directory Management
 #   Purpose     : Manage Samba Active Directory users, groups, memberships, and computers
 #
 #   Checksum : 17f5acdd36f138315549b1a19979762550040ddc5e9cbeaa135153442855e6f8
@@ -55,7 +56,7 @@ set -uo pipefail
         #     present, falls back to the installed framework copy without changing
         #     SGND_FRAMEWORK_ROOT.
         #
-        # . Globals (write)
+        # . Globals (Write)
         #   SGND_FRAMEWORK_ROOT
         #
         # . Output
@@ -63,8 +64,8 @@ set -uo pipefail
         #   helpers are not available until sgnd-exe-common.sh has been loaded.
         #
         # . Returns
-        #   0 when the framework root was resolved and executable common library loaded.
-        #   126 when the script path cannot be resolved, no canonical root component can
+        #   - 0 when the framework root was resolved and executable common library loaded.
+        #   - 126 when the script path cannot be resolved, no canonical root component can
         #   be found, or the executable common library is unreadable.
         #
         # . Usage
@@ -133,6 +134,13 @@ set -uo pipefail
         source "$exe_common"
     }
     # fn: _load_ad_management_library - Load ad management library in the Active Directory workflow.
+        # . Purpose
+        #   Locate and source the shared Active Directory management helpers.
+        #
+        # . Usage
+        #   ```bash
+        #   _load_ad_management_library
+        #   ```
     _load_ad_management_library() {
         local script_file="" path_without_root="" component="" app_root="" lib_file=""
         local index=0 root_index=-1
@@ -195,9 +203,23 @@ set -uo pipefail
 
 # - Internal helpers ---------------------------------------------------------------
     # fn: _admg_require_dc - Require dc in the Active Directory management workflow.
+        # . Purpose
+        #   Require a usable Active Directory domain controller before a management action.
+        #
+        # . Usage
+        #   ```bash
+        #   _admg_require_dc
+        #   ```
     _admg_require_dc() { sgnd_ad_require_dc; }
 
     # fn: _admg_validate_sam_name - Validate sam name in the Active Directory management workflow.
+        # . Purpose
+        #   Validate the account name against the accepted sAMAccountName character rules.
+        #
+        # . Usage
+        #   ```bash
+        #   _admg_validate_sam_name
+        #   ```
     _admg_validate_sam_name() { sgnd_ad_validate_account "$@"; }
 
     # fn: _admg_list_users_raw - Return directory users
@@ -259,10 +281,10 @@ set -uo pipefail
         #   Enumerate users and store one selected user in the requested variable.
         #
         # . Arguments
-        #   $1 - Output variable name.
+        #   - `$1` — Output variable name.
         #
         # . Returns
-        #   0 on selection; 1 on cancel or unavailable users.
+        #   - 0 on selection; 1 on cancel or unavailable users.
         #
         # . Usage
         #   ```bash
@@ -288,10 +310,10 @@ set -uo pipefail
         #   Enumerate groups and store one selected group in the requested variable.
         #
         # . Arguments
-        #   $1 - Output variable name.
+        #   - `$1` — Output variable name.
         #
         # . Returns
-        #   0 on selection; 1 on cancel or unavailable groups.
+        #   - 0 on selection; 1 on cancel or unavailable groups.
         #
         # . Usage
         #   ```bash
@@ -317,10 +339,10 @@ set -uo pipefail
         #   Enumerate computer accounts and store one selected computer in the requested variable.
         #
         # . Arguments
-        #   $1 - Output variable name.
+        #   - `$1` — Output variable name.
         #
         # . Returns
-        #   0 on selection; 1 on cancel or unavailable computers.
+        #   - 0 on selection; 1 on cancel or unavailable computers.
         #
         # . Usage
         #   ```bash
@@ -346,10 +368,10 @@ set -uo pipefail
         #   Read userAccountControl and test the ACCOUNTDISABLE flag.
         #
         # . Arguments
-        #   $1 - User sAMAccountName.
+        #   - `$1` — User sAMAccountName.
         #
         # . Returns
-        #   0 when disabled; 1 when enabled or the state cannot be read.
+        #   - 0 when disabled; 1 when enabled or the state cannot be read.
         #
         # . Usage
         #   ```bash
@@ -369,11 +391,11 @@ set -uo pipefail
         #   Provide the shared implementation used by user- and group-oriented workflows.
         #
         # . Arguments
-        #   $1 - Group name.
-        #   $2 - Member sAMAccountName.
+        #   - `$1` — Group name.
+        #   - `$2` — Member sAMAccountName.
         #
         # . Returns
-        #   0 on success or dry-run; samba-tool status otherwise.
+        #   - 0 on success or dry-run; samba-tool status otherwise.
         #
         # . Usage
         #   ```bash
@@ -396,11 +418,11 @@ set -uo pipefail
         #   Provide the shared removal implementation used by user- and group-oriented workflows.
         #
         # . Arguments
-        #   $1 - Group name.
-        #   $2 - Member sAMAccountName.
+        #   - `$1` — Group name.
+        #   - `$2` — Member sAMAccountName.
         #
         # . Returns
-        #   0 on success or dry-run; samba-tool status otherwise.
+        #   - 0 on success or dry-run; samba-tool status otherwise.
         #
         # . Usage
         #   ```bash
@@ -423,7 +445,7 @@ set -uo pipefail
         #   Prevent accidental deletion or disabling of core Samba AD service accounts.
         #
         # . Returns
-        #   0 for a protected account; 1 otherwise.
+        #   - 0 for a protected account; 1 otherwise.
         #
         # . Usage
         #   ```bash
@@ -441,7 +463,7 @@ set -uo pipefail
         #   Prevent accidental deletion of core domain and built-in security groups.
         #
         # . Returns
-        #   0 for a protected group; 1 otherwise.
+        #   - 0 for a protected group; 1 otherwise.
         #
         # . Usage
         #   ```bash
@@ -455,17 +477,29 @@ set -uo pipefail
     }
 
     # fn: _admg_decision_is_quit - Test whether a canonical decision means quit/back
+        # . Purpose
+        #   Test whether a canonical decision means quit/back.
+        #
         # . Returns
-        #   0 when the value is Quit/Q (case-insensitive); 1 otherwise.
+        #   - 0 when the value is Quit/Q (case-insensitive); 1 otherwise.
         # . Usage
         #   ```bash
-        #   _admg_decision_is_quit "<arg1>"
+        #   _admg_decision_is_quit
         #   ```
     _admg_decision_is_quit() {
         [[ "${1^^}" == "QUIT" || "${1^^}" == "Q" ]]
     }
 
     # fn: _admg_ask_selection - Render AD selections with manager-owned presentation
+        # . Purpose
+        #   Render AD selections with manager-owned presentation.
+        #
+        # . Arguments
+        #   - `$2`: Name of the output shell variable.
+        # . Usage
+        #   ```bash
+        #   _admg_ask_selection --label "Choose user" --var selected --items "alice" "bob"
+        #   ```
     _admg_ask_selection() {
         local label="Select an option" var_name="selection" multi=0 input="" token="" start=0 end=0 index=0 i=0 invalid=0
         local -a items=() tokens=() selected_values=()
@@ -517,7 +551,7 @@ set -uo pipefail
         #   Display realm, controller, service state, and directory object counts.
         #
         # . Returns
-        #   0 when status is displayed; 1 when no local AD domain is available.
+        #   - 0 when status is displayed; 1 when no local AD domain is available.
         #
         # . Usage
         #   ```bash
@@ -549,6 +583,13 @@ set -uo pipefail
     }
 
     # fn: _admg_validate - Validate local Active Directory administration readiness
+        # . Purpose
+        #   Validate local Active Directory administration readiness.
+        #
+        # . Usage
+        #   ```bash
+        #   _admg_validate
+        #   ```
     _admg_validate() {
         local failures=0 realm=""
         sgnd_print
@@ -572,7 +613,7 @@ set -uo pipefail
         #   Display all directory user accounts.
         #
         # . Returns
-        #   0 after listing users; 1 when management is unavailable.
+        #   - 0 after listing users; 1 when management is unavailable.
         #
         # . Usage
         #   ```bash
@@ -596,7 +637,7 @@ set -uo pipefail
         #   Display the selected user object, account state, and direct group memberships.
         #
         # . Returns
-        #   0 when displayed or cancelled; non-zero on query failure.
+        #   - 0 when displayed or cancelled; non-zero on query failure.
         #
         # . Usage
         #   ```bash
@@ -629,7 +670,7 @@ set -uo pipefail
         #   Create directory users, optionally disable password expiry, and optionally continue creating users.
         #
         # . Returns
-        #   0 on success, dry-run, or cancellation; non-zero on creation failure.
+        #   - 0 on success, dry-run, or cancellation; non-zero on creation failure.
         #
         # . Usage
         #   ```bash
@@ -696,7 +737,7 @@ set -uo pipefail
         #   Toggle the selected account between enabled and disabled states.
         #
         # . Returns
-        #   0 on success, dry-run, or cancellation; non-zero on update failure.
+        #   - 0 on success, dry-run, or cancellation; non-zero on update failure.
         #
         # . Usage
         #   ```bash
@@ -740,7 +781,7 @@ set -uo pipefail
         #   Reset the selected user's password using samba-tool's interactive secure prompt.
         #
         # . Returns
-        #   0 on success, dry-run, or cancellation; non-zero on reset failure.
+        #   - 0 on success, dry-run, or cancellation; non-zero on reset failure.
         #
         # . Usage
         #   ```bash
@@ -770,7 +811,7 @@ set -uo pipefail
         #   Disable password expiry for the selected Active Directory user.
         #
         # . Returns
-        #   0 on success, dry-run, or cancellation; non-zero on update failure.
+        #   - 0 on success, dry-run, or cancellation; non-zero on update failure.
         #
         # . Usage
         #   ```bash
@@ -802,7 +843,7 @@ set -uo pipefail
         #   Delete a selected non-protected user account after confirmation.
         #
         # . Returns
-        #   0 on success, dry-run, protected-account refusal, or cancellation; non-zero on deletion failure.
+        #   - 0 on success, dry-run, protected-account refusal, or cancellation; non-zero on deletion failure.
         #
         # . Usage
         #   ```bash
@@ -850,7 +891,7 @@ set -uo pipefail
         #   Select a user and one or more groups, then add that user through the shared membership helper.
         #
         # . Returns
-        #   0 after completion or cancellation; 1 when one or more membership updates fail.
+        #   - 0 after completion or cancellation; 1 when one or more membership updates fail.
         #
         # . Usage
         #   ```bash
@@ -886,7 +927,7 @@ set -uo pipefail
         #   Select from the user's current direct groups and remove selected memberships.
         #
         # . Returns
-        #   0 after completion or cancellation; 1 when one or more removals fail.
+        #   - 0 after completion or cancellation; 1 when one or more removals fail.
         #
         # . Usage
         #   ```bash
@@ -944,7 +985,7 @@ set -uo pipefail
         #   Display all directory groups.
         #
         # . Returns
-        #   0 after listing groups; 1 when management is unavailable.
+        #   - 0 after listing groups; 1 when management is unavailable.
         #
         # . Usage
         #   ```bash
@@ -968,7 +1009,7 @@ set -uo pipefail
         #   Display the selected group object and its direct members.
         #
         # . Returns
-        #   0 when displayed or cancelled; non-zero on query failure.
+        #   - 0 when displayed or cancelled; non-zero on query failure.
         #
         # . Usage
         #   ```bash
@@ -998,7 +1039,7 @@ set -uo pipefail
         #   Create a new AD group after confirmation.
         #
         # . Returns
-        #   0 on success, dry-run, or cancellation; non-zero on creation failure.
+        #   - 0 on success, dry-run, or cancellation; non-zero on creation failure.
         #
         # . Usage
         #   ```bash
@@ -1046,7 +1087,7 @@ set -uo pipefail
         #   Delete a selected non-protected AD group after confirmation.
         #
         # . Returns
-        #   0 on success, dry-run, protected-group refusal, or cancellation; non-zero on deletion failure.
+        #   - 0 on success, dry-run, protected-group refusal, or cancellation; non-zero on deletion failure.
         #
         # . Usage
         #   ```bash
@@ -1104,7 +1145,7 @@ set -uo pipefail
         #   Select a group and users, then add memberships through the shared helper.
         #
         # . Returns
-        #   0 after completion or cancellation; 1 when one or more updates fail.
+        #   - 0 after completion or cancellation; 1 when one or more updates fail.
         #
         # . Usage
         #   ```bash
@@ -1161,7 +1202,7 @@ set -uo pipefail
         #   Select a group and remove one or more of its current direct members.
         #
         # . Returns
-        #   0 after completion or cancellation; 1 when one or more removals fail.
+        #   - 0 after completion or cancellation; 1 when one or more removals fail.
         #
         # . Usage
         #   ```bash
@@ -1219,7 +1260,7 @@ set -uo pipefail
         #   Display all directory computer accounts.
         #
         # . Returns
-        #   0 after listing computers; 1 when management is unavailable.
+        #   - 0 after listing computers; 1 when management is unavailable.
         #
         # . Usage
         #   ```bash
@@ -1243,7 +1284,7 @@ set -uo pipefail
         #   Display the selected computer AD object.
         #
         # . Returns
-        #   0 when displayed or cancelled; non-zero on query failure.
+        #   - 0 when displayed or cancelled; non-zero on query failure.
         #
         # . Usage
         #   ```bash
@@ -1263,7 +1304,7 @@ set -uo pipefail
         #   Remove a selected stale computer account after confirmation.
         #
         # . Returns
-        #   0 on success, dry-run, or cancellation; non-zero on deletion failure.
+        #   - 0 on success, dry-run, or cancellation; non-zero on deletion failure.
         #
         # . Usage
         #   ```bash
@@ -1291,10 +1332,26 @@ set -uo pipefail
 
 # - Action dispatch -----------------------------------------------------------------
     # fn: _admg_action_is_mutating - Identify AD management actions that change users, groups or computers.
+        # . Purpose
+        #   Identify AD management actions that change users, groups or computers.
+        #
+        # . Usage
+        #   ```bash
+        #   _admg_action_is_mutating "user-create"
+        #   ```
     _admg_action_is_mutating() {
         case "${1:-}" in user-create|user-toggle|user-password|user-noexpiry|user-addgroups|user-removegroups|user-delete|group-create|group-addusers|group-removemembers|group-delete|computer-delete) return 0 ;; *) return 1 ;; esac
     }
     # fn: _admg_run_action - Forward an Active Directory management action to its management executable.
+        # . Purpose
+        #   Forward an Active Directory management action to its management executable.
+        #
+        # . Arguments
+        #   - `$1`: Management action to execute.
+        # . Usage
+        #   ```bash
+        #   _admg_run_action "status"
+        #   ```
     _admg_run_action() {
         local action="${1:?missing action}" rc=0
         case "$action" in
@@ -1325,6 +1382,13 @@ set -uo pipefail
     }
 # - Main ---------------------------------------------------------------------------
     # fn: main - Dispatch command-line options to the appropriate management workflow.
+        # . Purpose
+        #   Dispatch command-line options to the appropriate management workflow.
+        #
+        # . Usage
+        #   ```bash
+        #   main "$@"
+        #   ```
     main() {
         local action=""
         _framework_locator || return $?

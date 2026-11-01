@@ -8,7 +8,8 @@
 #   Shortname   : MANAGE_COMPUTER
 #   Source      : manage-computer.sh
 #   Type        : script
-#   Group       : Role Managers
+#   Group       : Modules
+#   Subgroup    : Computer Setup
 #   Purpose     : Computer Setup action implementation
 #   Checksum : ae086d397bbb4ce8d8cbc5e51ea1295f69c56e85fd802472274e493ad14dce50
 # Description:
@@ -46,7 +47,7 @@ set -uo pipefail
         #     present, falls back to the installed framework copy without changing
         #     SGND_FRAMEWORK_ROOT.
         #
-        # . Globals (write)
+        # . Globals (Write)
         #   SGND_FRAMEWORK_ROOT
         #
         # . Output
@@ -54,8 +55,8 @@ set -uo pipefail
         #   helpers are not available until sgnd-exe-common.sh has been loaded.
         #
         # . Returns
-        #   0 when the framework root was resolved and executable common library loaded.
-        #   126 when the script path cannot be resolved, no canonical root component can
+        #   - 0 when the framework root was resolved and executable common library loaded.
+        #   - 126 when the script path cannot be resolved, no canonical root component can
         #   be found, or the executable common library is unreadable.
         #
         # . Usage
@@ -142,7 +143,7 @@ SGND_STATE_SAVE=0
         #   Enable or disable SSH and keep its runtime state aligned.
         #
         # . Returns
-        #   0 on success; non-zero on failure.
+        #   - 0 on success; non-zero on failure.
         # . Usage
         #   ```bash
         #   _computer_configure_ssh_service
@@ -195,7 +196,7 @@ SGND_STATE_SAVE=0
         #   Generate missing SSH host keys, validate sshd, and restart SSH.
         #
         # . Returns
-        #   0 on success; non-zero on failure.
+        #   - 0 on success; non-zero on failure.
         # . Usage
         #   ```bash
         #   _computer_generate_ssh_keys
@@ -232,7 +233,7 @@ SGND_STATE_SAVE=0
         #   SolidGroundUX administration executables.
         #
         # . Returns
-        #   0 on success; non-zero on failure or cancellation.
+        #   - 0 on success; non-zero on failure or cancellation.
         # . Usage
         #   ```bash
         #   _computer_configure_sudoers
@@ -313,7 +314,7 @@ SGND_STATE_SAVE=0
         #   Display the current Computer Setup state without changing the machine.
         #
         # . Returns
-        #   0 after displaying available status information.
+        #   - 0 after displaying available status information.
         # . Usage
         #   ```bash
         #   _computer_status "<dns_servers>" "<dns_servers>"
@@ -386,7 +387,7 @@ SGND_STATE_SAVE=0
         #   Validate the principal Computer Setup outcomes without changing the machine.
         #
         # . Returns
-        #   0 when all required checks pass; 1 otherwise.
+        #   - 0 when all required checks pass; 1 otherwise.
         # . Usage
         #   ```bash
         #   _computer_validate
@@ -457,6 +458,15 @@ SGND_STATE_SAVE=0
 
 # - Dispatch ------------------------------------------------------------------------
 # fn: _run_action - Dispatch the requested management action to its implementation.
+    # . Purpose
+    #   Dispatch the requested management action to its implementation.
+    #
+    # . Arguments
+    #   - `$1`: Management action to execute.
+    # . Usage
+    #   ```bash
+    #   _run_action "status"
+    #   ```
 _run_action() {
     local action="${1:?missing action}"
     case "$action" in
@@ -470,6 +480,13 @@ _run_action() {
 }
 
 # fn: main - Dispatch command-line options to the appropriate management workflow.
+    # . Purpose
+    #   Dispatch command-line options to the appropriate management workflow.
+    #
+    # . Usage
+    #   ```bash
+    #   main "$@"
+    #   ```
 main() {
     _framework_locator || return $?
     sgnd_exe_start -- "$@" || return $?

@@ -8,7 +8,8 @@
 #   Shortname   : PUBLISH_WEB_CONTENT
 #   Source      : publish-web-content.sh
 #   Type        : script
-#   Group       : Role Managers
+#   Group       : Modules
+#   Subgroup    : Web Content Management
 #   Purpose     : Publish local, remote, Git, and SolidGroundUX documentation content
 #
 #   Checksum : 3605f17b0e185a098210332966945eb3fad2181e194ef6672bbc792f149be0ba
@@ -53,7 +54,7 @@ set -uo pipefail
         #     present, falls back to the installed framework copy without changing
         #     SGND_FRAMEWORK_ROOT.
         #
-        # . Globals (write)
+        # . Globals (Write)
         #   SGND_FRAMEWORK_ROOT
         #
         # . Output
@@ -61,8 +62,8 @@ set -uo pipefail
         #   helpers are not available until sgnd-exe-common.sh has been loaded.
         #
         # . Returns
-        #   0 when the framework root was resolved and executable common library loaded.
-        #   126 when the script path cannot be resolved, no canonical root component can
+        #   - 0 when the framework root was resolved and executable common library loaded.
+        #   - 126 when the script path cannot be resolved, no canonical root component can
         #   be found, or the executable common library is unreadable.
         #
         # . Usage
@@ -183,6 +184,15 @@ set -uo pipefail
     # Render a local numbered selector using the Web Server action layout.
     # The framework ask_selection API is intentionally left unchanged.
     # fn: _web_ask_selection - Prompt for selection in the web server workflow.
+        # . Purpose
+        #   Present a numbered selection prompt and return the chosen item to its caller.
+        #
+        # . Arguments
+        #   - `$2`: Name of the output shell variable.
+        # . Usage
+        #   ```bash
+        #   _web_ask_selection --label "Choose deployment" --var destination --items "Test" "Production"
+        #   ```
     _web_ask_selection() {
         local label="Select an option"
         local var_name="selection"
@@ -226,6 +236,13 @@ set -uo pipefail
     }
 
     # fn: _web_server_load_state - Read web-management settings from the state file when available.
+        # . Purpose
+        #   Read web-management settings from the state file when available.
+        #
+        # . Usage
+        #   ```bash
+        #   _web_server_load_state
+        #   ```
     _web_server_load_state() {
         if [[ -r "$SGND_WEB_SERVER_STATE_FILE" ]] && command -v sgnd_state_load_keys >/dev/null 2>&1; then
             sgnd_state_load_keys --file "$SGND_WEB_SERVER_STATE_FILE" --array SGND_WEB_SERVER_STATE_VARIABLES >/dev/null 2>&1 || true
@@ -233,6 +250,13 @@ set -uo pipefail
     }
 
     # fn: _web_server_save_state - Save web-management settings to the configured state file.
+        # . Purpose
+        #   Save web-management settings to the configured state file.
+        #
+        # . Usage
+        #   ```bash
+        #   _web_server_save_state
+        #   ```
     _web_server_save_state() {
         command -v sgnd_state_save_keys >/dev/null 2>&1 || return 0
         mkdir -p "$(dirname -- "$SGND_WEB_SERVER_STATE_FILE")" || return 1
@@ -240,13 +264,23 @@ set -uo pipefail
     }
 
     # fn: _dryrun_complete - Report the dry-run result without executing the requested host change.
+        # . Purpose
+        #   Report the dry-run result without executing the requested host change.
+        #
+        # . Usage
+        #   ```bash
+        #   _dryrun_complete
+        #   ```
     _dryrun_complete() {
         (( ${FLAG_DRYRUN:-0} == 1 )) || return 0
         sayok "DRYRUN complete. The changes shown above would have been applied; no changes were written."
     }
     # fn: _web_server_storage_root - Resolve the configured SolidGroundUX storage root
+        # . Purpose
+        #   Resolve the configured SolidGroundUX storage root.
+        #
         # . Returns
-        #   0 on success; non-zero when the operation cannot be completed.
+        #   - 0 on success; non-zero when the operation cannot be completed.
         # . Usage
         #   ```bash
         #   _web_server_storage_root
@@ -264,8 +298,11 @@ set -uo pipefail
     }
 
     # fn: _web_server_root - Resolve the configured web content root
+        # . Purpose
+        #   Resolve the configured web content root.
+        #
         # . Returns
-        #   0 on success; non-zero when the operation cannot be completed.
+        #   - 0 on success; non-zero when the operation cannot be completed.
         # . Usage
         #   ```bash
         #   _web_server_root
@@ -286,8 +323,14 @@ set -uo pipefail
         #   Read SGND_WEB_DOC_INSTALLED_ROOT from the environment or web-server.cfg;
         #   use the canonical installed documentation directory if unset.
         #   Support staged framework roots during development.
+        #
         # . Output
         #   Prints the configured absolute documentation path.
+        #
+        # . Usage
+        #   ```bash
+        #   _web_server_installed_docs_root "/srv/storage/example"
+        #   ```
     _web_server_installed_docs_root() {
         local configured="${SGND_WEB_DOC_INSTALLED_ROOT:-}"
         local framework_root="${SGND_FRAMEWORK_ROOT:-/}"
@@ -304,8 +347,13 @@ set -uo pipefail
     }
 
     # fn: _web_server_site_document_root - Resolve the document root for an Nginx site
+        # . Purpose
+        #   Resolve the document root for an Nginx site.
+        #
+        # . Arguments
+        #   - `$1`: Configured Nginx site name.
         # . Returns
-        #   0 when a document root can be resolved; non-zero otherwise.
+        #   - 0 when a document root can be resolved; non-zero otherwise.
         # . Usage
         #   ```bash
         #   _web_server_site_document_root <site>
@@ -322,8 +370,13 @@ set -uo pipefail
     }
 
     # fn: _web_server_remove_document_content - Remove all content below a document root
+        # . Purpose
+        #   Remove all content below a document root.
+        #
+        # . Arguments
+        #   - `$1`: Absolute document root to clear.
         # . Returns
-        #   0 on success; non-zero when the operation cannot be completed.
+        #   - 0 on success; non-zero when the operation cannot be completed.
         # . Usage
         #   ```bash
         #   _web_server_remove_document_content <document-root>
@@ -351,11 +404,17 @@ set -uo pipefail
     }
 
     # fn: _web_server_ensure_directory - Create and prepare a web content directory when needed
+        # . Purpose
+        #   Create and prepare a web content directory when needed.
+        #
+        # . Arguments
+        #   - `$1`: Filesystem path to inspect.
+        #   - `$2`: Optional: account that owns the directory.
         # . Returns
-        #   0 on success; non-zero when the operation cannot be completed.
+        #   - 0 on success; non-zero when the operation cannot be completed.
         # . Usage
         #   ```bash
-        #   _web_server_ensure_directory
+        #   _web_server_ensure_directory "/srv/storage/www/example" "www-data"
         #   ```
     _web_server_ensure_directory() {
         local path="$1"
@@ -384,6 +443,16 @@ set -uo pipefail
     # the site's index file. If exactly one immediate child contains an index,
     # offer that child as the web root rather than silently publishing one level too high.
     # fn: _web_server_resolve_local_web_root - Select the local website root for a remote publishing operation.
+        # . Purpose
+        #   Select the local website root for a remote publishing operation.
+        #
+        # . Arguments
+        #   - `$1`: Filesystem path.
+        #   - `$2`: Name of the output shell variable.
+        # . Usage
+        #   ```bash
+        #   _web_server_resolve_local_web_root "/srv/storage/example" "/srv/storage/example"
+        #   ```
     _web_server_resolve_local_web_root() {
         local input_dir="$1"
         local var_name="$2"
@@ -415,8 +484,11 @@ set -uo pipefail
         return 1
     }
     # fn: _web_server_publish_key - Return the dedicated SolidGroundUX publishing key path
+        # . Purpose
+        #   Return the dedicated SolidGroundUX publishing key path.
+        #
         # . Returns
-        #   0 on success.
+        #   - 0 on success.
         # . Usage
         #   ```bash
         #   _web_server_publish_key
@@ -426,8 +498,13 @@ set -uo pipefail
     }
 
     # fn: _web_server_remote_access_ready - Test passwordless SSH publishing access
+        # . Purpose
+        #   Test passwordless SSH publishing access.
+        #
+        # . Arguments
+        #   - `$1`: SSH remote target in user@host form.
         # . Returns
-        #   0 when passwordless access works; non-zero otherwise.
+        #   - 0 when passwordless access works; non-zero otherwise.
         # . Usage
         #   ```bash
         #   _web_server_remote_access_ready <user@host>
@@ -442,8 +519,13 @@ set -uo pipefail
     }
 
     # fn: _web_server_setup_remote_access - Configure dedicated passwordless SSH publishing access
+        # . Purpose
+        #   Configure dedicated passwordless SSH publishing access.
+        #
+        # . Arguments
+        #   - `$1`: SSH remote target in user@host form.
         # . Returns
-        #   0 on success; non-zero when setup fails or is cancelled.
+        #   - 0 on success; non-zero when setup fails or is cancelled.
         # . Usage
         #   ```bash
         #   _web_server_setup_remote_access <user@host>
@@ -491,8 +573,11 @@ set -uo pipefail
     }
 
     # fn: _web_server_publish_site - Publish local or remote content into a site document root
+        # . Purpose
+        #   Publish local or remote content into a site document root.
+        #
         # . Returns
-        #   0 on success; non-zero when the operation cannot be completed.
+        #   - 0 on success; non-zero when the operation cannot be completed.
         # . Usage
         #   ```bash
         #   _web_server_publish_site
@@ -764,6 +849,15 @@ set -uo pipefail
 
 # - Action dispatch -----------------------------------------------------------------
     # fn: _run_action - Dispatch the requested management action to its implementation.
+        # . Purpose
+        #   Dispatch the requested management action to its implementation.
+        #
+        # . Arguments
+        #   - `$1`: Management action to execute.
+        # . Usage
+        #   ```bash
+        #   _run_action "publish-documentation"
+        #   ```
     _run_action() {
         local action="${1:?missing action}" rc=0
         case "$action" in
@@ -779,6 +873,13 @@ set -uo pipefail
 
 # - Main ----------------------------------------------------------------------------
     # fn: main - Dispatch command-line options to the appropriate management workflow.
+        # . Purpose
+        #   Dispatch command-line options to the appropriate management workflow.
+        #
+        # . Usage
+        #   ```bash
+        #   main "$@"
+        #   ```
     main() {
         local action=""
         _framework_locator || return $?

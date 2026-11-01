@@ -9,7 +9,8 @@
 #   Checksum    : 5c3d49bab9348d5a1315c3445cb720ce39f3a9a80b6506bbdf7f71fdf88fde1f
 #   Source      : manage-samba-shares.sh
 #   Type        : script
-#   Group       : Role Managers
+#   Group       : Modules
+#   Subgroup    : Samba File Server
 #   Purpose     : Manage Samba shares
 #
 # Description:
@@ -67,7 +68,7 @@ set -uo pipefail
         #     present, falls back to the installed framework copy without changing
         #     SGND_FRAMEWORK_ROOT.
         #
-        # . Globals (write)
+        # . Globals (Write)
         #   SGND_FRAMEWORK_ROOT
         #
         # . Output
@@ -75,8 +76,8 @@ set -uo pipefail
         #   helpers are not available until sgnd-exe-common.sh has been loaded.
         #
         # . Returns
-        #   0 when the framework root was resolved and executable common library loaded.
-        #   126 when the script path cannot be resolved, no canonical root component can
+        #   - 0 when the framework root was resolved and executable common library loaded.
+        #   - 126 when the script path cannot be resolved, no canonical root component can
         #   be found, or the executable common library is unreadable.
         #
         # . Usage
@@ -306,13 +307,23 @@ set -uo pipefail
 
 # - Helpers -------------------------------------------------------------------------
     # fn: _dryrun_complete - Report the dry-run result without executing the requested host change.
+        # . Purpose
+        #   Report the dry-run result without executing the requested host change.
+        #
+        # . Usage
+        #   ```bash
+        #   _dryrun_complete
+        #   ```
     _dryrun_complete() {
         sayok "DRYRUN complete. The changes shown above would have been applied; no changes were written."
     }
 
     # fn: _refresh_storage_paths - Resolve the configured SolidGroundUX share root
+        # . Purpose
+        #   Resolve the configured SolidGroundUX share root.
+        #
         # . Returns
-        #   0 after SGND_SAMBA_SHARE_ROOT is refreshed.
+        #   - 0 after SGND_SAMBA_SHARE_ROOT is refreshed.
         #
         # . Usage
         #   ```bash
@@ -371,13 +382,18 @@ set -uo pipefail
         #   final option and the Selection prompt.
         #
         # . Arguments
-        #   --label TEXT
-        #   --var NAME
-        #   --multi
-        #   --items ITEM...
+        #   - --label TEXT
+        #   - --var NAME
+        #   - --multi
+        #   - --items ITEM...
         #
         # . Returns
-        #   0 on selection; 1 when Q is entered; 2 on invalid invocation.
+        #   - 0 on selection; 1 when Q is entered; 2 on invalid invocation.
+        #
+        # . Usage
+        #   ```bash
+        #   _smb_ask_selection --label "Choose share" --var share --items "Public" "Private"
+        #   ```
     _smb_ask_selection() {
         local label="Select an option"
         local var_name="selection"
@@ -493,6 +509,9 @@ set -uo pipefail
     }
 
     # fn: _share_path - Resolve the configured path for a Samba share
+        # . Purpose
+        #   Resolve the configured path for a Samba share.
+        #
         # . Returns
         #   Writes the configured path to stdout.
         #
@@ -514,7 +533,7 @@ set -uo pipefail
         #   - Requires mode 0711, the canonical SolidGroundUX Samba share-root mode.
         #
         # . Returns
-        #   0 when the share root exists with mode 0711; 1 otherwise.
+        #   - 0 when the share root exists with mode 0711; 1 otherwise.
         #
         # . Usage
         #   ```bash
@@ -526,11 +545,15 @@ set -uo pipefail
     }
 
     # fn: _list_managed_shares - Discover shares beneath the SolidGroundUX share root
-        # . Outputs (globals)
+        # . Purpose
+        #   Discover shares beneath the SolidGroundUX share root.
+        #
+        # . Outputs
+        #   (globals)
         #   MANAGED_SHARES
         #
         # . Returns
-        #   0 when at least one managed share exists; 1 otherwise.
+        #   - 0 when at least one managed share exists; 1 otherwise.
         #
         # . Usage
         #   ```bash
@@ -569,11 +592,15 @@ set -uo pipefail
     }
 
     # fn: _select_shares - Select one or more managed shares
-        # . Outputs (globals)
+        # . Purpose
+        #   Select one or more managed shares.
+        #
+        # . Outputs
+        #   (globals)
         #   SELECTED_SHARES
         #
         # . Returns
-        #   0 after selection; 1 when the user returns.
+        #   - 0 after selection; 1 when the user returns.
         #
         # . Usage
         #   ```bash
@@ -590,8 +617,11 @@ set -uo pipefail
     }
 
     # fn: _acl_groups_for_share - Return named group ACL entries for one share
+        # . Purpose
+        #   Return named group ACL entries for one share.
+        #
         # . Arguments
-        #   $1 SHARE
+        #   - $1 SHARE
         #
         # . Output
         #   Writes GROUP|PERMISSIONS records.
@@ -627,19 +657,25 @@ set -uo pipefail
     }
 
     # fn: _validate_share_name - Validate a managed Samba share name
+        # . Purpose
+        #   Validate a managed Samba share name.
+        #
         # . Usage
         #   ```bash
-        #   _validate_share_name "<arg1>"
+        #   _validate_share_name "example-value"
         #   ```
     _validate_share_name() {
         [[ "${1:-}" =~ ^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$ ]]
     }
 
     # fn: _validate_relative_path - Validate a relative path beneath the share root
+        # . Purpose
+        #   Validate a relative path beneath the share root.
+        #
         # . Arguments
-        #   $1  Relative directory path.
+        #   - $1  Relative directory path.
         # . Returns
-        #   0 for a safe relative path; 1 otherwise.
+        #   - 0 for a safe relative path; 1 otherwise.
         # . Usage
         #   ```bash
         #   _validate_relative_path "Department/Files"
@@ -660,6 +696,11 @@ set -uo pipefail
     }
 
     # fn: _share_exists - Test whether a Samba share exists
+        # . Purpose
+        #   Test whether a Samba share exists.
+        #
+        # . Arguments
+        #   - `$1`: Optional: name of the selected item.
         # . Usage
         #   ```bash
         #   _share_exists "<share_name>"
@@ -672,11 +713,14 @@ set -uo pipefail
 
 
     # fn: _share_path_in_use - Test whether a backing directory is already used by a managed share
+        # . Purpose
+        #   Test whether a backing directory is already used by a managed share.
+        #
         # . Arguments
-        #   $1 PATH
+        #   - $1 PATH
         #
         # . Returns
-        #   0 when another managed Samba share already uses PATH; 1 otherwise.
+        #   - 0 when another managed Samba share already uses PATH; 1 otherwise.
         #
         # . Usage
         #   ```bash
@@ -708,6 +752,9 @@ set -uo pipefail
     }
 
     # fn: _reload_samba - Validate and reload Samba configuration
+        # . Purpose
+        #   Validate and reload Samba configuration.
+        #
         # . Usage
         #   ```bash
         #   _reload_samba
@@ -724,10 +771,10 @@ set -uo pipefail
         # . Purpose
         #   Normalize and validate a persisted/default group without guessing across authentication modes.
         # . Arguments
-        #   $1  User-entered group name; empty means no default access group.
-        #   $2  Output variable name.
+        #   - $1  User-entered group name; empty means no default access group.
+        #   - $2  Output variable name.
         # . Returns
-        #   0 with an empty or resolvable group; 1 when the group cannot be resolved.
+        #   - 0 with an empty or resolvable group; 1 when the group cannot be resolved.
         # . Usage
         #   ```bash
         #   _resolve_access_group_input "$DEFAULT_ACCESS_GROUP" resolved_group || return 1
@@ -775,10 +822,10 @@ set -uo pipefail
         #   Share the ACL/Samba synchronization implementation between interactive access changes
         #   and stateful default access applied during share creation.
         # . Arguments
-        #   $1  MODE - read or write.
+        #   - $1  MODE - read or write.
         #   $@  One or more resolved group names.
         # . Returns
-        #   0 after all selected shares are updated; non-zero on failure.
+        #   - 0 after all selected shares are updated; non-zero on failure.
         # . Usage
         #   ```bash
         #   _apply_group_access_to_groups write "domain users@testadura.hq"
@@ -829,7 +876,7 @@ set -uo pipefail
         #   - Persists the default access group and access level through SolidGroundUX state.
         #   - Validates the resulting Samba configuration and reloads smbd.
         # . Returns
-        #   0 after returning to the manager; non-zero on creation/access failure.
+        #   - 0 after returning to the manager; non-zero on creation/access failure.
         # . Usage
         #   ```bash
         #   _create_share
@@ -991,6 +1038,9 @@ set -uo pipefail
     }
 
     # fn: _remove_share - Remove a managed share and optionally its directory
+        # . Purpose
+        #   Remove a managed share and optionally its directory.
+        #
         # . Usage
         #   ```bash
         #   _remove_share
@@ -1070,7 +1120,7 @@ set -uo pipefail
         #   Require an existing Kerberos TGT before querying Active Directory through LDAP/GSSAPI.
         #
         # . Returns
-        #   0 when a valid ticket cache exists; 1 otherwise.
+        #   - 0 when a valid ticket cache exists; 1 otherwise.
         # . Usage
         #   ```bash
         #   _ensure_kerberos_ticket
@@ -1131,11 +1181,12 @@ set -uo pipefail
         #   present on selected share ACLs. NSS is used only to resolve the selected
         #   group to the local fully-qualified identity required for ACL operations.
         #
-        # Outputs (globals):
+        # . Outputs
+        #   (globals):
         #   DISCOVERED_GROUPS
         #
         # . Returns
-        #   0 always.
+        #   - 0 always.
         #
         # . Usage
         #   ```bash
@@ -1241,10 +1292,10 @@ set -uo pipefail
         #   A manual group entry remains available as a single additional identity.
         #
         # . Arguments
-        #   $1 OUTPUT_ARRAY_VAR
+        #   - $1 OUTPUT_ARRAY_VAR
         #
         # . Returns
-        #   0 with one or more resolvable groups; 1 on cancellation or lookup failure.
+        #   - 0 with one or more resolvable groups; 1 on cancellation or lookup failure.
         #
         # . Usage
         #   ```bash
@@ -1304,6 +1355,11 @@ set -uo pipefail
     }
 
     # fn: _samba_principal - Format an NSS group for a Samba user-list parameter
+        # . Purpose
+        #   Format an NSS group for a Samba user-list parameter.
+        #
+        # . Arguments
+        #   - `$1`: Group name.
         # . Output
         #   Writes a quoted Samba group principal.
         #
@@ -1317,11 +1373,14 @@ set -uo pipefail
     }
 
     # fn: _sync_share_samba_access - Synchronize Samba access lists from POSIX ACLs
+        # . Purpose
+        #   Synchronize Samba access lists from POSIX ACLs.
+        #
         # . Arguments
-        #   $1 SHARE
+        #   - $1 SHARE
         #
         # . Returns
-        #   0 when smb.conf validates and reload succeeds; non-zero otherwise.
+        #   - 0 when smb.conf validates and reload succeeds; non-zero otherwise.
         #
         # . Usage
         #   ```bash
@@ -1412,10 +1471,13 @@ set -uo pipefail
     }
 
     # fn: _apply_group_access - Apply read or write ACLs to selected shares
+        # . Purpose
+        #   Apply read or write ACLs to selected shares.
+        #
         # . Arguments
-        #   $1 MODE - read or write.
+        #   - $1 MODE - read or write.
         # . Returns
-        #   0 after all selected shares are updated; non-zero on failure.
+        #   - 0 after all selected shares are updated; non-zero on failure.
         # . Usage
         #   ```bash
         #   _apply_group_access write
@@ -1434,11 +1496,14 @@ set -uo pipefail
     }
 
     # fn: _select_assigned_group - Select a group currently assigned to the selected shares
+        # . Purpose
+        #   Select a group currently assigned to the selected shares.
+        #
         # . Arguments
-        #   $1 OUTPUT_VAR
+        #   - $1 OUTPUT_VAR
         #
         # . Returns
-        #   0 with a selected group; 1 when none are assigned or the user returns.
+        #   - 0 with a selected group; 1 when none are assigned or the user returns.
         # . Usage
         #   ```bash
         #   _select_assigned_group "<output_var>"
@@ -1481,8 +1546,11 @@ set -uo pipefail
     }
 
     # fn: _remove_group_access - Remove one AD/NSS group's access from selected shares
+        # . Purpose
+        #   Remove one AD/NSS group's access from selected shares.
+        #
         # . Returns
-        #   0 after all selected shares are updated; non-zero on failure.
+        #   - 0 after all selected shares are updated; non-zero on failure.
         #
         # . Usage
         #   ```bash
@@ -1533,8 +1601,11 @@ set -uo pipefail
     }
 
     # fn: _validate_selected - Validate selected share paths, traversal, ACLs, and Samba configuration
+        # . Purpose
+        #   Validate selected share paths, traversal, ACLs, and Samba configuration.
+        #
         # . Returns
-        #   0 when selected shares validate; 1 otherwise.
+        #   - 0 when selected shares validate; 1 otherwise.
         #
         # . Usage
         #   ```bash
@@ -1619,6 +1690,9 @@ set -uo pipefail
 
 # - Authentication-aware access-group selection -----------------------------------
     # fn: _smb_runtime_auth_mode - Return the configured Samba authentication mode
+        # . Purpose
+        #   Return the configured Samba authentication mode.
+        #
         # . Returns
         #   Writes "ad" for ADS security and "standalone" otherwise.
         # . Usage
@@ -1643,7 +1717,7 @@ set -uo pipefail
         # . Output
         #   Writes one local access-group name per line.
         # . Returns
-        #   0 after enumeration.
+        #   - 0 after enumeration.
         # . Usage
         #   ```bash
         #   mapfile -t groups < <(_list_local_groups_raw)
@@ -1672,11 +1746,11 @@ set -uo pipefail
         # . Purpose
         #   Label deliberate standalone access groups consistently in selectors.
         # . Arguments
-        #   $1  Local group name.
+        #   - $1  Local group name.
         # . Output
         #   Writes a display label.
         # . Returns
-        #   0 always.
+        #   - 0 always.
         # . Usage
         #   ```bash
         #   label="$(_local_group_display SambaUsers)"
@@ -1699,10 +1773,13 @@ set -uo pipefail
     }
 
     # fn: _select_local_groups - Select one or more local groups
+        # . Purpose
+        #   Select one or more local groups.
+        #
         # . Arguments
-        #   $1  Output array variable name.
+        #   - $1  Output array variable name.
         # . Returns
-        #   0 on selection; 1 on cancel or when no groups exist.
+        #   - 0 on selection; 1 on cancel or when no groups exist.
         # . Usage
         #   ```bash
         #   _select_local_groups selected_groups || return 0
@@ -1737,10 +1814,13 @@ set -uo pipefail
     }
 
     # fn: _pause_return_to_share_manager - Keep terminal action results visible
+        # . Purpose
+        #   Keep terminal action results visible.
+        #
         # . Arguments
-        #   $1  Optional message.
+        #   - $1  Optional message.
         # . Returns
-        #   0 always.
+        #   - 0 always.
         # . Usage
         #   ```bash
         #   _pause_return_to_share_manager "Press Enter to return to share management."
@@ -1759,9 +1839,9 @@ set -uo pipefail
         #   array explicitly so Bash dynamic scoping cannot redirect the result into a helper-local
         #   array with the same name.
         # . Arguments
-        #   $1 OUTPUT_ARRAY_VAR
+        #   - $1 OUTPUT_ARRAY_VAR
         # . Returns
-        #   0 with one or more resolvable groups; 1 on cancellation or lookup failure.
+        #   - 0 with one or more resolvable groups; 1 on cancellation or lookup failure.
         # . Usage
         #   ```bash
         #   _select_access_groups groups || return $?
@@ -1789,9 +1869,9 @@ set -uo pipefail
         #   Reuse the authentication-aware access-group selector while enforcing the single
         #   replacement target required by access-identity reconciliation.
         # . Arguments
-        #   $1 OUTPUT_VAR
+        #   - $1 OUTPUT_VAR
         # . Returns
-        #   0 with exactly one resolvable group; non-zero on cancellation or lookup failure.
+        #   - 0 with exactly one resolvable group; non-zero on cancellation or lookup failure.
         # . Usage
         #   ```bash
         #   _select_access_group target || return $?
@@ -1812,6 +1892,9 @@ set -uo pipefail
     }
 
     # fn: _show_shares_overview - Display comprehensive managed-share access information
+        # . Purpose
+        #   Display comprehensive managed-share access information.
+        #
         # . Behavior
         #   - Shows the active authentication mode and canonical share-root traversal state.
         #   - Shows each managed path and backing-directory state.
@@ -1819,7 +1902,7 @@ set -uo pipefail
         #   - Reports whether a Samba access list is present when explicit ACL groups exist.
         #
         # . Returns
-        #   0 after displaying the overview.
+        #   - 0 after displaying the overview.
         # . Usage
         #   ```bash
         #   _show_shares_overview
@@ -1872,7 +1955,7 @@ set -uo pipefail
         # . Purpose
         #   Reconcile share ACL identities after changing Samba authentication mode without guessing mappings.
         # . Returns
-        #   0 after replacement; non-zero on failure or cancellation.
+        #   - 0 after replacement; non-zero on failure or cancellation.
         # . Usage
         #   ```bash
         #   _reconcile_access_group
@@ -1903,6 +1986,13 @@ set -uo pipefail
 
 # - Share-management menu ----------------------------------------------------------
     # fn: _smb_menu_require_selection - Require at least one Samba share before performing a selection-based action.
+        # . Purpose
+        #   Require at least one Samba share before performing a selection-based action.
+        #
+        # . Usage
+        #   ```bash
+        #   _smb_menu_require_selection
+        #   ```
     _smb_menu_require_selection() {
         (( ${#SELECTED_SHARES[@]} > 0 )) || {
             saywarning "Select one or more shares first."
@@ -1911,43 +2001,113 @@ set -uo pipefail
     }
 
     # fn: _smb_menu_create_share - Open the create-share action in the Samba share manager.
+        # . Purpose
+        #   Open the create-share action in the Samba share manager.
+        #
+        # . Usage
+        #   ```bash
+        #   _smb_menu_create_share
+        #   ```
     _smb_menu_create_share()        { _create_share; }
     # fn: _smb_menu_show_shares - Show the overview of configured Samba shares.
+        # . Purpose
+        #   Show the overview of configured Samba shares.
+        #
+        # . Usage
+        #   ```bash
+        #   _smb_menu_show_shares
+        #   ```
     _smb_menu_show_shares()          { _show_shares_overview; }
     # fn: _smb_menu_reconcile - Reconcile Samba access groups and return to the share menu.
+        # . Purpose
+        #   Reconcile Samba access groups and return to the share menu.
+        #
+        # . Usage
+        #   ```bash
+        #   _smb_menu_reconcile
+        #   ```
     _smb_menu_reconcile() {
         _reconcile_access_group || return $?
         _pause_return_to_share_manager
     }
     # fn: _smb_menu_remove_share - Open the Samba share-removal workflow.
+        # . Purpose
+        #   Open the Samba share-removal workflow.
+        #
+        # . Usage
+        #   ```bash
+        #   _smb_menu_remove_share
+        #   ```
     _smb_menu_remove_share()        { _remove_share; }
     # fn: _smb_menu_select_shares - Prompt for the Samba shares to operate on.
+        # . Purpose
+        #   Prompt for the Samba shares to operate on.
+        #
+        # . Usage
+        #   ```bash
+        #   _smb_menu_select_shares
+        #   ```
     _smb_menu_select_shares()       { _select_shares; }
     # fn: _smb_menu_grant_read - Read smb menu grant in the Samba workflow.
+        # . Purpose
+        #   Start the interactive Samba share read-access grant workflow.
+        #
+        # . Usage
+        #   ```bash
+        #   _smb_menu_grant_read
+        #   ```
     _smb_menu_grant_read() {
         _smb_menu_require_selection || return $?
         _apply_group_access read || return $?
         _pause_return_to_share_manager
     }
     # fn: _smb_menu_grant_write - Write smb menu grant in the Samba workflow.
+        # . Purpose
+        #   Start the interactive Samba share write-access grant workflow.
+        #
+        # . Usage
+        #   ```bash
+        #   _smb_menu_grant_write
+        #   ```
     _smb_menu_grant_write() {
         _smb_menu_require_selection || return $?
         _apply_group_access write || return $?
         _pause_return_to_share_manager
     }
     # fn: _smb_menu_remove_access - Remove group access from the selected shares and return to the menu.
+        # . Purpose
+        #   Remove group access from the selected shares and return to the menu.
+        #
+        # . Usage
+        #   ```bash
+        #   _smb_menu_remove_access
+        #   ```
     _smb_menu_remove_access() {
         _smb_menu_require_selection || return $?
         _remove_group_access || return $?
         _pause_return_to_share_manager
     }
     # fn: _smb_menu_validate - Validate smb menu in the Samba workflow.
+        # . Purpose
+        #   Run Samba share configuration checks from the share-management menu.
+        #
+        # . Usage
+        #   ```bash
+        #   _smb_menu_validate
+        #   ```
     _smb_menu_validate() {
         _smb_menu_require_selection || return $?
         _validate_selected
     }
 
     # fn: _smb_menu_build - Build smb menu in the Samba workflow.
+        # . Purpose
+        #   Register and display the Samba share-management menu actions.
+        #
+        # . Usage
+        #   ```bash
+        #   _smb_menu_build
+        #   ```
     _smb_menu_build() {
         local selection_state=2
         local selected_text="None selected"
@@ -1980,6 +2140,13 @@ set -uo pipefail
 
 # - Main ----------------------------------------------------------------------------
     # fn: main - Run interactive Samba share management
+        # . Purpose
+        #   Run interactive Samba share management.
+        #
+        # . Usage
+        #   ```bash
+        #   main "$@"
+        #   ```
     main() {
         local choice=""
         local dispatch_rc=0

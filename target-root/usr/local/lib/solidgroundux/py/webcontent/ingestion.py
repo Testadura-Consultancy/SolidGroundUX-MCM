@@ -18,6 +18,8 @@ _VALID_SLUG_RE = re.compile(r"^[a-z0-9][a-z0-9-]*$")
 _LANGUAGE_SUFFIX_RE = re.compile(r"_(?P<language>[A-Za-z]{2})\.md$")
 
 
+
+# --- Public classes ------------------------------------------------------------
 @dataclass(slots=True)
 class IngestInspection:
     """Validation findings for a candidate incoming Markdown document."""
@@ -38,8 +40,10 @@ class IngestInspection:
     def as_dict(self) -> dict[str, object]:
         """Serialize the result to a JSON-compatible mapping.
         
-        Returns:
-            Operation result or None, as defined by the implementation."""
+        Usage:
+            ```python
+            ingest_inspection.as_dict()
+            ```"""
         return {
             "success": self.success,
             "input_file": self.input_file,
@@ -73,8 +77,10 @@ class IngestResult:
     def as_dict(self) -> dict[str, object]:
         """Serialize the result to a JSON-compatible mapping.
         
-        Returns:
-            Operation result or None, as defined by the implementation."""
+        Usage:
+            ```python
+            ingest_result.as_dict()
+            ```"""
         return {
             "success": self.success,
             "input_file": self.input_file,
@@ -88,8 +94,15 @@ class IngestResult:
         }
 
 
+
+# --- Internal functions ------------------------------------------------------------
 def _normalize_route(value: str) -> str:
-    """Normalize route to a canonical representation."""
+    """Normalize route to a canonical representation.
+    
+    Usage:
+        ```python
+        _normalize_route(value)
+        ```"""
     route = str(value or "").strip()
     if not route:
         return ""
@@ -102,7 +115,12 @@ def _normalize_route(value: str) -> str:
 
 
 def _base_route(route: str, language: str, default_language: str) -> str:
-    """Handle base route for the web content workflow."""
+    """Convert a language-specific content route to its default-language base route.
+        
+        Usage:
+            ```python
+            _base_route(route, language, default_language)
+            ```"""
     if language.upper() == default_language.upper():
         return route
     prefix = f"/{language.lower()}"
@@ -114,7 +132,12 @@ def _base_route(route: str, language: str, default_language: str) -> str:
 
 
 def _route_parent_and_slug(route: str) -> tuple[str, str]:
-    """Handle route parent and slug for the web content workflow."""
+    """Separate a normalized route into its parent route and final slug.
+        
+        Usage:
+            ```python
+            _route_parent_and_slug(route)
+            ```"""
     normalized = _normalize_route(route)
     parts = [part for part in normalized.strip("/").split("/") if part]
     if not parts:
@@ -125,16 +148,30 @@ def _route_parent_and_slug(route: str) -> tuple[str, str]:
     return parent, slug
 
 
+
+# --- Public functions ------------------------------------------------------------
 def slugify(value: str) -> str:
-    """Create a conservative ASCII URL slug from a title."""
+    """Create a conservative ASCII URL slug from a title.
+    
+    Usage:
+        ```python
+        slugify(value)
+        ```"""
     normalized = unicodedata.normalize("NFKD", value)
     ascii_value = normalized.encode("ascii", "ignore").decode("ascii").lower()
     slug = re.sub(r"[^a-z0-9]+", "-", ascii_value).strip("-")
     return slug
 
 
+
+# --- Internal functions ------------------------------------------------------------
 def _infer_language(path: Path, supported: list[str]) -> str:
-    """Infer language from source metadata or path."""
+    """Infer language from source metadata or path.
+    
+    Usage:
+        ```python
+        _infer_language(path, supported)
+        ```"""
     match = _LANGUAGE_SUFFIX_RE.search(path.name)
     if not match:
         return ""
@@ -143,7 +180,12 @@ def _infer_language(path: Path, supported: list[str]) -> str:
 
 
 def _infer_kind(metadata: dict[str, Any], path: Path) -> str:
-    """Infer kind from source metadata or path."""
+    """Infer kind from source metadata or path.
+    
+    Usage:
+        ```python
+        _infer_kind(metadata, path)
+        ```"""
     value = str(metadata.get("kind", metadata.get("type", "")) or "").strip().lower()
     if value in _VALID_KINDS:
         return value
@@ -156,7 +198,12 @@ def _infer_kind(metadata: dict[str, Any], path: Path) -> str:
 
 
 def _index_options(source: Path, language: str) -> list[tuple[str, str]]:
-    """Handle index options for the web content workflow."""
+    """Discover canonical section indexes available as ingest destinations.
+        
+        Usage:
+            ```python
+            _index_options(source, language)
+            ```"""
     config = load_site_config(source)
     navigation = load_navigation(config.root)
     items = discover_content(config, navigation)
@@ -185,16 +232,20 @@ def _index_options(source: Path, language: str) -> list[tuple[str, str]]:
     return options
 
 
+
+# --- Public functions ------------------------------------------------------------
 def inspect_ingest(source: str | Path, input_file: str | Path, language_override: str = "") -> IngestInspection:
     """Validate an incoming Markdown candidate before ingesting it.
-    
-    Args:
-        source: Input used by this operation.
-        input_file: Input used by this operation.
-        language_override: Input used by this operation.
-    
-    Returns:
-        Operation result or None, as defined by the implementation."""
+            
+            Args:
+                source: Website source root directory.
+                input_file: Path to the incoming Markdown source.
+                language_override: Optional language to use instead of the source metadata.
+            
+            Usage:
+        ```python
+        inspection = inspect_ingest(site_root, input_file, language_override="NL")
+        ```"""
     source_path = Path(source).expanduser().resolve()
     input_path = Path(input_file).expanduser().resolve()
     errors: list[str] = []
@@ -268,14 +319,26 @@ def inspect_ingest(source: str | Path, input_file: str | Path, language_override
     )
 
 
+
+# --- Internal functions ------------------------------------------------------------
 def _route_to_content_dir(content_dir: Path, parent_route: str) -> Path:
-    """Handle route to content dir for the web content workflow."""
+    """Resolve the directory corresponding to a parent content route.
+        
+        Usage:
+            ```python
+            _route_to_content_dir(content_dir, parent_route)
+            ```"""
     parts = [part for part in parent_route.strip("/").split("/") if part]
     return content_dir.joinpath(*parts) if parts else content_dir
 
 
 def _archive_destination(source: Path, input_file: Path) -> Path:
-    """Return a collision-safe canonical archive path for an ingested source file."""
+    """Return a collision-safe canonical archive path for an ingested source file.
+    
+    Usage:
+        ```python
+        _archive_destination(source, input_file)
+        ```"""
     archive_dir = source / "ingested" / date.today().isoformat()
     candidate = archive_dir / input_file.name
     if not candidate.exists():
@@ -292,7 +355,12 @@ def _archive_destination(source: Path, input_file: Path) -> Path:
 
 
 def _plain_scalar(value: Any) -> str:
-    """Handle plain scalar for the web content workflow."""
+    """Serialize a scalar to the supported front-matter syntax.
+        
+        Usage:
+            ```python
+            _plain_scalar(value)
+            ```"""
     if value is None:
         return "null"
     if isinstance(value, bool):
@@ -317,7 +385,12 @@ def _plain_scalar(value: Any) -> str:
 
 
 def _serialize_mapping(mapping: dict[str, Any], indent: int = 0) -> list[str]:
-    """Handle serialize mapping for the web content workflow."""
+    """Serialize nested front-matter mappings and lists with indentation.
+        
+        Usage:
+            ```python
+            _serialize_mapping(mapping, indent)
+            ```"""
     lines: list[str] = []
     prefix = " " * indent
     for key, value in mapping.items():
@@ -344,12 +417,16 @@ def _canonical_metadata(
     summary: str,
 ) -> dict[str, Any]:
     """Return front matter for the canonical repository copy.
-
+    
     Ingestion-only placement metadata (language, parent, slug, route, and kind)
     is consumed while the loose file is imported. The canonical content tree and
     filename then carry that information, avoiding redundant metadata that could
     drift out of sync after later repository edits.
-    """
+    
+    Usage:
+        ```python
+        _canonical_metadata(existing, title=title, kind=kind, summary=summary)
+        ```"""
     metadata = dict(existing)
     for key in ("language", "kind", "type", "parent", "parent_route", "slug", "route"):
         metadata.pop(key, None)
@@ -374,6 +451,8 @@ def _canonical_metadata(
     return canonical
 
 
+
+# --- Public functions ------------------------------------------------------------
 def ingest_content(
     source: str | Path,
     input_file: str | Path,
@@ -387,20 +466,27 @@ def ingest_content(
     commit: bool = True,
 ) -> IngestResult:
     """Normalize and archive incoming Markdown into canonical source content.
-    
-    Args:
-        source: Input used by this operation.
-        input_file: Input used by this operation.
-        title: Input used by this operation.
-        language: Input used by this operation.
-        parent: Input used by this operation.
-        kind: Input used by this operation.
-        slug: Input used by this operation.
-        summary: Input used by this operation.
-        commit: Input used by this operation.
-    
-    Returns:
-        Operation result or None, as defined by the implementation."""
+            
+            Args:
+                source: Website source root directory.
+                input_file: Path to the incoming Markdown source.
+                title: Human-readable content title.
+                language: Language code of the requested content.
+                parent: Destination parent section or route.
+                kind: Content kind, such as page, section or article.
+                slug: URL-friendly final route component.
+                summary: Optional short description of the content.
+                commit: Whether to write the validated ingest operation.
+            
+            Usage:
+        ```python
+        # Preview normalized destination and metadata without writing.
+        preview = ingest_content(source, input_file, title="Example", language="NL",
+                                 parent="/", kind="page", slug="example", commit=False)
+        # Commit the reviewed page into the canonical content tree.
+        result = ingest_content(source, input_file, title="Example", language="NL",
+                                parent="/", kind="page", slug="example", commit=True)
+        ```"""
     source_path = Path(source).expanduser().resolve()
     input_path = Path(input_file).expanduser().resolve()
     config = load_site_config(source_path)

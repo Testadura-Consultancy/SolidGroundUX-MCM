@@ -50,28 +50,32 @@
 # ==================================================================================
 set -uo pipefail
 # - Library guard ------------------------------------------------------------------
-    # fn$ _sgnd_lib_guard - Enforce source-only, single-load library initialization
+    # fn: _sgnd_lib_guard - Enforce source-only, source-only library guard
         # . Purpose
-        #   Ensure the file is sourced as a library and initialized only once.
+        #   Ensure the file is sourced as a library and marked as loaded.
         #
         # . Behavior
         #   - Derives a unique guard variable name from the current filename.
         #   - Aborts execution when the file is run directly instead of sourced.
         #   - Sets the guard variable on first load.
-        #   - Returns immediately when the library was already loaded.
+        #   - Returns from the guard helper when the file is already marked loaded; it does not skip subsequent top-level statements.
         #
-        # Inputs
+        # . Inputs
         #   BASH_SOURCE[0]
-        #   $0
+        #   - $0
         #
-        # Outputs (globals)
+        # . Outputs
+        #   (globals)
         #   SGND_<MODULE>_LOADED
         #
         # . Returns
-        #   0 when already loaded or successfully initialized.
+        #   - 0 when already loaded or successfully initialized.
         #   Exits with code 2 when executed instead of sourced.
         #
         # . Usage
+        #   ```bash
+        #     _sgnd_lib_guard
+        #   ```
         #   _sgnd_lib_guard
     _sgnd_lib_guard() {
         local lib_base=""
@@ -109,25 +113,31 @@ set -uo pipefail
     SGND_MODULE_NAME="${SGND_SAMPLE_MODULE_NAME}"
 
 # - Internal helpers -------------------------------------------------------------
-    # fn$ _sample_format_status
+    # fn: _sample_format_status
         # . Purpose
         #   Format a status value for display by a public module action.
         #
+        # . Arguments
+        #   - `$1`: Optional: validation status.
         # . Behavior
         #   - Accepts a raw status value.
         #   - Substitutes a readable fallback when the value is empty.
         #   - Writes the formatted value to stdout.
         #
-        # Inputs:
-        #   $1 - Raw status value.
+        # . Inputs
+        #   - `$1` — Raw status value.
         #
-        # Outputs (stdout):
+        # . Outputs
+        #   (stdout):
         #   Formatted status value.
         #
         # . Returns
-        #   0 after writing the formatted value.
+        #   - 0 after writing the formatted value.
         #
         # . Usage
+        #   ```bash
+        #     _sample_format_status "active"
+        #   ```
         #   _sample_format_status "active"
     _sample_format_status() {
         local status="${1:-}"
@@ -137,7 +147,7 @@ set -uo pipefail
     }
 
 # - Public module actions --------------------------------------------------------
-    # fn$ sample_show_status
+    # fn: sample_show_status
         # . Purpose
         #   Display example module status using the canonical console helpers.
         #
@@ -145,13 +155,17 @@ set -uo pipefail
         #   - Resolves the current example status through the internal helper.
         #   - Displays the module section and status value.
         #
-        # Outputs (console):
+        # . Outputs
+        #   (console):
         #   Example module status.
         #
         # . Returns
-        #   0 after displaying status.
+        #   - 0 after displaying status.
         #
         # . Usage
+        #   ```bash
+        #     sample_show_status
+        #   ```
         #   sample_show_status
     sample_show_status() {
         local status=""
@@ -164,10 +178,16 @@ set -uo pipefail
     }
 
     # fn: sample_run_action - Run the example module action
+        # . Purpose
+        #   Run the example module action.
+        #
         # . Returns
-        #   0 after reporting successful execution.
+        #   - 0 after reporting successful execution.
         #
         # . Usage
+        #   ```bash
+        #     sample_run_action
+        #   ```
         #   sample_run_action
     sample_run_action() {
         if (( ${FLAG_DRYRUN:-0} == 1 )); then

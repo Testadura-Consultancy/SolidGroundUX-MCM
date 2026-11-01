@@ -8,7 +8,8 @@
 #   Shortname   : MANAGE_AD_SERVER
 #   Source      : manage-active-directory-server.sh
 #   Type        : script
-#   Group       : Role Managers
+#   Group       : Modules
+#   Subgroup    : Active Directory Server
 #   Purpose     : Provision, validate, and inspect a Samba Active Directory domain controller
 #
 #   Checksum : 7211dd603d584a6597866bec0dcadbc0d7c02c1edc0a52558d29b6fdef4d177f
@@ -55,7 +56,7 @@ set -uo pipefail
         #     present, falls back to the installed framework copy without changing
         #     SGND_FRAMEWORK_ROOT.
         #
-        # . Globals (write)
+        # . Globals (Write)
         #   SGND_FRAMEWORK_ROOT
         #
         # . Output
@@ -63,8 +64,8 @@ set -uo pipefail
         #   helpers are not available until sgnd-exe-common.sh has been loaded.
         #
         # . Returns
-        #   0 when the framework root was resolved and executable common library loaded.
-        #   126 when the script path cannot be resolved, no canonical root component can
+        #   - 0 when the framework root was resolved and executable common library loaded.
+        #   - 126 when the script path cannot be resolved, no canonical root component can
         #   be found, or the executable common library is unreadable.
         #
         # . Usage
@@ -133,6 +134,13 @@ set -uo pipefail
         source "$exe_common"
     }
     # fn: _load_ad_management_library - Load ad management library in the Active Directory workflow.
+        # . Purpose
+        #   Locate and source the shared Active Directory management helpers.
+        #
+        # . Usage
+        #   ```bash
+        #   _load_ad_management_library
+        #   ```
     _load_ad_management_library() {
         local script_file="" path_without_root="" component="" app_root="" lib_file=""
         local index=0 root_index=-1
@@ -209,6 +217,13 @@ set -uo pipefail
     SGND_AD_EXISTING_DC_IP=""
 
     # fn: _adsvr_validate_realm - Validate realm in the Active Directory Server workflow.
+        # . Purpose
+        #   Check whether an Active Directory realm name satisfies the accepted DNS-style format.
+        #
+        # . Usage
+        #   ```bash
+        #   _adsvr_validate_realm
+        #   ```
     _adsvr_validate_realm() { sgnd_ad_validate_realm "$@"; }
 
     # fn: _adsvr_collect_context
@@ -216,7 +231,7 @@ set -uo pipefail
         #   Collect and validate the realm, NetBIOS, DNS forwarder, host, and server-address provisioning context.
         #
         # . Returns
-        #   0 when a complete provisioning context is available; non-zero on validation or cancellation.
+        #   - 0 when a complete provisioning context is available; non-zero on validation or cancellation.
         #
         # . Usage
         #   ```bash
@@ -261,7 +276,7 @@ set -uo pipefail
         #   Load Active Directory context from the current Samba configuration.
         #
         # . Returns
-        #   0 when a configured realm can be loaded; 1 otherwise.
+        #   - 0 when a configured realm can be loaded; 1 otherwise.
         #
         # . Usage
         #   ```bash
@@ -287,7 +302,7 @@ set -uo pipefail
         #   Ensure Active Directory provisioning context is available.
         #
         # . Returns
-        #   0 when existing or interactively collected context is available; non-zero otherwise.
+        #   - 0 when existing or interactively collected context is available; non-zero otherwise.
         #
         # . Usage
         #   ```bash
@@ -305,7 +320,7 @@ set -uo pipefail
         #   Rewrite /etc/hosts so the domain controller short name resolves to its canonical FQDN and IPv4 address.
         #
         # . Returns
-        #   0 when hostname -f resolves to the expected FQDN; non-zero on file or validation failure.
+        #   - 0 when hostname -f resolves to the expected FQDN; non-zero on file or validation failure.
         #
         # . Usage
         #   ```bash
@@ -330,7 +345,7 @@ set -uo pipefail
         #   Set the Samba global dns forwarder value while preserving the rest of smb.conf.
         #
         # . Returns
-        #   0 when smb.conf is updated; non-zero on temporary-file or install failure.
+        #   - 0 when smb.conf is updated; non-zero on temporary-file or install failure.
         #
         # . Usage
         #   ```bash
@@ -355,12 +370,14 @@ set -uo pipefail
         # . Purpose
         #   Wait for Samba is-configured to report the service ready.
         #
+        # . Arguments
+        #   - `$1`: Optional: maximum seconds to wait.
         # . Returns
-        #   0 when Samba becomes configured before the timeout; 1 otherwise.
+        #   - 0 when Samba becomes configured before the timeout; 1 otherwise.
         #
         # . Usage
         #   ```bash
-        #   _adsvr_wait_configured
+        #   _adsvr_wait_configured "30"
         #   ```
     _adsvr_wait_configured() {
         local elapsed=0 timeout_seconds="${1:-20}" helper="/usr/share/samba/is-configured"
@@ -377,12 +394,14 @@ set -uo pipefail
         # . Purpose
         #   Wait until IPv4 TCP and UDP port 53 are free for Samba DNS.
         #
+        # . Arguments
+        #   - `$1`: Optional: maximum seconds to wait.
         # . Returns
-        #   0 when both IPv4 DNS ports are free before timeout; 1 otherwise.
+        #   - 0 when both IPv4 DNS ports are free before timeout; 1 otherwise.
         #
         # . Usage
         #   ```bash
-        #   _adsvr_wait_dns_port_free
+        #   _adsvr_wait_dns_port_free "30"
         #   ```
     _adsvr_wait_dns_port_free() {
         local elapsed=0 timeout_seconds="${1:-10}"
@@ -405,12 +424,14 @@ set -uo pipefail
         # . Purpose
         #   Wait until Samba owns IPv4 TCP and UDP port 53 on the domain controller.
         #
+        # . Arguments
+        #   - `$1`: Optional: maximum seconds to wait.
         # . Returns
-        #   0 when both DNS listeners are detected before timeout; 1 otherwise.
+        #   - 0 when both DNS listeners are detected before timeout; 1 otherwise.
         #
         # . Usage
         #   ```bash
-        #   _adsvr_wait_dns
+        #   _adsvr_wait_dns "30"
         #   ```
     _adsvr_wait_dns() {
         local elapsed=0 timeout_seconds="${1:-15}" pattern="${SGND_AD_SERVER_IP//./\\.}"
@@ -431,7 +452,7 @@ set -uo pipefail
         #   Install and validate Samba AD/DC, Kerberos, and DNS prerequisites.
         #
         # . Returns
-        #   0 on success or dry-run; non-zero on package or command validation failure.
+        #   - 0 on success or dry-run; non-zero on package or command validation failure.
         #
         # . Usage
         #   ```bash
@@ -453,7 +474,7 @@ set -uo pipefail
         #   Collect provisioning inputs and reject an already-provisioned or invalid domain-controller state.
         #
         # . Returns
-        #   0 when provisioning may continue; non-zero otherwise.
+        #   - 0 when provisioning may continue; non-zero otherwise.
         #
         # . Usage
         #   ```bash
@@ -471,7 +492,7 @@ set -uo pipefail
         #   Prepare the domain controller hostname and hosts-file identity.
         #
         # . Returns
-        #   0 when the configured FQDN is active; non-zero otherwise.
+        #   - 0 when the configured FQDN is active; non-zero otherwise.
         #
         # . Usage
         #   ```bash
@@ -490,7 +511,7 @@ set -uo pipefail
         #   Provision the Samba Active Directory domain database and configuration.
         #
         # . Returns
-        #   0 when samba-tool domain provision completes; non-zero otherwise.
+        #   - 0 when samba-tool domain provision completes; non-zero otherwise.
         #
         # . Usage
         #   ```bash
@@ -512,7 +533,7 @@ set -uo pipefail
         #   Apply initial Administrator password policy and Samba DNS forwarder settings.
         #
         # . Returns
-        #   0 when the requested initial settings are applied; non-zero otherwise.
+        #   - 0 when the requested initial settings are applied; non-zero otherwise.
         #
         # . Usage
         #   ```bash
@@ -535,7 +556,7 @@ set -uo pipefail
         #   Install and validate the Kerberos configuration generated by Samba.
         #
         # . Returns
-        #   0 when /etc/krb5.conf is installed and usable; non-zero otherwise.
+        #   - 0 when /etc/krb5.conf is installed and usable; non-zero otherwise.
         #
         # . Usage
         #   ```bash
@@ -555,7 +576,7 @@ set -uo pipefail
         #   Configure the domain controller resolver to use Samba DNS and prepare port 53 ownership.
         #
         # . Returns
-        #   0 when resolver configuration succeeds; non-zero otherwise.
+        #   - 0 when resolver configuration succeeds; non-zero otherwise.
         #
         # . Usage
         #   ```bash
@@ -581,7 +602,7 @@ set -uo pipefail
         #   Start Samba AD/DC and wait for service and DNS readiness.
         #
         # . Returns
-        #   0 when the AD/DC service and DNS listeners become ready; non-zero otherwise.
+        #   - 0 when the AD/DC service and DNS listeners become ready; non-zero otherwise.
         #
         # . Usage
         #   ```bash
@@ -603,7 +624,7 @@ set -uo pipefail
         #   Register and verify the domain controller DNS records required for AD discovery.
         #
         # . Returns
-        #   0 when the A, SOA, Kerberos, and LDAP records validate; non-zero otherwise.
+        #   - 0 when the A, SOA, Kerberos, and LDAP records validate; non-zero otherwise.
         #
         # . Usage
         #   ```bash
@@ -626,9 +647,9 @@ set -uo pipefail
         #   Run the complete tracked Active Directory server provisioning sequence.
         #
         # . Returns
-        #   0 when provisioning completes successfully.
+        #   - 0 when provisioning completes successfully.
         #   31-32 when prerequisite installation or preflight validation fails.
-        #   33 when the operator cancels after preflight and before provisioning changes.
+        #   - 33 when the operator cancels after preflight and before provisioning changes.
         #   34-40 when the corresponding provisioning step fails.
         #
         # . Usage
@@ -661,7 +682,12 @@ set -uo pipefail
         #   Reject an existing local DC or Samba configuration, resolve the remote DC,
         #   check AD discovery, and collect the target realm without changing the host.
         # . Returns
-        #   0 when remote discovery succeeds; nonzero on missing prerequisites.
+        #   - 0 when remote discovery succeeds; nonzero on missing prerequisites.
+        #
+        # . Usage
+        #   ```bash
+        #   _adsvr_join_preflight
+        #   ```
     _adsvr_join_preflight() {
         local realm="" existing_ip="" current_domain="" short=""
         sgnd_ad_is_domain_controller && { sayfail "This host is already a domain controller."; return 1; }
@@ -704,7 +730,12 @@ set -uo pipefail
         #   Use Samba's domain join DC path, not domain provision. Credentials are
         #   obtained interactively by samba-tool and are never stored in a variable.
         # . Returns
-        #   0 on successful join; otherwise nonzero with no implicit retry.
+        #   - 0 on successful join; otherwise nonzero with no implicit retry.
+        #
+        # . Usage
+        #   ```bash
+        #   _adsvr_join_domain
+        #   ```
     _adsvr_join_domain() {
         [[ -n "$SGND_AD_DNS_DOMAIN" && -n "$SGND_AD_EXISTING_DC_IP" ]] || { sayfail "Run additional-DC preflight first."; return 1; }
         (( ${FLAG_DRYRUN:-0} == 1 )) && { sayinfo "DRYRUN: Would join ${SGND_AD_DNS_DOMAIN} as a writable DC via ${SGND_AD_EXISTING_DC_IP}."; return 0; }
@@ -720,6 +751,11 @@ set -uo pipefail
     # fn: _adsvr_join_replication - Validate incoming AD replication after DC join
         # . Purpose
         #   Check DRS replication status and domain health without forcing replication.
+        #
+        # . Usage
+        #   ```bash
+        #   _adsvr_join_replication
+        #   ```
     _adsvr_join_replication() {
         systemctl is-active --quiet samba-ad-dc.service || { sayfail "AD/DC service is not active."; return 1; }
         sudo samba-tool drs showrepl || { sayfail "DRS replication status query failed."; return 1; }
@@ -728,9 +764,17 @@ set -uo pipefail
     }
 
     # fn: _adsvr_join_additional - Track additional DC provisioning in one process
+        # . Purpose
+        #   Track additional DC provisioning in one process.
+        #
         # . Returns
         #   Codes 51-59 identify the first failing step for menu-level tracking.
-        #   53 is an operator cancellation without mutation.
+        #   - 53 is an operator cancellation without mutation.
+        #
+        # . Usage
+        #   ```bash
+        #   _adsvr_join_additional
+        #   ```
     _adsvr_join_additional() {
         local decision="NO"
         _adsvr_step_install_packages || return 51
@@ -753,7 +797,7 @@ set -uo pipefail
         #   Run active validation checks for the Samba AD/DC service, DNS, directory, and Kerberos discovery.
         #
         # . Returns
-        #   0 when all checks pass; 1 when one or more checks fail.
+        #   - 0 when all checks pass; 1 when one or more checks fail.
         #
         # . Usage
         #   ```bash
@@ -783,7 +827,7 @@ set -uo pipefail
         #   Display the configured Samba server role, realm, workgroup, DNS forwarder, and service state.
         #
         # . Returns
-        #   0 after displaying available status information.
+        #   - 0 after displaying available status information.
         #
         # . Usage
         #   ```bash
@@ -802,6 +846,13 @@ set -uo pipefail
 
 # - Action dispatch -----------------------------------------------------------------
     # fn: _adsvr_action_is_mutating - Identify AD Server actions that modify host or domain state.
+        # . Purpose
+        #   Identify AD Server actions that modify host or domain state.
+        #
+        # . Usage
+        #   ```bash
+        #   _adsvr_action_is_mutating "install"
+        #   ```
     _adsvr_action_is_mutating() {
         case "${1:-}" in
             provision-all|join-additional|join-domain|install|identity|provision|settings|kerberos|resolver|start|dns) return 0 ;;
@@ -810,6 +861,15 @@ set -uo pipefail
     }
 
     # fn: _adsvr_run_action - Run action in the Active Directory Server workflow.
+        # . Purpose
+        #   Dispatch the selected Active Directory Server action to its standalone manager.
+        #
+        # . Arguments
+        #   - `$1`: Management action to execute.
+        # . Usage
+        #   ```bash
+        #   _adsvr_run_action "status"
+        #   ```
     _adsvr_run_action() {
         local action="${1:?missing action}"
         local rc=0
@@ -842,6 +902,13 @@ set -uo pipefail
 
 # - Main ---------------------------------------------------------------------------
     # fn: main - Dispatch command-line options to the appropriate management workflow.
+        # . Purpose
+        #   Dispatch command-line options to the appropriate management workflow.
+        #
+        # . Usage
+        #   ```bash
+        #   main "$@"
+        #   ```
     main() {
         local action=""
         _framework_locator || return $?

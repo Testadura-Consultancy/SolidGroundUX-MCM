@@ -6,6 +6,10 @@ This generator does not import or alter WCM. It emits its documented source layo
 from __future__ import annotations
 
 import argparse
+import ast
+import inspect
+import io
+import tokenize
 import json
 import re
 import shutil
@@ -33,11 +37,287 @@ IDENTITY = re.compile(r'[^a-z0-9]+')
 SKIP_DIRS = {'.git', '.cache', '__pycache__', 'node_modules', '.venv', 'venv', 'www-html', 'www-md'}
 
 
+
+
+# --- Internal functions ------------------------------------------------------------
+def source_files(root: Path) -> list[Path]:
+    """Find supported source languages without crawling build or cache folders.
+    
+    Usage:
+        ```python
+        for path in source_files(source_root):
+            print(path)
+        ```"""
+    return sorted((p for p in root.rglob('*') if p.is_file()
+                   and p.suffix.lower() in ('.sh', '.py')
+                   and not any(part in SKIP_DIRS for part in p.relative_to(root).parts)),
+                  key=lambda p: p.as_posix())
+
+
+def source_line_counts(path: Path) -> tuple[int, int]:
+    """Return non-overlapping physical code/comment lines (blank lines excluded).
+    
+    Python docstrings are counted as documentation, not executable code.
+    Inline comments remain part of the code line rather than being double-counted.
+    
+    Usage:
+        ```python
+        code_lines, comment_lines = source_line_counts(source_file)
+        ```"""
+    source = path.read_text(encoding='utf-8', errors='replace')
+    lines = source.splitlines()
+    if path.suffix.lower() == '.sh':
+        code = sum(bool(line.strip()) and not line.lstrip().startswith('#') for line in lines)
+        comments = sum(line.lstrip().startswith('#') for line in lines)
+        return code, comments
+    tree = ast.parse(source, filename=str(path))
+    doc_lines: set[int] = set()
+    for node in ast.walk(tree):
+        if isinstance(node, (ast.Module, ast.ClassDef, ast.FunctionDef, ast.AsyncFunctionDef)) and node.body:
+            first = node.body[0]
+            if isinstance(first, ast.Expr) and isinstance(first.value, ast.Constant) and isinstance(first.value.value, str):
+                doc_lines.update(range(first.lineno, first.end_lineno + 1))
+    code_lines: set[int] = set()
+    comment_lines: set[int] = set(doc_lines)
+    ignored = {tokenize.ENDMARKER, tokenize.ENCODING, tokenize.INDENT,
+               tokenize.DEDENT, tokenize.NL, tokenize.NEWLINE}
+    for token in tokenize.generate_tokens(io.StringIO(source).readline):
+        if token.type == tokenize.COMMENT:
+            comment_lines.add(token.start[0])
+        elif token.type not in ignored:
+            is_docstring = token.type == tokenize.STRING and all(
+                line in doc_lines for line in range(token.start[0], token.end[0] + 1))
+            if not is_docstring:
+                code_lines.update(range(token.start[0], token.end[0] + 1))
+    return len(code_lines), len(comment_lines - code_lines)
+
+
+PY_SECTION = re.compile(r'^(Args|Arguments|Parameters|Returns|Raises|Yields|Examples|Usage|Notes|Attributes):\s*$', re.I)
+PY_FIELD = re.compile(r'^\s*([*]{0,2}[A-Za-z_][A-Za-z_0-9]*)(?:\s*\([^)]*\))?:\s*(.*)$')
+PY_API_SECTION = re.compile(r'^\s*#\s*-{1,3}\s*(Public|Internal)\s+(?:functions|classes|api|declarations)\b', re.I)
+PY_API_DIRECT = re.compile(r'^\s*#\s*(?:API|Visibility)\s*:\s*(Public|Internal)\s*$', re.I)
+
+
+def python_doc_markdown(doc: str, purpose: str) -> list[str]:
+    """Render native Python docstrings into readable Markdown sections and lists.
+    
+    Usage:
+        ```python
+        python_doc_markdown(doc, purpose)
+        ```"""
+    if not doc.strip():
+        return []
+    lines = inspect.cleandoc(doc).splitlines()
+    summary = []
+    cursor = 0
+    while cursor < len(lines) and lines[cursor].strip() and not PY_SECTION.match(lines[cursor].strip()):
+        summary.append(lines[cursor].strip())
+        cursor += 1
+    result: list[str] = []
+    description = ' '.join(summary).strip()
+    if description and description.rstrip('.') != purpose.rstrip('.'):
+        result.extend(['### Description', '', description, ''])
+    section = ''
+    fence = ''
+    fence_indent = 0
+    while cursor < len(lines):
+        raw = lines[cursor]
+        stripped = raw.strip()
+        section_match = PY_SECTION.match(stripped) if not fence else None
+        if section_match:
+            section = section_match.group(1).lower()
+            label = {'args': 'Arguments', 'parameters': 'Arguments',
+                     'examples': 'Usage'}.get(section, section.title())
+            result.extend(['', '### ' + label, ''])
+        elif stripped.startswith(('```', '~~~')):
+            if not fence:
+                fence = stripped[:3]
+                fence_indent = len(raw) - len(raw.lstrip())
+            elif stripped.startswith(fence):
+                fence = ''
+                fence_indent = 0
+            result.append(stripped)
+        elif not stripped:
+            result.append('')
+        elif section in ('args', 'arguments', 'parameters', 'attributes', 'raises') and not fence:
+            match = PY_FIELD.match(raw)
+            if match:
+                result.append(f'- **{match.group(1)}:** {match.group(2)}')
+            elif result and result[-1].startswith('- '):
+                result[-1] += ' ' + stripped
+            else:
+                result.append(stripped)
+        elif section in ('returns', 'yields', 'notes') and not fence:
+            # Google-style docstrings indent the field values; retaining that
+            # indent would turn prose into an unintended Markdown code block.
+            result.append(stripped)
+        else:
+            result.append(raw[fence_indent:] if fence and raw.startswith(' ' * fence_indent) else (raw if fence else stripped))
+        cursor += 1
+    return result
+
+
+def parse_python_source(path: Path):
+    """Discover Python functions/classes via AST and document their native docstrings.
+    
+    Comment markers supply optional descriptions; they do not define API shape.
+    Parsing is static: the source is never imported or executed.
+    
+    Usage:
+        ```python
+        parse_python_source(path)
+        ```"""
+    source = path.read_text(encoding='utf-8', errors='replace')
+    raw = source.splitlines()
+    tree = ast.parse(source, filename=str(path))
+    meta: dict[str, str] = {'group': 'Python Modules', 'type': 'module',
+                            'title': path.stem.replace('_', ' ').title()}
+    for line in raw[:100]:
+        match = META.match(line)
+        if match:
+            meta[match.group(1).lower()] = match.group(2).strip()
+    # Preserve Python package boundaries in navigation. A source within a
+    # package (identified by __init__.py) appears below that package's own
+    # subsection, rather than flattening the entire Python tree into one list.
+    # Explicit source metadata always takes precedence.
+    if not meta.get('subgroup') and meta.get('group') == 'Python Modules':
+        package_root = None
+        directory = path.parent
+        while (directory / '__init__.py').is_file():
+            package_root = directory
+            directory = directory.parent
+        if package_root is not None:
+            meta['subgroup'] = package_root.name
+    module_doc = ast.get_docstring(tree, clean=True) or ''
+    if module_doc and not meta.get('purpose'):
+        meta['purpose'] = module_doc.splitlines()[0].strip()
+    entries: list[dict] = []
+    if module_doc:
+        narrative = python_doc_markdown(module_doc, meta.get('purpose', ''))
+        if narrative:
+            entries.append({'kind': 'narrative', 'name': '', 'title': '', 'lines': narrative})
+
+    def marker_for(node: ast.AST, expected: str) -> str:
+        """Find an adjacent documentation marker for a Python definition.
+                
+                Usage:
+                    ```python
+                    marker_for(node, expected)
+                    ```"""
+        first_line = min([getattr(decorator, 'lineno', node.lineno)
+                          for decorator in getattr(node, 'decorator_list', [])]
+                         or [node.lineno])
+        previous = first_line - 2
+        # A marker can be followed by a longer '# . Description' block.
+        # Walk only the adjacent comment block; never attach earlier symbols.
+        blank_allowed = 1
+        while previous >= 0:
+            line = raw[previous]
+            if not line.strip() and blank_allowed:
+                blank_allowed -= 1
+                previous -= 1
+                continue
+            if not line.lstrip().startswith('#'):
+                break
+            match = DECL.match(line)
+            if match:
+                if match.group(1) == expected:
+                    return (match.group(4) or '').strip()
+                break
+            previous -= 1
+        return ''
+
+    def walk(statements: list[ast.stmt], parents: tuple[str, ...] = (),
+             accessible: bool = True, nested: bool = False,
+             initial_line: int = 0) -> None:
+        """Collect Python functions, classes, and documented variables from the syntax tree.
+                
+                Usage:
+                    ```python
+                    walk(statements, parents, accessible, nested)
+                    ```"""
+        # Section annotations classify the API without renaming or moving functions.
+        # Adjacent '# API: Public/Internal' can override a section for one symbol.
+        # Unannotated definitions retain the conventional underscore fallback.
+        section_visibility = None
+        previous_end = initial_line
+        for node in statements:
+            declaration_line = min([decorator.lineno for decorator in getattr(node, 'decorator_list', [])]
+                                   or [getattr(node, 'lineno', previous_end + 1)])
+            direct_visibility = None
+            for line in raw[previous_end:declaration_line - 1]:
+                section = PY_API_SECTION.match(line)
+                explicit = PY_API_DIRECT.match(line)
+                if section:
+                    section_visibility = section.group(1).lower()
+                if explicit:
+                    direct_visibility = explicit.group(1).lower()
+            previous_end = getattr(node, 'end_lineno', declaration_line)
+            if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
+                is_class = isinstance(node, ast.ClassDef)
+                kind = 'cls' if is_class else 'fn'
+                name = '.'.join((*parents, node.name))
+                visibility = direct_visibility or section_visibility
+                public = accessible and not nested and (visibility == 'public' or
+                            (visibility is None and not node.name.startswith('_')))
+                doc = ast.get_docstring(node, clean=True) or ''
+                annotated = marker_for(node, kind)
+                summary = doc.splitlines()[0].strip() if doc else ''
+                purpose = annotated or summary or 'No purpose documented in source.'
+                details = ['### Purpose', '', purpose, '']
+                if not is_class:
+                    args = ast.unparse(node.args)
+                    returns = ' -> ' + ast.unparse(node.returns) if node.returns else ''
+                    prefix = 'async def' if isinstance(node, ast.AsyncFunctionDef) else 'def'
+                    details += ['### Signature', '', '```python',
+                                f'{prefix} {node.name}({args}){returns}:', '```', '']
+                details.extend(python_doc_markdown(doc, purpose))
+                entries.append({'kind': kind, 'name': name, 'title': name,
+                                'lines': details, 'public': public})
+                walk(node.body, (*parents, node.name), public,
+                     nested or not is_class, node.lineno)
+            # Include explicitly documented Python module/class variables.
+            elif isinstance(node, (ast.Assign, ast.AnnAssign)) and not nested:
+                name_node = node.target if isinstance(node, ast.AnnAssign) else (node.targets[0] if len(node.targets) == 1 else None)
+                if isinstance(name_node, ast.Name):
+                    label = marker_for(node, 'var')
+                    if label:
+                        name = '.'.join((*parents, name_node.id))
+                        entries.append({'kind': 'var', 'name': name, 'title': name,
+                                        'lines': ['### Purpose', '', label],
+                                        'public': accessible and not name_node.id.startswith('_')})
+    walk(tree.body)
+    return meta, entries, len(raw)
+
+
+def parse_documented_source(path: Path):
+    """Parse a Bash or Python source file using the matching documentation parser.
+    
+    Usage:
+        ```python
+        metadata, entries, total_lines = parse_documented_source(source_file)
+        ```"""
+    return parse_python_source(path) if path.suffix.lower() == '.py' else parse_source(path)
+
+
+
 def slug(value: str) -> str:
+    """Convert a label into a stable lowercase hyphenated route component.
+    
+    Usage:
+        ```python
+        slug("Active Directory Server")  # active-directory-server
+        ```"""
     return IDENTITY.sub('-', value.lower()).strip('-') or 'untitled'
 
 
 def is_template_source(rel: Path, metadata: dict, path: Path) -> bool:
+    """Identify a source file that declares or lives in a template directory.
+    
+    Usage:
+        ```python
+        is_template_source(rel, metadata, path)
+        ```"""
     if metadata.get('type', '').strip().casefold() == 'template':
         return True
     parts = tuple(part.casefold() for part in rel.parts[:-1])
@@ -45,6 +325,12 @@ def is_template_source(rel: Path, metadata: dict, path: Path) -> bool:
 
 
 def template_priority(product_id: str, rel: Path) -> tuple:
+    """Rank template candidates by product, location, and path for deduplication.
+    
+    Usage:
+        ```python
+        template_priority(product_id, rel)
+        ```"""
     parts = tuple(part.casefold() for part in rel.parts)
     product_rank = 0 if 'software development kit' in product_id.casefold() else 1
     if parts[:5] == ('usr', 'local', 'lib', 'solidgroundux', 'templates'):
@@ -57,6 +343,12 @@ def template_priority(product_id: str, rel: Path) -> tuple:
 
 
 def build_template_owners(products: list[dict]) -> dict[str, tuple[str, str]]:
+    """Select the authoritative owner for each shared shell template name.
+    
+    Usage:
+        ```python
+        build_template_owners(products)
+        ```"""
     owners: dict[str, tuple[tuple, tuple[str, str]]] = {}
     for product in products:
         source = Path(product['source_dir']).expanduser().resolve()
@@ -74,12 +366,16 @@ def build_template_owners(products: list[dict]) -> dict[str, tuple[str, str]]:
 
 def prune_empty_headings(lines: list[str]) -> list[str]:
     """Remove headings without body text or meaningful child sections.
-
+    
     A WCM td-details disclosure with heading=N is an independent document
     section at that level, not content belonging to the preceding heading.
     Treat it as a boundary so an empty heading such as ``## Bootstrap``
     cannot borrow the following Script metadata disclosure as its body.
-    """
+    
+    Usage:
+        ```python
+        prune_empty_headings(lines)
+        ```"""
     markdown_heading = re.compile(r'^(#{2,6})\s+')
     details_heading = re.compile(r'^:::\s+td-details\b[^\n]*?\bheading=([2-6])\b')
     boundaries: list[int | None] = []
@@ -146,6 +442,12 @@ def prune_empty_headings(lines: list[str]) -> list[str]:
 
 
 def front(title: str, order: int = 1000, summary: str = '', *, section: bool = True, template: str = 'page', nav_title: str | None = None) -> str:
+    """Build YAML front matter for a generated Markdown page.
+    
+    Usage:
+        ```python
+        front(title, order, summary, section=section, template=template, nav_title=nav_title)
+        ```"""
     values = {'title': title, 'nav_title': title if nav_title is None else nav_title, 'summary': summary, 'template': template,
               'content_type': 'section' if section else 'page', 'nav_order': order,
               'draft': False, 'featured': False}
@@ -155,12 +457,23 @@ def front(title: str, order: int = 1000, summary: str = '', *, section: bool = T
 
 
 def write_index(folder: Path, title: str, body: str, order: int = 1000, summary: str = '', template: str = 'page', *, nav_title: str | None = None) -> None:
+    """Write a descriptive Markdown index and its front matter to a section directory.
+    
+    Usage:
+        ```python
+        write_index(folder, title, body, order, summary, template, nav_title=nav_title)
+        ```"""
     folder.mkdir(parents=True, exist_ok=True)
     (folder / f'{slug(title)}_Index_NL.md').write_text(front(title, order, summary, template=template, nav_title=nav_title) + body.strip() + '\n', encoding='utf-8')
 
 
 def _section_marker(text: str, inside_item: bool, in_fence: bool):
-    """Recognize old section headers, but never reinterpret Markdown lists."""
+    """Recognize old section headers, but never reinterpret Markdown lists.
+    
+    Usage:
+        ```python
+        _section_marker(text, inside_item, in_fence)
+        ```"""
     if in_fence:
         return None
     m = SECTION.match(text)
@@ -187,7 +500,12 @@ def _section_marker(text: str, inside_item: bool, in_fence: bool):
 
 
 def parse_source(path: Path):
-    """Extract documented items and Markdown while preserving source comment blocks."""
+    """Extract documented items and Markdown while preserving source comment blocks.
+    
+    Usage:
+        ```python
+        parse_source(path)
+        ```"""
     lines = path.read_text(encoding='utf-8', errors='replace').splitlines()
     meta = {}
     for line in lines[:100]:
@@ -216,6 +534,12 @@ def parse_source(path: Path):
         # Header prose is conventionally indented by two spaces after '# '.
         # Remove only that shared margin so nested list bullets and code fences
         # retain their own Markdown structure.
+        """Convert one legacy source heading into a Markdown line.
+                
+                Usage:
+                    ```python
+                    header_line(text)
+                    ```"""
         return text[2:] if text.startswith('  ') else text
     for line in lines:
         # # def: blocks document the *actual* following shell definitions.
@@ -335,7 +659,12 @@ IMAGE_ITEM = re.compile(r"^\s*(.+?\.(?:png|jpe?g|gif|svg|webp|avif))(?:\s*::\s*(
 
 
 def markdown_documentation(lines: list[str]) -> list[str]:
-    """Translate legacy Images blocks, preserving all other Markdown lines."""
+    """Translate legacy Images blocks, preserving all other Markdown lines.
+    
+    Usage:
+        ```python
+        markdown_documentation(lines)
+        ```"""
     result = []
     index = 0
     while index < len(lines):
@@ -375,13 +704,17 @@ def markdown_documentation(lines: list[str]) -> list[str]:
 
 def script_metadata_markdown(lines: list[str]) -> list[str]:
     """Render source metadata comments without losing alignment or examples.
-
+    
     These comments alternate with live SGND_* assignments. They are not
     function headers and their indentation often describes Bash syntax or
     column-aligned field definitions, which ordinary Markdown collapses.
     Only script-metadata sections use this rendering; authored Markdown in
     other sections and function documentation is left unchanged.
-    """
+    
+    Usage:
+        ```python
+        script_metadata_markdown(lines)
+        ```"""
     import textwrap
 
     result: list[str] = []
@@ -390,12 +723,24 @@ def script_metadata_markdown(lines: list[str]) -> list[str]:
     in_explanation = False
 
     def close_explanation() -> None:
+        """Close the current explanation block before emitting the next declaration.
+                
+                Usage:
+                    ```python
+                    close_explanation()
+                    ```"""
         nonlocal in_explanation
         if in_explanation:
             result.extend(["", ":::", ""])
             in_explanation = False
 
     def flush_literal() -> None:
+        """Flush buffered literal content to the output Markdown stream.
+                
+                Usage:
+                    ```python
+                    flush_literal()
+                    ```"""
         if literal:
             # Dedent the shared comment margin, not alignment within the sample.
             sample = textwrap.dedent('\n'.join(literal)).strip('\n')
@@ -469,11 +814,22 @@ DEF_ASSIGN = re.compile(r'^\s*(?:export\s+|readonly\s+)?([A-Za-z_][A-Za-z0-9_]*)
 
 
 def _def_cell(value: str) -> str:
-    """Escape table delimiters without interpreting shell syntax."""
+    """Escape table delimiters without interpreting shell syntax.
+    
+    Usage:
+        ```python
+        _def_cell(value)
+        ```"""
     return value.strip().replace('\\', '\\\\').replace('|', '\\|').replace('\n', '<br>')
 
 
 def _def_literal(value: str) -> str:
+    """Unquote a literal assignment value for the definition table.
+    
+    Usage:
+        ```python
+        _def_literal(value)
+        ```"""
     value = value.strip()
     if len(value) >= 2 and value[0] == value[-1] and value[0] in ('"', "'"):
         return value[1:-1]
@@ -481,7 +837,12 @@ def _def_literal(value: str) -> str:
 
 
 def _def_assignments(lines: list[str]) -> list[tuple[str, str, str, list[str] | None]]:
-    """Read literal assignments, including multiline Bash arrays, without evaluation."""
+    """Read literal assignments, including multiline Bash arrays, without evaluation.
+    
+    Usage:
+        ```python
+        _def_assignments(lines)
+        ```"""
     assignments = []
     position = 0
     while position < len(lines):
@@ -530,10 +891,14 @@ def _def_assignments(lines: list[str]) -> list[tuple[str, str, str, list[str] | 
 
 def definition_markdown(entry: dict) -> list[str]:
     """Render the established # def: blocks as tables from literal source.
-
+    
     `pivot=LBL:Label,ICO:Icon` combines assignments sharing a suffix into
     one row, matching the existing style/palette definition convention.
-    """
+    
+    Usage:
+        ```python
+        definition_markdown(entry)
+        ```"""
     assignments = _def_assignments(entry['raw'])
     if not assignments:
         return []
@@ -604,6 +969,12 @@ def definition_markdown(entry: dict) -> list[str]:
 
 
 def append_preface(target: list[str], entries: list[dict]) -> None:
+    """Append authored preface or epilogue entries to a section in order.
+    
+    Usage:
+        ```python
+        append_preface(target, entries)
+        ```"""
     for entry in entries:
         if entry['kind'] == 'section':
             target.extend([SCRIPT_SECTION_HEADING + entry['title'], ''])
@@ -614,7 +985,12 @@ def append_preface(target: list[str], entries: list[dict]) -> None:
 
 
 def copy_legacy_images(source: Path, root: Path) -> None:
-    """Use the original product asset location and the existing doc-sources locations."""
+    """Use the original product asset location and the existing doc-sources locations.
+    
+    Usage:
+        ```python
+        copy_legacy_images(source, root)
+        ```"""
     candidates = [source / 'usr/local/assets', source / 'target-root/usr/local/assets',
                   source / 'doc-sources/assets', source / 'usr/local/share/doc-sources/assets',
                   source / 'target-root/usr/local/share/doc-sources/assets']
@@ -632,7 +1008,12 @@ def copy_legacy_images(source: Path, root: Path) -> None:
 
 
 def copy_assets_checked(source: Path, destination: Path) -> None:
-    """Merge resource trees without silently replacing different files."""
+    """Merge resource trees without silently replacing different files.
+    
+    Usage:
+        ```python
+        copy_assets_checked(source, destination)
+        ```"""
     if not source.is_dir():
         return
     for file in sorted(source.rglob('*')):
@@ -648,7 +1029,12 @@ def copy_assets_checked(source: Path, destination: Path) -> None:
 
 
 def missing_image_references(root: Path) -> list[str]:
-    """Report unresolved local Markdown images without rejecting documentary examples."""
+    """Report unresolved local Markdown images without rejecting documentary examples.
+    
+    Usage:
+        ```python
+        missing_image_references(root)
+        ```"""
     image = re.compile(r'!\[[^\]]*\]\(([^)]+)\)')
     unresolved = set()
     for document in (root / 'content').rglob('*.md'):
@@ -668,6 +1054,12 @@ def missing_image_references(root: Path) -> list[str]:
 
 
 def declaration_template(kind: str) -> str:
+    """Select the generated page template for a declaration kind.
+    
+    Usage:
+        ```python
+        declaration_template(kind)
+        ```"""
     if kind.startswith('fn'):
         return 'function'
     if kind == 'var':
@@ -678,6 +1070,12 @@ def declaration_template(kind: str) -> str:
 
 
 def source_document_template(filename: str) -> str:
+    """Classify a source file as a preface, epilogue, or regular page.
+    
+    Usage:
+        ```python
+        source_document_template(filename)
+        ```"""
     name = filename.casefold().replace('_', '-')
     if 'preface' in name:
         return 'preface'
@@ -686,20 +1084,31 @@ def source_document_template(filename: str) -> str:
     return 'source'
 
 def directory_title(path: Path):
+    """Derive a readable title from a directory name.
+    
+    Usage:
+        ```python
+        directory_title(path)
+        ```"""
     return path.name.replace('-', ' ').replace('_', ' ').strip().title()
 
 
 def collect(product, content: Path, order: int, counters: Counter, template_owners: dict[str, tuple[str, str]]):
-    """Use source metadata Group/Subgroup, never installation directories, for navigation."""
+    """Use source metadata Group/Subgroup, never installation directories, for navigation.
+    
+    Usage:
+        ```python
+        collect(product, content, order, counters, template_owners)
+        ```"""
     source = Path(product['source_dir']).expanduser().resolve()
     if not source.is_dir():
         raise ValueError(f'Missing source directory: {source}')
     product_folder = content / slug(product['id'])
     write_index(product_folder, product['title'], '', order, template='chapter')
-    paths = sorted(p for p in source.rglob('*.sh') if p.is_file() and not any(part in SKIP_DIRS for part in p.relative_to(source).parts))
+    paths = source_files(source)
     records = []
     for path in paths:
-        metadata, entries, loc = parse_source(path)
+        metadata, entries, loc = parse_documented_source(path)
         records.append((path, metadata, entries, loc))
     # Product-level prefaces and epilogues belong to the chapter index, not to
     # a new group named after the product. Group/subgroup prefaces remain in their
@@ -707,26 +1116,48 @@ def collect(product, content: Path, order: int, counters: Counter, template_owne
     grouped_records = []
     product_specials = []
     for path, metadata, entries, loc in records:
+        language = 'python' if path.suffix.lower() == '.py' else 'bash'
+        code, comments = source_line_counts(path)
+        counters[f'{language}_files'] += 1
+        counters[f'{language}_code_lines'] += code
+        counters[f'{language}_comment_lines'] += comments
+        counters['files'] += 1
+        counters['code_lines'] += code
+        counters['comment_lines'] += comments
+        counters['lines'] += code + comments
         special = source_document_template(path.name)
         purpose = metadata.get('purpose', '').strip().casefold()
         if special in ('preface', 'epilogue') and purpose == f'product {special}':
             product_specials.append((special, entries, loc))
         else:
             grouped_records.append((path, metadata, entries, loc))
-    # Legacy renderer sorted groups and subgroups alphabetically, within each product.
-    groups = sorted({metadata.get('group', '').strip() or 'Ungrouped' for _, metadata, _, _ in grouped_records}, key=str.casefold)
+    # Group: / deliberately places a source at the product root, without adding a
+    # redundant group level. All other Group/Subgroup values retain their meaning.
+    groups = sorted({metadata.get('group', '').strip() or 'Ungrouped' for _, metadata, _, _ in grouped_records}
+                    - {'/'}, key=str.casefold)
+    if any(metadata.get('group', '').strip() == '/' for _, metadata, _, _ in grouped_records):
+        groups.insert(0, '/')
     route_names = set()
     special_pages = {}
     for special, entries, loc in product_specials:
         special_pages.setdefault(product_folder, {'preface': [], 'epilogue': []})[special].append(entries)
-        counters['files'] += 1
-        counters['lines'] += loc
     for group_index, group in enumerate(groups, 1):
-        group_folder = product_folder / slug(group)
-        group_body = []
-        write_index(group_folder, group, '\n'.join(group_body), group_index, template='group')
+        group_folder = product_folder if group == '/' else product_folder / slug(group)
+        if group != '/':
+            write_index(group_folder, group, '', group_index, template='group')
         group_records = [r for r in grouped_records if (r[1].get('group', '').strip() or 'Ungrouped') == group]
-        subgroup_names = sorted({r[1].get('subgroup', '').strip() for r in group_records if r[1].get('subgroup', '').strip()}, key=str.casefold)
+        subgroup_names = {r[1].get('subgroup', '').strip() for r in group_records if r[1].get('subgroup', '').strip()}
+        # Numbered console modules define their operator-facing order. Keep the
+        # associated role managers in the same subsection without alphabetizing
+        # the module categories away from their established registration order.
+        subgroup_order = {}
+        if group == 'Modules':
+            for path, metadata, _, _ in group_records:
+                subgroup = metadata.get('subgroup', '').strip()
+                match = re.match(r'^(\d+)-', path.name)
+                if subgroup and match and metadata.get('type', '').strip().lower() == 'module':
+                    subgroup_order[subgroup] = min(subgroup_order.get(subgroup, 1000), int(match.group(1)))
+        subgroup_names = sorted(subgroup_names, key=lambda name: (subgroup_order.get(name, 1000), name.casefold()))
         for subgroup_index, subgroup in enumerate(subgroup_names, 1):
             subfolder = group_folder / slug(subgroup)
             write_index(subfolder, subgroup, '', subgroup_index, template='group')
@@ -737,22 +1168,22 @@ def collect(product, content: Path, order: int, counters: Counter, template_owne
             # Defer prefaces/epilogues until every source is discovered, preserving
             # source ordering and placing introductions before closing material.
             special = source_document_template(path.name)
-            if special in ('preface', 'epilogue'):
+            # A Page preface is a named child article. Group/subgroup prefaces
+            # continue to populate their section's landing page as before.
+            page_preface = (special == 'preface' and
+                            metadata.get('purpose', '').strip().casefold() == 'page preface')
+            if special in ('preface', 'epilogue') and not page_preface:
                 section_folder = parent
                 special_pages.setdefault(section_folder, {'preface': [], 'epilogue': []})[special].append(entries)
-                counters['files'] += 1
-                counters['lines'] += loc
                 continue
             # Keep one source document per file, with anchored public declarations.
             basename = slug(path.stem)
             source_folder = parent / basename
             if source_folder in route_names:
-                source_folder = parent / slug(str(rel.with_suffix('')))
+                source_folder = parent / slug(f'{rel.with_suffix("").as_posix()}-{path.suffix[1:]}')
             if source_folder in route_names or source_folder.exists():
                 raise ValueError(f'Route collision: {rel} -> {source_folder}')
             route_names.add(source_folder)
-            counters['files'] += 1
-            counters['lines'] += loc
             is_template = is_template_source(rel, metadata, path)
             if is_template:
                 owner = template_owners.get(path.name.casefold())
@@ -769,24 +1200,40 @@ def collect(product, content: Path, order: int, counters: Counter, template_owne
                                          for entry in documented))
             if not has_source_content:
                 continue
-            counters['functions'] += sum(e['kind'].startswith('fn') for e in documented)
-            counters['declarations'] += sum(e['kind'] not in ('section', 'narrative') for e in documented)
+            language = 'python' if path.suffix.lower() == '.py' else 'bash'
+            function_count = sum(e['kind'].startswith('fn') for e in documented)
+            declaration_count = sum(e['kind'] not in ('section', 'narrative') for e in documented)
+            counters['functions'] += function_count
+            counters['declarations'] += declaration_count
+            counters[f'{language}_functions'] += function_count
+            counters[f'{language}_declarations'] += declaration_count
             for key in ('version', 'build'):
                 if metadata.get(key) and not counters.get(key):
                     counters[key] = metadata[key]
             title = metadata.get('title') or path.stem.replace('-', ' ')
-            body = [f'**Source:** `{rel.as_posix()}`', '']
-            if metadata.get('purpose'):
+            body = [] if page_preface else [f'**Source:** `{rel.as_posix()}`', '']
+            if metadata.get('purpose') and not page_preface:
                 body += [metadata['purpose'], '']
             if metadata.get('description'):
                 body += [metadata['description'], '']
-            public = [e for e in documented if e['kind'].startswith('fn') and not e['name'].startswith('_')]
-            internal = [e for e in documented if e['kind'].startswith('fn') and e['name'].startswith('_')]
+            public = [e for e in documented if e['kind'].startswith('fn')
+                      and e.get('public', not e['name'].startswith('_'))]
+            internal = [e for e in documented if e['kind'].startswith('fn')
+                        and not e.get('public', not e['name'].startswith('_'))]
+            public_classes = [e for e in documented if e['kind'] == 'cls'
+                              and e.get('public', not e['name'].startswith('_'))]
+            internal_classes = [e for e in documented if e['kind'] == 'cls'
+                                and not e.get('public', not e['name'].startswith('_'))]
             if public:
                 body += ['## Public functions', '']
                 for entry in public:
                     page_slug = slug(entry['name'])
                     body.append(f'- [{entry["title"]}]({page_slug}/)')
+                body.append('')
+            if public_classes:
+                body += ['## Public classes', '']
+                for entry in public_classes:
+                    body.append(f'- [{entry["title"]}]({slug(entry["name"])}/)')
                 body.append('')
             if internal:
                 # WCM's native details component renders Markdown inside a
@@ -810,6 +1257,15 @@ def collect(product, content: Path, order: int, counters: Counter, template_owne
                     if purpose == '—' and entry['title'] != entry['name']:
                         purpose = entry['title'].replace('|', r'\|')
                     body.append(f'| `{entry["name"]}` | {purpose} | {field_value("Arguments")} | {field_value("Output")} |')
+                body += ['', ':::', '']
+            if internal_classes:
+                body += ['::: td-details heading=2 Internal classes', '',
+                         '| Class | Purpose |', '| --- | --- |']
+                for entry in internal_classes:
+                    lines = entry['lines']
+                    purpose = next((value.strip().replace('|', r'\|') for ix, value in enumerate(lines)
+                                   if value.strip() and ix >= 2 and lines[ix - 2].strip() == '### Purpose'), '—')
+                    body.append(f'| `{entry["name"]}` | {purpose} |')
                 body += ['', ':::', '']
             # Public functions receive full pages. All other documentation
             # remains on the source overview; internal functions appear only in the table.
@@ -840,12 +1296,12 @@ def collect(product, content: Path, order: int, counters: Counter, template_owne
                     else:
                         body += [SCRIPT_SECTION_HEADING + entry['title'], '']
                         body += markdown_documentation(entry['lines']) + ['']
-                elif kind.startswith('fn') and entry['name'].startswith('_'):
+                elif kind in ('fn', 'cls') and not entry.get('public', not entry['name'].startswith('_')):
                     continue
-                elif kind.startswith('fn'):
+                elif kind.startswith('fn') or kind == 'cls':
                     page_slug = slug(entry['name'])
                     if page_slug in used_public_slugs:
-                        raise ValueError(f'Duplicate public function route in {rel}: {entry["name"]}')
+                        raise ValueError(f'Duplicate public declaration route in {rel}: {entry["name"]}')
                     used_public_slugs.add(page_slug)
                     page_path = source_folder / f'{page_slug}_NL.md'
                     page_path.parent.mkdir(parents=True, exist_ok=True)
@@ -860,9 +1316,13 @@ def collect(product, content: Path, order: int, counters: Counter, template_owne
             # Remove structural headings whose section contains no documentation.
             # Apply this to the assembled overview (including header narrative).
             body = prune_empty_headings(body)
-            # Use the real source filename in navigation; retain its descriptive page title.
+            # Root-level files precede grouped sections in the chapter navigation.
+            # Use the real source filename, not its descriptive page title.
             write_index(source_folder, title, '\n'.join(body),
-                        summary=metadata.get('purpose', ''), template='source', nav_title=path.name)
+                        order=100 if page_preface else (0 if group == '/' else 1000),
+                        summary=(metadata.get('description', '') if page_preface else metadata.get('purpose', '')),
+                        template='page' if page_preface else 'source',
+                        nav_title=title if page_preface else path.name)
     for section_folder, specials in special_pages.items():
         index_files = list(section_folder.glob('*_Index_NL.md'))
         if len(index_files) != 1:
@@ -911,7 +1371,12 @@ def collect(product, content: Path, order: int, counters: Counter, template_owne
 
 
 def _product_reference_files(source: Path, name: str) -> list[Path]:
-    """Only authored repository documents; never generated caches or website output."""
+    """Only authored repository documents; never generated caches or website output.
+    
+    Usage:
+        ```python
+        _product_reference_files(source, name)
+        ```"""
     candidates = [source / name, source / 'usr/local/share/doc-sources' / name,
                   source / 'target-root/usr/local/share/doc-sources' / name]
     if name == 'LICENSE':
@@ -921,7 +1386,12 @@ def _product_reference_files(source: Path, name: str) -> list[Path]:
 
 
 def build_appendices(products: list[dict], content: Path, root: Path) -> dict:
-    """Build one bundle-level reference index from the actually published pages."""
+    """Build one bundle-level reference index from the actually published pages.
+    
+    Usage:
+        ```python
+        build_appendices(products, content, root)
+        ```"""
     appendix = content / 'appendices'
     entries = []
     variables = []
@@ -940,11 +1410,11 @@ def build_appendices(products: list[dict], content: Path, root: Path) -> dict:
             source_path = Path(product['source_dir']).expanduser().resolve() / src
             if not source_path.is_file():
                 continue
-            meta, declarations, _ = parse_source(source_path)
+            meta, declarations, _ = parse_documented_source(source_path)
             route = '/' + source_page.parent.relative_to(content).as_posix() + '/'
             for item in declarations:
                 name = item['name']
-                if not name or name.startswith('_'):
+                if not name or not item.get('public', not name.startswith('_')):
                     continue
                 if item['kind'].startswith('fn'):
                     target = source_page.parent / f'{slug(name)}_NL.md'
@@ -1024,10 +1494,14 @@ def build_appendices(products: list[dict], content: Path, root: Path) -> dict:
 
 def split_wcm_document(markdown: str) -> tuple[dict[str, str], str]:
     """Separate a WCM document's leading YAML metadata from its Markdown body.
-
+    
     WCM page metadata belongs to the document, not the body that is promoted
     into another page. Do not interpret ordinary Markdown rules as metadata.
-    """
+    
+    Usage:
+        ```python
+        split_wcm_document(markdown)
+        ```"""
     normalized = markdown.lstrip('\ufeff').replace('\r\n', '\n').replace('\r', '\n')
     lines = normalized.splitlines(keepends=True)
     metadata: dict[str, str] = {}
@@ -1050,11 +1524,15 @@ def split_wcm_document(markdown: str) -> tuple[dict[str, str], str]:
 
 def chapter0_body(markdown: str) -> str:
     """Return just the body of a promoted WCM page.
-
+    
     Older generated introductions may already contain a *second* WCM page
     embedded after a logo. Consume that nested document boundary explicitly,
     rather than deleting arbitrary text that resembles YAML fields.
-    """
+    
+    Usage:
+        ```python
+        chapter0_body(markdown)
+        ```"""
     _, body = split_wcm_document(markdown)
     lines = body.splitlines(keepends=True)
     result: list[str] = []
@@ -1074,10 +1552,14 @@ def chapter0_body(markdown: str) -> str:
 
 def generated_chapter0_path(content: Path, reference: str, origin: str = '') -> Path | None:
     """Resolve a logical generated page, migrating old absolute output references.
-
+    
     External authored Markdown is deliberately not interpreted as a generated
     route. A retained snapshot with an original generated path is migrated.
-    """
+    
+    Usage:
+        ```python
+        generated_chapter0_path(content, reference, origin)
+        ```"""
     selected = reference
     if origin and '/content/' in origin:
         selected = origin
@@ -1096,7 +1578,12 @@ def generated_chapter0_path(content: Path, reference: str, origin: str = '') -> 
 
 
 def exclude_chapter0(content: Path, target: Path) -> None:
-    """Promote exactly one generated page, removing its normal navigation entry."""
+    """Promote exactly one generated page, removing its normal navigation entry.
+    
+    Usage:
+        ```python
+        exclude_chapter0(content, target)
+        ```"""
     target.unlink()
     folder = target.parent
     while folder != content and folder.is_dir() and not any(folder.iterdir()):
@@ -1105,7 +1592,12 @@ def exclude_chapter0(content: Path, target: Path) -> None:
 
 
 def rewrite_chapter0_links(content: Path, old_page: Path) -> None:
-    """Retarget absolute links to a promoted page to its Introduction route."""
+    """Retarget absolute links to a promoted page to its Introduction route.
+    
+    Usage:
+        ```python
+        rewrite_chapter0_links(content, old_page)
+        ```"""
     relative = old_page.relative_to(content)
     parts = list(relative.parts)
     filename = parts.pop()
@@ -1123,7 +1615,15 @@ def rewrite_chapter0_links(content: Path, old_page: Path) -> None:
             file.write_text(text, encoding='utf-8')
 
 
+
+# --- Public functions ------------------------------------------------------------
 def generate(bundle: dict, docs_root: Path | None = None) -> dict:
+    """Validate a saved bundle and generate its combined Markdown repository.
+    
+    Usage:
+        ```python
+        summary = generate(bundle)  # Writes the configured output directory
+        ```"""
     output = Path(bundle['output_dir']).expanduser().resolve()
     if not output.is_absolute() or output == Path('/'):
         raise ValueError('Invalid output directory')
@@ -1171,10 +1671,17 @@ def generate(bundle: dict, docs_root: Path | None = None) -> dict:
             copy_assets_checked(asset_dir, root / 'assets')
         # The home/title page is independent of Chapter 0. It always displays
         # the bundle metrics; the home template supplies its established branding.
-        metrics = ('\n'.join(f'- **{label}:** {counts.get(key, 0)}' for label, key in
-                             [('Products', 'products'), ('Source files', 'files'),
-                              ('Functions', 'functions'), ('Declarations', 'declarations'),
-                              ('Lines of code and comments', 'lines')]))
+        metrics = f'- **Products:** {counts["products"]}\n\n'
+        metrics += '| Metric | Bash | Python | Total |\n'
+        metrics += '| --- | ---: | ---: | ---: |\n'
+        for label, key in (('Source files', 'files'), ('Functions', 'functions'),
+                           ('Declarations', 'declarations'), ('Code lines', 'code_lines'),
+                           ('Comment and docstring lines', 'comment_lines'),
+                           ('Code + comment lines', 'lines')):
+            metrics += (f'| {label} | {counts[f"bash_{key}"] if key != "lines" else counts["bash_code_lines"] + counts["bash_comment_lines"]:,}'
+                        f' | {counts[f"python_{key}"] if key != "lines" else counts["python_code_lines"] + counts["python_comment_lines"]:,}'
+                        f' | {counts[key]:,} |\n')
+        metrics += '\n'
         for key in ('version', 'build'):
             if counts.get(key):
                 metrics += f'\n- **{key.title()}:** {counts[key]}'
@@ -1242,6 +1749,12 @@ def generate(bundle: dict, docs_root: Path | None = None) -> dict:
 
 
 def main() -> int:
+    """Load the requested bundle and run the Markdown generator CLI.
+    
+    Usage:
+        ```python
+        main()
+        ```"""
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('bundle', help='Saved bundle identifier')
     parser.add_argument('--store', default=str(Path.home() / '.config/solidgroundux/documentation-bundles'))

@@ -10,6 +10,8 @@ import shutil
 from .content import discover_content, load_navigation, load_site_config
 
 
+
+# --- Public classes ------------------------------------------------------------
 @dataclass(slots=True)
 class SocialResult:
     """Generated social-media draft paths and reported diagnostics."""
@@ -23,15 +25,24 @@ class SocialResult:
     def as_dict(self) -> dict[str, object]:
         """Serialize the result to a JSON-compatible mapping.
         
-        Returns:
-            Operation result or None, as defined by the implementation."""
+        Usage:
+            ```python
+            social_result.as_dict()
+            ```"""
         return {"success": self.success, "output": self.output, "platform": self.platform,
                 "drafts_generated": self.drafts_generated, "warnings": self.warnings,
                 "errors": self.errors}
 
 
+
+# --- Internal functions ------------------------------------------------------------
 def _plain_text(body: str) -> str:
-    """Extract readable prose, not Markdown or td-component markup."""
+    """Extract readable prose, not Markdown or td-component markup.
+    
+    Usage:
+        ```python
+        _plain_text(body)
+        ```"""
     body = re.sub(r"```[\s\S]*?```", " ", body)
     body = re.sub(r"(?m)^\s*:::[^\n]*$", " ", body)
     body = re.sub(r"!\[[^]]*\]\([^)]*\)", " ", body)
@@ -43,7 +54,12 @@ def _plain_text(body: str) -> str:
 
 
 def _excerpt(body: str, limit: int) -> str:
-    """Extract a readable short text excerpt for a social-media draft."""
+    """Extract a readable short text excerpt for a social-media draft.
+    
+    Usage:
+        ```python
+        _excerpt(body, limit)
+        ```"""
     text = _plain_text(body)
     if len(text) <= limit:
         return text
@@ -51,9 +67,18 @@ def _excerpt(body: str, limit: int) -> str:
     return cropped.rstrip(".,;: ") + "..."
 
 
+
+# --- Public functions ------------------------------------------------------------
 def prepare_social(source: str | Path, output: str | Path, platform: str = "linkedin",
                    content_file: str = "", excerpt_length: int = 150) -> SocialResult:
-    """Write one editable draft and optional image, without modifying site sources."""
+    """Write one editable draft and optional image, without modifying site sources.
+        
+        Usage:
+        ```python
+        # Generate an editable draft from a specific source article.
+        draft = prepare_social(source, output, platform="linkedin",
+                               content_file="content/articles/example_NL.md")
+        ```"""
     source_path = Path(source).resolve()
     output_path = Path(output).expanduser().resolve()
     platform = platform.strip().lower()

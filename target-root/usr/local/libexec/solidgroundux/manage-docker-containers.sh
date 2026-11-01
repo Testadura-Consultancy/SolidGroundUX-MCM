@@ -8,7 +8,8 @@
 #   Shortname   : MANAGE_DOCKER_CONTAINERS
 #   Source      : manage-docker-containers.sh
 #   Type        : script
-#   Group       : Role Managers
+#   Group       : Modules
+#   Subgroup    : Docker Server
 #   Purpose     : Create and manage Docker containers and images
 #
 #   Checksum : 61d4d99666b4f81ba0af9e17c3c94d3f04d2ab6130fdde58fea53778b8df4b09
@@ -56,7 +57,7 @@ set -uo pipefail
         #     present, falls back to the installed framework copy without changing
         #     SGND_FRAMEWORK_ROOT.
         #
-        # . Globals (write)
+        # . Globals (Write)
         #   SGND_FRAMEWORK_ROOT
         #
         # . Output
@@ -64,8 +65,8 @@ set -uo pipefail
         #   helpers are not available until sgnd-exe-common.sh has been loaded.
         #
         # . Returns
-        #   0 when the framework root was resolved and executable common library loaded.
-        #   126 when the script path cannot be resolved, no canonical root component can
+        #   - 0 when the framework root was resolved and executable common library loaded.
+        #   - 126 when the script path cannot be resolved, no canonical root component can
         #   be found, or the executable common library is unreadable.
         #
         # . Usage
@@ -154,23 +155,53 @@ set -uo pipefail
 
 # - Helpers ------------------------------------------------------------------------
     # fn: _dryrun_complete - Report the dry-run result without executing the requested host change.
+        # . Purpose
+        #   Report the dry-run result without executing the requested host change.
+        #
+        # . Usage
+        #   ```bash
+        #   _dryrun_complete
+        #   ```
     _dryrun_complete() {
         (( ${FLAG_DRYRUN:-0} == 1 )) || return 0
         sayok "DRYRUN complete. The changes shown above would have been applied; no changes were written."
     }
 
     # fn: _docker_require_daemon - Check that the Docker daemon is available for container operations.
+        # . Purpose
+        #   Check that the Docker daemon is available for container operations.
+        #
+        # . Usage
+        #   ```bash
+        #   _docker_require_daemon
+        #   ```
     _docker_require_daemon() {
         command -v docker >/dev/null 2>&1 || { sayfail "Docker is not installed."; return 1; }
         sudo docker info >/dev/null 2>&1 || { sayfail "Docker daemon is unavailable."; return 1; }
     }
 
     # fn: _docker_validate_name - Validate the proposed Docker container name.
+        # . Purpose
+        #   Validate the proposed Docker container name.
+        #
+        # . Usage
+        #   ```bash
+        #   _docker_validate_name
+        #   ```
     _docker_validate_name() {
         [[ "${1-}" =~ ^[A-Za-z0-9][A-Za-z0-9_.-]*$ ]]
     }
 
     # fn: _docker_trim - Remove leading and trailing whitespace from the supplied value.
+        # . Purpose
+        #   Remove leading and trailing whitespace from the supplied value.
+        #
+        # . Arguments
+        #   - `$1`: Value to inspect or write.
+        # . Usage
+        #   ```bash
+        #   _docker_trim "  sample text  "
+        #   ```
     _docker_trim() {
         local value="${1-}"
         value="${value#"${value%%[![:space:]]*}"}"
@@ -179,6 +210,13 @@ set -uo pipefail
     }
 
     # fn: _docker_print_command - Format a command for dry-run reporting without executing it.
+        # . Purpose
+        #   Format a command for dry-run reporting without executing it.
+        #
+        # . Usage
+        #   ```bash
+        #   _docker_print_command
+        #   ```
     _docker_print_command() {
         local part=""
         local quoted=""
@@ -191,18 +229,43 @@ set -uo pipefail
     }
 
     # fn: _docker_validate_port - Accept a decimal TCP/UDP port number from 1 through 65535.
+        # . Purpose
+        #   Accept a decimal TCP/UDP port number from 1 through 65535.
+        #
+        # . Arguments
+        #   - `$1`: Value to inspect or write.
+        # . Usage
+        #   ```bash
+        #   _docker_validate_port "8080"
+        #   ```
     _docker_validate_port() {
         local value="${1-}"
         [[ "$value" =~ ^[0-9]+$ ]] && (( value >= 1 && value <= 65535 ))
     }
 
     # fn: _docker_validate_absolute_path - Reject empty, root-only, relative, and multiline host paths.
+        # . Purpose
+        #   Reject empty, root-only, relative, and multiline host paths.
+        #
+        # . Arguments
+        #   - `$1`: Value to inspect or write.
+        # . Usage
+        #   ```bash
+        #   _docker_validate_absolute_path "/srv/storage/example"
+        #   ```
     _docker_validate_absolute_path() {
         local value="${1-}"
         [[ "$value" == /* && "$value" != "/" && "$value" != *$'\n'* ]]
     }
 
     # fn: _docker_validate_env_name - Check that a variable name follows the environment-key syntax.
+        # . Purpose
+        #   Check that a variable name follows the environment-key syntax.
+        #
+        # . Usage
+        #   ```bash
+        #   _docker_validate_env_name
+        #   ```
     _docker_validate_env_name() {
         [[ "${1-}" =~ ^[A-Za-z_][A-Za-z0-9_]*$ ]]
     }
@@ -211,6 +274,19 @@ set -uo pipefail
     # When a details array is supplied, render each choice as a labeled multi-value row so
     # long descriptive text wraps in the value column instead of being clipped.
     # fn: _docker_select_labeled_value - Prompt for a value while displaying separate labels and optional explanatory details.
+        # . Purpose
+        #   Prompt for a value while displaying separate labels and optional explanatory details.
+        #
+        # . Arguments
+        #   - `$1`: Name of the shell variable receiving the result.
+        #   - `$2`: Optional: prompt or display label.
+        #   - `$3`: Name of a shell array containing available choices.
+        #   - `$4`: Display label.
+        #   - `$5`: Name of the selected item.
+        # . Usage
+        #   ```bash
+        #   _docker_select_labeled_value "selected" "Select an option" "<values_name>" "<labels_name>" "<details_name>"
+        #   ```
     _docker_select_labeled_value() {
         local output_var="${1:?missing output variable}"
         local label="${2:-Select an option}"
@@ -260,6 +336,17 @@ set -uo pipefail
     }
 
     # fn: _docker_select_container - Select container in the Docker workflow.
+        # . Purpose
+        #   Prompt for an existing Docker container and return its identifier.
+        #
+        # . Arguments
+        #   - `$1`: Name of the shell variable receiving the result.
+        #   - `$2`: Optional: Selection scope, such as all or running.
+        #   - `$3`: Optional: prompt or display label.
+        # . Usage
+        #   ```bash
+        #   _docker_select_container "selected" "<scope>" "Select an option"
+        #   ```
     _docker_select_container() {
         local output_var="${1:?missing output variable}"
         local scope="${2:-all}"
@@ -290,6 +377,15 @@ set -uo pipefail
     # Select a locally available image without reusing the caller's output variable name
     # locally; Bash dynamic scoping would otherwise swallow the selected image value.
     # fn: _docker_select_local_image - Select local image in the Docker workflow.
+        # . Purpose
+        #   Prompt for a locally available Docker image.
+        #
+        # . Arguments
+        #   - `$1`: Name of the shell variable receiving the result.
+        # . Usage
+        #   ```bash
+        #   _docker_select_local_image "selected"
+        #   ```
     _docker_select_local_image() {
         local output_var="${1:?missing output variable}"
         local image_ref=""
@@ -313,6 +409,15 @@ set -uo pipefail
     }
 
     # fn: _docker_search_hub_repository - Search hub repository in the Docker workflow.
+        # . Purpose
+        #   Search Docker Hub for repositories matching the supplied query.
+        #
+        # . Arguments
+        #   - `$1`: Name of the shell variable receiving the result.
+        # . Usage
+        #   ```bash
+        #   _docker_search_hub_repository "selected"
+        #   ```
     _docker_search_hub_repository() {
         local output_var="${1:?missing output variable}"
         local search_term=""
@@ -350,6 +455,15 @@ set -uo pipefail
     }
 
     # fn: _docker_list_hub_tags - List hub tags in the Docker workflow.
+        # . Purpose
+        #   Retrieve available tags for the selected Docker Hub repository.
+        #
+        # . Arguments
+        #   - `$1`: Docker Hub image repository.
+        # . Usage
+        #   ```bash
+        #   _docker_list_hub_tags "<repository>"
+        #   ```
     _docker_list_hub_tags() {
         local repository="${1:?missing repository}"
         command -v python3 >/dev/null 2>&1 || return 1
@@ -403,6 +517,16 @@ PYTAG
     }
 
     # fn: _docker_select_hub_tag - Select hub tag in the Docker workflow.
+        # . Purpose
+        #   Prompt for the desired image tag from Docker Hub results.
+        #
+        # . Arguments
+        #   - `$1`: Name of the shell variable receiving the result.
+        #   - `$2`: Docker Hub image repository.
+        # . Usage
+        #   ```bash
+        #   _docker_select_hub_tag "selected" "<repository>"
+        #   ```
     _docker_select_hub_tag() {
         local output_var="${1:?missing output variable}"
         local repository="${2:?missing repository}"
@@ -432,6 +556,15 @@ PYTAG
     }
 
     # fn: _docker_select_restart_policy - Select restart policy in the Docker workflow.
+        # . Purpose
+        #   Prompt for a Docker container restart policy.
+        #
+        # . Arguments
+        #   - `$1`: Name of the shell variable receiving the result.
+        # . Usage
+        #   ```bash
+        #   _docker_select_restart_policy "selected"
+        #   ```
     _docker_select_restart_policy() {
         local output_var="${1:?missing output variable}"
         local selected=""
@@ -440,6 +573,16 @@ PYTAG
     }
 
     # fn: _docker_collect_port_mappings - Collect port mappings in the Docker workflow.
+        # . Purpose
+        #   Collect and validate host-to-container port mappings for container creation.
+        #
+        # . Arguments
+        #   - `$1`: Name of the selected item.
+        #   - `$2`: Output variable receiving a summary of port mappings.
+        # . Usage
+        #   ```bash
+        #   _docker_collect_port_mappings "8080" "8080"
+        #   ```
     _docker_collect_port_mappings() {
         local array_name="${1:?missing command array}"
         local summary_var="${2:?missing summary variable}"
@@ -466,6 +609,16 @@ PYTAG
     }
 
     # fn: _docker_collect_volume_mappings - Collect volume mappings in the Docker workflow.
+        # . Purpose
+        #   Collect host-volume-to-container path mappings for container creation.
+        #
+        # . Arguments
+        #   - `$1`: Name of the selected item.
+        #   - `$2`: Output variable receiving a summary of volume mappings.
+        # . Usage
+        #   ```bash
+        #   _docker_collect_volume_mappings "<array_name>" "<summary_var>"
+        #   ```
     _docker_collect_volume_mappings() {
         local array_name="${1:?missing command array}"
         local summary_var="${2:?missing summary variable}"
@@ -496,6 +649,16 @@ PYTAG
     # Keep the prompt receiver names distinct from generic framework-local names so
     # Bash dynamic scoping cannot swallow values before they are added to docker -e.
     # fn: _docker_collect_environment - Collect environment in the Docker workflow.
+        # . Purpose
+        #   Collect environment-variable assignments for a new Docker container.
+        #
+        # . Arguments
+        #   - `$1`: Name of the selected item.
+        #   - `$2`: Output variable receiving a summary of environment assignments.
+        # . Usage
+        #   ```bash
+        #   _docker_collect_environment "<array_name>" "<summary_var>"
+        #   ```
     _docker_collect_environment() {
         local array_name="${1:?missing command array}"
         local summary_var="${2:?missing summary variable}"
@@ -522,6 +685,15 @@ PYTAG
     # Render a local numbered selector using the Docker action layout.
     # The framework ask_selection API is intentionally left unchanged.
     # fn: _docker_ask_selection - Prompt for selection in the Docker workflow.
+        # . Purpose
+        #   Present numbered Docker management choices and write the selection to an output variable.
+        #
+        # . Arguments
+        #   - `$2`: Name of the output shell variable.
+        # . Usage
+        #   ```bash
+        #   _docker_ask_selection --label "Choose container" --var container --items "frontend" "database"
+        #   ```
     _docker_ask_selection() {
         local label="Select an option"
         local var_name="selection"
@@ -566,6 +738,13 @@ PYTAG
 
 # - Read-only actions ---------------------------------------------------------------
     # fn: _docker_list_containers - List containers in the Docker workflow.
+        # . Purpose
+        #   Display existing Docker containers and their current states.
+        #
+        # . Usage
+        #   ```bash
+        #   _docker_list_containers
+        #   ```
     _docker_list_containers() {
         _docker_require_daemon || return 1
         sgnd_print
@@ -574,6 +753,13 @@ PYTAG
     }
 
     # fn: _docker_list_images - List images in the Docker workflow.
+        # . Purpose
+        #   Display locally stored Docker images.
+        #
+        # . Usage
+        #   ```bash
+        #   _docker_list_images
+        #   ```
     _docker_list_images() {
         _docker_require_daemon || return 1
         sgnd_print
@@ -582,6 +768,13 @@ PYTAG
     }
 
     # fn: _docker_inspect_container - Inspect container in the Docker workflow.
+        # . Purpose
+        #   Display detailed configuration for a selected Docker container.
+        #
+        # . Usage
+        #   ```bash
+        #   _docker_inspect_container
+        #   ```
     _docker_inspect_container() {
         local container=""
         _docker_require_daemon || return 1
@@ -590,6 +783,13 @@ PYTAG
     }
 
     # fn: _docker_show_logs - Display logs in the Docker workflow.
+        # . Purpose
+        #   Display or follow logs for the selected Docker container.
+        #
+        # . Usage
+        #   ```bash
+        #   _docker_show_logs
+        #   ```
     _docker_show_logs() {
         local container=""
         local lines="100"
@@ -602,6 +802,13 @@ PYTAG
 
 # - Mutating actions ---------------------------------------------------------------
     # fn: _docker_pull_image - Pull image in the Docker workflow.
+        # . Purpose
+        #   Pull the selected repository and tag from a Docker image registry.
+        #
+        # . Usage
+        #   ```bash
+        #   _docker_pull_image
+        #   ```
     _docker_pull_image() {
         local mode=""
         local repository=""
@@ -640,6 +847,13 @@ PYTAG
     }
 
     # fn: _docker_create_container - Create container in the Docker workflow.
+        # . Purpose
+        #   Collect settings and create a Docker container from an available image.
+        #
+        # . Usage
+        #   ```bash
+        #   _docker_create_container
+        #   ```
     _docker_create_container() {
         local name=""
         local image=""
@@ -714,6 +928,13 @@ PYTAG
     }
 
     # fn: _docker_start_container - Start container in the Docker workflow.
+        # . Purpose
+        #   Start the selected Docker container.
+        #
+        # . Usage
+        #   ```bash
+        #   _docker_start_container
+        #   ```
     _docker_start_container() {
         local container=""
         _docker_require_daemon || return 1
@@ -724,6 +945,13 @@ PYTAG
     }
 
     # fn: _docker_stop_container - Stop container in the Docker workflow.
+        # . Purpose
+        #   Stop the selected running Docker container.
+        #
+        # . Usage
+        #   ```bash
+        #   _docker_stop_container
+        #   ```
     _docker_stop_container() {
         local container=""
         _docker_require_daemon || return 1
@@ -734,6 +962,13 @@ PYTAG
     }
 
     # fn: _docker_restart_container - Restart container in the Docker workflow.
+        # . Purpose
+        #   Restart the selected Docker container.
+        #
+        # . Usage
+        #   ```bash
+        #   _docker_restart_container
+        #   ```
     _docker_restart_container() {
         local container=""
         _docker_require_daemon || return 1
@@ -752,6 +987,11 @@ PYTAG
         #   - Prefers /bin/bash when present and falls back to /bin/sh.
         #   - Reports a clear failure when the container image provides neither shell.
         #   - Honors console dry-run mode.
+        #
+        # . Usage
+        #   ```bash
+        #   _docker_open_container_shell
+        #   ```
     _docker_open_container_shell() {
         local container=""
         local shell_path=""
@@ -778,6 +1018,13 @@ PYTAG
     }
 
     # fn: _docker_remove_container - Remove container in the Docker workflow.
+        # . Purpose
+        #   Confirm and remove the selected Docker container.
+        #
+        # . Usage
+        #   ```bash
+        #   _docker_remove_container
+        #   ```
     _docker_remove_container() {
         local container=""
         local decision="No"
@@ -801,7 +1048,12 @@ PYTAG
         #   - P/Space pauses the automatic return countdown.
         #
         # . Returns
-        #   0 only when the operator selected A (do another); otherwise non-zero.
+        #   - 0 only when the operator selected A (do another); otherwise non-zero.
+        #
+        # . Usage
+        #   ```bash
+        #   _docker_action_again
+        #   ```
     _docker_action_again() {
         local rc=0
 
@@ -826,6 +1078,11 @@ PYTAG
         # . Behavior
         #   - Enter returns to the Management Console immediately.
         #   - P/Space pauses the automatic return countdown.
+        #
+        # . Usage
+        #   ```bash
+        #   _docker_return_to_menu
+        #   ```
     _docker_return_to_menu() {
         sgnd_print
         ask_dlg_autocontinue \
@@ -836,6 +1093,15 @@ PYTAG
 
 # - Action dispatch ----------------------------------------------------------------
     # fn: _run_action - Dispatch the requested management action to its implementation.
+        # . Purpose
+        #   Dispatch the requested management action to its implementation.
+        #
+        # . Arguments
+        #   - `$1`: Management action to execute.
+        # . Usage
+        #   ```bash
+        #   _run_action "list"
+        #   ```
     _run_action() {
         local action="${1:?missing action}" rc=0
         case "$action" in
@@ -863,6 +1129,13 @@ PYTAG
 
 # - Main ----------------------------------------------------------------------------
     # fn: main - Dispatch command-line options to the appropriate management workflow.
+        # . Purpose
+        #   Dispatch command-line options to the appropriate management workflow.
+        #
+        # . Usage
+        #   ```bash
+        #   main "$@"
+        #   ```
     main() {
         local action=""
         local rc=0

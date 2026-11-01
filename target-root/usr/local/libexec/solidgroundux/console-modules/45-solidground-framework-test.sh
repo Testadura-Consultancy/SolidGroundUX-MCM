@@ -5,7 +5,8 @@
 #   Version     : 2.1
 #   Source      : 45-solidground-framework-test.sh
 #   Type        : module
-#   Group       : Module Registration
+#   Group       : Modules
+#   Subgroup    : SolidGroundUX Framework
 #   Purpose     : Register SolidGroundUX framework test and validation actions
 #   Build       : 2627501
 #   Shortname   : FRAMEWORK_TEST
@@ -25,25 +26,26 @@
 set -uo pipefail
 
 # - Library guard ------------------------------------------------------------------
-    # fn$ _sgnd_lib_guard - Enforce source-only, single-load library initialization
+    # fn: _sgnd_lib_guard - Enforce source-only, source-only library guard
         # . Purpose
-        #   Ensure the file is sourced as a library and initialized only once.
+        #   Ensure the file is sourced as a library and marked as loaded.
         #
         # . Behavior
         #   - Derives a unique guard variable name from the current filename.
         #   - Aborts execution when the file is run directly instead of sourced.
         #   - Sets the guard variable on first load.
-        #   - Returns immediately when the library was already loaded.
+        #   - Returns from the guard helper when the file is already marked loaded; it does not skip subsequent top-level statements.
         #
-        # Inputs
+        # . Inputs
         #   BASH_SOURCE[0]
-        #   $0
+        #   - $0
         #
-        # Outputs (globals)
+        # . Outputs
+        #   (globals)
         #   SGND_<MODULE>_LOADED
         #
         # . Returns
-        #   0 when already loaded or successfully initialized.
+        #   - 0 when already loaded or successfully initialized.
         #   Exits with code 2 when executed instead of sourced.
         #
         # . Usage
@@ -82,6 +84,15 @@ set -uo pipefail
     SGND_MODULE_NAME="${SGND_FRAMEWORK_TEST_MODULE_NAME}"
 # - Test agent ---------------------------------------------------------------------
     # fn: _framework_test_run_framework_suite - Test run framework suite.
+        # . Purpose
+        #   Test run framework suite.
+        #
+        # . Arguments
+        #   - `$1`: Name of the Framework test suite.
+        # . Usage
+        #   ```bash
+        #   _framework_test_run_framework_suite "<suite>"
+        #   ```
     _framework_test_run_framework_suite() {
         local suite="${1:?missing test suite}"
         local -a args=(--suite "$suite")
@@ -91,16 +102,41 @@ set -uo pipefail
     }
 
     # fn: _framework_test_smoketest - Test smoketest in the Framework workflow.
+        # . Purpose
+        #   Run the Framework smoke tests from the MCM test console.
+        #
+        # . Usage
+        #   ```bash
+        #   _framework_test_smoketest
+        #   ```
     _framework_test_smoketest() {
         _framework_test_run_framework_suite "smoke"
     }
 
     # fn: _framework_test_validate_installation - Test validate installation in the Framework workflow.
+        # . Purpose
+        #   Run the Framework installation-validation suite.
+        #
+        # . Usage
+        #   ```bash
+        #   _framework_test_validate_installation
+        #   ```
     _framework_test_validate_installation() {
         _framework_test_run_framework_suite "installation"
     }
 
     # fn: _framework_test_console_result - Test console result in the Framework workflow.
+        # . Purpose
+        #   Display one console-validation result and update its pass/fail counters.
+        #
+        # . Arguments
+        #   - `$1`: Prompt or display label.
+        #   - `$2`: Validation status.
+        #   - `$3`: Optional: Optional explanation of the test result.
+        # . Usage
+        #   ```bash
+        #   _framework_test_console_result "Select an option" "<status>" "<detail>"
+        #   ```
     _framework_test_console_result() {
         local label="${1:?missing label}"
         local status="${2:?missing status}"
@@ -118,6 +154,13 @@ set -uo pipefail
     }
 
     # fn: _framework_test_validate_console - Test validate console in the Framework workflow.
+        # . Purpose
+        #   Validate console registration tables, handlers and item-group references.
+        #
+        # . Usage
+        #   ```bash
+        #   _framework_test_validate_console
+        #   ```
     _framework_test_validate_console() {
         local row=""
         local key=""
@@ -207,6 +250,15 @@ set -uo pipefail
     }
 
     # fn: _framework_test_read_module_metadata - Test read module metadata in the Framework workflow.
+        # . Purpose
+        #   Read the declared metadata of an MCM console module without loading its actions.
+        #
+        # . Arguments
+        #   - `$1`: Path to the console module script.
+        # . Usage
+        #   ```bash
+        #   _framework_test_read_module_metadata "/usr/local/libexec/solidgroundux/console-modules/55-web-content-management.sh"
+        #   ```
     _framework_test_read_module_metadata() {
         local module_file="${1:?missing module file}"
         local line=""
@@ -231,6 +283,17 @@ set -uo pipefail
     }
 
     # fn: _framework_test_render_validation_result - Test render validation result in the Framework workflow.
+        # . Purpose
+        #   Display a module-validation finding with its status and details.
+        #
+        # . Arguments
+        #   - `$1`: Validation status.
+        #   - `$2`: Prompt or display label.
+        #   - `$3`: Optional: Optional validation message.
+        # . Usage
+        #   ```bash
+        #   _framework_test_render_validation_result "<status>" "Select an option" "Proceed with the operation?"
+        #   ```
     _framework_test_render_validation_result() {
         local status="${1:?missing status}"
         local label="${2:?missing label}"
@@ -246,6 +309,13 @@ set -uo pipefail
     }
 
     # fn: _framework_test_validate_modules - Test validate modules in the Framework workflow.
+        # . Purpose
+        #   Validate the discovered MCM modules and their registration contracts.
+        #
+        # . Usage
+        #   ```bash
+        #   _framework_test_validate_modules
+        #   ```
     _framework_test_validate_modules() {
         local module_dir="${SGND_FRAMEWORK_ROOT%/}/usr/local/libexec/solidgroundux/console-modules"
         local module_file=""
@@ -396,6 +466,13 @@ set -uo pipefail
     }
 
     # fn: _framework_test_run_all - Test run all in the Framework workflow.
+        # . Purpose
+        #   Run the Framework test suites and the MCM console/module checks in sequence.
+        #
+        # . Usage
+        #   ```bash
+        #   _framework_test_run_all
+        #   ```
     _framework_test_run_all() {
         local rc=0
 
@@ -408,6 +485,8 @@ set -uo pipefail
 
 # - Module validation contract ------------------------------------------------------
     # fn: validate_module_framework_test - Validate the Framework module and record its status for the console.
+        # . Purpose
+        #   Validate the Framework module and record its status for the console.
         #
         # . Returns
         #   A console validation status (0=pass, 1=fail, 2=warning, 3=skipped).

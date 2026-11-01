@@ -7,7 +7,8 @@
 #   Shortname   : STORAGE
 #   Source      : 15-storage.sh
 #   Type        : module
-#   Group       : Module Registration
+#   Group       : Modules
+#   Subgroup    : Storage
 #   Purpose     : Configure and inspect local storage volumes and directories
 #
 #   Checksum : bcbd429937a05d126eb06babf74e0d344728fb38e2babbc36d9a551e8aa7e007
@@ -25,25 +26,26 @@
 set -uo pipefail
 
 # - Library guard ------------------------------------------------------------------
-    # fn$ _sgnd_lib_guard - Enforce source-only, single-load library initialization
+    # fn: _sgnd_lib_guard - Enforce source-only, source-only library guard
         # . Purpose
-        #   Ensure the file is sourced as a library and initialized only once.
+        #   Ensure the file is sourced as a library and marked as loaded.
         #
         # . Behavior
         #   - Derives a unique guard variable name from the current filename.
         #   - Aborts execution when the file is run directly instead of sourced.
         #   - Sets the guard variable on first load.
-        #   - Returns immediately when the library was already loaded.
+        #   - Returns from the guard helper when the file is already marked loaded; it does not skip subsequent top-level statements.
         #
-        # Inputs
+        # . Inputs
         #   BASH_SOURCE[0]
-        #   $0
+        #   - $0
         #
-        # Outputs (globals)
+        # . Outputs
+        #   (globals)
         #   SGND_<MODULE>_LOADED
         #
         # . Returns
-        #   0 when already loaded or successfully initialized.
+        #   - 0 when already loaded or successfully initialized.
         #   Exits with code 2 when executed instead of sourced.
         #
         # . Usage
@@ -82,12 +84,30 @@ set -uo pipefail
     SGND_MODULE_NAME="$SGND_STORAGE_MODULE_NAME"
 # - Management dispatch -------------------------------------------------------------
     # fn: _storage_run_action - Run action in the storage workflow.
+        # . Purpose
+        #   Dispatch the selected storage-management action to the standalone storage manager.
+        #
+        # . Arguments
+        #   - `$1`: Management action to execute.
+        # . Usage
+        #   ```bash
+        #   _storage_run_action "status"
+        #   ```
     _storage_run_action() {
         local action="${1:?missing action}"
         _sgnd_run_module_script "manage-storage.sh" --action "$action"
     }
 
     # fn: _storage_run_compound_step - Run compound step in the storage workflow.
+        # . Purpose
+        #   Execute one stage of a multi-step storage workflow via the standalone manager.
+        #
+        # . Arguments
+        #   - `$1`: Management action to execute.
+        # . Usage
+        #   ```bash
+        #   _storage_run_compound_step "provision"
+        #   ```
     _storage_run_compound_step() {
         local action="${1:?missing action}"
 
@@ -98,6 +118,8 @@ set -uo pipefail
     }
 
     # fn: _storage_step_provision - Call `_storage_run_compound_step` with the `provision` action.
+        # . Purpose
+        #   Invoke the provision action through the module manager.
         #
         # . Returns
         #   The status returned by the delegated action.
@@ -108,6 +130,8 @@ set -uo pipefail
         #   ```
     _storage_step_provision() { _storage_run_compound_step provision; }
     # fn: _storage_step_validate - Call `_storage_run_compound_step` with the `validate` action.
+        # . Purpose
+        #   Invoke the validate action through the module manager.
         #
         # . Returns
         #   The status returned by the delegated action.
@@ -135,7 +159,7 @@ set -uo pipefail
         #     provisioning performed equivalent internal work.
         #
         # . Returns
-        #   0 when provisioning and validation both succeed; otherwise the first failing child code.
+        #   - 0 when provisioning and validation both succeed; otherwise the first failing child code.
         #
         # . Usage
         #   ```bash
@@ -158,6 +182,8 @@ set -uo pipefail
     }
 
     # fn: storage_provision - Call `_storage_run_action` with the `provision` action.
+        # . Purpose
+        #   Invoke the provision action through the module manager.
         #
         # . Returns
         #   The status returned by the delegated action.
@@ -168,6 +194,8 @@ set -uo pipefail
         #   ```
     storage_provision()                 { _storage_run_action provision; }
     # fn: storage_mount - Call `_storage_run_action` with the `mount` action.
+        # . Purpose
+        #   Invoke the mount action through the module manager.
         #
         # . Returns
         #   The status returned by the delegated action.
@@ -178,6 +206,8 @@ set -uo pipefail
         #   ```
     storage_mount()                     { _storage_run_action mount; }
     # fn: storage_unmount - Call `_storage_run_action` with the `unmount` action.
+        # . Purpose
+        #   Invoke the unmount action through the module manager.
         #
         # . Returns
         #   The status returned by the delegated action.
@@ -188,6 +218,8 @@ set -uo pipefail
         #   ```
     storage_unmount()                   { _storage_run_action unmount; }
     # fn: storage_expand - Call `_storage_run_action` with the `expand` action.
+        # . Purpose
+        #   Invoke the expand action through the module manager.
         #
         # . Returns
         #   The status returned by the delegated action.
@@ -198,6 +230,8 @@ set -uo pipefail
         #   ```
     storage_expand()                    { _storage_run_action expand; }
     # fn: storage_reconcile - Call `_storage_run_action` with the `reconcile` action.
+        # . Purpose
+        #   Invoke the reconcile action through the module manager.
         #
         # . Returns
         #   The status returned by the delegated action.
@@ -208,6 +242,8 @@ set -uo pipefail
         #   ```
     storage_reconcile()                 { _storage_run_action reconcile; }
     # fn: storage_reconcile_persistence - Call `_storage_run_action` with the `reconcile-persistence` action.
+        # . Purpose
+        #   Invoke the reconcile persistence action through the module manager.
         #
         # . Returns
         #   The status returned by the delegated action.
@@ -218,6 +254,8 @@ set -uo pipefail
         #   ```
     storage_reconcile_persistence()     { _storage_run_action reconcile-persistence; }
     # fn: storage_validate_provisioning - Call `_storage_run_action` with the `validate` action.
+        # . Purpose
+        #   Invoke the validate action through the module manager.
         #
         # . Returns
         #   The status returned by the delegated action.
@@ -228,6 +266,8 @@ set -uo pipefail
         #   ```
     storage_validate_provisioning()     { _storage_run_action validate; }
     # fn: storage_status - Call `_storage_run_action` with the `status` action.
+        # . Purpose
+        #   Invoke the status action through the module manager.
         #
         # . Returns
         #   The status returned by the delegated action.
@@ -257,6 +297,8 @@ set -uo pipefail
     storage_manage_directories()          { _storage_run_action directories; }
 
     # fn: storage_access_status - Call `_storage_run_action` with the `access-status` action.
+        # . Purpose
+        #   Invoke the access status action through the module manager.
         #
         # . Returns
         #   The status returned by the delegated action.
@@ -267,6 +309,8 @@ set -uo pipefail
         #   ```
     storage_access_status()             { _storage_run_action access-status; }
     # fn: storage_set_access - Call `_storage_run_action` with the `set-access` action.
+        # . Purpose
+        #   Invoke the set access action through the module manager.
         #
         # . Returns
         #   The status returned by the delegated action.
@@ -277,6 +321,8 @@ set -uo pipefail
         #   ```
     storage_set_access()                 { _storage_run_action set-access; }
     # fn: storage_restore_access_defaults - Call `_storage_run_action` with the `restore-defaults` action.
+        # . Purpose
+        #   Invoke the restore defaults action through the module manager.
         #
         # . Returns
         #   The status returned by the delegated action.
@@ -297,6 +343,8 @@ set -uo pipefail
     # Every validator sets SGND_MODULE_VALIDATION_MESSAGE to a concise result summary.
     # Detailed diagnostic output may be written by the validator or delegated action.
     # fn: validate_module_storage - Validate the storage module and record its status for the console.
+        # . Purpose
+        #   Validate the storage module and record its status for the console.
         #
         # . Returns
         #   A console validation status (0=pass, 1=fail, 2=warning, 3=skipped).

@@ -12,6 +12,8 @@ import shutil
 from .incoming_plan import inspect_incoming_package
 
 
+
+# --- Public classes ------------------------------------------------------------
 @dataclass
 class TransferPlan:
     """Read-only preview of a proposed transfer and its conflicts."""
@@ -24,18 +26,36 @@ class TransferPlan:
 
     @property
     def valid(self) -> bool:
-        """Whether the reviewed plan is eligible for execution."""
+        """Whether the reviewed plan is eligible for execution.
+        
+        Usage:
+            ```python
+            transfer_plan.valid
+            ```"""
         return not self.errors and (not self.conflicts or self.conflict_policy == 'skip')
 
     @property
     def copy_count(self) -> int:
-        """Number of files eligible for copying under the selected policy."""
+        """Number of files eligible for copying under the selected policy.
+        
+        Usage:
+            ```python
+            transfer_plan.copy_count
+            ```"""
         return len(self.files) - (len(self.conflicts) if self.conflict_policy == 'skip' else 0)
 
 
+
+# --- Public functions ------------------------------------------------------------
 def plan_local_import(source: str | Path, incoming: str | Path,
                       conflict_policy: str = 'abort') -> TransferPlan:
-    """Plan a local file, directory, or ZIP transfer; never modify either tree."""
+    """Plan a local file, directory, or ZIP transfer; never modify either tree.
+        
+        Usage:
+        ```python
+        # Inspect a proposed transfer without writing any files.
+        plan = plan_local_import(source, incoming, conflict_policy="abort")
+        ```"""
     src_input = Path(source).expanduser()
     dst_input = Path(incoming).expanduser()
     src = src_input.resolve()
@@ -72,10 +92,16 @@ def plan_local_import(source: str | Path, incoming: str | Path,
 
 def copy_local_to_incoming(plan: TransferPlan) -> list[str]:
     """Copy reviewed files exclusively; skip only pre-reviewed conflicts.
-
-    Recheck conflicts before writing. If a planned destination changes after
-    review, abort rather than silently skipping a newly created file.
-    """
+        
+        Recheck conflicts before writing. If a planned destination changes after
+        review, abort rather than silently skipping a newly created file.
+        
+        Usage:
+        ```python
+        plan = plan_local_import(source, incoming, conflict_policy="abort")
+        if plan.valid:
+            copy_local_to_incoming(plan)  # Writes only reviewed entries
+        ```"""
     if not plan.valid:
         raise ValueError('Transfer plan has errors or unresolved conflicts')
     fresh = plan_local_import(plan.source, plan.incoming, plan.conflict_policy)

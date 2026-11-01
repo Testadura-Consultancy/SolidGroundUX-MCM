@@ -11,8 +11,15 @@ import os
 import uuid
 
 
+
+# --- Public functions ------------------------------------------------------------
 def archive_ingested_package(package: Path, incoming: Path) -> Path:
-    """Move a single, fully ingested top-level package to a unique archive slot."""
+    """Move a single, fully ingested top-level package to a unique archive slot.
+    
+    Usage:
+        ```python
+        archive_ingested_package(package, incoming)
+        ```"""
     incoming = incoming.resolve(strict=True)
     package = Path(package)
     if package.is_symlink() or package.parent.resolve(strict=True) != incoming:

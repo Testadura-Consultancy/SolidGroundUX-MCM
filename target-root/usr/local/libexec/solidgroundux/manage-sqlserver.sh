@@ -8,7 +8,8 @@
 #   Shortname   : MANAGE_SQLSERVER
 #   Source      : manage-sqlserver.sh
 #   Type        : script
-#   Group       : Role Managers
+#   Group       : Modules
+#   Subgroup    : SQL Server
 #   Purpose     : Install, configure, manage, validate, and inspect Microsoft SQL Server
 #
 #   Checksum : d58d881f48fa29d46b6bbf6830a03b661d045ece7a5edc3fa63010561aa78658
@@ -53,7 +54,7 @@ set -uo pipefail
         #     present, falls back to the installed framework copy without changing
         #     SGND_FRAMEWORK_ROOT.
         #
-        # . Globals (write)
+        # . Globals (Write)
         #   SGND_FRAMEWORK_ROOT
         #
         # . Output
@@ -61,8 +62,8 @@ set -uo pipefail
         #   helpers are not available until sgnd-exe-common.sh has been loaded.
         #
         # . Returns
-        #   0 when the framework root was resolved and executable common library loaded.
-        #   126 when the script path cannot be resolved, no canonical root component can
+        #   - 0 when the framework root was resolved and executable common library loaded.
+        #   - 126 when the script path cannot be resolved, no canonical root component can
         #   be found, or the executable common library is unreadable.
         #
         # . Usage
@@ -155,12 +156,29 @@ set -uo pipefail
     SGND_SQLSERVER_DEFAULT_STORAGE_ROOT="/srv/storage"
 
     # fn: _dryrun_complete - Report the dry-run result without executing the requested host change.
+        # . Purpose
+        #   Report the dry-run result without executing the requested host change.
+        #
+        # . Usage
+        #   ```bash
+        #   _dryrun_complete
+        #   ```
     _dryrun_complete() {
         (( ${FLAG_DRYRUN:-0} == 1 )) || return 0
         sayok "DRYRUN complete. The changes shown above would have been applied; no changes were written."
     }
 
     # fn: _sqlserver_ask_selection - Prompt for selection in the SQL Server workflow.
+        # . Purpose
+        #   Display a numbered list and write the selected label to the caller-supplied output variable.
+        #
+        # . Arguments
+        #   - `$1`: Prompt or display label.
+        #   - `$2`: Name of the shell variable receiving the result.
+        # . Usage
+        #   ```bash
+        #   _sqlserver_ask_selection "Choose operation" selected "Status" "Validate"
+        #   ```
     _sqlserver_ask_selection() {
         local label="${1:?missing label}"
         local output_var="${2:?missing output variable}"
@@ -186,8 +204,11 @@ set -uo pipefail
 
 # - Internal helpers ---------------------------------------------------------------
     # fn: _sqlserver_ubuntu_version - Return the supported Ubuntu version
+        # . Purpose
+        #   Return the supported Ubuntu version.
+        #
         # . Returns
-        #   0 on success; non-zero when the operation cannot be completed.
+        #   - 0 on success; non-zero when the operation cannot be completed.
         # . Usage
         #   ```bash
         #   _sqlserver_ubuntu_version
@@ -205,8 +226,11 @@ set -uo pipefail
     }
 
     # fn: _sqlserver_validate_port - Validate a TCP port number
+        # . Purpose
+        #   Validate a TCP port number.
+        #
         # . Returns
-        #   0 on success; non-zero when the operation cannot be completed.
+        #   - 0 on success; non-zero when the operation cannot be completed.
         # . Usage
         #   ```bash
         #   _sqlserver_validate_port
@@ -216,8 +240,11 @@ set -uo pipefail
     }
 
     # fn: _sqlserver_engine_installed - Test whether SQL Server is installed
+        # . Purpose
+        #   Test whether SQL Server is installed.
+        #
         # . Returns
-        #   0 on success; non-zero when the operation cannot be completed.
+        #   - 0 on success; non-zero when the operation cannot be completed.
         # . Usage
         #   ```bash
         #   _sqlserver_engine_installed
@@ -227,8 +254,11 @@ set -uo pipefail
     }
 
     # fn: _sqlserver_tools_installed - Test whether sqlcmd tools are installed
+        # . Purpose
+        #   Test whether sqlcmd tools are installed.
+        #
         # . Returns
-        #   0 on success; non-zero when the operation cannot be completed.
+        #   - 0 on success; non-zero when the operation cannot be completed.
         # . Usage
         #   ```bash
         #   _sqlserver_tools_installed
@@ -238,11 +268,16 @@ set -uo pipefail
     }
 
     # fn: _sqlserver_conf_get - Read one persisted SQL Server setting
+        # . Purpose
+        #   Read one persisted SQL Server setting.
+        #
+        # . Arguments
+        #   - `$1`: Configuration or response-field key.
         # . Returns
-        #   0 on success; non-zero when the setting cannot be read or is not configured.
+        #   - 0 on success; non-zero when the setting cannot be read or is not configured.
         # . Usage
         #   ```bash
-        #   _sqlserver_conf_get
+        #   _sqlserver_conf_get "network.tcpport"
         #   ```
     _sqlserver_conf_get() {
         local key="$1"
@@ -308,8 +343,11 @@ set -uo pipefail
     }
 
     # fn: _sqlserver_tcp_port - Return the effective SQL Server TCP port
+        # . Purpose
+        #   Return the effective SQL Server TCP port.
+        #
         # . Returns
-        #   0 on success; non-zero when the operation cannot be completed.
+        #   - 0 on success; non-zero when the operation cannot be completed.
         # . Usage
         #   ```bash
         #   _sqlserver_tcp_port
@@ -322,8 +360,11 @@ set -uo pipefail
     }
 
     # fn: _sqlserver_storage_root - Resolve the configured SolidGroundUX storage root
+        # . Purpose
+        #   Resolve the configured SolidGroundUX storage root.
+        #
         # . Returns
-        #   0 on success; non-zero when the operation cannot be completed.
+        #   - 0 on success; non-zero when the operation cannot be completed.
         # . Usage
         #   ```bash
         #   _sqlserver_storage_root
@@ -339,11 +380,18 @@ set -uo pipefail
     }
 
     # fn: _sqlserver_select_directory - Select or enter a SQL Server storage directory
+        # . Purpose
+        #   Select or enter a SQL Server storage directory.
+        #
+        # . Arguments
+        #   - `$1`: Prompt or display label.
+        #   - `$2`: Filesystem path.
+        #   - `$3`: Name of the shell variable receiving the result.
         # . Returns
-        #   0 on success; non-zero when the operation cannot be completed.
+        #   - 0 on success; non-zero when the operation cannot be completed.
         # . Usage
         #   ```bash
-        #   _sqlserver_select_directory
+        #   _sqlserver_select_directory "Select an option" "/srv/storage/example" "selected"
         #   ```
     _sqlserver_select_directory() {
         local label="$1"
@@ -374,11 +422,16 @@ set -uo pipefail
     }
 
     # fn: _sqlserver_ensure_directory - Create and prepare a SQL Server storage directory
+        # . Purpose
+        #   Create and prepare a SQL Server storage directory.
+        #
+        # . Arguments
+        #   - `$1`: Filesystem path to inspect.
         # . Returns
-        #   0 on success; non-zero when the operation cannot be completed.
+        #   - 0 on success; non-zero when the operation cannot be completed.
         # . Usage
         #   ```bash
-        #   _sqlserver_ensure_directory
+        #   _sqlserver_ensure_directory "/srv/storage/mssql"
         #   ```
     _sqlserver_ensure_directory() {
         local path="$1"
@@ -396,11 +449,18 @@ set -uo pipefail
     }
 
     # fn: _sqlserver_apply_conf - Set one mssql-conf value
+        # . Purpose
+        #   Set one mssql-conf value.
+        #
+        # . Arguments
+        #   - `$1`: Configuration or response-field key.
+        #   - `$2`: Value to inspect or write.
+        #   - `$3`: Optional flag to suppress informational output.
         # . Returns
-        #   0 on success; non-zero when the operation cannot be completed.
+        #   - 0 on success; non-zero when the operation cannot be completed.
         # . Usage
         #   ```bash
-        #   _sqlserver_apply_conf
+        #   _sqlserver_apply_conf "network.tcpport" "1433" "0"
         #   ```
     _sqlserver_apply_conf() {
         local key="$1"
@@ -426,8 +486,11 @@ set -uo pipefail
     }
 
     # fn: _sqlserver_restart_if_active - Restart SQL Server when it is currently active
+        # . Purpose
+        #   Restart SQL Server when it is currently active.
+        #
         # . Returns
-        #   0 on success; non-zero when the operation cannot be completed.
+        #   - 0 on success; non-zero when the operation cannot be completed.
         # . Usage
         #   ```bash
         #   _sqlserver_restart_if_active
@@ -440,8 +503,11 @@ set -uo pipefail
 
 # - Role preparation ---------------------------------------------------------------
     # fn: _sqlserver_step_repository - Configure Microsoft SQL Server repositories
+        # . Purpose
+        #   Configure Microsoft SQL Server repositories.
+        #
         # . Returns
-        #   0 on success; non-zero when the operation cannot be completed.
+        #   - 0 on success; non-zero when the operation cannot be completed.
         # . Usage
         #   ```bash
         #   _sqlserver_step_repository
@@ -472,8 +538,11 @@ set -uo pipefail
     }
 
     # fn: _sqlserver_step_install_engine - Install Microsoft SQL Server 2025
+        # . Purpose
+        #   Install Microsoft SQL Server 2025.
+        #
         # . Returns
-        #   0 on success; non-zero when the operation cannot be completed.
+        #   - 0 on success; non-zero when the operation cannot be completed.
         # . Usage
         #   ```bash
         #   _sqlserver_step_install_engine
@@ -488,8 +557,11 @@ set -uo pipefail
     }
 
     # fn: _sqlserver_step_configure - Run the canonical mssql-conf setup workflow
+        # . Purpose
+        #   Run the canonical mssql-conf setup workflow.
+        #
         # . Returns
-        #   0 on success; non-zero when the operation cannot be completed.
+        #   - 0 on success; non-zero when the operation cannot be completed.
         # . Usage
         #   ```bash
         #   _sqlserver_step_configure
@@ -514,8 +586,11 @@ set -uo pipefail
     }
 
     # fn: _sqlserver_step_install_tools - Install sqlcmd and bcp tools
+        # . Purpose
+        #   Install sqlcmd and bcp tools.
+        #
         # . Returns
-        #   0 on success; non-zero when the operation cannot be completed.
+        #   - 0 on success; non-zero when the operation cannot be completed.
         # . Usage
         #   ```bash
         #   _sqlserver_step_install_tools
@@ -528,13 +603,20 @@ set -uo pipefail
         sayok "SQL Server command-line tools installed."
     }
 
-    # _sqlserver_collect_install_configuration
-    # Purpose:
-    #   Collect non-interactive SQL Server setup values once and retain them for review.
-    # Returns:
-    #   0 when approved, 2 when cancelled, 1 on invalid input.
-    # Usage:
     # fn: _sqlserver_collect_install_configuration - Collect install configuration in the SQL Server workflow.
+        # . Purpose
+        #   Collect SQL Server edition, port and memory settings, review them together,
+        #   confirm license acceptance, and securely request the administrator password.
+        #
+        # . Returns
+        #   - 0 when the configuration and license are approved.
+        #   - 2 when the operator cancels or declines the license.
+        #   - 1 for an invalid configuration or failed password confirmation.
+        #
+        # . Usage
+        #   ```bash
+        #   _sqlserver_collect_install_configuration
+        #   ```
     _sqlserver_collect_install_configuration() {
         local edition="EnterpriseDeveloper" port="1433" memory_mb="2048"
         local action="" accepted="" password="" password_again=""
@@ -589,11 +671,11 @@ set -uo pipefail
         #   - Installs the SQL Server command-line tools.
         #
         # . Returns
-        #   0 when all preparation steps succeed.
-        #   51 when repository configuration fails.
-        #   52 when engine installation fails.
-        #   53 when SQL Server configuration fails.
-        #   54 when tools installation fails.
+        #   - 0 when all preparation steps succeed.
+        #   - 51 when repository configuration fails.
+        #   - 52 when engine installation fails.
+        #   - 53 when SQL Server configuration fails.
+        #   - 54 when tools installation fails.
         #
         # . Usage
         #   ```bash
@@ -619,8 +701,11 @@ set -uo pipefail
 
 # - Configuration ------------------------------------------------------------------
     # fn: _sqlserver_configure_storage - Configure SQL data, log, and backup directories
+        # . Purpose
+        #   Configure SQL data, log, and backup directories.
+        #
         # . Returns
-        #   0 on success; non-zero when the operation cannot be completed.
+        #   - 0 on success; non-zero when the operation cannot be completed.
         # . Usage
         #   ```bash
         #   _sqlserver_configure_storage
@@ -686,8 +771,11 @@ set -uo pipefail
     }
 
     # fn: _sqlserver_configure_network - Configure the SQL Server TCP port
+        # . Purpose
+        #   Configure the SQL Server TCP port.
+        #
         # . Returns
-        #   0 on success; non-zero when the operation cannot be completed.
+        #   - 0 on success; non-zero when the operation cannot be completed.
         # . Usage
         #   ```bash
         #   _sqlserver_configure_network
@@ -715,8 +803,11 @@ set -uo pipefail
     }
 
     # fn: _sqlserver_configure_memory - Configure the SQL Server memory limit
+        # . Purpose
+        #   Configure the SQL Server memory limit.
+        #
         # . Returns
-        #   0 on success; non-zero when the operation cannot be completed.
+        #   - 0 on success; non-zero when the operation cannot be completed.
         # . Usage
         #   ```bash
         #   _sqlserver_configure_memory
@@ -740,8 +831,11 @@ set -uo pipefail
     }
 
     # fn: _sqlserver_manage_service - Manage SQL Server service state and startup behavior
+        # . Purpose
+        #   Manage SQL Server service state and startup behavior.
+        #
         # . Returns
-        #   0 on success; non-zero when the operation cannot be completed.
+        #   - 0 on success; non-zero when the operation cannot be completed.
         # . Usage
         #   ```bash
         #   _sqlserver_manage_service
@@ -772,8 +866,11 @@ set -uo pipefail
     }
 
     # fn: _sqlserver_configure_firewall - Allow the configured SQL Server port through UFW
+        # . Purpose
+        #   Allow the configured SQL Server port through UFW.
+        #
         # . Returns
-        #   0 on success; non-zero when the operation cannot be completed.
+        #   - 0 on success; non-zero when the operation cannot be completed.
         # . Usage
         #   ```bash
         #   _sqlserver_configure_firewall
@@ -802,8 +899,11 @@ set -uo pipefail
 
 # - Status / validation ------------------------------------------------------------
     # fn: _sqlserver_status - Show SQL Server status and effective configuration
+        # . Purpose
+        #   Show SQL Server status and effective configuration.
+        #
         # . Returns
-        #   0 on success; non-zero when the operation cannot be completed.
+        #   - 0 on success; non-zero when the operation cannot be completed.
         # . Usage
         #   ```bash
         #   _sqlserver_status
@@ -856,8 +956,11 @@ set -uo pipefail
     }
 
     # fn: _sqlserver_validate - Validate the SQL Server role
+        # . Purpose
+        #   Validate the SQL Server role.
+        #
         # . Returns
-        #   0 on success; non-zero when the operation cannot be completed.
+        #   - 0 on success; non-zero when the operation cannot be completed.
         # . Usage
         #   ```bash
         #   _sqlserver_validate
@@ -912,6 +1015,15 @@ set -uo pipefail
 
 # - Action dispatch ----------------------------------------------------------------
     # fn: _run_action - Dispatch the requested management action to its implementation.
+        # . Purpose
+        #   Dispatch the requested management action to its implementation.
+        #
+        # . Arguments
+        #   - `$1`: Management action to execute.
+        # . Usage
+        #   ```bash
+        #   _run_action "status"
+        #   ```
     _run_action() {
         local action="${1:?missing action}" rc=0
         case "$action" in
@@ -941,6 +1053,13 @@ set -uo pipefail
 
 # - Main ----------------------------------------------------------------------------
     # fn: main - Dispatch command-line options to the appropriate management workflow.
+        # . Purpose
+        #   Dispatch command-line options to the appropriate management workflow.
+        #
+        # . Usage
+        #   ```bash
+        #   main "$@"
+        #   ```
     main() {
         local action=""
         _framework_locator || return $?

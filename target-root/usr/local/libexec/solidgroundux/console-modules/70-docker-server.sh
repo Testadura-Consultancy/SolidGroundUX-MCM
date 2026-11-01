@@ -7,7 +7,8 @@
 #   Shortname   : DOCKER
 #   Source      : 70-docker-server.sh
 #   Type        : module
-#   Group       : Module Registration
+#   Group       : Modules
+#   Subgroup    : Docker Server
 #   Purpose     : Install, configure, manage, validate, and inspect a Docker host and its containers
 #
 #   Checksum : a6c02d6c6088c3cf0dd2f47210d40a8d563fda00ae4d22c4b91bd06e31377bfc
@@ -20,25 +21,26 @@
 set -uo pipefail
 
 # - Library guard ------------------------------------------------------------------
-    # fn$ _sgnd_lib_guard - Enforce source-only, single-load library initialization
+    # fn: _sgnd_lib_guard - Enforce source-only, source-only library guard
         # . Purpose
-        #   Ensure the file is sourced as a library and initialized only once.
+        #   Ensure the file is sourced as a library and marked as loaded.
         #
         # . Behavior
         #   - Derives a unique guard variable name from the current filename.
         #   - Aborts execution when the file is run directly instead of sourced.
         #   - Sets the guard variable on first load.
-        #   - Returns immediately when the library was already loaded.
+        #   - Returns from the guard helper when the file is already marked loaded; it does not skip subsequent top-level statements.
         #
-        # Inputs
+        # . Inputs
         #   BASH_SOURCE[0]
-        #   $0
+        #   - $0
         #
-        # Outputs (globals)
+        # . Outputs
+        #   (globals)
         #   SGND_<MODULE>_LOADED
         #
         # . Returns
-        #   0 when already loaded or successfully initialized.
+        #   - 0 when already loaded or successfully initialized.
         #   Exits with code 2 when executed instead of sourced.
         #
         # . Usage
@@ -76,18 +78,38 @@ set -uo pipefail
     SGND_MODULE_NAME="$SGND_DOCKER_MODULE_NAME"
 # - Management dispatch -------------------------------------------------------------
     # fn: _docker_run_host - Dispatch a Docker host action to the Docker Server manager.
+        # . Purpose
+        #   Dispatch a Docker host action to the Docker Server manager.
+        #
+        # . Arguments
+        #   - `$1`: Management action to execute.
+        # . Usage
+        #   ```bash
+        #   _docker_run_host "status"
+        #   ```
     _docker_run_host() {
         local action="${1:?missing action}"
         _sgnd_run_module_script "manage-docker-server.sh" --action "$action"
     }
 
     # fn: _docker_run_containers - Dispatch a Docker container action to the container manager.
+        # . Purpose
+        #   Dispatch a Docker container action to the container manager.
+        #
+        # . Arguments
+        #   - `$1`: Management action to execute.
+        # . Usage
+        #   ```bash
+        #   _docker_run_containers "status"
+        #   ```
     _docker_run_containers() {
         local action="${1:?missing action}"
         _sgnd_run_module_script "manage-docker-containers.sh" --action "$action"
     }
 
     # fn: _docker_step_install - Forward the `install` action to the Docker host manager.
+        # . Purpose
+        #   Forward the `install` action to the Docker host manager.
         #
         # . Returns
         #   The status returned by the delegated action.
@@ -98,6 +120,8 @@ set -uo pipefail
         #   ```
     _docker_step_install()       { _docker_run_host install; }
     # fn: _docker_step_storage - Forward the `storage` action to the Docker host manager.
+        # . Purpose
+        #   Forward the `storage` action to the Docker host manager.
         #
         # . Returns
         #   The status returned by the delegated action.
@@ -108,6 +132,8 @@ set -uo pipefail
         #   ```
     _docker_step_storage()       { _docker_run_host storage; }
     # fn: _docker_step_start - Forward the `start` action to the Docker host manager.
+        # . Purpose
+        #   Forward the `start` action to the Docker host manager.
         #
         # . Returns
         #   The status returned by the delegated action.
@@ -118,6 +144,8 @@ set -uo pipefail
         #   ```
     _docker_step_start()         { _docker_run_host start; }
     # fn: _docker_step_validate - Forward the `validate` action to the Docker host manager.
+        # . Purpose
+        #   Forward the `validate` action to the Docker host manager.
         #
         # . Returns
         #   The status returned by the delegated action.
@@ -141,7 +169,7 @@ set -uo pipefail
         #   - Falls back to direct child execution when invoked outside management-console.
         #
         # . Returns
-        #   0 when all child actions succeed; otherwise the first failing child return code.
+        #   - 0 when all child actions succeed; otherwise the first failing child return code.
         #
         # . Usage
         #   ```bash
@@ -179,6 +207,8 @@ set -uo pipefail
     }
 
     # fn: docker_install - Install the Docker operation.
+        # . Purpose
+        #   Install the Docker operation.
         #
         # . Usage
         #   ```bash
@@ -186,6 +216,8 @@ set -uo pipefail
         #   ```
     docker_install()             { _docker_step_install; }
     # fn: docker_storage - Invoke the Docker storage configuration action.
+        # . Purpose
+        #   Invoke the Docker storage configuration action.
         #
         # . Usage
         #   ```bash
@@ -193,6 +225,8 @@ set -uo pipefail
         #   ```
     docker_storage()             { _docker_step_storage; }
     # fn: docker_start - Start the Docker operation.
+        # . Purpose
+        #   Start the Docker operation.
         #
         # . Usage
         #   ```bash
@@ -200,6 +234,8 @@ set -uo pipefail
         #   ```
     docker_start()               { _docker_step_start; }
     # fn: docker_service - Forward the `service` action to the Docker host manager.
+        # . Purpose
+        #   Forward the `service` action to the Docker host manager.
         #
         # . Returns
         #   The status returned by the delegated action.
@@ -210,6 +246,8 @@ set -uo pipefail
         #   ```
     docker_service()             { _docker_run_host service; }
     # fn: docker_validate - Validate the Docker operation.
+        # . Purpose
+        #   Validate the Docker operation.
         #
         # . Usage
         #   ```bash
@@ -217,6 +255,8 @@ set -uo pipefail
         #   ```
     docker_validate()            { _docker_step_validate; }
     # fn: docker_status - Forward the `status` action to the Docker host manager.
+        # . Purpose
+        #   Forward the `status` action to the Docker host manager.
         #
         # . Returns
         #   The status returned by the delegated action.
@@ -228,6 +268,8 @@ set -uo pipefail
     docker_status()              { _docker_run_host status; }
 
     # fn: docker_container_list - Forward the `list` action to the Docker container manager.
+        # . Purpose
+        #   Forward the `list` action to the Docker container manager.
         #
         # . Returns
         #   The status returned by the delegated action.
@@ -238,6 +280,8 @@ set -uo pipefail
         #   ```
     docker_container_list()      { _docker_run_containers list; }
     # fn: docker_container_create - Forward the `create` action to the Docker container manager.
+        # . Purpose
+        #   Forward the `create` action to the Docker container manager.
         #
         # . Returns
         #   The status returned by the delegated action.
@@ -248,6 +292,8 @@ set -uo pipefail
         #   ```
     docker_container_create()    { _docker_run_containers create; }
     # fn: docker_container_start - Forward the `start` action to the Docker container manager.
+        # . Purpose
+        #   Forward the `start` action to the Docker container manager.
         #
         # . Returns
         #   The status returned by the delegated action.
@@ -258,6 +304,8 @@ set -uo pipefail
         #   ```
     docker_container_start()     { _docker_run_containers start; }
     # fn: docker_container_stop - Forward the `stop` action to the Docker container manager.
+        # . Purpose
+        #   Forward the `stop` action to the Docker container manager.
         #
         # . Returns
         #   The status returned by the delegated action.
@@ -268,6 +316,8 @@ set -uo pipefail
         #   ```
     docker_container_stop()      { _docker_run_containers stop; }
     # fn: docker_container_restart - Forward the `restart` action to the Docker container manager.
+        # . Purpose
+        #   Forward the `restart` action to the Docker container manager.
         #
         # . Returns
         #   The status returned by the delegated action.
@@ -278,6 +328,8 @@ set -uo pipefail
         #   ```
     docker_container_restart()   { _docker_run_containers restart; }
     # fn: docker_container_shell - Forward the `shell` action to the Docker container manager.
+        # . Purpose
+        #   Forward the `shell` action to the Docker container manager.
         #
         # . Returns
         #   The status returned by the delegated action.
@@ -288,6 +340,8 @@ set -uo pipefail
         #   ```
     docker_container_shell()     { _docker_run_containers shell; }
     # fn: docker_container_remove - Forward the `remove` action to the Docker container manager.
+        # . Purpose
+        #   Forward the `remove` action to the Docker container manager.
         #
         # . Returns
         #   The status returned by the delegated action.
@@ -298,6 +352,8 @@ set -uo pipefail
         #   ```
     docker_container_remove()    { _docker_run_containers remove; }
     # fn: docker_container_inspect - Forward the `inspect` action to the Docker container manager.
+        # . Purpose
+        #   Forward the `inspect` action to the Docker container manager.
         #
         # . Returns
         #   The status returned by the delegated action.
@@ -308,6 +364,8 @@ set -uo pipefail
         #   ```
     docker_container_inspect()   { _docker_run_containers inspect; }
     # fn: docker_container_logs - Forward the `logs` action to the Docker container manager.
+        # . Purpose
+        #   Forward the `logs` action to the Docker container manager.
         #
         # . Returns
         #   The status returned by the delegated action.
@@ -318,6 +376,8 @@ set -uo pipefail
         #   ```
     docker_container_logs()      { _docker_run_containers logs; }
     # fn: docker_image_list - Forward the `images` action to the Docker container manager.
+        # . Purpose
+        #   Forward the `images` action to the Docker container manager.
         #
         # . Returns
         #   The status returned by the delegated action.
@@ -328,6 +388,8 @@ set -uo pipefail
         #   ```
     docker_image_list()          { _docker_run_containers images; }
     # fn: docker_image_pull - Forward the `pull` action to the Docker container manager.
+        # . Purpose
+        #   Forward the `pull` action to the Docker container manager.
         #
         # . Returns
         #   The status returned by the delegated action.
@@ -348,6 +410,8 @@ set -uo pipefail
     # Every validator sets SGND_MODULE_VALIDATION_MESSAGE to a concise result summary.
     # Detailed diagnostic output may be written by the validator or delegated action.
     # fn: validate_module_docker_server - Validate the Docker module and record its status for the console.
+        # . Purpose
+        #   Validate the Docker module and record its status for the console.
         #
         # . Returns
         #   A console validation status (0=pass, 1=fail, 2=warning, 3=skipped).

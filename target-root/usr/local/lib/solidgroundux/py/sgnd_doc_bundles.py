@@ -11,8 +11,17 @@ from pathlib import Path
 DEFAULT_STORE = Path.home() / '.config' / 'solidgroundux' / 'documentation-bundles'
 
 
+
+# --- Internal functions ------------------------------------------------------------
 # fn: bundle_path - Validate a bundle identifier and return its JSON config path.
 def bundle_path(store, name):
+    """Validate a bundle identifier and return its JSON config path.
+    
+    Usage:
+        ```python
+        from pathlib import Path
+        bundle_path(Path.home() / ".config/solidgroundux/documentation-bundles", "full")
+        ```"""
     if not re.fullmatch(r'[A-Za-z0-9][A-Za-z0-9_.-]*', name) or name in ('.', '..'):
         raise ValueError('Bundle identifier must contain letters, digits, dots, underscores or hyphens')
     return store / (name + '.json')
@@ -20,6 +29,12 @@ def bundle_path(store, name):
 
 # fn: load - Read and validate a saved documentation bundle from JSON.
 def load(store, name):
+    """Read and validate a saved documentation bundle from JSON.
+    
+    Usage:
+        ```python
+        bundle = load(store, "full")
+        ```"""
     path = bundle_path(store, name)
     data = json.loads(path.read_text(encoding='utf-8'))
     if data.get('schema') != 1 or data.get('id') != name:
@@ -29,6 +44,12 @@ def load(store, name):
 
 # fn: save - Write a bundle configuration atomically to the bundle store.
 def save(store, data):
+    """Write a bundle configuration atomically to the bundle store.
+    
+    Usage:
+        ```python
+        save(store, bundle)  # Replaces the saved JSON configuration
+        ```"""
     store.mkdir(parents=True, exist_ok=True)
     target = bundle_path(store, data['id'])
     fd, tmp = tempfile.mkstemp(prefix='.bundle-', suffix='.tmp', dir=str(store))
@@ -44,6 +65,12 @@ def save(store, data):
 
 # fn: check_sources - Validate bundle source directories and their output-location constraints.
 def check_sources(data):
+    """Validate bundle source directories and their output-location constraints.
+    
+    Usage:
+        ```python
+        check_sources(bundle)  # Raises ValueError for unsafe paths
+        ```"""
     if not data['products']:
         raise ValueError('Bundle has no products')
     if not data['output_dir']:
@@ -73,6 +100,12 @@ def check_sources(data):
 
 # fn: document_path - Resolve a configured source file independently of generated output.
 def document_path(value):
+    """Resolve a configured source file independently of generated output.
+    
+    Usage:
+        ```python
+        source_file = document_path("/srv/docs/introduction.md")
+        ```"""
     path = Path(value).expanduser().resolve()
     if not path.is_file() or path.suffix.lower() not in ('.sh', '.py', '.md'):
         raise ValueError('Documentation source must be an existing .sh, .py or .md file: ' + str(path))
@@ -81,6 +114,12 @@ def document_path(value):
 
 # fn: document_list - Validate the explicit bundle document list for the selected role.
 def document_list(data, role):
+    """Validate the explicit bundle document list for the selected role.
+    
+    Usage:
+        ```python
+        field, pages = document_list(bundle, "preface")
+        ```"""
     field = {'preface': 'bundle_prefaces', 'epilogue': 'bundle_epilogues', 'page': 'documents'}[role]
     values = data.get(field)
     if values is None:
@@ -90,8 +129,16 @@ def document_list(data, role):
     return field, values
 
 
+
+# --- Public functions ------------------------------------------------------------
 # fn: run - Execute the selected bundle-management subcommand.
 def run(args):
+    """Execute the selected bundle-management subcommand.
+    
+    Usage:
+        ```python
+        run(args)
+        ```"""
     store = Path(args.store).expanduser()
     if args.command == 'list-json':
         bundles = []
@@ -227,6 +274,12 @@ def run(args):
 
 # fn: main - Parse bundle CLI arguments and execute the requested command.
 def main():
+    """Parse bundle CLI arguments and execute the requested command.
+    
+    Usage:
+        ```python
+        main()
+        ```"""
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--store', default=str(DEFAULT_STORE))
     sub = parser.add_subparsers(dest='command', required=True)

@@ -7,7 +7,8 @@
 #   Shortname   : MARIADB
 #   Source      : 62-mariadb.sh
 #   Type        : module
-#   Group       : Module Registration
+#   Group       : Modules
+#   Subgroup    : MariaDB
 #   Purpose     : Install, configure, manage, validate, and inspect MariaDB
 #   Checksum : 79d99e8d7edd64d888f645dcab8e419648e9827af9fb8f10c28a0d78d2e081b7
 # Description:
@@ -18,25 +19,26 @@
 set -uo pipefail
 
 # - Library guard ------------------------------------------------------------------
-    # fn$ _sgnd_lib_guard - Enforce source-only, single-load library initialization
+    # fn: _sgnd_lib_guard - Enforce source-only, source-only library guard
         # . Purpose
-        #   Ensure the file is sourced as a library and initialized only once.
+        #   Ensure the file is sourced as a library and marked as loaded.
         #
         # . Behavior
         #   - Derives a unique guard variable name from the current filename.
         #   - Aborts execution when the file is run directly instead of sourced.
         #   - Sets the guard variable on first load.
-        #   - Returns immediately when the library was already loaded.
+        #   - Returns from the guard helper when the file is already marked loaded; it does not skip subsequent top-level statements.
         #
-        # Inputs
+        # . Inputs
         #   BASH_SOURCE[0]
-        #   $0
+        #   - $0
         #
-        # Outputs (globals)
+        # . Outputs
+        #   (globals)
         #   SGND_<MODULE>_LOADED
         #
         # . Returns
-        #   0 when already loaded or successfully initialized.
+        #   - 0 when already loaded or successfully initialized.
         #   Exits with code 2 when executed instead of sourced.
         #
         # . Usage
@@ -75,6 +77,15 @@ set -uo pipefail
 
 # - Management dispatch -------------------------------------------------------------
     # fn: _maria_run_manage - Manage maria run in the MariaDB workflow.
+        # . Purpose
+        #   Run the requested MariaDB management action through the standalone executable.
+        #
+        # . Arguments
+        #   - `$1`: Management action to execute.
+        # . Usage
+        #   ```bash
+        #   _maria_run_manage "status"
+        #   ```
     _maria_run_manage() {
         local action="${1:?missing action}"
         _sgnd_run_module_script "manage-mariadb.sh" --action "$action"
@@ -82,22 +93,30 @@ set -uo pipefail
 
     # Mirror SQL Server composite-child tracking, including partial failures.
     # fn: _maria_record_step - Record a MariaDB preparation step in the console action tracker.
+        # . Purpose
+        #   Record a MariaDB preparation step in the console action tracker.
+        #
+        # . Usage
+        #   ```bash
+        #   _maria_record_step
+        #   ```
     _maria_record_step() {
         if declare -F sgnd_console_record_action_result >/dev/null 2>&1; then
             sgnd_console_record_action_result "maria-$1" "$2" || true
         fi
     }
-    # maria_prepare
-    # Purpose:
-    #   Run the installer and report completed child configuration actions.
-    # Behavior:
-    #   - Only records fresh-install child actions after the helper succeeds and a
-    #     previously absent database instance is confirmed running.
-    #   - Existing-install inspection/reconfiguration never marks all children.
-    # Returns:
-    #   Installer exit status (nonzero when post-install verification fails).
-    # Usage:
     # fn: maria_prepare - Prepare maria in the MariaDB workflow.
+        # . Purpose
+        #   Start MariaDB setup and record completed child actions only after a fresh
+        #   installation is verified as running; reconfiguration does not mark all steps.
+        #
+        # . Returns
+        #   - Installer status; nonzero when setup or post-install verification fails.
+        #
+        # . Usage
+        #   ```bash
+        #   maria_prepare
+        #   ```
     maria_prepare() {
         local rc=0
         local had_instance=0
@@ -130,6 +149,8 @@ set -uo pipefail
         return 0
     }
     # fn: maria_repository - Forward the `repository` action to the MariaDB manager.
+        # . Purpose
+        #   Forward the `repository` action to the MariaDB manager.
         #
         # . Returns
         #   The status returned by the delegated action.
@@ -140,6 +161,8 @@ set -uo pipefail
         #   ```
     maria_repository() { _maria_run_manage repository; }
     # fn: maria_install - Forward the `install` action to the MariaDB manager.
+        # . Purpose
+        #   Forward the `install` action to the MariaDB manager.
         #
         # . Returns
         #   The status returned by the delegated action.
@@ -150,6 +173,8 @@ set -uo pipefail
         #   ```
     maria_install() { _maria_run_manage install; }
     # fn: maria_configure - Forward the `configure` action to the MariaDB manager.
+        # . Purpose
+        #   Forward the `configure` action to the MariaDB manager.
         #
         # . Returns
         #   The status returned by the delegated action.
@@ -160,6 +185,8 @@ set -uo pipefail
         #   ```
     maria_configure() { _maria_run_manage configure; }
     # fn: maria_tools - Forward the `tools` action to the MariaDB manager.
+        # . Purpose
+        #   Forward the `tools` action to the MariaDB manager.
         #
         # . Returns
         #   The status returned by the delegated action.
@@ -170,6 +197,8 @@ set -uo pipefail
         #   ```
     maria_tools() { _maria_run_manage tools; }
     # fn: maria_storage - Forward the `storage` action to the MariaDB manager.
+        # . Purpose
+        #   Forward the `storage` action to the MariaDB manager.
         #
         # . Returns
         #   The status returned by the delegated action.
@@ -180,6 +209,8 @@ set -uo pipefail
         #   ```
     maria_storage() { _maria_run_manage storage; }
     # fn: maria_network - Forward the `network` action to the MariaDB manager.
+        # . Purpose
+        #   Forward the `network` action to the MariaDB manager.
         #
         # . Returns
         #   The status returned by the delegated action.
@@ -190,6 +221,8 @@ set -uo pipefail
         #   ```
     maria_network() { _maria_run_manage network; }
     # fn: maria_memory - Forward the `memory` action to the MariaDB manager.
+        # . Purpose
+        #   Forward the `memory` action to the MariaDB manager.
         #
         # . Returns
         #   The status returned by the delegated action.
@@ -200,6 +233,8 @@ set -uo pipefail
         #   ```
     maria_memory() { _maria_run_manage memory; }
     # fn: maria_access - Forward the `access` action to the MariaDB manager.
+        # . Purpose
+        #   Forward the `access` action to the MariaDB manager.
         #
         # . Returns
         #   The status returned by the delegated action.
@@ -210,6 +245,8 @@ set -uo pipefail
         #   ```
     maria_access() { _maria_run_manage access; }
     # fn: maria_service - Forward the `service` action to the MariaDB manager.
+        # . Purpose
+        #   Forward the `service` action to the MariaDB manager.
         #
         # . Returns
         #   The status returned by the delegated action.
@@ -220,6 +257,8 @@ set -uo pipefail
         #   ```
     maria_service() { _maria_run_manage service; }
     # fn: maria_firewall - Forward the `firewall` action to the MariaDB manager.
+        # . Purpose
+        #   Forward the `firewall` action to the MariaDB manager.
         #
         # . Returns
         #   The status returned by the delegated action.
@@ -230,6 +269,8 @@ set -uo pipefail
         #   ```
     maria_firewall() { _maria_run_manage firewall; }
     # fn: maria_validate - Forward the `validate` action to the MariaDB manager.
+        # . Purpose
+        #   Forward the `validate` action to the MariaDB manager.
         #
         # . Returns
         #   The status returned by the delegated action.
@@ -240,6 +281,8 @@ set -uo pipefail
         #   ```
     maria_validate() { _maria_run_manage validate; }
     # fn: maria_status - Forward the `status` action to the MariaDB manager.
+        # . Purpose
+        #   Forward the `status` action to the MariaDB manager.
         #
         # . Returns
         #   The status returned by the delegated action.
@@ -250,6 +293,8 @@ set -uo pipefail
         #   ```
     maria_status() { _maria_run_manage status; }
     # fn: maria_logs - Forward the `logs` action to the MariaDB manager.
+        # . Purpose
+        #   Forward the `logs` action to the MariaDB manager.
         #
         # . Returns
         #   The status returned by the delegated action.
@@ -260,6 +305,8 @@ set -uo pipefail
         #   ```
     maria_logs() { _maria_run_manage logs; }
     # fn: maria_backup - Forward the `backup` action to the MariaDB manager.
+        # . Purpose
+        #   Forward the `backup` action to the MariaDB manager.
         #
         # . Returns
         #   The status returned by the delegated action.
@@ -273,6 +320,8 @@ set -uo pipefail
 # - Module validation contract ------------------------------------------------------
     # 0=passed, 1=failed, 2=warning, 3=skipped/not applicable.
     # fn: validate_module_mariadb - Validate the MariaDB module and record its status for the console.
+        # . Purpose
+        #   Validate the MariaDB module and record its status for the console.
         #
         # . Returns
         #   A console validation status (0=pass, 1=fail, 2=warning, 3=skipped).

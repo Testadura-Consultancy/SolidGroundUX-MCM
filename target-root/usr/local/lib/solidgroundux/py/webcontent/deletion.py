@@ -11,6 +11,8 @@ from typing import Any
 from .content import ContentItem, discover_content, load_navigation, load_site_config
 
 
+
+# --- Public classes ------------------------------------------------------------
 @dataclass(slots=True)
 class DeleteInspection:
     """Describe canonical content files that may be removed safely."""
@@ -24,8 +26,10 @@ class DeleteInspection:
     def as_dict(self) -> dict[str, Any]:
         """Serialize the result to a JSON-compatible mapping.
         
-        Returns:
-            Operation result or None, as defined by the implementation."""
+        Usage:
+            ```python
+            delete_inspection.as_dict()
+            ```"""
         return {
             "success": self.success,
             "options": self.options,
@@ -59,8 +63,10 @@ class DeleteResult:
     def as_dict(self) -> dict[str, Any]:
         """Serialize the result to a JSON-compatible mapping.
         
-        Returns:
-            Operation result or None, as defined by the implementation."""
+        Usage:
+            ```python
+            delete_result.as_dict()
+            ```"""
         return {
             "success": self.success,
             "content_file": self.content_file,
@@ -81,8 +87,15 @@ class DeleteResult:
         }
 
 
+
+# --- Internal functions ------------------------------------------------------------
 def _base_route(item: ContentItem, default_language: str) -> str:
-    """Return the language-neutral route for one discovered content item."""
+    """Return the language-neutral route for one discovered content item.
+    
+    Usage:
+        ```python
+        _base_route(item, default_language)
+        ```"""
     if item.language.upper() == default_language.upper():
         return item.route
     prefix = f"/{item.language.lower()}"
@@ -94,22 +107,38 @@ def _base_route(item: ContentItem, default_language: str) -> str:
 
 
 def _relative_content_path(item: ContentItem, content_dir: Path) -> str:
-    """Handle relative content path for the web content workflow."""
+    """Return the source path of a content item relative to the canonical content root.
+        
+        Usage:
+            ```python
+            _relative_content_path(item, content_dir)
+            ```"""
     return item.source_path.relative_to(content_dir).as_posix()
 
 
 def _candidate_label(item: ContentItem, content_dir: Path) -> str:
-    """Handle candidate label for the web content workflow."""
+    """Format the title, language, route, and source path of a deletion candidate.
+        
+        Usage:
+            ```python
+            _candidate_label(item, content_dir)
+            ```"""
     relative = _relative_content_path(item, content_dir)
     return f"{item.title} | {item.language} | {item.route} [{relative}]"
 
 
+
+# --- Public functions ------------------------------------------------------------
 def inspect_delete(source: str | Path) -> DeleteInspection:
     """List content pages that may be deleted without breaking main navigation.
-
+    
     The homepage and direct main-navigation section roots are intentionally protected.
     Deleting those requires an explicit navigation change rather than a page-only action.
-    """
+    
+    Usage:
+        ```python
+        inspect_delete(source)
+        ```"""
     try:
         config = load_site_config(Path(source).expanduser().resolve())
         navigation = load_navigation(config.root)
@@ -142,8 +171,15 @@ def inspect_delete(source: str | Path) -> DeleteInspection:
     )
 
 
+
+# --- Internal functions ------------------------------------------------------------
 def _resolve_item(source: Path, relative_path: str) -> tuple[Any, list[ContentItem], ContentItem]:
-    """Resolve item within the configured content tree."""
+    """Resolve item within the configured content tree.
+    
+    Usage:
+        ```python
+        _resolve_item(source, relative_path)
+        ```"""
     config = load_site_config(source)
     navigation = load_navigation(config.root)
     items = discover_content(config, navigation)
@@ -166,7 +202,12 @@ def _resolve_item(source: Path, relative_path: str) -> tuple[Any, list[ContentIt
 
 
 def _archive_destination(archive_root: Path, relative_path: Path) -> Path:
-    """Return a collision-safe archive path while preserving the content hierarchy."""
+    """Return a collision-safe archive path while preserving the content hierarchy.
+    
+    Usage:
+        ```python
+        _archive_destination(archive_root, relative_path)
+        ```"""
     candidate = archive_root / relative_path
     if not candidate.exists():
         return candidate
@@ -179,6 +220,8 @@ def _archive_destination(archive_root: Path, relative_path: Path) -> Path:
         index += 1
 
 
+
+# --- Public functions ------------------------------------------------------------
 def delete_content(
     source: str | Path,
     content_file: str,
@@ -188,12 +231,19 @@ def delete_content(
     commit: bool = False,
 ) -> DeleteResult:
     """Preview or archive one canonical content page and optional descendants.
-
-    Deletion is recoverable: committed files are moved to
-    ``deleted/YYYY-MM-DD/<original relative content path>``. Main-navigation section
-    roots and the site homepage are protected because deleting them requires a matching
-    navigation change, which is outside this page-only operation.
-    """
+        
+        Deletion is recoverable: committed files are moved to
+        ``deleted/YYYY-MM-DD/<original relative content path>``. Main-navigation section
+        roots and the site homepage are protected because deleting them requires a matching
+        navigation change, which is outside this page-only operation.
+        
+        Usage:
+        ```python
+        # Preview the recoverable deletion without changing content.
+        preview = delete_content(source, content_file, commit=False)
+        # Archive the selected page only after reviewing the preview.
+        result = delete_content(source, content_file, commit=True)
+        ```"""
     source_path = Path(source).expanduser().resolve()
     try:
         config, items, selected = _resolve_item(source_path, content_file)

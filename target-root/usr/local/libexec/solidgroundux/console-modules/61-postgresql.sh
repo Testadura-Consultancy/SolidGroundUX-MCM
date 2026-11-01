@@ -7,7 +7,8 @@
 #   Shortname   : POSTGRESQL
 #   Source      : 61-postgresql.sh
 #   Type        : module
-#   Group       : Module Registration
+#   Group       : Modules
+#   Subgroup    : PostgreSQL
 #   Purpose     : Install, configure, manage, validate, and inspect PostgreSQL
 #   Checksum : 983cd86192c605d1ac0b52797c1536aa5bf650fa3cfbbc4d798411bd2b36d0b2
 # Description:
@@ -18,25 +19,26 @@
 set -uo pipefail
 
 # - Library guard ------------------------------------------------------------------
-    # fn$ _sgnd_lib_guard - Enforce source-only, single-load library initialization
+    # fn: _sgnd_lib_guard - Enforce source-only, source-only library guard
         # . Purpose
-        #   Ensure the file is sourced as a library and initialized only once.
+        #   Ensure the file is sourced as a library and marked as loaded.
         #
         # . Behavior
         #   - Derives a unique guard variable name from the current filename.
         #   - Aborts execution when the file is run directly instead of sourced.
         #   - Sets the guard variable on first load.
-        #   - Returns immediately when the library was already loaded.
+        #   - Returns from the guard helper when the file is already marked loaded; it does not skip subsequent top-level statements.
         #
-        # Inputs
+        # . Inputs
         #   BASH_SOURCE[0]
-        #   $0
+        #   - $0
         #
-        # Outputs (globals)
+        # . Outputs
+        #   (globals)
         #   SGND_<MODULE>_LOADED
         #
         # . Returns
-        #   0 when already loaded or successfully initialized.
+        #   - 0 when already loaded or successfully initialized.
         #   Exits with code 2 when executed instead of sourced.
         #
         # . Usage
@@ -75,6 +77,15 @@ set -uo pipefail
 
 # - Management dispatch -------------------------------------------------------------
     # fn: _pg_run_manage - Forward a PostgreSQL action to its management executable.
+        # . Purpose
+        #   Forward a PostgreSQL action to its management executable.
+        #
+        # . Arguments
+        #   - `$1`: Management action to execute.
+        # . Usage
+        #   ```bash
+        #   _pg_run_manage "status"
+        #   ```
     _pg_run_manage() {
         local action="${1:?missing action}"
         _sgnd_run_module_script "manage-postgresql.sh" --action "$action"
@@ -82,6 +93,13 @@ set -uo pipefail
 
     # Mirror SQL Server composite-child tracking, including partial failures.
     # fn: _pg_record_step - Record a PostgreSQL installer child-step result if the console recorder is available.
+        # . Purpose
+        #   Record a PostgreSQL installer child-step result if the console recorder is available.
+        #
+        # . Usage
+        #   ```bash
+        #   _pg_record_step
+        #   ```
     _pg_record_step() {
         if declare -F sgnd_console_record_action_result >/dev/null 2>&1; then
             sgnd_console_record_action_result "pg-$1" "$2" || true
@@ -114,6 +132,8 @@ set -uo pipefail
         return "$rc"
     }
     # fn: pg_repository - Forward the `repository` action to the PostgreSQL manager.
+        # . Purpose
+        #   Forward the `repository` action to the PostgreSQL manager.
         #
         # . Returns
         #   The status returned by the delegated action.
@@ -124,6 +144,8 @@ set -uo pipefail
         #   ```
     pg_repository() { _pg_run_manage repository; }
     # fn: pg_install - Forward the `install` action to the PostgreSQL manager.
+        # . Purpose
+        #   Forward the `install` action to the PostgreSQL manager.
         #
         # . Returns
         #   The status returned by the delegated action.
@@ -134,6 +156,8 @@ set -uo pipefail
         #   ```
     pg_install() { _pg_run_manage install; }
     # fn: pg_configure - Forward the `configure` action to the PostgreSQL manager.
+        # . Purpose
+        #   Forward the `configure` action to the PostgreSQL manager.
         #
         # . Returns
         #   The status returned by the delegated action.
@@ -144,6 +168,8 @@ set -uo pipefail
         #   ```
     pg_configure() { _pg_run_manage configure; }
     # fn: pg_tools - Forward the `tools` action to the PostgreSQL manager.
+        # . Purpose
+        #   Forward the `tools` action to the PostgreSQL manager.
         #
         # . Returns
         #   The status returned by the delegated action.
@@ -154,6 +180,8 @@ set -uo pipefail
         #   ```
     pg_tools() { _pg_run_manage tools; }
     # fn: pg_storage - Forward the `storage` action to the PostgreSQL manager.
+        # . Purpose
+        #   Forward the `storage` action to the PostgreSQL manager.
         #
         # . Returns
         #   The status returned by the delegated action.
@@ -164,6 +192,8 @@ set -uo pipefail
         #   ```
     pg_storage() { _pg_run_manage storage; }
     # fn: pg_network - Forward the `network` action to the PostgreSQL manager.
+        # . Purpose
+        #   Forward the `network` action to the PostgreSQL manager.
         #
         # . Returns
         #   The status returned by the delegated action.
@@ -174,6 +204,8 @@ set -uo pipefail
         #   ```
     pg_network() { _pg_run_manage network; }
     # fn: pg_memory - Forward the `memory` action to the PostgreSQL manager.
+        # . Purpose
+        #   Forward the `memory` action to the PostgreSQL manager.
         #
         # . Returns
         #   The status returned by the delegated action.
@@ -184,6 +216,8 @@ set -uo pipefail
         #   ```
     pg_memory() { _pg_run_manage memory; }
     # fn: pg_access - Forward the `access` action to the PostgreSQL manager.
+        # . Purpose
+        #   Forward the `access` action to the PostgreSQL manager.
         #
         # . Returns
         #   The status returned by the delegated action.
@@ -194,6 +228,8 @@ set -uo pipefail
         #   ```
     pg_access() { _pg_run_manage access; }
     # fn: pg_service - Forward the `service` action to the PostgreSQL manager.
+        # . Purpose
+        #   Forward the `service` action to the PostgreSQL manager.
         #
         # . Returns
         #   The status returned by the delegated action.
@@ -204,6 +240,8 @@ set -uo pipefail
         #   ```
     pg_service() { _pg_run_manage service; }
     # fn: pg_firewall - Forward the `firewall` action to the PostgreSQL manager.
+        # . Purpose
+        #   Forward the `firewall` action to the PostgreSQL manager.
         #
         # . Returns
         #   The status returned by the delegated action.
@@ -214,6 +252,8 @@ set -uo pipefail
         #   ```
     pg_firewall() { _pg_run_manage firewall; }
     # fn: pg_validate - Forward the `validate` action to the PostgreSQL manager.
+        # . Purpose
+        #   Forward the `validate` action to the PostgreSQL manager.
         #
         # . Returns
         #   The status returned by the delegated action.
@@ -224,6 +264,8 @@ set -uo pipefail
         #   ```
     pg_validate() { _pg_run_manage validate; }
     # fn: pg_status - Forward the `status` action to the PostgreSQL manager.
+        # . Purpose
+        #   Forward the `status` action to the PostgreSQL manager.
         #
         # . Returns
         #   The status returned by the delegated action.
@@ -234,6 +276,8 @@ set -uo pipefail
         #   ```
     pg_status() { _pg_run_manage status; }
     # fn: pg_logs - Forward the `logs` action to the PostgreSQL manager.
+        # . Purpose
+        #   Forward the `logs` action to the PostgreSQL manager.
         #
         # . Returns
         #   The status returned by the delegated action.
@@ -244,6 +288,8 @@ set -uo pipefail
         #   ```
     pg_logs() { _pg_run_manage logs; }
     # fn: pg_backup - Forward the `backup` action to the PostgreSQL manager.
+        # . Purpose
+        #   Forward the `backup` action to the PostgreSQL manager.
         #
         # . Returns
         #   The status returned by the delegated action.
@@ -254,6 +300,8 @@ set -uo pipefail
         #   ```
     pg_backup() { _pg_run_manage backup; }
     # fn: pg_credentials - Forward the `credentials` action to the PostgreSQL manager.
+        # . Purpose
+        #   Forward the `credentials` action to the PostgreSQL manager.
         #
         # . Returns
         #   The status returned by the delegated action.
@@ -267,6 +315,8 @@ set -uo pipefail
 # - Module validation contract ------------------------------------------------------
     # 0=passed, 1=failed, 2=warning, 3=skipped/not applicable.
     # fn: validate_module_postgresql - Validate the PostgreSQL module and record its status for the console.
+        # . Purpose
+        #   Validate the PostgreSQL module and record its status for the console.
         #
         # . Returns
         #   A console validation status (0=pass, 1=fail, 2=warning, 3=skipped).

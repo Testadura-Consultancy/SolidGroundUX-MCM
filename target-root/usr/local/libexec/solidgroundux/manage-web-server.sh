@@ -8,7 +8,8 @@
 #   Shortname   : MANAGE_WEB_SERVER
 #   Source      : manage-web-server.sh
 #   Type        : script
-#   Group       : Role Managers
+#   Group       : Modules
+#   Subgroup    : Web Server
 #   Purpose     : Configure, manage, validate, and inspect an Nginx web server
 #
 #   Checksum : 234ff54f3c9085c1c9d5a58a4a1f78efa13213131bb9261bb3914ea6cb84cc12
@@ -57,7 +58,7 @@ set -uo pipefail
         #     present, falls back to the installed framework copy without changing
         #     SGND_FRAMEWORK_ROOT.
         #
-        # . Globals (write)
+        # . Globals (Write)
         #   SGND_FRAMEWORK_ROOT
         #
         # . Output
@@ -65,8 +66,8 @@ set -uo pipefail
         #   helpers are not available until sgnd-exe-common.sh has been loaded.
         #
         # . Returns
-        #   0 when the framework root was resolved and executable common library loaded.
-        #   126 when the script path cannot be resolved, no canonical root component can
+        #   - 0 when the framework root was resolved and executable common library loaded.
+        #   - 126 when the script path cannot be resolved, no canonical root component can
         #   be found, or the executable common library is unreadable.
         #
         # . Usage
@@ -191,6 +192,15 @@ set -uo pipefail
     # Render a local numbered selector using the Web Server action layout.
     # The framework ask_selection API is intentionally left unchanged.
     # fn: _web_ask_selection - Prompt for selection in the web server workflow.
+        # . Purpose
+        #   Present a numbered selection prompt and return the chosen item to its caller.
+        #
+        # . Arguments
+        #   - `$2`: Name of the output shell variable.
+        # . Usage
+        #   ```bash
+        #   _web_ask_selection --label "Choose a site" --var site --items "example-site" "documentation"
+        #   ```
     _web_ask_selection() {
         local label="Select an option"
         local var_name="selection"
@@ -234,6 +244,13 @@ set -uo pipefail
     }
 
     # fn: _web_server_load_state - Read web-management settings from the state file when available.
+        # . Purpose
+        #   Read web-management settings from the state file when available.
+        #
+        # . Usage
+        #   ```bash
+        #   _web_server_load_state
+        #   ```
     _web_server_load_state() {
         if [[ -r "$SGND_WEB_SERVER_STATE_FILE" ]] && command -v sgnd_state_load_keys >/dev/null 2>&1; then
             sgnd_state_load_keys --file "$SGND_WEB_SERVER_STATE_FILE" --array SGND_WEB_SERVER_STATE_VARIABLES >/dev/null 2>&1 || true
@@ -241,6 +258,13 @@ set -uo pipefail
     }
 
     # fn: _web_server_save_state - Save web-management settings to the configured state file.
+        # . Purpose
+        #   Save web-management settings to the configured state file.
+        #
+        # . Usage
+        #   ```bash
+        #   _web_server_save_state
+        #   ```
     _web_server_save_state() {
         command -v sgnd_state_save_keys >/dev/null 2>&1 || return 0
         mkdir -p "$(dirname -- "$SGND_WEB_SERVER_STATE_FILE")" || return 1
@@ -248,13 +272,23 @@ set -uo pipefail
     }
 
     # fn: _dryrun_complete - Report the dry-run result without executing the requested host change.
+        # . Purpose
+        #   Report the dry-run result without executing the requested host change.
+        #
+        # . Usage
+        #   ```bash
+        #   _dryrun_complete
+        #   ```
     _dryrun_complete() {
         (( ${FLAG_DRYRUN:-0} == 1 )) || return 0
         sayok "DRYRUN complete. The changes shown above would have been applied; no changes were written."
     }
     # fn: _web_server_package_installed - Test whether Nginx is installed
+        # . Purpose
+        #   Test whether Nginx is installed.
+        #
         # . Returns
-        #   0 on success; non-zero when the operation cannot be completed.
+        #   - 0 on success; non-zero when the operation cannot be completed.
         # . Usage
         #   ```bash
         #   _web_server_package_installed
@@ -264,8 +298,11 @@ set -uo pipefail
     }
 
     # fn: _web_server_storage_root - Resolve the configured SolidGroundUX storage root
+        # . Purpose
+        #   Resolve the configured SolidGroundUX storage root.
+        #
         # . Returns
-        #   0 on success; non-zero when the operation cannot be completed.
+        #   - 0 on success; non-zero when the operation cannot be completed.
         # . Usage
         #   ```bash
         #   _web_server_storage_root
@@ -283,8 +320,11 @@ set -uo pipefail
     }
 
     # fn: _web_server_root - Resolve the configured web content root
+        # . Purpose
+        #   Resolve the configured web content root.
+        #
         # . Returns
-        #   0 on success; non-zero when the operation cannot be completed.
+        #   - 0 on success; non-zero when the operation cannot be completed.
         # . Usage
         #   ```bash
         #   _web_server_root
@@ -301,11 +341,16 @@ set -uo pipefail
     }
 
     # fn: _web_server_save_root - Persist the configured web content root
+        # . Purpose
+        #   Persist the configured web content root.
+        #
+        # . Arguments
+        #   - `$1`: Root filesystem directory.
         # . Returns
-        #   0 on success; non-zero when the operation cannot be completed.
+        #   - 0 on success; non-zero when the operation cannot be completed.
         # . Usage
         #   ```bash
-        #   _web_server_save_root
+        #   _web_server_save_root "/srv/storage/www"
         #   ```
     _web_server_save_root() {
         local root="$1"
@@ -322,8 +367,14 @@ set -uo pipefail
         #   Use SGND_WEB_DOC_INSTALLED_ROOT from the environment or web-server.cfg;
         #   otherwise use the supported installed documentation location. This replaces
         #   the legacy /usr/local/share/testadura/solidgroundux/doc default.
+        #
         # . Output
         #   Prints an absolute path beneath the active framework root when staged.
+        #
+        # . Usage
+        #   ```bash
+        #   _web_server_installed_docs_root "/srv/storage/example"
+        #   ```
     _web_server_installed_docs_root() {
         local configured="${SGND_WEB_DOC_INSTALLED_ROOT:-}"
         local framework_root="${SGND_FRAMEWORK_ROOT:-/}"
@@ -339,8 +390,11 @@ set -uo pipefail
     }
 
     # fn: _web_server_enabled_sites - List enabled Nginx sites
+        # . Purpose
+        #   List enabled Nginx sites.
+        #
         # . Returns
-        #   0 on success; non-zero when the operation cannot be completed.
+        #   - 0 on success; non-zero when the operation cannot be completed.
         # . Usage
         #   ```bash
         #   _web_server_enabled_sites
@@ -355,8 +409,11 @@ set -uo pipefail
     }
 
     # fn: _web_server_available_sites - List available Nginx sites
+        # . Purpose
+        #   List available Nginx sites.
+        #
         # . Returns
-        #   0 on success; non-zero when the operation cannot be completed.
+        #   - 0 on success; non-zero when the operation cannot be completed.
         # . Usage
         #   ```bash
         #   _web_server_available_sites
@@ -375,11 +432,11 @@ set -uo pipefail
         #   Allow inspection of root-owned configuration files without changing
         #   their ownership or permissions. Prompt for sudo only when required.
         # . Arguments
-        #   $1  Existing Nginx site identifier.
+        #   - $1  Existing Nginx site identifier.
         # . Output
         #   Writes the configuration contents to stdout.
         # . Returns
-        #   0 when the configuration was read; non-zero otherwise.
+        #   - 0 when the configuration was read; non-zero otherwise.
         # . Usage
         #   ```bash
         #   config="$(_web_server_read_site_config "$site")" || return $?
@@ -397,11 +454,16 @@ set -uo pipefail
     }
 
     # fn: _web_server_validate_site_name - Validate an Nginx site name
+        # . Purpose
+        #   Validate an Nginx site name.
+        #
+        # . Arguments
+        #   - `$1`: Value to inspect or write.
         # . Returns
-        #   0 on success; non-zero when the operation cannot be completed.
+        #   - 0 on success; non-zero when the operation cannot be completed.
         # . Usage
         #   ```bash
-        #   _web_server_validate_site_name
+        #   _web_server_validate_site_name "example-site"
         #   ```
     _web_server_validate_site_name() {
         local value="$1"
@@ -410,9 +472,12 @@ set -uo pipefail
     }
 
     # fn: _web_server_current_dns - Resolve the first configured non-loopback DNS server
+        # . Purpose
+        #   Resolve the first configured non-loopback DNS server.
+        #
         # . Usage
         #   ```bash
-        #   _web_server_current_dns "<arg1>" "<dns>"
+        #   _web_server_current_dns
         #   ```
     _web_server_current_dns() {
         local dns=""
@@ -426,6 +491,9 @@ set -uo pipefail
     }
 
     # fn: _web_server_local_ipv4 - Resolve this server's primary IPv4 address
+        # . Purpose
+        #   Resolve this server's primary IPv4 address.
+        #
         # . Usage
         #   ```bash
         #   _web_server_local_ipv4
@@ -435,6 +503,11 @@ set -uo pipefail
     }
 
     # fn: _web_server_offer_dns_record - Optionally register an internal AD DNS A record
+        # . Purpose
+        #   Optionally register an internal AD DNS A record.
+        #
+        # . Arguments
+        #   - `$1`: Web hostname for which a DNS record may be created.
         # . Usage
         #   ```bash
         #   _web_server_offer_dns_record "<web_address>"
@@ -509,6 +582,9 @@ set -uo pipefail
         # . Purpose
         #   During site removal, delete only a confirmed A record pointing at this host.
         #   Never remove unrelated records, aliases, or a hostname with multiple A values.
+        #
+        # . Arguments
+        #   - `$1`: Web hostname whose DNS entry may be removed.
         # . Usage
         #   ```bash
         #   _web_server_remove_dns_record "<saved site hostname>"
@@ -583,8 +659,13 @@ set -uo pipefail
     }
 
     # fn: _web_server_site_document_root - Resolve the document root for an Nginx site
+        # . Purpose
+        #   Resolve the document root for an Nginx site.
+        #
+        # . Arguments
+        #   - `$1`: Configured Nginx site name.
         # . Returns
-        #   0 when a document root can be resolved; non-zero otherwise.
+        #   - 0 when a document root can be resolved; non-zero otherwise.
         # . Usage
         #   ```bash
         #   _web_server_site_document_root <site>
@@ -600,8 +681,13 @@ set -uo pipefail
     }
 
     # fn: _web_server_remove_document_content - Remove all content below a document root
+        # . Purpose
+        #   Remove all content below a document root.
+        #
+        # . Arguments
+        #   - `$1`: Absolute web document root whose content is to be removed.
         # . Returns
-        #   0 on success; non-zero when the operation cannot be completed.
+        #   - 0 on success; non-zero when the operation cannot be completed.
         # . Usage
         #   ```bash
         #   _web_server_remove_document_content <document-root>
@@ -629,11 +715,17 @@ set -uo pipefail
     }
 
     # fn: _web_server_ensure_directory - Create and prepare a web content directory when needed
+        # . Purpose
+        #   Create and prepare a web content directory when needed.
+        #
+        # . Arguments
+        #   - `$1`: Filesystem path to inspect.
+        #   - `$2`: Optional: account that owns the directory.
         # . Returns
-        #   0 on success; non-zero when the operation cannot be completed.
+        #   - 0 on success; non-zero when the operation cannot be completed.
         # . Usage
         #   ```bash
-        #   _web_server_ensure_directory
+        #   _web_server_ensure_directory "/srv/storage/www/example" "www-data"
         #   ```
     _web_server_ensure_directory() {
         local path="$1"
@@ -665,6 +757,11 @@ set -uo pipefail
         #   Create a dedicated HTTPS default when no explicit HTTPS default exists.
         #   Preserve other administrators' defaults and all named virtual hosts.
         #   Validate before keeping the new configuration; rollback on failure.
+        #
+        # . Usage
+        #   ```bash
+        #   _web_server_ensure_https_fallback
+        #   ```
     _web_server_ensure_https_fallback() {
         local available="/etc/nginx/sites-available/00-solidgroundux-https-default"
         local enabled="/etc/nginx/sites-enabled/00-solidgroundux-https-default"
@@ -710,8 +807,11 @@ NGINX
     }
 
     # fn: _web_server_reload - Validate and reload Nginx
+        # . Purpose
+        #   Validate and reload Nginx.
+        #
         # . Returns
-        #   0 on success; non-zero when the operation cannot be completed.
+        #   - 0 on success; non-zero when the operation cannot be completed.
         # . Usage
         #   ```bash
         #   _web_server_reload
@@ -728,8 +828,11 @@ NGINX
 
 # - Role preparation ---------------------------------------------------------------
     # fn: _web_server_step_install_packages - Install Nginx and publishing prerequisites
+        # . Purpose
+        #   Install Nginx and publishing prerequisites.
+        #
         # . Returns
-        #   0 on success; non-zero when the operation cannot be completed.
+        #   - 0 on success; non-zero when the operation cannot be completed.
         # . Usage
         #   ```bash
         #   _web_server_step_install_packages
@@ -750,8 +853,11 @@ NGINX
     }
 
     # fn: _web_server_step_start - Enable and start Nginx
+        # . Purpose
+        #   Enable and start Nginx.
+        #
         # . Returns
-        #   0 on success; non-zero when the operation cannot be completed.
+        #   - 0 on success; non-zero when the operation cannot be completed.
         # . Usage
         #   ```bash
         #   _web_server_step_start
@@ -776,9 +882,9 @@ NGINX
         #   Run the complete Web Server preparation sequence in one management process.
         #
         # . Returns
-        #   0 when preparation completes successfully.
-        #   41 when prerequisite installation fails.
-        #   42 when enabling or starting Nginx fails.
+        #   - 0 when preparation completes successfully.
+        #   - 41 when prerequisite installation fails.
+        #   - 42 when enabling or starting Nginx fails.
         #
         # . Usage
         #   ```bash
@@ -795,8 +901,11 @@ NGINX
 
 # - Configuration ------------------------------------------------------------------
     # fn: _web_server_configure_root - Select or create the web content root
+        # . Purpose
+        #   Select or create the web content root.
+        #
         # . Returns
-        #   0 on success; non-zero when the operation cannot be completed.
+        #   - 0 on success; non-zero when the operation cannot be completed.
         # . Usage
         #   ```bash
         #   _web_server_configure_root
@@ -839,8 +948,11 @@ NGINX
     }
 
     # fn: _web_server_manage_service - Manage nginx.service state and startup behavior
+        # . Purpose
+        #   Manage nginx.service state and startup behavior.
+        #
         # . Returns
-        #   0 on success; non-zero when the operation cannot be completed.
+        #   - 0 on success; non-zero when the operation cannot be completed.
         # . Usage
         #   ```bash
         #   _web_server_manage_service
@@ -879,8 +991,11 @@ NGINX
     }
 
     # fn: _web_server_configure_firewall - Allow HTTP and HTTPS through UFW
+        # . Purpose
+        #   Allow HTTP and HTTPS through UFW.
+        #
         # . Returns
-        #   0 on success; non-zero when the operation cannot be completed.
+        #   - 0 on success; non-zero when the operation cannot be completed.
         # . Usage
         #   ```bash
         #   _web_server_configure_firewall
@@ -911,8 +1026,11 @@ NGINX
 
 # - Site management ----------------------------------------------------------------
     # fn: _web_server_create_site - Create and enable an Nginx site
+        # . Purpose
+        #   Create and enable an Nginx site.
+        #
         # . Returns
-        #   0 on success; non-zero when the operation cannot be completed.
+        #   - 0 on success; non-zero when the operation cannot be completed.
         # . Usage
         #   ```bash
         #   _web_server_create_site
@@ -966,6 +1084,9 @@ EOF
     }
 
     # fn: _web_server_ensure_site - Noninteractive, idempotent site provisioning for an approved remote deployment.
+        # . Purpose
+        #   Noninteractive, idempotent site provisioning for an approved remote deployment.
+        #
         # . Behavior
         #   - Only creates a dedicated site under the configured web root.
         #   - Returns success for an existing identical configuration, without changing it.
@@ -974,6 +1095,11 @@ EOF
         #   - Preserves the explicitly supplied unprivileged publisher for directory ownership.
         #   - Tests Nginx before reload and rolls back only newly created configuration.
         #   - Does not register DNS; DNS changes are a separate management action.
+        #
+        # . Usage
+        #   ```bash
+        #   _web_server_ensure_site
+        #   ```
     _web_server_ensure_site() {
         local name="${SITE_NAME:-}" address="${WEB_ADDRESS:-}" root="${DOCUMENT_ROOT:-}"
         local base="" cfg="" linked="" other="" current_address="" current_root="" publisher="${DEPLOYMENT_USER:-}"
@@ -1035,7 +1161,15 @@ EOF
     }
 
     # fn: _web_server_ensure_directory_for_publish - Noninteractive preparation/repair of a dedicated publishing directory.
-    # Existing content is preserved; only the document root inode receives ownership/mode changes.
+        # . Purpose
+        #   Noninteractive preparation/repair of a dedicated publishing directory.
+        #
+        # Existing content is preserved; only the document root inode receives ownership/mode changes.
+        #
+        # . Usage
+        #   ```bash
+        #   _web_server_ensure_directory_for_publish
+        #   ```
     _web_server_ensure_directory_for_publish() {
         local root="${DOCUMENT_ROOT:-}" base="" publisher="${DEPLOYMENT_USER:-}"
         (( EUID == 0 )) || { sayfail "ensure-directory must be invoked as root through authorized sudo."; return 1; }
@@ -1063,6 +1197,13 @@ EOF
     }
 
     # fn: _web_server_configure_dns - Reuse existing interactive AD DNS setup via a direct action.
+        # . Purpose
+        #   Reuse existing interactive AD DNS setup via a direct action.
+        #
+        # . Usage
+        #   ```bash
+        #   _web_server_configure_dns
+        #   ```
     _web_server_configure_dns() {
         local address="${WEB_ADDRESS:-}"
         [[ "$address" =~ ^[A-Za-z0-9][A-Za-z0-9.-]*$ && "$address" == *.* ]] || {
@@ -1072,11 +1213,16 @@ EOF
     }
 
     # fn: _web_server_enable_site - Enable an available Nginx site
+        # . Purpose
+        #   Enable an available Nginx site.
+        #
+        # . Arguments
+        #   - `$1`: Optional: configured Nginx site name.
         # . Returns
-        #   0 on success; non-zero when the operation cannot be completed.
+        #   - 0 on success; non-zero when the operation cannot be completed.
         # . Usage
         #   ```bash
-        #   _web_server_enable_site
+        #   _web_server_enable_site "example-site"
         #   ```
     _web_server_enable_site() {
         local site="${1:-}"
@@ -1092,11 +1238,16 @@ EOF
     }
 
     # fn: _web_server_disable_site - Disable an enabled Nginx site
+        # . Purpose
+        #   Disable an enabled Nginx site.
+        #
+        # . Arguments
+        #   - `$1`: Optional: configured Nginx site name.
         # . Returns
-        #   0 on success; non-zero when the operation cannot be completed.
+        #   - 0 on success; non-zero when the operation cannot be completed.
         # . Usage
         #   ```bash
-        #   _web_server_disable_site
+        #   _web_server_disable_site "example-site"
         #   ```
     _web_server_disable_site() {
         local site="${1:-}"
@@ -1112,11 +1263,16 @@ EOF
 
 
     # fn: _web_server_change_document_root - Change the document root for an Nginx site
+        # . Purpose
+        #   Change the document root for an Nginx site.
+        #
+        # . Arguments
+        #   - `$1`: Optional: configured Nginx site name.
         # . Returns
-        #   0 on success; non-zero when the operation cannot be completed.
+        #   - 0 on success; non-zero when the operation cannot be completed.
         # . Usage
         #   ```bash
-        #   _web_server_change_document_root
+        #   _web_server_change_document_root "example-site"
         #   ```
     _web_server_change_document_root() {
         local site="${1:-}"
@@ -1183,11 +1339,16 @@ EOF
     }
 
     # fn: _web_server_remove_site - Remove an Nginx site configuration
+        # . Purpose
+        #   Remove an Nginx site configuration.
+        #
+        # . Arguments
+        #   - `$1`: Optional: configured Nginx site name.
         # . Returns
-        #   0 on success; non-zero when the operation cannot be completed.
+        #   - 0 on success; non-zero when the operation cannot be completed.
         # . Usage
         #   ```bash
-        #   _web_server_remove_site
+        #   _web_server_remove_site "example-site"
         #   ```
     _web_server_remove_site() {
         local site="${1:-}"
@@ -1242,11 +1403,16 @@ EOF
     }
 
     # fn: _web_server_remove_site_content - Remove the contents of a site's document root
+        # . Purpose
+        #   Remove the contents of a site's document root.
+        #
+        # . Arguments
+        #   - `$1`: Optional: configured Nginx site name.
         # . Returns
-        #   0 on success; non-zero when the operation cannot be completed.
+        #   - 0 on success; non-zero when the operation cannot be completed.
         # . Usage
         #   ```bash
-        #   _web_server_remove_site_content
+        #   _web_server_remove_site_content "example-site"
         #   ```
     _web_server_remove_site_content() {
         local site="${1:-}"
@@ -1269,8 +1435,11 @@ EOF
     }
 
     # fn: _web_server_list_sites - List Nginx sites and document roots
+        # . Purpose
+        #   List Nginx sites and document roots.
+        #
         # . Returns
-        #   0 on success; non-zero when the operation cannot be completed.
+        #   - 0 on success; non-zero when the operation cannot be completed.
         # . Usage
         #   ```bash
         #   _web_server_list_sites
@@ -1315,10 +1484,17 @@ EOF
     }
 
     # fn: _web_server_configure_https - Configure optional TLS for one managed Nginx site
-    # . Purpose
-    #   Enable HTTPS using an existing certificate or a locally generated self-signed
-    #   certificate. Keep other sites untouched and roll back on Nginx failure.
-    #   A self-signed certificate is for testing only until trusted by clients.
+        # . Purpose
+        #   Enable HTTPS using an existing certificate or a locally generated self-signed
+        #   certificate. Keep other sites untouched and roll back on Nginx failure.
+        #   A self-signed certificate is for testing only until trusted by clients.
+        #
+        # . Arguments
+        #   - `$1`: Optional: configured Nginx site name.
+        # . Usage
+        #   ```bash
+        #   _web_server_configure_https "example-site"
+        #   ```
     _web_server_configure_https() {
         local site="${1:-}" cfg="" address="" root="" option="" cert="" key="" redirect="NO"
         local backup="" staged="" host="" answer="" tls_dir="" cert_tmp="" key_tmp=""
@@ -1444,23 +1620,23 @@ EOF
     }
 
     # fn: _web_server_export_https_certificate - Export a site's public TLS certificate
-    # . Purpose
-    #   Make the public certificate of an HTTPS-enabled Nginx site available to the
-    #   invoking administrator for download and, when self-signed, local trust setup.
-    # . Behavior
-    #   - Read ssl_certificate from the selected site's Nginx configuration.
-    #   - Export only the first X.509 certificate (never the private key or chain keys).
-    #   - Save to the invoking user's private sgnd-certificates directory.
-    #   - Report the source path, exported path, SHA-256 fingerprint, and SCP command.
-    #   - Do not change Nginx configuration or restart the service.
-    # . Arguments
-    #   $1  Optional Nginx site identifier.
-    # . Returns
-    #   0 on success or cancellation; non-zero for invalid or inaccessible certificates.
-    # . Usage
-    #   ```bash
-    #   _web_server_export_https_certificate "sgndux"
-    #   ```
+        # . Purpose
+        #   Make the public certificate of an HTTPS-enabled Nginx site available to the
+        #   invoking administrator for download and, when self-signed, local trust setup.
+        # . Behavior
+        #   - Read ssl_certificate from the selected site's Nginx configuration.
+        #   - Export only the first X.509 certificate (never the private key or chain keys).
+        #   - Save to the invoking user's private sgnd-certificates directory.
+        #   - Report the source path, exported path, SHA-256 fingerprint, and SCP command.
+        #   - Do not change Nginx configuration or restart the service.
+        # . Arguments
+        #   - $1  Optional Nginx site identifier.
+        # . Returns
+        #   - 0 on success or cancellation; non-zero for invalid or inaccessible certificates.
+        # . Usage
+        #   ```bash
+        #   _web_server_export_https_certificate "sgndux"
+        #   ```
     _web_server_export_https_certificate() {
         local site="${1:-}" cfg="" cert="" address="" username="" home_dir=""
         local export_dir="" export_file="" temporary="" fingerprint="" server=""
@@ -1535,15 +1711,23 @@ EOF
     }
 
     # fn: _web_server_configure_basic_auth - Protect one HTTPS URL prefix with Nginx Basic Auth
-    # . Purpose
-    #   Add or remove password protection without changing the public site or TLS setup.
-    #   HTTP must already redirect to HTTPS. Passwords use bcrypt in a file outside
-    #   the document root; custom Nginx configurations are never rewritten.
-    # . Behavior
-    #   Supports one managed protected URL prefix per site. A second prefix, existing
-    #   custom auth configuration, or unexpected site layout requires manual review.
-    #   Keep password files after disabling protection to avoid deleting credentials
-    #   that might be used elsewhere; only the Nginx guard is removed.
+        # . Purpose
+        #   Add or remove password protection without changing the public site or TLS setup.
+        #   HTTP must already redirect to HTTPS. Passwords use bcrypt in a file outside
+        #   the document root; custom Nginx configurations are never rewritten.
+        #
+        # . Arguments
+        #   - `$1`: Optional: configured Nginx site name.
+        # . Behavior
+        #   Supports one managed protected URL prefix per site. A second prefix, existing
+        #   custom auth configuration, or unexpected site layout requires manual review.
+        #   Keep password files after disabling protection to avoid deleting credentials
+        #   that might be used elsewhere; only the Nginx guard is removed.
+        #
+        # . Usage
+        #   ```bash
+        #   _web_server_configure_basic_auth "example-site"
+        #   ```
     _web_server_configure_basic_auth() {
         local site="${1:-}" cfg="" action="" prefix="" username="" decision="NO"
         local host="" marker_start="# SGND_BASIC_AUTH_BEGIN" marker_end="# SGND_BASIC_AUTH_END"
@@ -1695,10 +1879,15 @@ EOF
     }
 
     # fn: _web_server_update_markdown_upload - Migrate a configured upload service to the canonical library implementation.
-    # . Purpose
-    #   Keep Python implementation in lib/solidgroundux/py, not a duplicate
-    #   libexec copy. Preserve site-specific hostname, upload directory and
-    #   systemd sandbox settings; restart only after validating the new unit.
+        # . Purpose
+        #   Keep Python implementation in lib/solidgroundux/py, not a duplicate
+        #   libexec copy. Preserve site-specific hostname, upload directory and
+        #   systemd sandbox settings; restart only after validating the new unit.
+        #
+        # . Usage
+        #   ```bash
+        #   _web_server_update_markdown_upload
+        #   ```
     _web_server_update_markdown_upload() {
         local unit="/etc/systemd/system/solidgroundux-markdown-upload.service"
         local canonical="/usr/local/lib/solidgroundux/py/webcontent/webcontent-upload-service.py"
@@ -1744,10 +1933,18 @@ EOF
     }
 
     # fn: _web_server_configure_markdown_upload - Install and protect the optional Markdown receiver
-    # . Purpose
-    #   Bind the upload service to localhost, outside the document root, with
-    #   Basic Authentication on its Nginx endpoint. Roll back Nginx on failure.
-    #   Currently supports one upload service per host; never expose it without auth.
+        # . Purpose
+        #   Bind the upload service to localhost, outside the document root, with
+        #   Basic Authentication on its Nginx endpoint. Roll back Nginx on failure.
+        #   Currently supports one upload service per host; never expose it without auth.
+        #
+        # . Arguments
+        #   - `$1`: Optional: configured Nginx site name.
+        #   - `$2`: Configuration file path.
+        # . Usage
+        #   ```bash
+        #   _web_server_configure_markdown_upload "example-site"
+        #   ```
     _web_server_configure_markdown_upload() {
         local site="${1:-}" cfg="" host="" root="" publisher="" source="" directory="/srv/storage/webcontent-incoming"
         local backup="" staged="" unit_tmp="" decision="NO" auth_file="" rc=0
@@ -1881,8 +2078,11 @@ UNIT
     # fn: _web_server_site_summary - Display the current site selection before actions
         # . Purpose
         #   Keep the selected site's hostname, root, status, and protection visible.
+        #
+        # . Arguments
+        #   - `$1`: Configured Nginx site name.
         # . Returns
-        #   0 on completion.
+        #   - 0 on completion.
         # . Usage
         #   ```bash
         #   _web_server_site_summary "my-site"
@@ -1911,7 +2111,7 @@ UNIT
         #   List sites, choose the active site, and keep its details above the actions.
         #   Reuse existing site operations without repeated site-selection prompts.
         # . Returns
-        #   0 on return to the calling menu; other action errors are shown in context.
+        #   - 0 on return to the calling menu; other action errors are shown in context.
         # . Usage
         #   ```bash
         #   _web_server_manage_sites
@@ -1983,6 +2183,9 @@ UNIT
 
 # - SolidGroundUX documentation ----------------------------------------------------
     # fn: _web_server_default_docs_address - Return a sensible documentation web address
+        # . Purpose
+        #   Return a sensible documentation web address.
+        #
         # . Usage
         #   ```bash
         #   _web_server_default_docs_address
@@ -2075,6 +2278,10 @@ EOF
         # . Purpose
         #   Never sync a missing, nested, identical, or symlinked documentation root.
         #   An installed source needs index.html; publishing never creates a new Nginx site.
+        #
+        # . Arguments
+        #   - `$1`: Output variable for documentation source path.
+        #   - `$2`: Output variable for published documentation destination.
         # . Usage
         #   ```bash
         #   _web_server_documentation_paths <source-var> <destination-var>
@@ -2103,6 +2310,14 @@ EOF
         # . Purpose
         #   Compare the full tree with rsync's read-only itemized dry-run, including
         #   removed files. Exit 0 when equal, 1 when different, 2 on comparison error.
+        #
+        # . Arguments
+        #   - `$1`: Source path.
+        #   - `$2`: Destination path.
+        # . Usage
+        #   ```bash
+        #   _web_server_documentation_changes "/srv/storage/example.txt" "/srv/storage/example"
+        #   ```
     _web_server_documentation_changes() {
         local source="$1" destination="$2" output="" rc=0
         command -v rsync >/dev/null 2>&1 || { saywarning "rsync is not installed."; return 2; }
@@ -2119,6 +2334,11 @@ EOF
         # . Purpose
         #   This action only updates an EXISTING configured documentation site.
         #   A mirrored update may remove obsolete files; explicit consent is required.
+        #
+        # . Usage
+        #   ```bash
+        #   _web_server_update_documentation
+        #   ```
     _web_server_update_documentation() {
         local source="" destination="" decision="NO" rc=0
         _web_server_documentation_paths source destination || return 1
@@ -2149,6 +2369,11 @@ EOF
         # . Purpose
         #   Only installed-documentation sources can be compared automatically;
         #   remote and Git sources follow their separate publishing workflows.
+        #
+        # . Usage
+        #   ```bash
+        #   _web_server_documentation_status
+        #   ```
     _web_server_documentation_status() {
         local site="${SGND_WEB_DOC_SITE:-SolidGroundUX-Documentation}"
         local config_file="/etc/nginx/sites-available/${SGND_WEB_DOC_SITE:-SolidGroundUX-Documentation}"
@@ -2195,8 +2420,11 @@ EOF
 
 # - Status / validation ------------------------------------------------------------
     # fn: _web_server_status - Show web-server status and configuration
+        # . Purpose
+        #   Show web-server status and configuration.
+        #
         # . Returns
-        #   0 on success; non-zero when the operation cannot be completed.
+        #   - 0 on success; non-zero when the operation cannot be completed.
         # . Usage
         #   ```bash
         #   _web_server_status
@@ -2242,8 +2470,11 @@ EOF
     }
 
     # fn: _web_server_validate - Validate the web-server role
+        # . Purpose
+        #   Validate the web-server role.
+        #
         # . Returns
-        #   0 on success; non-zero when the operation cannot be completed.
+        #   - 0 on success; non-zero when the operation cannot be completed.
         # . Usage
         #   ```bash
         #   _web_server_validate
@@ -2283,6 +2514,15 @@ EOF
 
 # - Action dispatch -----------------------------------------------------------------
     # fn: _run_action - Dispatch the requested management action to its implementation.
+        # . Purpose
+        #   Dispatch the requested management action to its implementation.
+        #
+        # . Arguments
+        #   - `$1`: Management action to execute.
+        # . Usage
+        #   ```bash
+        #   _run_action "status"
+        #   ```
     _run_action() {
         local action="${1:?missing action}" rc=0
         case "$action" in
@@ -2313,6 +2553,13 @@ EOF
 
 # - Main ----------------------------------------------------------------------------
     # fn: main - Dispatch command-line options to the appropriate management workflow.
+        # . Purpose
+        #   Dispatch command-line options to the appropriate management workflow.
+        #
+        # . Usage
+        #   ```bash
+        #   main "$@"
+        #   ```
     main() {
         local action=""
         _framework_locator || return $?

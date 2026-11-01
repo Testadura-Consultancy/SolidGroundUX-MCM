@@ -8,7 +8,8 @@
 #   Shortname   : MANAGE_AD_CLIENT
 #   Source      : manage-active-directory-client.sh
 #   Type        : script
-#   Group       : Role Managers
+#   Group       : Modules
+#   Subgroup    : Active Directory Client
 #   Purpose     : Join, reconcile, validate, and inspect an Active Directory client
 #
 #   Checksum : 2c51917c4b11d48a773e27c47f75f5a25263b9edaf8cad70fa3b8471bef2f40e
@@ -55,7 +56,7 @@ set -uo pipefail
         #     present, falls back to the installed framework copy without changing
         #     SGND_FRAMEWORK_ROOT.
         #
-        # . Globals (write)
+        # . Globals (Write)
         #   SGND_FRAMEWORK_ROOT
         #
         # . Output
@@ -63,8 +64,8 @@ set -uo pipefail
         #   helpers are not available until sgnd-exe-common.sh has been loaded.
         #
         # . Returns
-        #   0 when the framework root was resolved and executable common library loaded.
-        #   126 when the script path cannot be resolved, no canonical root component can
+        #   - 0 when the framework root was resolved and executable common library loaded.
+        #   - 126 when the script path cannot be resolved, no canonical root component can
         #   be found, or the executable common library is unreadable.
         #
         # . Usage
@@ -133,6 +134,13 @@ set -uo pipefail
         source "$exe_common"
     }
     # fn: _load_ad_management_library - Load ad management library in the Active Directory workflow.
+        # . Purpose
+        #   Locate and source the shared Active Directory management helpers.
+        #
+        # . Usage
+        #   ```bash
+        #   _load_ad_management_library
+        #   ```
     _load_ad_management_library() {
         local script_file="" path_without_root="" component="" app_root="" lib_file=""
         local index=0 root_index=-1
@@ -208,11 +216,32 @@ set -uo pipefail
 
 # - Internal helpers ---------------------------------------------------------------
     # fn: _adc_validate_realm - Validate a realm name using the shared AD validation helper.
+        # . Purpose
+        #   Validate a realm name using the shared AD validation helper.
+        #
+        # . Usage
+        #   ```bash
+        #   _adc_validate_realm
+        #   ```
     _adc_validate_realm() { sgnd_ad_validate_realm "$@"; }
     # fn: _adc_validate_account - Validate a domain account name using the shared AD validation helper.
+        # . Purpose
+        #   Validate a domain account name using the shared AD validation helper.
+        #
+        # . Usage
+        #   ```bash
+        #   _adc_validate_account
+        #   ```
     _adc_validate_account() { sgnd_ad_validate_account "$@"; }
 
     # fn: _adc_collect_context - Collect Active Directory client join context
+        # . Purpose
+        #   Collect Active Directory client join context.
+        #
+        # . Usage
+        #   ```bash
+        #   _adc_collect_context
+        #   ```
     _adc_collect_context() {
         local current_domain=""
 
@@ -255,7 +284,7 @@ set -uo pipefail
         #   Ensure Active Directory client join context is available.
         #
         # . Returns
-        #   0 when context exists or can be collected; non-zero otherwise.
+        #   - 0 when context exists or can be collected; non-zero otherwise.
         #
         # . Usage
         #   ```bash
@@ -271,7 +300,7 @@ set -uo pipefail
         #   Install and validate realmd, SSSD, Kerberos, and Active Directory client prerequisites.
         #
         # . Returns
-        #   0 on success or dry-run; non-zero on package or command validation failure.
+        #   - 0 on success or dry-run; non-zero on package or command validation failure.
         #
         # . Usage
         #   ```bash
@@ -290,7 +319,7 @@ set -uo pipefail
         #   Collect join inputs and reject a machine that is already joined to a realm.
         #
         # . Returns
-        #   0 when the join may continue; non-zero otherwise.
+        #   - 0 when the join may continue; non-zero otherwise.
         #
         # . Usage
         #   ```bash
@@ -310,7 +339,7 @@ set -uo pipefail
         #   Point the client resolver at the authoritative Active Directory DNS server and verify its SOA.
         #
         # . Returns
-        #   0 when DNS is configured and authoritative; non-zero otherwise.
+        #   - 0 when DNS is configured and authoritative; non-zero otherwise.
         #
         # . Usage
         #   ```bash
@@ -339,7 +368,7 @@ set -uo pipefail
         #   Set the client FQDN and maintain the matching /etc/hosts entry.
         #
         # . Returns
-        #   0 when hostname -f matches the expected client FQDN; non-zero otherwise.
+        #   - 0 when hostname -f matches the expected client FQDN; non-zero otherwise.
         #
         # . Usage
         #   ```bash
@@ -368,7 +397,7 @@ set -uo pipefail
         #   Validate realm, Kerberos, and LDAP service discovery before joining.
         #
         # . Returns
-        #   0 when all required services are discoverable; non-zero otherwise.
+        #   - 0 when all required services are discoverable; non-zero otherwise.
         #
         # . Usage
         #   ```bash
@@ -388,8 +417,8 @@ set -uo pipefail
         #   the machine account against the joined Active Directory realm.
         #
         # . Returns
-        #   0 when the host keytab is readable by root and adcli validates the machine trust;
-        #   1 otherwise.
+        #   - 0 when the host keytab is readable by root and adcli validates the machine trust;
+        #   - 1 otherwise.
         #
         # . Usage
         #   ```bash
@@ -416,7 +445,7 @@ set -uo pipefail
         #   - Validates the recreated keytab with klist and adcli testjoin before returning.
         #
         # . Returns
-        #   0 when the keytab is already valid or repaired successfully; non-zero otherwise.
+        #   - 0 when the keytab is already valid or repaired successfully; non-zero otherwise.
         #
         # . Usage
         #   ```bash
@@ -481,7 +510,7 @@ set -uo pipefail
         #   Join the machine to the selected Active Directory realm.
         #
         # . Returns
-        #   0 when realm membership validates; non-zero or the realm command status otherwise.
+        #   - 0 when realm membership validates; non-zero or the realm command status otherwise.
         #
         # . Usage
         #   ```bash
@@ -506,7 +535,7 @@ set -uo pipefail
         #   - Enables and restarts sssd.service only after configuration validation succeeds.
         #
         # . Returns
-        #   0 when the SSSD configuration is valid and the service is active; non-zero otherwise.
+        #   - 0 when the SSSD configuration is valid and the service is active; non-zero otherwise.
         #
         # . Usage
         #   ```bash
@@ -522,6 +551,13 @@ set -uo pipefail
     }
 
     # fn: _adc_dns_record_matches - Verify that the client hostname resolves to its expected IPv4 address.
+        # . Purpose
+        #   Verify that the client hostname resolves to its expected IPv4 address.
+        #
+        # . Usage
+        #   ```bash
+        #   _adc_dns_record_matches
+        #   ```
     _adc_dns_record_matches() { sgnd_ad_dns_a_record_matches "$SGND_ADC_FQDN" "$SGND_ADC_IP" "$SGND_ADC_DNS_SERVER"; }
 
     # fn: _adc_step_register_dns
@@ -529,7 +565,7 @@ set -uo pipefail
         #   Create and verify the client Active Directory DNS A record when needed.
         #
         # . Returns
-        #   0 when the record already exists or is successfully registered; non-zero otherwise.
+        #   - 0 when the record already exists or is successfully registered; non-zero otherwise.
         #
         # . Usage
         #   ```bash
@@ -556,17 +592,17 @@ set -uo pipefail
         #   - Returns a distinct cancellation status when the administrator declines the join.
         #
         # . Returns
-        #   0  when every join step succeeds.
-        #   21 when prerequisite installation fails.
-        #   20 when the machine is already joined (warning; no join required).
-        #   22 when join-input validation fails.
-        #   23 when the administrator cancels after successful preflight.
-        #   24 when Active Directory DNS configuration fails.
-        #   25 when client identity preparation fails.
-        #   26 when Active Directory service discovery fails.
-        #   27 when the realm join fails.
-        #   28 when SSSD activation fails.
-        #   29 when client DNS registration fails.
+        #   - 0  when every join step succeeds.
+        #   - 21 when prerequisite installation fails.
+        #   - 20 when the machine is already joined (warning; no join required).
+        #   - 22 when join-input validation fails.
+        #   - 23 when the administrator cancels after successful preflight.
+        #   - 24 when Active Directory DNS configuration fails.
+        #   - 25 when client identity preparation fails.
+        #   - 26 when Active Directory service discovery fails.
+        #   - 27 when the realm join fails.
+        #   - 28 when SSSD activation fails.
+        #   - 29 when client DNS registration fails.
         #
         # . Usage
         #   ```bash
@@ -614,6 +650,13 @@ set -uo pipefail
     }
 
     # fn: _adc_validate - Validate Active Directory client membership, DNS/search-domain configuration, and local integration
+        # . Purpose
+        #   Validate Active Directory client membership, DNS/search-domain configuration, and local integration.
+        #
+        # . Usage
+        #   ```bash
+        #   _adc_validate
+        #   ```
     _adc_validate() {
         local realm="" failures=0 expected_fqdn="" current_dns="" ip="" dns_server="" desired_dns=""
         realm="$(realm list --name-only 2>/dev/null | head -n 1)"
@@ -674,10 +717,18 @@ set -uo pipefail
     }
 
     # fn: _adc_reconcile - Repair safe local Active Directory client drift
+        # . Purpose
+        #   Repair safe local Active Directory client drift.
+        #
         # . Behavior
         #   - Reconciles DNS server, DNS search-domain, and machine identity drift.
         #   - Repairs a missing or invalid /etc/krb5.keytab before SSSD activation.
         #   - Restarts SSSD when inactive and repairs the client DNS record when needed.
+        #
+        # . Usage
+        #   ```bash
+        #   _adc_reconcile
+        #   ```
     _adc_reconcile() {
         local realm="" current_dns="" desired_dns="" current_search_domain="" primary_iface="" ip="" fqdn="" repaired=0
         realm="$(realm list --name-only 2>/dev/null | head -n 1)"
@@ -765,7 +816,7 @@ set -uo pipefail
         #   Display client FQDN, realm membership, SSSD state, and realm details.
         #
         # . Returns
-        #   0 after displaying available status information.
+        #   - 0 after displaying available status information.
         #
         # . Usage
         #   ```bash
@@ -786,7 +837,7 @@ set -uo pipefail
         #   Leave the currently joined Active Directory realm after confirmation.
         #
         # . Returns
-        #   0 when not joined, cancelled, dry-run, or leave succeeds; otherwise the realm command status.
+        #   - 0 when not joined, cancelled, dry-run, or leave succeeds; otherwise the realm command status.
         #
         # . Usage
         #   ```bash
@@ -805,11 +856,27 @@ set -uo pipefail
 
 # - Action dispatch ----------------------------------------------------------------
     # fn: _adc_action_is_mutating - Identify AD client actions that change the host or domain configuration.
+        # . Purpose
+        #   Identify AD client actions that change the host or domain configuration.
+        #
+        # . Usage
+        #   ```bash
+        #   _adc_action_is_mutating "install"
+        #   ```
     _adc_action_is_mutating() {
         case "${1:-}" in join-all|install|dns|identity|join|sssd|register|reconcile|leave) return 0 ;; *) return 1 ;; esac
     }
 
     # fn: _adc_run_action - Dispatch an Active Directory client-management action.
+        # . Purpose
+        #   Dispatch an Active Directory client-management action.
+        #
+        # . Arguments
+        #   - `$1`: Management action to execute.
+        # . Usage
+        #   ```bash
+        #   _adc_run_action "status"
+        #   ```
     _adc_run_action() {
         local action="${1:?missing action}" rc=0
         case "$action" in
@@ -836,6 +903,13 @@ set -uo pipefail
 
 # - Main ---------------------------------------------------------------------------
     # fn: main - Dispatch command-line options to the appropriate management workflow.
+        # . Purpose
+        #   Dispatch command-line options to the appropriate management workflow.
+        #
+        # . Usage
+        #   ```bash
+        #   main "$@"
+        #   ```
     main() {
         local action=""
         _framework_locator || return $?

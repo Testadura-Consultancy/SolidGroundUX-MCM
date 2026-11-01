@@ -18,8 +18,15 @@ from .social import prepare_social
 from .validation import validate_site
 
 
+
+# --- Internal functions ------------------------------------------------------------
 def _write_result(payload: dict[str, object], result_file: str | None) -> None:
-    """Write result to generated output."""
+    """Write result to generated output.
+    
+    Usage:
+        ```python
+        _write_result(payload, result_file)
+        ```"""
     encoded = json.dumps(payload, ensure_ascii=False, indent=2)
     if result_file:
         path = Path(result_file).expanduser()
@@ -30,7 +37,12 @@ def _write_result(payload: dict[str, object], result_file: str | None) -> None:
 
 
 def _add_ingest_fields(parser: argparse.ArgumentParser) -> None:
-    """Add normalized metadata fields shared by ingest preview and commit calls."""
+    """Add normalized metadata fields shared by ingest preview and commit calls.
+    
+    Usage:
+        ```python
+        _add_ingest_fields(parser)
+        ```"""
     parser.add_argument("--source", required=True)
     parser.add_argument("--input-file", required=True)
     parser.add_argument("--title", required=True)
@@ -43,7 +55,12 @@ def _add_ingest_fields(parser: argparse.ArgumentParser) -> None:
 
 
 def _parser() -> argparse.ArgumentParser:
-    """Handle parser for the web content workflow."""
+    """Construct the WebContent command-line subparsers and supported options.
+    
+    Usage:
+        ```python
+        _parser()
+        ```"""
     parser = argparse.ArgumentParser(prog="sgnd-webcontent", description="Generate, validate, ingest, and delete static web content repositories.")
     subparsers = parser.add_subparsers(dest="command", required=True)
 
@@ -150,14 +167,20 @@ def _parser() -> argparse.ArgumentParser:
     return parser
 
 
+
+# --- Public functions ------------------------------------------------------------
 def main(argv: list[str] | None = None) -> int:
     """Parse command-line arguments and dispatch the requested command.
-    
-    Args:
-        argv: Input used by this operation.
-    
-    Returns:
-        Operation result or None, as defined by the implementation."""
+            
+            Args:
+                argv: Optional CLI argument vector; None uses the process arguments.
+            
+            Usage:
+        ```python
+        result = main(["validate", "--source", str(site_root)])
+        result = main(["generate", "--source", str(site_root),
+                       "--output", str(output_dir), "--mode", "preview"])
+        ```"""
     args = _parser().parse_args(argv)
     try:
         if args.command in ("preview-local-import", "import-to-incoming"):

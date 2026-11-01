@@ -8,7 +8,8 @@
 #   Shortname   : MANAGE_SAMBA_USERS
 #   Source      : manage-samba-users.sh
 #   Type        : script
-#   Group       : Role Managers
+#   Group       : Modules
+#   Subgroup    : Samba File Server
 #   Purpose     : Manage standalone Samba users, local access groups, and memberships
 #
 #   Checksum : cc27364a43c77a875f7f0206cf645a3b6729164318da61a7a969f9fd6b98e67e
@@ -52,7 +53,7 @@ set -uo pipefail
         #     present, falls back to the installed framework copy without changing
         #     SGND_FRAMEWORK_ROOT.
         #
-        # . Globals (write)
+        # . Globals (Write)
         #   SGND_FRAMEWORK_ROOT
         #
         # . Output
@@ -60,8 +61,8 @@ set -uo pipefail
         #   helpers are not available until sgnd-exe-common.sh has been loaded.
         #
         # . Returns
-        #   0 when the framework root was resolved and executable common library loaded.
-        #   126 when the script path cannot be resolved, no canonical root component can
+        #   - 0 when the framework root was resolved and executable common library loaded.
+        #   - 126 when the script path cannot be resolved, no canonical root component can
         #   be found, or the executable common library is unreadable.
         #
         # . Usage
@@ -155,10 +156,13 @@ set -uo pipefail
 
 # - Helpers -------------------------------------------------------------------------
     # fn: _smb_runtime_auth_mode - Return the configured Samba authentication mode
+        # . Purpose
+        #   Return the configured Samba authentication mode.
+        #
         # . Output
         #   Writes "ad" for ADS security and "standalone" otherwise.
         # . Returns
-        #   0 always.
+        #   - 0 always.
         # . Usage
         #   ```bash
         #   mode="$(_smb_runtime_auth_mode)"
@@ -170,10 +174,13 @@ set -uo pipefail
     }
 
     # fn: _validate_identity_name - Validate a local Samba user/group name
+        # . Purpose
+        #   Validate a local Samba user/group name.
+        #
         # . Arguments
-        #   $1  Candidate identity name.
+        #   - $1  Candidate identity name.
         # . Returns
-        #   0 for a supported name; 1 otherwise.
+        #   - 0 for a supported name; 1 otherwise.
         # . Usage
         #   ```bash
         #   _validate_identity_name "SambaUsers"
@@ -183,10 +190,13 @@ set -uo pipefail
     }
 
     # fn: _smb_ask_selection - Render a numbered single/multi-select prompt
+        # . Purpose
+        #   Render a numbered single/multi-select prompt.
+        #
         # . Arguments
-        #   --label TEXT, --var NAME, optional --multi, then --items ITEM...
+        #   - --label TEXT, --var NAME, optional --multi, then --items ITEM...
         # . Returns
-        #   0 on selection; 1 on Q/back; 2 for invalid invocation.
+        #   - 0 on selection; 1 on Q/back; 2 for invalid invocation.
         # . Usage
         #   ```bash
         #   _smb_ask_selection --label "Select users" --var selected --multi --items "user1" "user2"
@@ -294,6 +304,9 @@ set -uo pipefail
     }
 
     # fn: _list_local_samba_users_raw - List enabled local Samba users
+        # . Purpose
+        #   List enabled local Samba users.
+        #
         # . Output
         #   Writes one Samba user name per line.
         # . Returns
@@ -307,6 +320,9 @@ set -uo pipefail
     }
 
     # fn: _list_local_groups_raw - List deliberate local access groups
+        # . Purpose
+        #   List deliberate local access groups.
+        #
         # . Behavior
         #   - Uses only the local files NSS source.
         #   - Includes groups with GID >= 1000.
@@ -314,7 +330,7 @@ set -uo pipefail
         # . Output
         #   Writes one group name per line.
         # . Returns
-        #   0 after enumeration.
+        #   - 0 after enumeration.
         # . Usage
         #   ```bash
         #   mapfile -t groups < <(_list_local_groups_raw)
@@ -340,12 +356,15 @@ set -uo pipefail
     }
 
     # fn: _user_group_memberships - Return local group memberships for one user
+        # . Purpose
+        #   Return local group memberships for one user.
+        #
         # . Arguments
-        #   $1  Local user name.
+        #   - $1  Local user name.
         # . Output
         #   Writes a comma-separated group list, or "None" when no groups resolve.
         # . Returns
-        #   0 always.
+        #   - 0 always.
         # . Usage
         #   ```bash
         #   groups="$(_user_group_memberships user1)"
@@ -372,10 +391,13 @@ set -uo pipefail
     }
 
     # fn: _select_local_samba_user - Select one enabled local Samba user
+        # . Purpose
+        #   Select one enabled local Samba user.
+        #
         # . Arguments
-        #   $1  Output variable name.
+        #   - $1  Output variable name.
         # . Returns
-        #   0 on selection; 1 on back/no users.
+        #   - 0 on selection; 1 on back/no users.
         # . Usage
         #   ```bash
         #   _select_local_samba_user user || return 0
@@ -392,10 +414,13 @@ set -uo pipefail
     }
 
     # fn: _select_local_groups - Select one or more local access groups
+        # . Purpose
+        #   Select one or more local access groups.
+        #
         # . Arguments
-        #   $1  Output array variable name.
+        #   - $1  Output array variable name.
         # . Returns
-        #   0 on selection; 1 on back/no groups.
+        #   - 0 on selection; 1 on back/no groups.
         # . Usage
         #   ```bash
         #   _select_local_groups selected_groups || return 0
@@ -414,10 +439,13 @@ set -uo pipefail
     }
 
     # fn: _select_local_group - Select exactly one local access group
+        # . Purpose
+        #   Select exactly one local access group.
+        #
         # . Arguments
-        #   $1  Output variable name.
+        #   - $1  Output variable name.
         # . Returns
-        #   0 on selection; 1 on back/no groups.
+        #   - 0 on selection; 1 on back/no groups.
         # . Usage
         #   ```bash
         #   _select_local_group group || return 0
@@ -434,13 +462,16 @@ set -uo pipefail
     }
 
     # fn: _pause_return - Keep terminal action results visible
+        # . Purpose
+        #   Keep terminal action results visible.
+        #
         # . Arguments
-        #   $1  Optional return message.
+        #   - $1  Optional return message.
         # . Returns
-        #   0 always.
+        #   - 0 always.
         # . Usage
         #   ```bash
-        #   _pause_return
+        #   _pause_return "Press Enter to return to the menu"
         #   ```
     _pause_return() {
         local message="${1:-Press Enter to return to Samba user management.}"
@@ -451,12 +482,15 @@ set -uo pipefail
 
 # - Overview ------------------------------------------------------------------------
     # fn: _show_identity_overview - Show Samba users and their local group memberships
+        # . Purpose
+        #   Show Samba users and their local group memberships.
+        #
         # . Behavior
         #   - Lists every enabled local Samba user.
         #   - Shows all groups reported by the local identity system for each user.
         #   - Lists deliberate local access groups and their supplementary members.
         # . Returns
-        #   0 after rendering the overview.
+        #   - 0 after rendering the overview.
         # . Usage
         #   ```bash
         #   _show_identity_overview
@@ -498,11 +532,14 @@ set -uo pipefail
 
 # - Samba users ---------------------------------------------------------------------
     # fn: _create_samba_user - Create/enable a local Samba user
+        # . Purpose
+        #   Create/enable a local Samba user.
+        #
         # . Behavior
         #   - Creates the matching Linux account when it does not exist.
         #   - Enables the account in Samba and prompts for its Samba password.
         # . Returns
-        #   0 after normal completion; non-zero on account-management failure.
+        #   - 0 after normal completion; non-zero on account-management failure.
         # . Usage
         #   ```bash
         #   _create_samba_user
@@ -538,8 +575,11 @@ set -uo pipefail
     }
 
     # fn: _change_samba_password - Change the password for one local Samba user
+        # . Purpose
+        #   Change the password for one local Samba user.
+        #
         # . Returns
-        #   0 on success/back; non-zero on smbpasswd failure.
+        #   - 0 on success/back; non-zero on smbpasswd failure.
         # . Usage
         #   ```bash
         #   _change_samba_password
@@ -553,8 +593,11 @@ set -uo pipefail
     }
 
     # fn: _remove_samba_users - Remove one or more Samba identities while preserving Linux users
+        # . Purpose
+        #   Remove one or more Samba identities while preserving Linux users.
+        #
         # . Returns
-        #   0 when all selected identities are removed/back; 1 when one or more removals fail.
+        #   - 0 when all selected identities are removed/back; 1 when one or more removals fail.
         # . Usage
         #   ```bash
         #   _remove_samba_users
@@ -584,8 +627,11 @@ set -uo pipefail
 
 # - Local groups --------------------------------------------------------------------
     # fn: _create_local_group - Create a local standalone access group
+        # . Purpose
+        #   Create a local standalone access group.
+        #
         # . Returns
-        #   0 after normal completion; non-zero on groupadd failure.
+        #   - 0 after normal completion; non-zero on groupadd failure.
         # . Usage
         #   ```bash
         #   _create_local_group
@@ -619,8 +665,11 @@ set -uo pipefail
     }
 
     # fn: _add_users_to_group - Add selected Samba users to one selected local group
+        # . Purpose
+        #   Add selected Samba users to one selected local group.
+        #
         # . Returns
-        #   0 after success/back; 1 when one or more usermod operations fail.
+        #   - 0 after success/back; 1 when one or more usermod operations fail.
         # . Usage
         #   ```bash
         #   _add_users_to_group
@@ -669,8 +718,11 @@ set -uo pipefail
     }
 
     # fn: _remove_users_from_group - Remove selected supplementary members from one local group
+        # . Purpose
+        #   Remove selected supplementary members from one local group.
+        #
         # . Returns
-        #   0 after success/back; 1 when one or more gpasswd operations fail.
+        #   - 0 after success/back; 1 when one or more gpasswd operations fail.
         # . Usage
         #   ```bash
         #   _remove_users_from_group
@@ -726,8 +778,11 @@ set -uo pipefail
     }
 
     # fn: _remove_local_groups - Remove one or more selected local access groups
+        # . Purpose
+        #   Remove one or more selected local access groups.
+        #
         # . Returns
-        #   0 when all selected groups are removed/back; 1 when one or more removals fail.
+        #   - 0 when all selected groups are removed/back; 1 when one or more removals fail.
         # . Usage
         #   ```bash
         #   _remove_local_groups
@@ -753,25 +808,84 @@ set -uo pipefail
 
 # - Menu ----------------------------------------------------------------------------
     # fn: _smb_user_menu_overview - Display the Samba identity overview.
+        # . Purpose
+        #   Display the Samba identity overview.
+        #
+        # . Usage
+        #   ```bash
+        #   _smb_user_menu_overview
+        #   ```
     _smb_user_menu_overview()       { _show_identity_overview; }
     # fn: _smb_user_menu_create_user - Open the Samba user-creation workflow.
+        # . Purpose
+        #   Open the Samba user-creation workflow.
+        #
+        # . Usage
+        #   ```bash
+        #   _smb_user_menu_create_user
+        #   ```
     _smb_user_menu_create_user()    { _create_samba_user; }
     # fn: _smb_user_menu_password - Open the Samba user password-change workflow.
+        # . Purpose
+        #   Open the Samba user password-change workflow.
+        #
+        # . Usage
+        #   ```bash
+        #   _smb_user_menu_password
+        #   ```
     _smb_user_menu_password()       { _change_samba_password; }
     # fn: _smb_user_menu_remove_user - Open the Samba user-removal workflow.
+        # . Purpose
+        #   Open the Samba user-removal workflow.
+        #
+        # . Usage
+        #   ```bash
+        #   _smb_user_menu_remove_user
+        #   ```
     _smb_user_menu_remove_user()    { _remove_samba_users; }
     # fn: _smb_user_menu_create_group - Open the local Samba group-creation workflow.
+        # . Purpose
+        #   Open the local Samba group-creation workflow.
+        #
+        # . Usage
+        #   ```bash
+        #   _smb_user_menu_create_group
+        #   ```
     _smb_user_menu_create_group()   { _create_local_group; }
     # fn: _smb_user_menu_add_members - Add users to a selected Samba group through the menu action.
+        # . Purpose
+        #   Add users to a selected Samba group through the menu action.
+        #
+        # . Usage
+        #   ```bash
+        #   _smb_user_menu_add_members
+        #   ```
     _smb_user_menu_add_members()    { _add_users_to_group; }
     # fn: _smb_user_menu_remove_members - Remove selected members from a Samba group.
+        # . Purpose
+        #   Remove selected members from a Samba group.
+        #
+        # . Usage
+        #   ```bash
+        #   _smb_user_menu_remove_members
+        #   ```
     _smb_user_menu_remove_members() { _remove_users_from_group; }
     # fn: _smb_user_menu_remove_group - Remove selected local groups through the menu action.
+        # . Purpose
+        #   Remove selected local groups through the menu action.
+        #
+        # . Usage
+        #   ```bash
+        #   _smb_user_menu_remove_group
+        #   ```
     _smb_user_menu_remove_group()   { _remove_local_groups; }
 
     # fn: _build_menu - Build the standalone Samba identity-management menu
+        # . Purpose
+        #   Build the standalone Samba identity-management menu.
+        #
         # . Returns
-        #   0 when menu registration succeeds.
+        #   - 0 when menu registration succeeds.
         # . Usage
         #   ```bash
         #   _build_menu
@@ -799,10 +913,13 @@ set -uo pipefail
 
 # - Main ----------------------------------------------------------------------------
     # fn: main - Run interactive standalone Samba identity management
+        # . Purpose
+        #   Run interactive standalone Samba identity management.
+        #
         # . Arguments
         #   $@  Framework and script-specific arguments.
         # . Returns
-        #   0 after normal exit; non-zero on bootstrap/action failure.
+        #   - 0 after normal exit; non-zero on bootstrap/action failure.
         # . Usage
         #   ```bash
         #   main "$@"

@@ -8,7 +8,8 @@
 #   Shortname   : MANAGE_DOCKER
 #   Source      : manage-docker-server.sh
 #   Type        : script
-#   Group       : Role Managers
+#   Group       : Modules
+#   Subgroup    : Docker Server
 #   Purpose     : Install, configure, validate, and inspect a Docker host
 #
 #   Checksum : a6330ad578e84dcea58b2fb8db41a79fa85b29489b1b43d52341da90c61ffb01
@@ -54,7 +55,7 @@ set -uo pipefail
         #     present, falls back to the installed framework copy without changing
         #     SGND_FRAMEWORK_ROOT.
         #
-        # . Globals (write)
+        # . Globals (Write)
         #   SGND_FRAMEWORK_ROOT
         #
         # . Output
@@ -62,8 +63,8 @@ set -uo pipefail
         #   helpers are not available until sgnd-exe-common.sh has been loaded.
         #
         # . Returns
-        #   0 when the framework root was resolved and executable common library loaded.
-        #   126 when the script path cannot be resolved, no canonical root component can
+        #   - 0 when the framework root was resolved and executable common library loaded.
+        #   - 126 when the script path cannot be resolved, no canonical root component can
         #   be found, or the executable common library is unreadable.
         #
         # . Usage
@@ -156,22 +157,50 @@ set -uo pipefail
     SGND_DOCKER_DAEMON_CONFIG="/etc/docker/daemon.json"
 
     # fn: _dryrun_complete - Report the dry-run result without executing the requested host change.
+        # . Purpose
+        #   Report the dry-run result without executing the requested host change.
+        #
+        # . Usage
+        #   ```bash
+        #   _dryrun_complete
+        #   ```
     _dryrun_complete() {
         (( ${FLAG_DRYRUN:-0} == 1 )) || return 0
         sayok "DRYRUN complete. The changes shown above would have been applied; no changes were written."
     }
 
     # fn: _docker_package_installed - Test whether the docker.io package is installed.
+        # . Purpose
+        #   Test whether the docker.io package is installed.
+        #
+        # . Usage
+        #   ```bash
+        #   _docker_package_installed
+        #   ```
     _docker_package_installed() {
         dpkg-query -W -f='${Status}' docker.io 2>/dev/null | grep -q '^install ok installed$'
     }
 
     # fn: _docker_command_available - Test whether the Docker command-line client is available.
+        # . Purpose
+        #   Test whether the Docker command-line client is available.
+        #
+        # . Usage
+        #   ```bash
+        #   _docker_command_available
+        #   ```
     _docker_command_available() {
         command -v docker >/dev/null 2>&1
     }
 
     # fn: _docker_storage_root - Read the SolidGroundUX storage mount point configured for Docker.
+        # . Purpose
+        #   Read the SolidGroundUX storage mount point configured for Docker.
+        #
+        # . Usage
+        #   ```bash
+        #   _docker_storage_root "/srv/storage/example"
+        #   ```
     _docker_storage_root() {
         local configured=""
         local storage_cfg="${SGND_SYSCFG_DIR:-/etc/solidgroundux}/storage.cfg"
@@ -184,6 +213,13 @@ set -uo pipefail
     }
 
     # fn: _docker_current_data_root - Discover Docker’s current data root or its configured fallback.
+        # . Purpose
+        #   Discover Docker’s current data root or its configured fallback.
+        #
+        # . Usage
+        #   ```bash
+        #   _docker_current_data_root
+        #   ```
     _docker_current_data_root() {
         local root=""
         if _docker_command_available && systemctl is-active --quiet "$SGND_DOCKER_SERVICE" 2>/dev/null; then
@@ -197,6 +233,13 @@ set -uo pipefail
     }
 
     # fn: _docker_has_workloads - Test whether Docker contains any containers or local images.
+        # . Purpose
+        #   Test whether Docker contains any containers or local images.
+        #
+        # . Usage
+        #   ```bash
+        #   _docker_has_workloads
+        #   ```
     _docker_has_workloads() {
         _docker_command_available || return 1
         sudo docker info >/dev/null 2>&1 || return 1
@@ -207,6 +250,15 @@ set -uo pipefail
     }
 
     # fn: _docker_directory_nonempty - Check whether a root-owned directory contains any entries.
+        # . Purpose
+        #   Check whether a root-owned directory contains any entries.
+        #
+        # . Arguments
+        #   - `$1`: Filesystem path to inspect.
+        # . Usage
+        #   ```bash
+        #   _docker_directory_nonempty "/srv/storage/example"
+        #   ```
     _docker_directory_nonempty() {
         local path="$1"
         sudo test -d "$path" || return 1
@@ -214,6 +266,15 @@ set -uo pipefail
     }
 
     # fn: _docker_write_data_root - Write data root in the Docker workflow.
+        # . Purpose
+        #   Persist the Docker daemon data-root directory setting.
+        #
+        # . Arguments
+        #   - `$1`: Docker daemon data directory.
+        # . Usage
+        #   ```bash
+        #   _docker_write_data_root "/srv/storage/example"
+        #   ```
     _docker_write_data_root() {
         local data_root="$1"
         local config_dir=""
@@ -252,6 +313,15 @@ print()
     }
 
     # fn: _docker_select_service_action - Select service action in the Docker workflow.
+        # . Purpose
+        #   Prompt for a Docker systemd service operation.
+        #
+        # . Arguments
+        #   - `$1`: Name of the shell variable receiving the result.
+        # . Usage
+        #   ```bash
+        #   _docker_select_service_action "selected"
+        #   ```
     _docker_select_service_action() {
         local output_var="${1:?missing output variable}"
         local selected=""
@@ -272,6 +342,15 @@ print()
     # Render a local numbered selector using the Docker action layout.
     # The framework ask_selection API is intentionally left unchanged.
     # fn: _docker_ask_selection - Prompt for selection in the Docker workflow.
+        # . Purpose
+        #   Present numbered Docker service choices and write the selected result.
+        #
+        # . Arguments
+        #   - `$2`: Name of the output shell variable.
+        # . Usage
+        #   ```bash
+        #   _docker_ask_selection --label "Choose operation" --var action --items "Status" "Validate"
+        #   ```
     _docker_ask_selection() {
         local label="Select an option"
         local var_name="selection"
@@ -316,6 +395,13 @@ print()
 
 # - Host operations ----------------------------------------------------------------
     # fn: _docker_install - Install the Docker operation.
+        # . Purpose
+        #   Install the Docker operation.
+        #
+        # . Usage
+        #   ```bash
+        #   _docker_install
+        #   ```
     _docker_install() {
         if (( ${FLAG_DRYRUN:-0} == 1 )); then
             sayinfo "DRYRUN: Would install Docker Engine from the Ubuntu docker.io package."
@@ -329,6 +415,13 @@ print()
     }
 
     # fn: _docker_start - Start the Docker operation.
+        # . Purpose
+        #   Start the Docker operation.
+        #
+        # . Usage
+        #   ```bash
+        #   _docker_start
+        #   ```
     _docker_start() {
         _docker_command_available || { sayfail "Docker is not installed."; return 1; }
         if (( ${FLAG_DRYRUN:-0} == 1 )); then
@@ -353,7 +446,7 @@ print()
         #   - Stops at the first failing step.
         #
         # . Returns
-        #   0 when all preparation steps succeed; otherwise the first failing return code.
+        #   - 0 when all preparation steps succeed; otherwise the first failing return code.
         #
         # . Usage
         #   ```bash
@@ -368,6 +461,13 @@ print()
     }
 
     # fn: _docker_configure_storage - Configure storage in the Docker workflow.
+        # . Purpose
+        #   Configure the Docker daemon data directory and required filesystem settings.
+        #
+        # . Usage
+        #   ```bash
+        #   _docker_configure_storage
+        #   ```
     _docker_configure_storage() {
         local storage_root=""
         local current_root=""
@@ -438,6 +538,13 @@ print()
     }
 
     # fn: _docker_manage_service - Manage service in the Docker workflow.
+        # . Purpose
+        #   Start, stop, restart or enable the Docker daemon through systemd.
+        #
+        # . Usage
+        #   ```bash
+        #   _docker_manage_service
+        #   ```
     _docker_manage_service() {
         local action=""
         _docker_select_service_action action || return 0
@@ -458,6 +565,13 @@ print()
 
 # - Status / validation -------------------------------------------------------------
     # fn: _docker_status - Inspect status for the Docker operation.
+        # . Purpose
+        #   Inspect status for the Docker operation.
+        #
+        # . Usage
+        #   ```bash
+        #   _docker_status
+        #   ```
     _docker_status() {
         local package_state="not installed"
         local package_version="-"
@@ -499,6 +613,13 @@ print()
     }
 
     # fn: _docker_validate - Validate the Docker operation.
+        # . Purpose
+        #   Validate the Docker operation.
+        #
+        # . Usage
+        #   ```bash
+        #   _docker_validate
+        #   ```
     _docker_validate() {
         local failures=0
         local result=""
@@ -534,6 +655,15 @@ print()
 
 # - Action dispatch ----------------------------------------------------------------
     # fn: _run_action - Dispatch the requested management action to its implementation.
+        # . Purpose
+        #   Dispatch the requested management action to its implementation.
+        #
+        # . Arguments
+        #   - `$1`: Management action to execute.
+        # . Usage
+        #   ```bash
+        #   _run_action "status"
+        #   ```
     _run_action() {
         local action="${1:?missing action}" rc=0
         case "$action" in
@@ -557,6 +687,13 @@ print()
 
 # - Main ----------------------------------------------------------------------------
     # fn: main - Dispatch command-line options to the appropriate management workflow.
+        # . Purpose
+        #   Dispatch command-line options to the appropriate management workflow.
+        #
+        # . Usage
+        #   ```bash
+        #   main "$@"
+        #   ```
     main() {
         local action=""
         _framework_locator || return $?

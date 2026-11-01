@@ -7,8 +7,8 @@
 #   Checksum    : ef0c330ea808bf3dc2d8a22e6b003c1d4e18b353a976d8f471ae537814d7bf11
 #   Source      : mcm-role-managers_preface.sh
 #   Type        : documentation
-#   Group       : Role Managers
-#   Purpose     : Group preface
+#   Group       : Modules
+#   Purpose     : Module implementation overview
 #
 # Attribution:
 #   Developers  : Mark Fieten
@@ -57,11 +57,11 @@
 # > Validation and status actions should remain useful in both direct and console-driven
 # > execution so an operator can inspect the target before or after a change.
 #
-# -- Relationship to Module Registration -------------------------------------------
+# -- Relationship to Console Modules -----------------------------------------------
 #
 # > The intended split is:
 # >
-# >     Module Registration
+# >     Console modules
 # >         operator-facing page, grouping, menu actions, orchestration
 # >
 # >     Role Managers

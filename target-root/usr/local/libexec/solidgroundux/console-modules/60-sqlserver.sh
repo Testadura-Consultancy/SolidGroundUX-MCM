@@ -7,7 +7,8 @@
 #   Shortname   : SQLSERVER
 #   Source      : 60-sqlserver.sh
 #   Type        : module
-#   Group       : Module Registration
+#   Group       : Modules
+#   Subgroup    : SQL Server
 #   Purpose     : Install, configure, manage, validate, and inspect Microsoft SQL Server
 #
 #   Checksum : eeb58f3bece3059548ec479c535927529ce476abfef0e23873ba73411b6fa16f
@@ -19,25 +20,26 @@
 set -uo pipefail
 
 # - Library guard ------------------------------------------------------------------
-    # fn$ _sgnd_lib_guard - Enforce source-only, single-load library initialization
+    # fn: _sgnd_lib_guard - Enforce source-only, source-only library guard
         # . Purpose
-        #   Ensure the file is sourced as a library and initialized only once.
+        #   Ensure the file is sourced as a library and marked as loaded.
         #
         # . Behavior
         #   - Derives a unique guard variable name from the current filename.
         #   - Aborts execution when the file is run directly instead of sourced.
         #   - Sets the guard variable on first load.
-        #   - Returns immediately when the library was already loaded.
+        #   - Returns from the guard helper when the file is already marked loaded; it does not skip subsequent top-level statements.
         #
-        # Inputs
+        # . Inputs
         #   BASH_SOURCE[0]
-        #   $0
+        #   - $0
         #
-        # Outputs (globals)
+        # . Outputs
+        #   (globals)
         #   SGND_<MODULE>_LOADED
         #
         # . Returns
-        #   0 when already loaded or successfully initialized.
+        #   - 0 when already loaded or successfully initialized.
         #   Exits with code 2 when executed instead of sourced.
         #
         # . Usage
@@ -75,18 +77,30 @@ set -uo pipefail
     SGND_MODULE_NAME="$SGND_SQLSERVER_MODULE_NAME"
 # - Management dispatch -------------------------------------------------------------
     # fn: _sqlserver_run_manage - Run manage in the SQL Server workflow.
+        # . Purpose
+        #   Run the selected SQL Server action through the standalone SQL Server role manager.
+        #
+        # . Arguments
+        #   - `$1`: Management action to execute.
+        # . Usage
+        #   ```bash
+        #   _sqlserver_run_manage "status"
+        #   ```
     _sqlserver_run_manage() {
         local action="${1:?missing action}"
         _sgnd_run_module_script "manage-sqlserver.sh" --action "$action"
     }
 
     # fn: _sqlserver_record_prepare_step - Persist one child-step result in the console tracker
+        # . Purpose
+        #   Persist one child-step result in the console tracker.
+        #
         # . Arguments
-        #   $1 ITEM_KEY
-        #   $2 RESULT_CODE
+        #   - $1 ITEM_KEY
+        #   - $2 RESULT_CODE
         #
         # . Returns
-        #   0 always; tracking is best-effort when the console tracker is unavailable.
+        #   - 0 always; tracking is best-effort when the console tracker is unavailable.
         #
         # . Usage
         #   ```bash
@@ -114,7 +128,7 @@ set -uo pipefail
         #   - Leaves later child actions untouched after a failure.
         #
         # . Returns
-        #   0 on success, 2 on user cancellation, or a workflow failure code.
+        #   - 0 on success, 2 on user cancellation, or a workflow failure code.
         #
         # . Usage
         #   ```bash
@@ -164,6 +178,8 @@ set -uo pipefail
         return "$rc"
     }
     # fn: sqlserver_repository - Call `_sqlserver_run_manage` with the `repository` action.
+        # . Purpose
+        #   Invoke the repository action through the module manager.
         #
         # . Returns
         #   The status returned by the delegated action.
@@ -174,6 +190,8 @@ set -uo pipefail
         #   ```
     sqlserver_repository()        { _sqlserver_run_manage repository; }
     # fn: sqlserver_install - Call `_sqlserver_run_manage` with the `install` action.
+        # . Purpose
+        #   Invoke the install action through the module manager.
         #
         # . Returns
         #   The status returned by the delegated action.
@@ -184,6 +202,8 @@ set -uo pipefail
         #   ```
     sqlserver_install()           { _sqlserver_run_manage install; }
     # fn: sqlserver_configure - Call `_sqlserver_run_manage` with the `configure` action.
+        # . Purpose
+        #   Invoke the configure action through the module manager.
         #
         # . Returns
         #   The status returned by the delegated action.
@@ -194,6 +214,8 @@ set -uo pipefail
         #   ```
     sqlserver_configure()         { _sqlserver_run_manage configure; }
     # fn: sqlserver_storage - Call `_sqlserver_run_manage` with the `storage` action.
+        # . Purpose
+        #   Invoke the storage action through the module manager.
         #
         # . Returns
         #   The status returned by the delegated action.
@@ -204,6 +226,8 @@ set -uo pipefail
         #   ```
     sqlserver_storage()           { _sqlserver_run_manage storage; }
     # fn: sqlserver_network - Call `_sqlserver_run_manage` with the `network` action.
+        # . Purpose
+        #   Invoke the network action through the module manager.
         #
         # . Returns
         #   The status returned by the delegated action.
@@ -214,6 +238,8 @@ set -uo pipefail
         #   ```
     sqlserver_network()           { _sqlserver_run_manage network; }
     # fn: sqlserver_memory - Call `_sqlserver_run_manage` with the `memory` action.
+        # . Purpose
+        #   Invoke the memory action through the module manager.
         #
         # . Returns
         #   The status returned by the delegated action.
@@ -224,6 +250,8 @@ set -uo pipefail
         #   ```
     sqlserver_memory()            { _sqlserver_run_manage memory; }
     # fn: sqlserver_service - Call `_sqlserver_run_manage` with the `service` action.
+        # . Purpose
+        #   Invoke the service action through the module manager.
         #
         # . Returns
         #   The status returned by the delegated action.
@@ -234,6 +262,8 @@ set -uo pipefail
         #   ```
     sqlserver_service()           { _sqlserver_run_manage service; }
     # fn: sqlserver_firewall - Call `_sqlserver_run_manage` with the `firewall` action.
+        # . Purpose
+        #   Invoke the firewall action through the module manager.
         #
         # . Returns
         #   The status returned by the delegated action.
@@ -244,6 +274,8 @@ set -uo pipefail
         #   ```
     sqlserver_firewall()          { _sqlserver_run_manage firewall; }
     # fn: sqlserver_tools - Call `_sqlserver_run_manage` with the `tools` action.
+        # . Purpose
+        #   Invoke the tools action through the module manager.
         #
         # . Returns
         #   The status returned by the delegated action.
@@ -254,6 +286,8 @@ set -uo pipefail
         #   ```
     sqlserver_tools()             { _sqlserver_run_manage tools; }
     # fn: sqlserver_validate - Call `_sqlserver_run_manage` with the `validate` action.
+        # . Purpose
+        #   Invoke the validate action through the module manager.
         #
         # . Returns
         #   The status returned by the delegated action.
@@ -264,6 +298,8 @@ set -uo pipefail
         #   ```
     sqlserver_validate()          { _sqlserver_run_manage validate; }
     # fn: sqlserver_status - Call `_sqlserver_run_manage` with the `status` action.
+        # . Purpose
+        #   Invoke the status action through the module manager.
         #
         # . Returns
         #   The status returned by the delegated action.
@@ -284,6 +320,8 @@ set -uo pipefail
     # Every validator sets SGND_MODULE_VALIDATION_MESSAGE to a concise result summary.
     # Detailed diagnostic output may be written by the validator or delegated action.
     # fn: validate_module_sql_server - Validate the SQL Server module and record its status for the console.
+        # . Purpose
+        #   Validate the SQL Server module and record its status for the console.
         #
         # . Returns
         #   A console validation status (0=pass, 1=fail, 2=warning, 3=skipped).

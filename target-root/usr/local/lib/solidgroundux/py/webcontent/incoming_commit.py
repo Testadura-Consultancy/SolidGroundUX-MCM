@@ -13,6 +13,8 @@ import shutil
 from .incoming_plan import inspect_incoming_package
 
 
+
+# --- Public classes ------------------------------------------------------------
 @dataclass
 class ContentCommitPlan:
     """Immutable-intent preview; revalidated immediately before committing."""
@@ -25,12 +27,26 @@ class ContentCommitPlan:
 
     @property
     def valid(self) -> bool:
+        """valid is an implementation helper.
+        
+        Usage:
+            ```python
+            content_commit_plan.valid
+            ```"""
         return not self.errors and (not self.conflicts or self.policy == 'skip')
 
 
+
+# --- Public functions ------------------------------------------------------------
 def plan_content_ingest(source: str | Path, content: str | Path,
                         policy: str = 'abort') -> ContentCommitPlan:
-    """Preview destination paths and collisions without modifying content."""
+    """Preview destination paths and collisions without modifying content.
+        
+        Usage:
+        ```python
+        # Preview potential destination collisions without making changes.
+        plan = plan_content_ingest(source, content, policy="abort")
+        ```"""
     src_input = Path(source).expanduser()
     dst_input = Path(content).expanduser()
     src, dst = src_input.resolve(), dst_input.resolve()
@@ -64,9 +80,15 @@ def plan_content_ingest(source: str | Path, content: str | Path,
 
 def commit_content_ingest(plan: ContentCommitPlan) -> list[str]:
     """Commit reviewed entries with exclusive file creation and rollback.
-
-    Abort if the inventory or conflicts have changed since the preview.
-    """
+        
+        Abort if the inventory or conflicts have changed since the preview.
+        
+        Usage:
+        ```python
+        plan = plan_content_ingest(source, content, policy="abort")
+        if plan.valid:
+            commit_content_ingest(plan)  # Revalidates before writing
+        ```"""
     if not plan.valid:
         raise ValueError('Unresolved ingestion plan')
     fresh = plan_content_ingest(plan.source, plan.content, plan.policy)
@@ -98,10 +120,24 @@ def commit_content_ingest(plan: ContentCommitPlan) -> list[str]:
         raise
 
 
+
+# --- Internal classes ------------------------------------------------------------
 class _NullContext:
     """Context manager for non-ZIP inputs."""
     def __enter__(self):
+        """__enter__ is an implementation helper.
+        
+        Usage:
+            ```python
+            __null_context.__enter__()
+            ```"""
         return None
 
     def __exit__(self, *_args):
+        """__exit__ is an implementation helper.
+        
+        Usage:
+            ```python
+            __null_context.__exit__(*_args)
+            ```"""
         return False

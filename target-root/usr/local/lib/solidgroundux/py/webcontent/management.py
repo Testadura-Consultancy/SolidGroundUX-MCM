@@ -10,29 +10,45 @@ from .content import discover_content, load_navigation, load_site_config, parse_
 SAFE_KEY = re.compile(r"^[A-Za-z][A-Za-z0-9_-]*$")
 SAFE_SEGMENT = re.compile(r"^[a-z0-9][a-z0-9-]*$")
 
+
+# --- Internal functions ------------------------------------------------------------
 def _setup(source):
-    """Handle setup for the web content workflow."""
+    """Resolve a site root and load its configured content and navigation.
+        
+        Usage:
+            ```python
+            _setup(source)
+            ```"""
     root = Path(source).expanduser().resolve()
     config = load_site_config(root)
     items = discover_content(config, load_navigation(root))
     return config, items
 
 def _resolve(config, path):
-    """Handle resolve for the web content workflow."""
+    """Resolve and validate a Markdown page path inside the configured content directory.
+        
+        Usage:
+            ```python
+            _resolve(config, path)
+            ```"""
     content = config.content_dir.resolve()
     candidate = (content / path).resolve()
     if not candidate.is_relative_to(content) or candidate.suffix.lower() != '.md' or not candidate.is_file():
         raise ValueError('Not an existing Markdown page within content directory')
     return candidate
 
+
+# --- Public functions ------------------------------------------------------------
 def list_pages(source):
     """List discovered canonical Markdown pages for the management interface.
-    
-    Args:
-        source: Input used by this operation.
-    
-    Returns:
-        Operation result or None, as defined by the implementation."""
+        
+        Args:
+            source: Website source root directory.
+        
+        Usage:
+            ```python
+            pages = list_pages(site_root)
+            ```"""
     config, items = _setup(source)
     pages = []
     for item in sorted(items, key=lambda x: (x.route, x.language)):
@@ -42,15 +58,17 @@ def list_pages(source):
 
 def edit_metadata(source, path, key, value):
     """Update a single front-matter field while retaining article body text.
-    
-    Args:
-        source: Input used by this operation.
-        path: Input used by this operation.
-        key: Input used by this operation.
-        value: Input used by this operation.
-    
-    Returns:
-        Operation result or None, as defined by the implementation."""
+        
+        Args:
+            source: Website source root directory.
+            path: Source or content file path.
+            key: Front-matter field or dotted template lookup key.
+            value: Value to parse, validate or serialize.
+        
+        Usage:
+            ```python
+            edit_metadata(site_root, page_path, "title", "New title")
+            ```"""
     config, _ = _setup(source)
     file = _resolve(config, path)
     if not SAFE_KEY.fullmatch(key) or key in {'parent', 'slug', 'language'}:
@@ -84,15 +102,18 @@ def edit_metadata(source, path, key, value):
 
 def move_page(source, path, parent, slug):
     """Move or rename one language-specific page without overwriting a target.
-    
-    Args:
-        source: Input used by this operation.
-        path: Input used by this operation.
-        parent: Input used by this operation.
-        slug: Input used by this operation.
-    
-    Returns:
-        Operation result or None, as defined by the implementation."""
+            
+            Args:
+                source: Website source root directory.
+                path: Source or content file path.
+                parent: Destination parent section or route.
+                slug: URL-friendly final route component.
+            
+            Usage:
+        ```python
+        # Move and rename an existing language-specific Markdown page.
+        move_page(source, "articles/old_NL.md", "articles", "new")
+        ```"""
     config, items = _setup(source)
     file = _resolve(config,path)
     if re.fullmatch(r'.+_Index_[A-Za-z]{2}', file.stem):
@@ -120,11 +141,15 @@ _RESERVED_FIELDS = {'parent', 'slug', 'language'}
 
 def inspect_metadata(source, path):
     """Inspect source metadata and selected resolved values without modifying the file.
-
+    
     Explicit fields are never confused with defaults. Computed fields are
     reported separately, and only defaults actually supported by ContentItem
     are exposed here; this is not a general inheritance engine.
-    """
+    
+    Usage:
+        ```python
+        inspect_metadata(source, path)
+        ```"""
     config = load_site_config(Path(source).expanduser().resolve())
     file = _resolve(config, path)
     raw = file.read_text(encoding='utf-8')
@@ -170,10 +195,15 @@ def inspect_metadata(source, path):
 
 def edit_metadata_fields(source, path, changes):
     """Atomically set scalar front-matter fields or remove fields marked by JSON null.
-
-    Removing a field deletes its line (rather than writing an empty value), so
-    page defaults apply again. Unmentioned fields and Markdown body stay intact.
-    """
+        
+        Removing a field deletes its line (rather than writing an empty value), so
+        page defaults apply again. Unmentioned fields and Markdown body stay intact.
+        
+        Usage:
+        ```python
+        # Replace a field while removing another field entirely.
+        edit_metadata_fields(site_root, page_path, {"title": "Revised", "summary": None})
+        ```"""
     if not isinstance(changes, dict) or not changes:
         raise ValueError('Changes must be a nonempty JSON object')
     config = load_site_config(Path(source).expanduser().resolve())

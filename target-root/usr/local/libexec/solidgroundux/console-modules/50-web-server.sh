@@ -7,7 +7,8 @@
 #   Shortname   : WEB_SERVER
 #   Source      : 50-web-server.sh
 #   Type        : module
-#   Group       : Module Registration
+#   Group       : Modules
+#   Subgroup    : Web Server
 #   Purpose     : Install, configure, manage, validate, and inspect an Nginx web server
 #
 #   Checksum : cfa3271091a0bcaaabd13b31bd838228b39f6ddc5c2dba860f6f3492e7c67e40
@@ -19,25 +20,26 @@
 set -uo pipefail
 
 # - Library guard ------------------------------------------------------------------
-    # fn$ _sgnd_lib_guard - Enforce source-only, single-load library initialization
+    # fn: _sgnd_lib_guard - Enforce source-only, source-only library guard
         # . Purpose
-        #   Ensure the file is sourced as a library and initialized only once.
+        #   Ensure the file is sourced as a library and marked as loaded.
         #
         # . Behavior
         #   - Derives a unique guard variable name from the current filename.
         #   - Aborts execution when the file is run directly instead of sourced.
         #   - Sets the guard variable on first load.
-        #   - Returns immediately when the library was already loaded.
+        #   - Returns from the guard helper when the file is already marked loaded; it does not skip subsequent top-level statements.
         #
-        # Inputs
+        # . Inputs
         #   BASH_SOURCE[0]
-        #   $0
+        #   - $0
         #
-        # Outputs (globals)
+        # . Outputs
+        #   (globals)
         #   SGND_<MODULE>_LOADED
         #
         # . Returns
-        #   0 when already loaded or successfully initialized.
+        #   - 0 when already loaded or successfully initialized.
         #   Exits with code 2 when executed instead of sourced.
         #
         # . Usage
@@ -75,17 +77,34 @@ set -uo pipefail
     SGND_MODULE_NAME="$SGND_WEB_SERVER_MODULE_NAME"
 # - Management dispatch -------------------------------------------------------------
     # fn: _web_run_manage - Run manage in the web server workflow.
+        # . Purpose
+        #   Run the selected web-server action using the standalone web-server role manager.
+        #
+        # . Usage
+        #   ```bash
+        #   _web_run_manage "status"
+        #   ```
     _web_run_manage() { local action="${1:?missing action}"; _sgnd_run_module_script "manage-web-server.sh" --action "$action"; }
     # fn: _web_run_publish - Run publish in the web server workflow.
+        # . Purpose
+        #   Run a web publication action using the standalone deployment manager.
+        #
+        # . Usage
+        #   ```bash
+        #   _web_run_publish "<item_key>" "<result_code>"
+        #   ```
     _web_run_publish() { local action="${1:?missing action}"; _sgnd_run_module_script "publish-web-content.sh" --action "$action"; }
 
     # fn: _web_record_prepare_step - Persist one child-step result in the console tracker
+        # . Purpose
+        #   Persist one child-step result in the console tracker.
+        #
         # . Arguments
-        #   $1 ITEM_KEY
-        #   $2 RESULT_CODE
+        #   - $1 ITEM_KEY
+        #   - $2 RESULT_CODE
         #
         # . Returns
-        #   0 always; tracking is best-effort when the console tracker is unavailable.
+        #   - 0 always; tracking is best-effort when the console tracker is unavailable.
         #
         # . Usage
         #   ```bash
@@ -112,7 +131,7 @@ set -uo pipefail
         #   - Marks the failing child action failed and leaves later work untouched.
         #
         # . Returns
-        #   0 when preparation succeeds; otherwise the workflow failure code returned by
+        #   - 0 when preparation succeeds; otherwise the workflow failure code returned by
         #   manage-web-server.sh.
         #
         # . Usage
@@ -145,6 +164,8 @@ set -uo pipefail
         return "$rc"
     }
     # fn: web_install - Call `_web_run_manage` with the `install` action.
+        # . Purpose
+        #   Invoke the install action through the module manager.
         #
         # . Returns
         #   The status returned by the delegated action.
@@ -155,6 +176,8 @@ set -uo pipefail
         #   ```
     web_install()                 { _web_run_manage install; }
     # fn: web_start - Call `_web_run_manage` with the `start` action.
+        # . Purpose
+        #   Invoke the start action through the module manager.
         #
         # . Returns
         #   The status returned by the delegated action.
@@ -165,6 +188,8 @@ set -uo pipefail
         #   ```
     web_start()                   { _web_run_manage start; }
     # fn: web_configure_root - Call `_web_run_manage` with the `configure-root` action.
+        # . Purpose
+        #   Invoke the configure root action through the module manager.
         #
         # . Returns
         #   The status returned by the delegated action.
@@ -175,6 +200,8 @@ set -uo pipefail
         #   ```
     web_configure_root()          { _web_run_manage configure-root; }
     # fn: web_manage_sites - Call `_web_run_manage` with the `manage-sites` action.
+        # . Purpose
+        #   Invoke the manage sites action through the module manager.
         #
         # . Returns
         #   The status returned by the delegated action.
@@ -185,6 +212,8 @@ set -uo pipefail
         #   ```
     web_manage_sites()            { _web_run_manage manage-sites; }
     # fn: web_configure_default - Call `_web_run_manage` with the `configure-default` action.
+        # . Purpose
+        #   Invoke the configure default action through the module manager.
         #
         # . Returns
         #   The status returned by the delegated action.
@@ -195,6 +224,8 @@ set -uo pipefail
         #   ```
     web_configure_default()       { _web_run_manage configure-default; }
     # fn: web_publish - Call `_web_run_publish` with the `publish-site` action.
+        # . Purpose
+        #   Invoke the publish site action through the module manager.
         #
         # . Returns
         #   The status returned by the delegated action.
@@ -205,6 +236,8 @@ set -uo pipefail
         #   ```
     web_publish()                 { _web_run_publish publish-site; }
     # fn: web_doc_configure - Call `_web_run_manage` with the `configure-documentation` action.
+        # . Purpose
+        #   Invoke the configure documentation action through the module manager.
         #
         # . Returns
         #   The status returned by the delegated action.
@@ -215,6 +248,8 @@ set -uo pipefail
         #   ```
     web_doc_configure()           { _web_run_manage configure-documentation; }
     # fn: web_doc_publish - Call `_web_run_publish` with the `publish-documentation` action.
+        # . Purpose
+        #   Invoke the publish documentation action through the module manager.
         #
         # . Returns
         #   The status returned by the delegated action.
@@ -225,6 +260,8 @@ set -uo pipefail
         #   ```
     web_doc_publish()             { _web_run_publish publish-documentation; }
     # fn: web_doc_status - Call `_web_run_manage` with the `documentation-status` action.
+        # . Purpose
+        #   Invoke the documentation status action through the module manager.
         #
         # . Returns
         #   The status returned by the delegated action.
@@ -235,6 +272,8 @@ set -uo pipefail
         #   ```
     web_doc_status()              { _web_run_manage documentation-status; }
     # fn: web_service_manage - Call `_web_run_manage` with the `service` action.
+        # . Purpose
+        #   Invoke the service action through the module manager.
         #
         # . Returns
         #   The status returned by the delegated action.
@@ -245,6 +284,8 @@ set -uo pipefail
         #   ```
     web_service_manage()          { _web_run_manage service; }
     # fn: web_firewall - Call `_web_run_manage` with the `firewall` action.
+        # . Purpose
+        #   Invoke the firewall action through the module manager.
         #
         # . Returns
         #   The status returned by the delegated action.
@@ -255,6 +296,8 @@ set -uo pipefail
         #   ```
     web_firewall()                { _web_run_manage firewall; }
     # fn: web_validate - Call `_web_run_manage` with the `validate` action.
+        # . Purpose
+        #   Invoke the validate action through the module manager.
         #
         # . Returns
         #   The status returned by the delegated action.
@@ -265,6 +308,8 @@ set -uo pipefail
         #   ```
     web_validate()                { _web_run_manage validate; }
     # fn: web_status - Call `_web_run_manage` with the `status` action.
+        # . Purpose
+        #   Invoke the status action through the module manager.
         #
         # . Returns
         #   The status returned by the delegated action.
@@ -285,6 +330,8 @@ set -uo pipefail
     # Every validator sets SGND_MODULE_VALIDATION_MESSAGE to a concise result summary.
     # Detailed diagnostic output may be written by the validator or delegated action.
     # fn: validate_module_web_server - Validate the web server module and record its status for the console.
+        # . Purpose
+        #   Validate the web server module and record its status for the console.
         #
         # . Returns
         #   A console validation status (0=pass, 1=fail, 2=warning, 3=skipped).

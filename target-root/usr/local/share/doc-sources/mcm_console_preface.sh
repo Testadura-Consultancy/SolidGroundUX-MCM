@@ -7,8 +7,8 @@
 #   Checksum    : 11c42f00286c49dac8496ec644839dd46274bea221e9c949b0fd2ad45aa2a0df
 #   Source      : mcm_console_preface.sh
 #   Type        : documentation
-#   Group       : Console
-#   Purpose     : Group preface
+#   Group       : /
+#   Purpose     : Console architecture overview
 #
 # Attribution:
 #   Developers  : Mark Fieten

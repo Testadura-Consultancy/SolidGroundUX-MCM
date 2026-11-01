@@ -15,6 +15,8 @@ _INDEX_RE = re.compile(r"^.+_Index_[A-Za-z]{2}\.md$", re.I)
 _PAGE_RE = re.compile(r"^.+_[A-Za-z]{2}\.md$", re.I)
 
 
+
+# --- Public classes ------------------------------------------------------------
 @dataclass
 class IncomingPlan:
     """Portable inventory of one incoming package, without side effects."""
@@ -27,12 +29,24 @@ class IncomingPlan:
 
     @property
     def valid(self) -> bool:
-        """Whether the package passed the path and file checks."""
+        """Whether the package passed the path and file checks.
+        
+        Usage:
+            ```python
+            incoming_plan.valid
+            ```"""
         return not self.errors
 
 
+
+# --- Internal functions ------------------------------------------------------------
 def _check_path(name: str) -> str | None:
-    """Reject paths that could escape staging or have ambiguous separators."""
+    """Reject paths that could escape staging or have ambiguous separators.
+    
+    Usage:
+        ```python
+        _check_path(name)
+        ```"""
     if not name or "\\" in name or "\x00" in name:
         return "invalid or ambiguous path"
     if name.startswith("/") or re.match(r"^[A-Za-z]:", name):
@@ -46,7 +60,12 @@ def _check_path(name: str) -> str | None:
 
 
 def _classify(plan: IncomingPlan, names: list[str]) -> None:
-    """Classify Markdown section indexes and associated resource files."""
+    """Classify Markdown section indexes and associated resource files.
+    
+    Usage:
+        ```python
+        _classify(plan, names)
+        ```"""
     plan.files = sorted(names)
     for name in plan.files:
         path = PurePosixPath(name)
@@ -58,12 +77,18 @@ def _classify(plan: IncomingPlan, names: list[str]) -> None:
     plan.sections = sorted(set(plan.sections))
 
 
+
+# --- Public functions ------------------------------------------------------------
 def inspect_incoming_package(path: str | Path) -> IncomingPlan:
     """Inspect a local file, directory or ZIP without modifying the filesystem.
-
+    
     ZIP entries are not extracted. Symlinks and nonregular archive entries are
     rejected. Directories are traversed without following symlinked entries.
-    """
+    
+    Usage:
+        ```python
+        inspect_incoming_package(path)
+        ```"""
     source = Path(path).expanduser()
     plan = IncomingPlan(str(source))
     if not source.exists():

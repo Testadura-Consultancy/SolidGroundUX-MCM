@@ -19,25 +19,26 @@
 set -uo pipefail
 
 # - Library guard ------------------------------------------------------------------
-    # fn$ _sgnd_lib_guard - Enforce source-only, single-load library initialization
+    # fn: _sgnd_lib_guard - Enforce source-only, source-only library guard
         # . Purpose
-        #   Ensure the file is sourced as a library and initialized only once.
+        #   Ensure the file is sourced as a library and marked as loaded.
         #
         # . Behavior
         #   - Derives a unique guard variable name from the current filename.
         #   - Aborts execution when the file is run directly instead of sourced.
         #   - Sets the guard variable on first load.
-        #   - Returns immediately when the library was already loaded.
+        #   - Returns from the guard helper when the file is already marked loaded; it does not skip subsequent top-level statements.
         #
-        # Inputs
+        # . Inputs
         #   BASH_SOURCE[0]
-        #   $0
+        #   - $0
         #
-        # Outputs (globals)
+        # . Outputs
+        #   (globals)
         #   SGND_<MODULE>_LOADED
         #
         # . Returns
-        #   0 when already loaded or successfully initialized.
+        #   - 0 when already loaded or successfully initialized.
         #   Exits with code 2 when executed instead of sourced.
         #
         # . Usage
@@ -74,10 +75,15 @@ set -uo pipefail
         #   Update only the configured DNS server through the canonical identity tool.
         #
         # . Arguments
-        #   $1  DNS server IPv4 address.
+        #   - $1  DNS server IPv4 address.
         #
         # . Returns
         #   Exit status from the canonical identity workflow.
+        #
+        # . Usage
+        #   ```bash
+        #   sgnd_console_set_dns_server "192.0.2.53"
+        #   ```
     sgnd_console_set_dns_server() {
         local dns_server="${1:-}"
         local identity_script=""
@@ -103,30 +109,42 @@ set -uo pipefail
 
 # - Shared validation --------------------------------------------------------------
     # fn: sgnd_ad_validate_realm - Validate realm in the Active Directory workflow.
+        # . Purpose
+        #   Validate a DNS-style Active Directory realm name.
         #
+        # . Arguments
+        #   - `$1`: Realm name to check.
         # . Usage
         #   ```bash
-        #   sgnd_ad_validate_realm
+        #   sgnd_ad_validate_realm "example.test"
         #   ```
     sgnd_ad_validate_realm() {
         [[ "${1-}" =~ ^[A-Za-z0-9]([A-Za-z0-9-]*[A-Za-z0-9])?(\.[A-Za-z0-9]([A-Za-z0-9-]*[A-Za-z0-9])?)+$ ]]
     }
 
     # fn: sgnd_ad_validate_netbios - Validate netbios in the Active Directory workflow.
+        # . Purpose
+        #   Validate a NetBIOS domain name against accepted characters and length.
         #
+        # . Arguments
+        #   - `$1`: NetBIOS name to check.
         # . Usage
         #   ```bash
-        #   sgnd_ad_validate_netbios
+        #   sgnd_ad_validate_netbios "EXAMPLE"
         #   ```
     sgnd_ad_validate_netbios() {
         [[ "${1-}" =~ ^[A-Za-z][A-Za-z0-9_-]{0,14}$ ]]
     }
 
     # fn: sgnd_ad_validate_account - Validate account in the Active Directory workflow.
+        # . Purpose
+        #   Validate a domain account name against accepted characters and length.
         #
+        # . Arguments
+        #   - `$1`: Account name to check.
         # . Usage
         #   ```bash
-        #   sgnd_ad_validate_account
+        #   sgnd_ad_validate_account "example-user"
         #   ```
     sgnd_ad_validate_account() {
         [[ "${1-}" =~ ^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$ ]]
@@ -134,6 +152,8 @@ set -uo pipefail
 
 # - Shared host/network discovery --------------------------------------------------
     # fn: sgnd_ad_primary_ipv4 - Print the source IPv4 address selected by the system routing table.
+        # . Purpose
+        #   Print the source IPv4 address selected by the system routing table.
         #
         # . Usage
         #   ```bash
@@ -144,6 +164,8 @@ set -uo pipefail
     }
 
     # fn: sgnd_ad_default_gateway - Print the first IPv4 default gateway from the routing table.
+        # . Purpose
+        #   Print the first IPv4 default gateway from the routing table.
         #
         # . Usage
         #   ```bash
@@ -154,6 +176,8 @@ set -uo pipefail
     }
 
     # fn: sgnd_ad_current_dns - Print the first non-loopback DNS resolver address reported by resolvectl.
+        # . Purpose
+        #   Print the first non-loopback DNS resolver address reported by resolvectl.
         #
         # . Usage
         #   ```bash
@@ -166,10 +190,14 @@ set -uo pipefail
 # - Shared AD state ---------------------------------------------------------------
 
     # fn: sgnd_ad_domain_controller_ipv4 - Resolve an Active Directory domain controller IPv4 address from DNS SRV records.
+        # . Purpose
+        #   Resolve an Active Directory domain controller IPv4 address from DNS SRV records.
         #
+        # . Arguments
+        #   - `$1`: Active Directory DNS realm.
         # . Usage
         #   ```bash
-        #   sgnd_ad_domain_controller_ipv4
+        #   sgnd_ad_domain_controller_ipv4 "example.test"
         #   ```
     sgnd_ad_domain_controller_ipv4() {
         local realm="${1:?missing realm}"
@@ -182,6 +210,8 @@ set -uo pipefail
     }
 
     # fn: sgnd_ad_current_realm - Detect the currently configured domain realm from realm or Samba.
+        # . Purpose
+        #   Detect the currently configured domain realm from realm or Samba.
         #
         # . Usage
         #   ```bash
@@ -204,13 +234,13 @@ set -uo pipefail
         #   Resolve the NetBIOS/short domain name for the currently joined Active Directory realm.
         #
         # . Arguments
-        #   $1  Optional realm name. Defaults to the currently joined realm.
+        #   - $1  Optional realm name. Defaults to the currently joined realm.
         #
         # . Output
         #   Writes the short domain name, for example TESTADURA.
         #
         # . Returns
-        #   0 when the short domain name can be discovered; 1 otherwise.
+        #   - 0 when the short domain name can be discovered; 1 otherwise.
         #
         # . Usage
         #   ```bash
@@ -255,8 +285,8 @@ set -uo pipefail
         #   May update /etc/sssd/sssd.conf and restart sssd.service.
         #
         # . Returns
-        #   0 when the configuration is already valid or is normalized successfully.
-        #   1 when the configuration cannot be read, validated, installed, or activated.
+        #   - 0 when the configuration is already valid or is normalized successfully.
+        #   - 1 when the configuration cannot be read, validated, installed, or activated.
         #
         # . Usage
         #   ```bash
@@ -401,6 +431,8 @@ set -uo pipefail
     }
 
     # fn: sgnd_ad_is_domain_controller - Test whether the host is configured as a Samba AD domain controller.
+        # . Purpose
+        #   Test whether the host is configured as a Samba AD domain controller.
         #
         # . Usage
         #   ```bash
@@ -413,6 +445,8 @@ set -uo pipefail
     }
 
     # fn: sgnd_ad_is_domain_member - Test whether realmd reports an active realm membership.
+        # . Purpose
+        #   Test whether realmd reports an active realm membership.
         #
         # . Usage
         #   ```bash
@@ -424,6 +458,8 @@ set -uo pipefail
     }
 
     # fn: sgnd_ad_require_dc - Require dc in the Active Directory workflow.
+        # . Purpose
+        #   Require domain-controller readiness before performing AD administration.
         #
         # . Usage
         #   ```bash
@@ -440,10 +476,15 @@ set -uo pipefail
 
 # - Shared discovery ---------------------------------------------------------------
     # fn: sgnd_ad_discover_kerberos - Discover kerberos in the Active Directory workflow.
+        # . Purpose
+        #   Locate the Kerberos realm information for the current AD environment.
         #
+        # . Arguments
+        #   - `$1`: Active Directory DNS realm.
+        #   - `$2`: Optional: Optional DNS server used for the SRV lookup.
         # . Usage
         #   ```bash
-        #   sgnd_ad_discover_kerberos
+        #   sgnd_ad_discover_kerberos "example.test" "192.0.2.53"
         #   ```
     sgnd_ad_discover_kerberos() {
         local realm="${1:?missing realm}"
@@ -456,10 +497,15 @@ set -uo pipefail
     }
 
     # fn: sgnd_ad_discover_ldap - Discover ldap in the Active Directory workflow.
+        # . Purpose
+        #   Locate LDAP servers and connection details for the current AD environment.
         #
+        # . Arguments
+        #   - `$1`: Active Directory DNS realm.
+        #   - `$2`: Optional: Optional DNS server used for the SRV lookup.
         # . Usage
         #   ```bash
-        #   sgnd_ad_discover_ldap
+        #   sgnd_ad_discover_ldap "example.test" "192.0.2.53"
         #   ```
     sgnd_ad_discover_ldap() {
         local realm="${1:?missing realm}"
@@ -472,10 +518,16 @@ set -uo pipefail
     }
 
     # fn: sgnd_ad_dns_a_record_matches - Test whether DNS resolves a given hostname to the expected IPv4 address.
+        # . Purpose
+        #   Test whether DNS resolves a given hostname to the expected IPv4 address.
         #
+        # . Arguments
+        #   - `$1`: Fully qualified hostname to resolve.
+        #   - `$2`: Expected IPv4 address.
+        #   - `$3`: Optional: Optional DNS server used for the lookup.
         # . Usage
         #   ```bash
-        #   sgnd_ad_dns_a_record_matches
+        #   sgnd_ad_dns_a_record_matches "server.example.test" "192.0.2.10" "192.0.2.53"
         #   ```
     sgnd_ad_dns_a_record_matches() {
         local fqdn="${1:?missing fqdn}"

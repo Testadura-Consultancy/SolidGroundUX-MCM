@@ -8,7 +8,8 @@
 #   Shortname   : MANAGE_POSTGRESQL
 #   Source      : manage-postgresql.sh
 #   Type        : script
-#   Group       : Role Managers
+#   Group       : Modules
+#   Subgroup    : PostgreSQL
 #   Purpose     : Install, configure, manage, validate, and inspect PostgreSQL
 #
 #   Checksum : 35b7ef9c1443231c83a0cd84d701a0034ceac99bdb486c1a804914e2ab166da3
@@ -53,7 +54,7 @@ set -uo pipefail
         #     present, falls back to the installed framework copy without changing
         #     SGND_FRAMEWORK_ROOT.
         #
-        # . Globals (write)
+        # . Globals (Write)
         #   SGND_FRAMEWORK_ROOT
         #
         # . Output
@@ -61,8 +62,8 @@ set -uo pipefail
         #   helpers are not available until sgnd-exe-common.sh has been loaded.
         #
         # . Returns
-        #   0 when the framework root was resolved and executable common library loaded.
-        #   126 when the script path cannot be resolved, no canonical root component can
+        #   - 0 when the framework root was resolved and executable common library loaded.
+        #   - 126 when the script path cannot be resolved, no canonical root component can
         #   be found, or the executable common library is unreadable.
         #
         # . Usage
@@ -156,6 +157,15 @@ set -uo pipefail
     DB_PORT_DEFAULT="5432"
 
     # fn: _db_check_client - IPv4 address optionally followed by CIDR prefix
+        # . Purpose
+        #   Validate an IPv4 address, optionally with a CIDR prefix.
+        #
+        # . Arguments
+        #   - `$1`: Value to inspect or write.
+        # . Usage
+        #   ```bash
+        #   _db_check_client "192.0.2.10/32"
+        #   ```
     _db_check_client() {
         local value="$1" ip="" prefix=""
         ip="${value%%/*}"
@@ -168,8 +178,15 @@ set -uo pipefail
     }
 
     # fn: _db_default_client_cidr - Determine the subnet of the default-route IPv4 interface.
-    # Returns: Network/prefix, or empty when no usable routed IPv4 address exists.
-    # Usage: _db_default_client_cidr
+        # . Purpose
+        #   Determine the subnet of the default-route IPv4 interface.
+        #
+        # . Returns
+        #   Network/prefix, or empty when no usable routed IPv4 address exists.
+        # . Usage
+        #   ```bash
+        #   _db_default_client_cidr
+        #   ```
     _db_default_client_cidr() {
         local interface="" address=""
         interface="$(ip -4 route show default 2>/dev/null | awk '$1 == "default" { for (i=1; i<=NF; i++) if ($i == "dev") { print $(i+1); exit } }')"
@@ -186,6 +203,13 @@ except ValueError:
 CIDR_PY
     }
     # fn: _db_transition - Present the framework's interruptible transition countdown
+        # . Purpose
+        #   Present the framework's interruptible transition countdown.
+        #
+        # . Usage
+        #   ```bash
+        #   _db_transition "Reviewing database settings"
+        #   ```
     _db_transition() {
         local rc=0
         ask_dlg_autocontinue --seconds 5 --message "$1" --cancel --pause || rc=$?
@@ -193,6 +217,13 @@ CIDR_PY
     }
 
     # fn: _db_confirm - Require approval before changing an installation
+        # . Purpose
+        #   Require approval before changing an installation.
+        #
+        # . Usage
+        #   ```bash
+        #   _db_confirm "Apply these database changes?"
+        #   ```
     _db_confirm() {
         local answer="NO"
         ask_decision --label "$1" --choices "Yes|Y,No|N" --default "No" --var answer || return 1
@@ -200,6 +231,13 @@ CIDR_PY
     }
 
     # fn: _db_size_suggestion - Suggest 25 percent of RAM for dedicated installations
+        # . Purpose
+        #   Suggest 25 percent of RAM for dedicated installations.
+        #
+        # . Usage
+        #   ```bash
+        #   _db_size_suggestion
+        #   ```
     _db_size_suggestion() {
         local total_kb=0 value=128
         total_kb="$(awk '/^MemTotal:/ {print $2; exit}' /proc/meminfo)"
@@ -210,6 +248,13 @@ CIDR_PY
     }
 
     # fn: _db_failure_pause - Keep an actionable error visible before menu redraw
+        # . Purpose
+        #   Keep an actionable error visible before menu redraw.
+        #
+        # . Usage
+        #   ```bash
+        #   _db_failure_pause "The database configuration could not be applied"
+        #   ```
     _db_failure_pause() {
         sayfail "$1"
         # Visible regardless of console log-level filtering (including SILENT).
@@ -222,6 +267,13 @@ CIDR_PY
     }
 
     # fn: _db_require_ubuntu - Require supported platform before package writes
+        # . Purpose
+        #   Require supported platform before package writes.
+        #
+        # . Usage
+        #   ```bash
+        #   _db_require_ubuntu
+        #   ```
     _db_require_ubuntu() {
         local os_id="" os_version=""
         source /etc/os-release
@@ -233,11 +285,25 @@ CIDR_PY
     }
 
     # fn: _db_installed - Check package state
+        # . Purpose
+        #   Check package state.
+        #
+        # . Usage
+        #   ```bash
+        #   _db_installed
+        #   ```
     _db_installed() {
         dpkg-query -W -f='${Status}' "$DB_PACKAGE" 2>/dev/null | grep -q '^install ok installed$'
     }
 
     # fn: _db_run_write - Honor SolidGroundUX dryrun before changing host
+        # . Purpose
+        #   Honor SolidGroundUX dryrun before changing host.
+        #
+        # . Usage
+        #   ```bash
+        #   _db_run_write
+        #   ```
     _db_run_write() {
         if (( ${FLAG_DRYRUN:-0} == 1 )); then
             sayinfo "DRYRUN: $(printf '%q ' "$@")"
@@ -247,6 +313,13 @@ CIDR_PY
     }
 
     # fn: _db_restart_active - Only restart when currently active
+        # . Purpose
+        #   Only restart when currently active.
+        #
+        # . Usage
+        #   ```bash
+        #   _db_restart_active
+        #   ```
     _db_restart_active() {
         if systemctl is-active --quiet "$DB_SERVICE"; then
             _db_run_write systemctl restart "$DB_SERVICE"
@@ -254,10 +327,23 @@ CIDR_PY
     }
 
     # fn: _db_check_port - Validate TCP port argument
+        # . Purpose
+        #   Validate TCP port argument.
+        #
+        # . Usage
+        #   ```bash
+        #   _db_check_port "5432"
+        #   ```
     _db_check_port() { [[ "$1" =~ ^[0-9]+$ ]] && (( 10#$1 >= 1 && 10#$1 <= 65535 )); }
 
-    # fn: _db_choose_service_action - Apply an explicitly selected systemd operation
     # fn: _db_service - Manage the service for db in the PostgreSQL workflow.
+        # . Purpose
+        #   Start, stop, restart or inspect the PostgreSQL systemd service as requested.
+        #
+        # . Usage
+        #   ```bash
+        #   _db_service
+        #   ```
     _db_service() {
         local choice="" operation=""
         sgnd_print_sectionheader "PostgreSQL service management"
@@ -270,6 +356,13 @@ CIDR_PY
     }
 
     # fn: _db_firewall - Open the configured TCP port (not the database auth rules)
+        # . Purpose
+        #   Open the configured TCP port (not the database auth rules).
+        #
+        # . Usage
+        #   ```bash
+        #   _db_firewall
+        #   ```
     _db_firewall() {
         local port=""
         command -v ufw >/dev/null 2>&1 || { saywarning "UFW is not installed."; return 0; }
@@ -282,6 +375,13 @@ CIDR_PY
     }
 
     # fn: _db_storage - No automatic migration of populated database files
+        # . Purpose
+        #   Review PostgreSQL storage configuration without automatically moving existing data files.
+        #
+        # . Usage
+        #   ```bash
+        #   _db_storage
+        #   ```
     _db_storage() {
         sgnd_print_sectionheader "PostgreSQL storage"
         if ! _db_installed; then
@@ -310,8 +410,12 @@ CIDR_PY
     # fn: _db_directory_inspect - Inspect db directory in the PostgreSQL workflow.
         # . Purpose
         #   Inspect an installation target without provisioning or modifying disks.
+        #
+        # . Arguments
+        #   - `$1`: Candidate PostgreSQL data directory.
+        #   - `$2`: Name of the shell variable for the result.
         # . Returns
-        #   0 when suitable, 2 when cancelled, 3 when the choice must change.
+        #   - 0 when suitable, 2 when cancelled, 3 when the choice must change.
         # . Usage
         #   ```bash
         #   _db_directory_inspect "/srv/storage/data" disposition
@@ -384,8 +488,11 @@ CIDR_PY
     # fn: _db_clear_directory - Validate the selected PostgreSQL data directory and request confirmation before clearing it.
         # . Purpose
         #   Remove contents of an approved, unregistered data directory only.
+        #
+        # . Arguments
+        #   - `$1`: Approved dedicated PostgreSQL data directory.
         # . Returns
-        #   0 on success, 2 when cancelled, 1 on unsafe target or failure.
+        #   - 0 on success, 2 when cancelled, 1 on unsafe target or failure.
         # . Usage
         #   ```bash
         #   _db_clear_directory "/srv/storage/data"
@@ -424,6 +531,13 @@ CIDR_PY
     }
 
     # fn: _db_fresh_install - Configure and initialize a new cluster on chosen storage
+        # . Purpose
+        #   Configure and initialize a new cluster on chosen storage.
+        #
+        # . Usage
+        #   ```bash
+        #   _db_fresh_install
+        #   ```
     _db_fresh_install() {
         local path="/srv/postgresql/data" cluster="main" port="5432" listen="localhost"
         local memory="" client="" version="" password_choice="NO" remote="NO" rc=0 disposition="Keep" default_client=""
@@ -564,23 +678,51 @@ CIDR_PY
     }
 
     # fn: _db_repository - Stock Ubuntu repos, no external keys or pinned versions
+        # . Purpose
+        #   Verify PostgreSQL package availability in Ubuntu repositories without adding third-party sources.
+        #
+        # . Usage
+        #   ```bash
+        #   _db_repository
+        #   ```
     _db_repository() {
         _db_require_ubuntu || return $?
         _db_run_write apt-get update
     }
 
     # fn: _db_install - Install engine using the selected Ubuntu packages
+        # . Purpose
+        #   Install engine using the selected Ubuntu packages.
+        #
+        # . Usage
+        #   ```bash
+        #   _db_install
+        #   ```
     _db_install() {
         _db_require_ubuntu || return $?
         _db_run_write env DEBIAN_FRONTEND=noninteractive apt-get install -y "$DB_PACKAGE"
     }
 
     # fn: _db_tools - Install standard engine command-line client
+        # . Purpose
+        #   Install standard engine command-line client.
+        #
+        # . Usage
+        #   ```bash
+        #   _db_tools
+        #   ```
     _db_tools() {
         _db_run_write env DEBIAN_FRONTEND=noninteractive apt-get install -y "postgresql-client"
     }
 
     # fn: _db_logs - Display recent service journal without another management UI
+        # . Purpose
+        #   Display recent service journal without another management UI.
+        #
+        # . Usage
+        #   ```bash
+        #   _db_logs
+        #   ```
     _db_logs() {
         saystart "Reading database service log"
         journalctl -u "$DB_SERVICE" -n 80 --no-pager || { sayfail "Unable to read service log."; return 1; }
@@ -588,6 +730,13 @@ CIDR_PY
     }
 
     # fn: _db_backup - Clarify scope without implementing unsafe restore operations
+        # . Purpose
+        #   Clarify scope without implementing unsafe restore operations.
+        #
+        # . Usage
+        #   ```bash
+        #   _db_backup
+        #   ```
     _db_backup() {
         sayinfo "Database backup and restore are intentionally managed with database-specific tooling."
         sayinfo "Use pg_dump, pg_restore and pg_basebackup, or DBeaver for interactive work."
@@ -595,6 +744,13 @@ CIDR_PY
     }
 
     # fn: _db_prepare - Mirror SQL Server's tracked four-step preparation
+        # . Purpose
+        #   Coordinate the staged PostgreSQL installation and configuration workflow.
+        #
+        # . Usage
+        #   ```bash
+        #   _db_prepare
+        #   ```
     _db_prepare() {
         local rc=0
         saystart "PostgreSQL installation workflow"
@@ -618,6 +774,13 @@ CIDR_PY
 # - PostgreSQL-specific operations -------------------------------------------------
     # Debian/Ubuntu support multiple clusters; refuse ambiguous selections.
     # fn: _db_cluster - Identify the PostgreSQL cluster from the available pg_lsclusters entries.
+        # . Purpose
+        #   Identify the PostgreSQL cluster from the available pg_lsclusters entries.
+        #
+        # . Usage
+        #   ```bash
+        #   _db_cluster
+        #   ```
     _db_cluster() {
         local -a clusters=()
         local version="" name="" port="" status="" owner="" directory="" logfile=""
@@ -629,6 +792,13 @@ CIDR_PY
         printf '%s\n' "${clusters[0]}"
     }
     # fn: _db_conf - Read a PostgreSQL cluster setting through pg_conftool.
+        # . Purpose
+        #   Read a PostgreSQL cluster setting through pg_conftool.
+        #
+        # . Usage
+        #   ```bash
+        #   _db_conf
+        #   ```
     _db_conf() {
         local version="" cluster="" assignment="" result=""
         read -r version cluster <<< "$(_db_cluster)" || return 1
@@ -641,12 +811,29 @@ CIDR_PY
         printf '%s\n' "$result"
     }
     # fn: _db_set - Set db in the PostgreSQL workflow.
+        # . Purpose
+        #   Write the selected PostgreSQL server configuration setting.
+        #
+        # . Arguments
+        #   - `$1`: PostgreSQL configuration setting name.
+        #   - `$2`: Value to inspect or write.
+        # . Usage
+        #   ```bash
+        #   _db_set "<setting>" "example-value"
+        #   ```
     _db_set() {
         local version="" cluster="" setting="$1" value="$2"
         read -r version cluster <<< "$(_db_cluster)" || return 1
         _db_run_write pg_conftool "$version" "$cluster" set "$setting" "$value"
     }
     # fn: _db_port - Read and validate the configured PostgreSQL TCP port.
+        # . Purpose
+        #   Read and validate the configured PostgreSQL TCP port.
+        #
+        # . Usage
+        #   ```bash
+        #   _db_port
+        #   ```
     _db_port() {
         local port=""
         port="$(_db_conf port)" || return 1
@@ -654,19 +841,40 @@ CIDR_PY
         printf '%s\n' "$port"
     }
     # fn: _db_configure - Configure db in the PostgreSQL workflow.
+        # . Purpose
+        #   Collect and apply PostgreSQL network, authentication and memory settings.
+        #
+        # . Usage
+        #   ```bash
+        #   _db_configure
+        #   ```
     _db_configure() {
         _db_installed || { sayfail "PostgreSQL is not installed."; return 1; }
         _db_cluster >/dev/null || return 1
         sayok "PostgreSQL cluster detected. Authentication and database roles remain unchanged."
     }
     # fn: _db_storage_detail - Display the configured database data directory.
+        # . Purpose
+        #   Display the configured database data directory.
+        #
+        # . Usage
+        #   ```bash
+        #   _db_storage_detail
+        #   ```
     _db_storage_detail() {
         local version="" cluster="" dir=""
         read -r version cluster <<< "$(_db_cluster)" || return 1
         dir="$(pg_lsclusters --no-header | awk -v v="$version" -v c="$cluster" '$1==v && $2==c {print $6;exit}')"
         sgnd_print_labeledvalue --label "Data directory" --value "$dir" --labelwidth 22
     }
-    # fn: _db_network - Review or configure the MariaDB TCP port and bind address.
+    # fn: _db_network - Review or configure the PostgreSQL TCP port and listen address.
+        # . Purpose
+        #   Review or configure the PostgreSQL TCP port and listen address.
+        #
+        # . Usage
+        #   ```bash
+        #   _db_network
+        #   ```
     _db_network() {
         local port="" address="" value="" newport="" newaddress=""
         _db_installed && _db_cluster >/dev/null || return 1
@@ -685,16 +893,19 @@ CIDR_PY
         sayend "PostgreSQL network configured"
         sayinfo "Client authentication restrictions are controlled separately in pg_hba.conf."
     }
-    # _db_memory
-    # Purpose:
-    #   Change PostgreSQL shared buffers only when the requested value differs.
-    # Behavior:
-    #   - Enter on the current value is a successful no-op.
-    #   - Report configuration-write and restart failures explicitly.
-    # Returns:
-    #   0 for unchanged or successfully applied settings; nonzero on failure.
-    # Usage:
-    # fn: _db_memory - Review or configure the MariaDB InnoDB buffer-pool size.
+    # fn: _db_memory - Review or configure the PostgreSQL memory configuration.
+        # . Purpose
+        #   Change PostgreSQL shared_buffers only when the requested value differs
+        #   from the current setting; validate the unit and restart the active service.
+        #
+        # . Returns
+        #   - 0 when settings are unchanged or successfully applied, including a back action.
+        #   - Nonzero if configuration, validation or restart fails.
+        #
+        # . Usage
+        #   ```bash
+        #   _db_memory
+        #   ```
     _db_memory() {
         local current="" value="" normalized_current="" normalized_value=""
         _db_installed || { _db_failure_pause "PostgreSQL is not installed."; return 1; }
@@ -729,6 +940,13 @@ CIDR_PY
         return 0
     }
     # fn: _db_access - Set postgres password and authorize one workstation
+        # . Purpose
+        #   Set postgres password and authorize one workstation.
+        #
+        # . Usage
+        #   ```bash
+        #   _db_access
+        #   ```
     _db_access() {
         local version="" cluster="" client="" hba="" port="" listen="" answer="NO" default_client=""
         default_client="$(_db_default_client_cidr 2>/dev/null || true)"
@@ -777,7 +995,7 @@ CIDR_PY
         # . Purpose
         #   Show the live server configuration and workstation connection settings.
         # . Returns
-        #   0 after reporting available information.
+        #   - 0 after reporting available information.
         # . Usage
         #   ```bash
         #   _db_status
@@ -838,6 +1056,13 @@ CIDR_PY
         sayinfo "The connection details are derived from this server, not a verified test from your workstation."
     }
     # fn: _db_validate - Validate db in the PostgreSQL workflow.
+        # . Purpose
+        #   Check PostgreSQL prerequisites, active configuration and service readiness.
+        #
+        # . Usage
+        #   ```bash
+        #   _db_validate
+        #   ```
     _db_validate() {
         local failures=0 port=""
         _db_installed || { sayfail "PostgreSQL engine not installed."; return 1; }
@@ -853,6 +1078,15 @@ CIDR_PY
 
 # - Action dispatch ----------------------------------------------------------------
     # fn: _run_action - Execute management action and retain its exit status
+        # . Purpose
+        #   Execute management action and retain its exit status.
+        #
+        # . Arguments
+        #   - `$1`: Management action to execute.
+        # . Usage
+        #   ```bash
+        #   _run_action "status"
+        #   ```
     _run_action() {
         local action="${1:?missing action}" rc=0
         case "$action" in
@@ -878,6 +1112,13 @@ CIDR_PY
 
 # - Main ----------------------------------------------------------------------------
     # fn: main - Dispatch command-line options to the appropriate management workflow.
+        # . Purpose
+        #   Dispatch command-line options to the appropriate management workflow.
+        #
+        # . Usage
+        #   ```bash
+        #   main "$@"
+        #   ```
     main() {
         _framework_locator || return $?
         sgnd_exe_start "$@" || return $?

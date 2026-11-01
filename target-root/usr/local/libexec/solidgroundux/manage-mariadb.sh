@@ -8,7 +8,8 @@
 #   Shortname   : MANAGE_MARIADB
 #   Source      : manage-mariadb.sh
 #   Type        : script
-#   Group       : Role Managers
+#   Group       : Modules
+#   Subgroup    : MariaDB
 #   Purpose     : Install, configure, manage, validate, and inspect MariaDB
 #
 #   Checksum : de9f3fe64205a5cabde58db6983026802346552c309ae8325221b59c0ab63010
@@ -53,7 +54,7 @@ set -uo pipefail
         #     present, falls back to the installed framework copy without changing
         #     SGND_FRAMEWORK_ROOT.
         #
-        # . Globals (write)
+        # . Globals (Write)
         #   SGND_FRAMEWORK_ROOT
         #
         # . Output
@@ -61,8 +62,8 @@ set -uo pipefail
         #   helpers are not available until sgnd-exe-common.sh has been loaded.
         #
         # . Returns
-        #   0 when the framework root was resolved and executable common library loaded.
-        #   126 when the script path cannot be resolved, no canonical root component can
+        #   - 0 when the framework root was resolved and executable common library loaded.
+        #   - 126 when the script path cannot be resolved, no canonical root component can
         #   be found, or the executable common library is unreadable.
         #
         # . Usage
@@ -156,8 +157,15 @@ set -uo pipefail
     DB_PORT_DEFAULT="3306"
 
     # fn: _db_default_client_cidr - Determine the subnet of the default-route IPv4 interface.
-    # Returns: Network/prefix, or empty when no usable routed IPv4 address exists.
-    # Usage: _db_default_client_cidr
+        # . Purpose
+        #   Determine the subnet of the default-route IPv4 interface.
+        #
+        # . Returns
+        #   Network/prefix, or empty when no usable routed IPv4 address exists.
+        # . Usage
+        #   ```bash
+        #   _db_default_client_cidr
+        #   ```
     _db_default_client_cidr() {
         local interface="" address=""
         interface="$(ip -4 route show default 2>/dev/null | awk '$1 == "default" { for (i=1; i<=NF; i++) if ($i == "dev") { print $(i+1); exit } }')"
@@ -174,8 +182,15 @@ except ValueError:
 CIDR_PY
     }
     # fn: _db_check_client_cidr - Validate a single IPv4 address or a routed CIDR.
-    # Returns: 0 for a valid IPv4 host/network, nonzero for invalid input.
-    # Usage: _db_check_client_cidr "192.168.0.0/24"
+        # . Purpose
+        #   Validate a single IPv4 address or a routed CIDR.
+        #
+        # . Returns
+        #   - 0 for a valid IPv4 host/network, nonzero for invalid input.
+        # . Usage
+        #   ```bash
+        #   _db_check_client_cidr "192.168.0.0/24"
+        #   ```
     _db_check_client_cidr() {
         python3 - "$1" <<'CIDR_PY'
 import ipaddress
@@ -187,8 +202,15 @@ except (ValueError, TypeError):
 CIDR_PY
     }
     # fn: _db_account_host - Convert CIDR to MariaDB's IPv4/netmask host format.
-    # Returns: The host specification for CREATE USER; no wildcard expansion.
-    # Usage: _db_account_host "192.168.0.0/24"
+        # . Purpose
+        #   Convert CIDR to MariaDB's IPv4/netmask host format.
+        #
+        # . Returns
+        #   The host specification for CREATE USER; no wildcard expansion.
+        # . Usage
+        #   ```bash
+        #   _db_account_host "192.168.0.0/24"
+        #   ```
     _db_account_host() {
         python3 - "$1" <<'CIDR_PY'
 import ipaddress
@@ -201,18 +223,39 @@ except (ValueError, TypeError):
 CIDR_PY
     }
     # fn: _db_transition - Framework countdown before installation work
+        # . Purpose
+        #   Framework countdown before installation work.
+        #
+        # . Usage
+        #   ```bash
+        #   _db_transition "Reviewing database settings"
+        #   ```
     _db_transition() {
         local rc=0
         ask_dlg_autocontinue --seconds 5 --message "$1" --cancel --pause || rc=$?
         (( rc != 2 ))
     }
     # fn: _db_confirm - Ask for explicit installation approval
+        # . Purpose
+        #   Ask for explicit installation approval.
+        #
+        # . Usage
+        #   ```bash
+        #   _db_confirm "Apply these database changes?"
+        #   ```
     _db_confirm() {
         local answer="NO"
         ask_decision --label "$1" --choices "Yes|Y,No|N" --default "No" --var answer || return 1
         [[ "$answer" == YES ]]
     }
     # fn: _db_failure_pause - Keep failures visible before the console redraws
+        # . Purpose
+        #   Keep failures visible before the console redraws.
+        #
+        # . Usage
+        #   ```bash
+        #   _db_failure_pause "The database configuration could not be applied"
+        #   ```
     _db_failure_pause() {
         sayfail "$1"
         if [[ -r /dev/tty && -w /dev/tty ]]; then
@@ -222,6 +265,13 @@ CIDR_PY
         return 1
     }
     # fn: _db_suggest_pool - Suggest a quarter of physical RAM in megabytes
+        # . Purpose
+        #   Suggest a quarter of physical RAM in megabytes.
+        #
+        # . Usage
+        #   ```bash
+        #   _db_suggest_pool
+        #   ```
     _db_suggest_pool() {
         local kb="" mb=128
         kb="$(awk '/^MemTotal:/ {print $2;exit}' /proc/meminfo)"
@@ -231,6 +281,13 @@ CIDR_PY
     }
 
     # fn: _db_require_ubuntu - Require supported platform before package writes
+        # . Purpose
+        #   Require supported platform before package writes.
+        #
+        # . Usage
+        #   ```bash
+        #   _db_require_ubuntu
+        #   ```
     _db_require_ubuntu() {
         local os_id="" os_version=""
         source /etc/os-release
@@ -242,11 +299,25 @@ CIDR_PY
     }
 
     # fn: _db_installed - Check package state
+        # . Purpose
+        #   Check package state.
+        #
+        # . Usage
+        #   ```bash
+        #   _db_installed
+        #   ```
     _db_installed() {
         dpkg-query -W -f='${Status}' "$DB_PACKAGE" 2>/dev/null | grep -q '^install ok installed$'
     }
 
     # fn: _db_run_write - Honor SolidGroundUX dryrun before changing host
+        # . Purpose
+        #   Honor SolidGroundUX dryrun before changing host.
+        #
+        # . Usage
+        #   ```bash
+        #   _db_run_write
+        #   ```
     _db_run_write() {
         if (( ${FLAG_DRYRUN:-0} == 1 )); then
             sayinfo "DRYRUN: $(printf '%q ' "$@")"
@@ -256,6 +327,13 @@ CIDR_PY
     }
 
     # fn: _db_restart_active - Only restart when currently active
+        # . Purpose
+        #   Only restart when currently active.
+        #
+        # . Usage
+        #   ```bash
+        #   _db_restart_active
+        #   ```
     _db_restart_active() {
         if systemctl is-active --quiet "$DB_SERVICE"; then
             _db_run_write systemctl restart "$DB_SERVICE"
@@ -263,10 +341,23 @@ CIDR_PY
     }
 
     # fn: _db_check_port - Validate TCP port argument
+        # . Purpose
+        #   Validate TCP port argument.
+        #
+        # . Usage
+        #   ```bash
+        #   _db_check_port "8080"
+        #   ```
     _db_check_port() { [[ "$1" =~ ^[0-9]+$ ]] && (( 10#$1 >= 1 && 10#$1 <= 65535 )); }
 
-    # fn: _db_choose_service_action - Apply an explicitly selected systemd operation
     # fn: _db_service - Manage the service for db in the MariaDB workflow.
+        # . Purpose
+        #   Start, stop, restart or inspect the MariaDB systemd service as requested.
+        #
+        # . Usage
+        #   ```bash
+        #   _db_service
+        #   ```
     _db_service() {
         local choice="" operation=""
         sgnd_print_sectionheader "MariaDB service management"
@@ -279,6 +370,13 @@ CIDR_PY
     }
 
     # fn: _db_firewall - Open the configured TCP port (not the database auth rules)
+        # . Purpose
+        #   Open the configured TCP port (not the database auth rules).
+        #
+        # . Usage
+        #   ```bash
+        #   _db_firewall
+        #   ```
     _db_firewall() {
         local port=""
         command -v ufw >/dev/null 2>&1 || { saywarning "UFW is not installed."; return 0; }
@@ -291,6 +389,13 @@ CIDR_PY
     }
 
     # fn: _db_storage - No automatic migration of populated database files
+        # . Purpose
+        #   No automatic migration of populated database files.
+        #
+        # . Usage
+        #   ```bash
+        #   _db_storage
+        #   ```
     _db_storage() {
         sgnd_print_sectionheader "MariaDB storage"
         _db_storage_detail || return 1
@@ -308,9 +413,17 @@ CIDR_PY
     }
 
     # fn: _db_storage_check - Validate selected directory before installing packages
-    # Purpose: Reject unsafe filesystem roots, unmounted fstab targets and existing data.
-    # Returns: 0 if directory is safe for fresh initialization; 1 otherwise.
-    # Usage: _db_storage_check "/srv/storage/data/mysql"
+        # . Purpose
+        #   Reject unsafe filesystem roots, unmounted fstab targets and existing data.
+        #
+        # . Arguments
+        #   - `$1`: Filesystem path to inspect.
+        # . Returns
+        #   - 0 if directory is safe for fresh initialization; 1 otherwise.
+        # . Usage
+        #   ```bash
+        #   _db_storage_check "/srv/storage/data/mysql"
+        #   ```
     _db_storage_check() {
         local path="$1" parent="" mount="" existing=""
         [[ "$path" == /* && "$path" != / ]] || { sayfail "Select an absolute data directory below a filesystem root."; return 1; }
@@ -366,7 +479,7 @@ CIDR_PY
         # . Purpose
         #   Discover the initialized package directory rather than assuming its path.
         # . Returns
-        #   0 and one absolute path, or 1 when no trustworthy location is known.
+        #   - 0 and one absolute path, or 1 when no trustworthy location is known.
         # . Usage
         #   ```bash
         #   _db_package_datadir
@@ -407,7 +520,7 @@ CIDR_PY
         # . Purpose
         #   Initialize only an empty and stopped package data directory.
         # . Returns
-        #   0 if initialized, nonzero if state is ambiguous or unsafe.
+        #   - 0 if initialized, nonzero if state is ambiguous or unsafe.
         # . Usage
         #   ```bash
         #   _db_ensure_initialized
@@ -456,7 +569,7 @@ CIDR_PY
         # . Purpose
         #   Discover the distro-installed MariaDB AppArmor profile.
         # . Returns
-        #   0 with the path, or 1 if none exists.
+        #   - 0 with the path, or 1 if none exists.
         # . Usage
         #   ```bash
         #   _db_apparmor_profile
@@ -472,11 +585,16 @@ CIDR_PY
     # fn: _db_apparmor_prepare - Prepare db apparmor in the MariaDB workflow.
         # . Purpose
         #   Allow MariaDB to access a custom datadir in its active profile.
+        #
+        # . Arguments
+        #   - `$1`: Data directory that requires AppArmor access.
+        #   - `$2`: AppArmor profile path to adapt.
+        #   - `$3`: Previous MariaDB data directory.
         # . Returns
-        #   Nonzero if an installed profile cannot be safely configured.
+        #   - Nonzero if an installed profile cannot be safely configured.
         # . Usage
         #   ```bash
-        #   _db_apparmor_prepare "/path/to/data" "/path/to/profile"
+        #   _db_apparmor_prepare "/srv/storage/data/mariadb" "/etc/apparmor.d/usr.sbin.mariadbd" "/var/lib/mysql"
         #   ```
     _db_apparmor_prepare() {
         local target="$1" profile="$2" local_file="" rule="" alias_entry="" old="$3"
@@ -520,8 +638,11 @@ CIDR_PY
     # fn: _db_apparmor_known_denial - Detect the known MariaDB AppArmor mknod denial in recent kernel messages.
         # . Purpose
         #   Identify the tested Ubuntu mknod/c AppArmor denial since a start attempt.
+        #
+        # . Arguments
+        #   - `$1`: Timestamp from which AppArmor kernel denials are inspected.
         # . Returns
-        #   0 only for a matching denial.
+        #   - 0 only for a matching denial.
         # . Usage
         #   ```bash
         #   _db_apparmor_known_denial "<unix seconds>"
@@ -535,8 +656,13 @@ CIDR_PY
     # fn: _db_apparmor_recover - Offer a targeted recovery for the recognized MariaDB AppArmor denial.
         # . Purpose
         #   Offer explicit, profile-only complain mode as a tested compatibility workaround.
+        #
+        # . Arguments
+        #   - `$1`: AppArmor profile path.
+        #   - `$2`: Requested MariaDB data directory.
+        #   - `$3`: Timestamp preceding the attempted MariaDB operation.
         # . Returns
-        #   0 only if approved and MariaDB passes datadir verification.
+        #   - 0 only if approved and MariaDB passes datadir verification.
         # . Usage
         #   ```bash
         #   _db_apparmor_recover "/path/to/profile" "/selected/datadir" "<start timestamp>"
@@ -564,8 +690,11 @@ CIDR_PY
     # fn: _db_custom_datadir - Configure a custom MariaDB data directory and required service/security settings.
         # . Purpose
         #   Relocate only freshly initialized package data to validated destination.
+        #
+        # . Arguments
+        #   - `$1`: Selected MariaDB data directory.
         # . Returns
-        #   0 after live datadir verification, nonzero otherwise.
+        #   - 0 after live datadir verification, nonzero otherwise.
         # . Usage
         #   ```bash
         #   _db_custom_datadir "/srv/storage/data/mysql"
@@ -619,9 +748,14 @@ CIDR_PY
     }
 
     # fn: _db_fresh_install - Collect all settings before package installation
-    # Purpose: Initialize a fresh MariaDB service using an arbitrary validated directory.
-    # Returns: 0 on completion or cancellation; nonzero on failure.
-    # Usage: _db_fresh_install
+        # . Purpose
+        #   Initialize a fresh MariaDB service using an arbitrary validated directory.
+        # . Returns
+        #   - 0 on completion or cancellation; nonzero on failure.
+        # . Usage
+        #   ```bash
+        #   _db_fresh_install
+        #   ```
     _db_fresh_install() {
         local path="/var/lib/mysql" port="3306" bind="127.0.0.1" memory="" remote="NO"
         local client="" admin="sgnd_admin" password="" confirm_password="" escaped=""
@@ -717,23 +851,51 @@ CIDR_PY
     }
 
     # fn: _db_repository - Stock Ubuntu repos, no external keys or pinned versions
+        # . Purpose
+        #   Stock Ubuntu repos, no external keys or pinned versions.
+        #
+        # . Usage
+        #   ```bash
+        #   _db_repository
+        #   ```
     _db_repository() {
         _db_require_ubuntu || return $?
         _db_run_write apt-get update
     }
 
     # fn: _db_install - Install engine using the selected Ubuntu packages
+        # . Purpose
+        #   Install engine using the selected Ubuntu packages.
+        #
+        # . Usage
+        #   ```bash
+        #   _db_install
+        #   ```
     _db_install() {
         _db_require_ubuntu || return $?
         _db_run_write env DEBIAN_FRONTEND=noninteractive apt-get install -y "$DB_PACKAGE"
     }
 
     # fn: _db_tools - Install standard engine command-line client
+        # . Purpose
+        #   Install standard engine command-line client.
+        #
+        # . Usage
+        #   ```bash
+        #   _db_tools
+        #   ```
     _db_tools() {
         _db_run_write env DEBIAN_FRONTEND=noninteractive apt-get install -y "mariadb-client"
     }
 
     # fn: _db_logs - Display recent service journal without another management UI
+        # . Purpose
+        #   Display recent service journal without another management UI.
+        #
+        # . Usage
+        #   ```bash
+        #   _db_logs
+        #   ```
     _db_logs() {
         saystart "Reading database service log"
         journalctl -u "$DB_SERVICE" -n 80 --no-pager || { sayfail "Unable to read service log."; return 1; }
@@ -741,6 +903,13 @@ CIDR_PY
     }
 
     # fn: _db_backup - Clarify scope without implementing unsafe restore operations
+        # . Purpose
+        #   Clarify scope without implementing unsafe restore operations.
+        #
+        # . Usage
+        #   ```bash
+        #   _db_backup
+        #   ```
     _db_backup() {
         sayinfo "Database backup and restore are intentionally managed with database-specific tooling."
         sayinfo "Use mariadb-dump/mariadb-backup or DBeaver for interactive work."
@@ -754,6 +923,13 @@ CIDR_PY
     #   0 on inspection, cancellation or successful configuration; nonzero on failure.
     # Usage:
     # fn: _db_existing_install - Install db existing in the MariaDB workflow.
+        # . Purpose
+        #   Offer inspection or reconfiguration options for an existing MariaDB installation.
+        #
+        # . Usage
+        #   ```bash
+        #   _db_existing_install
+        #   ```
     _db_existing_install() {
         local choice="" port="" bind="" memory="" current_port="" current_bind=""
         local current_memory="" review="" access="No" rc=0
@@ -831,6 +1007,13 @@ CIDR_PY
     }
 
     # fn: _db_prepare - Mirror SQL Server's tracked four-step preparation
+        # . Purpose
+        #   Mirror SQL Server's tracked four-step preparation.
+        #
+        # . Usage
+        #   ```bash
+        #   _db_prepare
+        #   ```
     _db_prepare() {
         local rc=0
         saystart "MariaDB installation workflow"
@@ -856,6 +1039,15 @@ CIDR_PY
     # SolidGroundUX writes a dedicated override rather than patching distro files.
     DB_OVERRIDE="/etc/mysql/mariadb.conf.d/99-solidgroundux.cnf"
     # fn: _db_option - Read a selected MariaDB server setting from the active service or configuration.
+        # . Purpose
+        #   Read a selected MariaDB server setting from the active service or configuration.
+        #
+        # . Arguments
+        #   - `$1`: Configuration or response-field key.
+        # . Usage
+        #   ```bash
+        #   _db_option "port"
+        #   ```
     _db_option() {
         local key="$1" value=""
         if command -v mariadb >/dev/null 2>&1 && systemctl is-active --quiet "$DB_SERVICE"; then
@@ -871,6 +1063,8 @@ CIDR_PY
         printf '%s\n' "$value"
     }
     # fn: _db_port - Call `_db_option` with the `port` action.
+        # . Purpose
+        #   Invoke the port action through the module manager.
         #
         # . Returns
         #   The status returned by the delegated action.
@@ -881,6 +1075,16 @@ CIDR_PY
         #   ```
     _db_port() { _db_option port; }
     # fn: _db_set - Set db in the MariaDB workflow.
+        # . Purpose
+        #   Write a MariaDB configuration setting through the selected configuration mechanism.
+        #
+        # . Arguments
+        #   - `$1`: Configuration or response-field key.
+        #   - `$2`: Value to inspect or write.
+        # . Usage
+        #   ```bash
+        #   _db_set "port" "3306"
+        #   ```
     _db_set() {
         local key="$1" value="$2" old="" tmp=""
         # Restrict keys and value syntax before an elevated file write.
@@ -904,6 +1108,13 @@ CIDR_PY
         return "$rc"
     }
     # fn: _db_configure - Configure db in the MariaDB workflow.
+        # . Purpose
+        #   Collect and apply MariaDB port, bind address and buffer-pool settings.
+        #
+        # . Usage
+        #   ```bash
+        #   _db_configure
+        #   ```
     _db_configure() {
         _db_installed || { sayfail "MariaDB not installed."; return 1; }
         if (( ${FLAG_DRYRUN:-0} == 1 )); then
@@ -918,12 +1129,26 @@ CIDR_PY
         fi
     }
     # fn: _db_storage_detail - Display the configured database data directory.
+        # . Purpose
+        #   Display the configured database data directory.
+        #
+        # . Usage
+        #   ```bash
+        #   _db_storage_detail
+        #   ```
     _db_storage_detail() {
         local path=""
         path="$(_db_option datadir 2>/dev/null || printf '/var/lib/mysql')"
         sgnd_print_labeledvalue --label "Data directory" --value "$path" --labelwidth 22
     }
     # fn: _db_network - Review or configure the MariaDB TCP port and bind address.
+        # . Purpose
+        #   Review or configure the MariaDB TCP port and bind address.
+        #
+        # . Usage
+        #   ```bash
+        #   _db_network
+        #   ```
     _db_network() {
         local port="" address="" value=""
         _db_installed || return 1
@@ -940,6 +1165,13 @@ CIDR_PY
         _db_restart_active
     }
     # fn: _db_memory - Review or configure the MariaDB InnoDB buffer-pool size.
+        # . Purpose
+        #   Review or configure the MariaDB InnoDB buffer-pool size.
+        #
+        # . Usage
+        #   ```bash
+        #   _db_memory
+        #   ```
     _db_memory() {
         local current="" value=""
         _db_installed || return 1
@@ -959,6 +1191,13 @@ CIDR_PY
         sayinfo "InnoDB buffer pool configured (${value}MB)."
     }
     # fn: _db_access - Configure one workstation-scoped DBeaver administrator
+        # . Purpose
+        #   Configure one workstation-scoped DBeaver administrator.
+        #
+        # . Usage
+        #   ```bash
+        #   _db_access
+        #   ```
     _db_access() {
         local client="" admin="sgnd_admin" password="" confirm_password="" escaped="" sql="" bind="" port="" account_host="" default_client=""
         default_client="$(_db_default_client_cidr 2>/dev/null || true)"
@@ -1000,6 +1239,13 @@ CIDR_PY
     }
 
     # fn: _db_status - Inspect status for db in the MariaDB workflow.
+        # . Purpose
+        #   Display installed MariaDB package, service and configuration status.
+        #
+        # . Usage
+        #   ```bash
+        #   _db_status
+        #   ```
     _db_status() {
         local bind="" port="" host="" addr=""
         port="$(_db_port 2>/dev/null || printf '3306')"
@@ -1036,6 +1282,13 @@ CIDR_PY
         fi
     }
     # fn: _db_validate - Validate db in the MariaDB workflow.
+        # . Purpose
+        #   Check MariaDB installation and service prerequisites and report validation results.
+        #
+        # . Usage
+        #   ```bash
+        #   _db_validate
+        #   ```
     _db_validate() {
         local failures=0 port=""
         _db_installed || { sayfail "MariaDB engine not installed."; return 1; }
@@ -1049,6 +1302,15 @@ CIDR_PY
 
 # - Action dispatch ----------------------------------------------------------------
     # fn: _run_action - Execute management action and retain its exit status
+        # . Purpose
+        #   Execute management action and retain its exit status.
+        #
+        # . Arguments
+        #   - `$1`: Management action to execute.
+        # . Usage
+        #   ```bash
+        #   _run_action "status"
+        #   ```
     _run_action() {
         local action="${1:?missing action}" rc=0
         case "$action" in
@@ -1074,6 +1336,13 @@ CIDR_PY
 
 # - Main ----------------------------------------------------------------------------
     # fn: main - Dispatch command-line options to the appropriate management workflow.
+        # . Purpose
+        #   Dispatch command-line options to the appropriate management workflow.
+        #
+        # . Usage
+        #   ```bash
+        #   main "$@"
+        #   ```
     main() {
         _framework_locator || return $?
         sgnd_exe_start "$@" || return $?

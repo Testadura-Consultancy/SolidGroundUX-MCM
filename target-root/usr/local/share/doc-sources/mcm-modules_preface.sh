@@ -7,7 +7,7 @@
 #   Checksum    : 1097c01140043aee179ddf7677fce60b7e0445fcb2aaad4cce852ca70e1966ae
 #   Source      : mcm-modules_preface.sh
 #   Type        : documentation
-#   Group       : Module Registration
+#   Group       : Modules
 #   Purpose     : Group preface
 #
 # Attribution:
@@ -17,7 +17,7 @@
 #   Copyright   : © 2025 - 2026 Testadura Consultancy
 #   License     : Licensed under the Testadura Non-Commercial License (TD-NC) v1.1.
 # ==================================================================================
-# - Module Registration -------------------------------------------------------------
+# - Modules -------------------------------------------------------------------------
 #
 # > Management Console modules define the guided pages shown by `sgnd-console`. They are
 # > orchestration and registration units: each module describes its page, groups, menu
@@ -57,6 +57,6 @@
 #
 # -- Documentation ------------------------------------------------------------------
 #
-# > The generated reference beneath this group documents the individual module pages and
-# > their registration contracts. The Console documentation describes host behavior,
-# > navigation, paging, visibility, and lifecycle rules shared by all modules.
+# > Each functional subsection contains both its console registration page and the
+# > corresponding operational role managers. The console host documentation describes
+# > navigation, paging, visibility and lifecycle rules common to all modules.

@@ -8,7 +8,8 @@
 #   Shortname   : MANAGE_STORAGE
 #   Source      : manage-storage.sh
 #   Type        : script
-#   Group       : Role Managers
+#   Group       : Modules
+#   Subgroup    : Storage
 #   Purpose     : Configure, reconcile, validate, and manage local storage volumes and directories
 #
 #   Checksum : 074c78a6e61ff9220b3fc21c404e9291b6da2611d44c7f1dca45cf72aea40b95
@@ -55,7 +56,7 @@ set -uo pipefail
         #     present, falls back to the installed framework copy without changing
         #     SGND_FRAMEWORK_ROOT.
         #
-        # . Globals (write)
+        # . Globals (Write)
         #   SGND_FRAMEWORK_ROOT
         #
         # . Output
@@ -63,8 +64,8 @@ set -uo pipefail
         #   helpers are not available until sgnd-exe-common.sh has been loaded.
         #
         # . Returns
-        #   0 when the framework root was resolved and executable common library loaded.
-        #   126 when the script path cannot be resolved, no canonical root component can
+        #   - 0 when the framework root was resolved and executable common library loaded.
+        #   - 126 when the script path cannot be resolved, no canonical root component can
         #   be found, or the executable common library is unreadable.
         #
         # . Usage
@@ -161,15 +162,17 @@ set -uo pipefail
         # . Purpose
         #   Validate that a selected path is an unused whole block device.
         #
+        # . Arguments
+        #   - `$1`: Optional: block-device path.
         # . Behavior
         #   - Requires an existing block device of type disk.
         #   - Rejects disks that currently contain mounted filesystems.
         #
-        # Inputs:
-        #   $1 - Block-device path.
+        # . Inputs
+        #   - `$1` — Block-device path.
         #
         # . Returns
-        #   0 when the device is an unused disk, otherwise 1.
+        #   - 0 when the device is an unused disk, otherwise 1.
         #
         # . Usage
         #   ```bash
@@ -195,11 +198,13 @@ set -uo pipefail
         # . Purpose
         #   Validate an absolute mount-point path.
         #
-        # Inputs:
-        #   $1 - Proposed mount point.
+        # . Arguments
+        #   - `$1`: Optional: filesystem mountpoint.
+        # . Inputs
+        #   - `$1` — Proposed mount point.
         #
         # . Returns
-        #   0 for a safe absolute path, otherwise 1.
+        #   - 0 for a safe absolute path, otherwise 1.
         #
         # . Usage
         #   ```bash
@@ -215,6 +220,13 @@ set -uo pipefail
     }
 
     # fn: _storage_list_mountpoints - List all SolidGroundUX-managed storage mount points
+        # . Purpose
+        #   List all SolidGroundUX-managed storage mount points.
+        #
+        # . Usage
+        #   ```bash
+        #   _storage_list_mountpoints
+        #   ```
     _storage_list_mountpoints() {
         local source=""
         local target=""
@@ -229,6 +241,15 @@ set -uo pipefail
     }
 
     # fn: _storage_mountpoint_is_managed - Validate a managed storage mount point
+        # . Purpose
+        #   Validate a managed storage mount point.
+        #
+        # . Arguments
+        #   - `$1`: Optional: Mountpoint to check against the managed set.
+        # . Usage
+        #   ```bash
+        #   _storage_mountpoint_is_managed "/srv/storage/example"
+        #   ```
     _storage_mountpoint_is_managed() {
         local candidate="${1:-}"
         local mountpoint=""
@@ -239,6 +260,16 @@ set -uo pipefail
     }
 
     # fn: _storage_select_mountpoint - Select one managed storage volume
+        # . Purpose
+        #   Select one managed storage volume.
+        #
+        # . Arguments
+        #   - `$1`: Name of the shell variable receiving the result.
+        #   - `$2`: Optional: prompt or display label.
+        # . Usage
+        #   ```bash
+        #   _storage_select_mountpoint "/srv/storage/example" "/srv/storage/example"
+        #   ```
     _storage_select_mountpoint() {
         local output_var="${1:?missing output variable}"
         local label="${2:-Storage mount point}"
@@ -266,6 +297,13 @@ set -uo pipefail
     }
 
     # fn: _storage_save_configuration - Persist the complete managed mount-point set
+        # . Purpose
+        #   Persist the complete managed mount-point set.
+        #
+        # . Usage
+        #   ```bash
+        #   _storage_save_configuration
+        #   ```
     _storage_save_configuration() {
         local config_dir=""
         local mountpoint=""
@@ -287,6 +325,13 @@ set -uo pipefail
     }
 
     # fn: _storage_get_configured_mountpoints - Read persisted managed mount points
+        # . Purpose
+        #   Read persisted managed mount points.
+        #
+        # . Usage
+        #   ```bash
+        #   _storage_get_configured_mountpoints "/srv/storage/example"
+        #   ```
     _storage_get_configured_mountpoints() {
         local value=""
         [[ -r "$SGND_STORAGE_CONFIG_FILE" ]] || return 1
@@ -296,7 +341,16 @@ set -uo pipefail
     }
 
     # fn: _storage_list_labeled_volumes - List every filesystem labelled SGND_STORAGE
-    # Output: DEVICE|UUID|FSTYPE|MOUNTPOINT|FSTAB_SOURCE
+        # . Purpose
+        #   List every filesystem labelled SGND_STORAGE.
+        #
+        # . Output
+        #   DEVICE|UUID|FSTYPE|MOUNTPOINT|FSTAB_SOURCE
+        #
+        # . Usage
+        #   ```bash
+        #   _storage_list_labeled_volumes
+        #   ```
     _storage_list_labeled_volumes() {
         local device=""
         local uuid=""
@@ -323,6 +377,13 @@ set -uo pipefail
 
     # Backward-compatible helper: return first managed mount point, or the default.
     # fn: _storage_get_mountpoint - Get mountpoint in the storage workflow.
+        # . Purpose
+        #   Resolve the mountpoint associated with a managed block device or storage entry.
+        #
+        # . Usage
+        #   ```bash
+        #   _storage_get_mountpoint
+        #   ```
     _storage_get_mountpoint() {
         local mountpoint=""
         mountpoint="$(_storage_list_mountpoints | head -n 1)"
@@ -330,6 +391,13 @@ set -uo pipefail
     }
 
     # fn: _storage_dryrun_complete - Report that a storage dry run made no changes.
+        # . Purpose
+        #   Report that a storage dry run made no changes.
+        #
+        # . Usage
+        #   ```bash
+        #   _storage_dryrun_complete
+        #   ```
     _storage_dryrun_complete() {
         sayok "DRYRUN complete. The changes shown above would have been applied; no changes were written."
     }
@@ -346,6 +414,11 @@ set -uo pipefail
         #
         # . Output
         #   One line per managed entry as: SOURCE|TARGET|FSTYPE|OPTIONS
+        #
+        # . Usage
+        #   ```bash
+        #   _storage_list_managed_fstab_entries
+        #   ```
     _storage_list_managed_fstab_entries() {
         awk '
             $0 == "# SolidGroundUX managed storage" {
@@ -369,6 +442,13 @@ set -uo pipefail
     }
 
     # fn: _storage_list_stale_managed_fstab_entries - List invalid/stale managed entries
+        # . Purpose
+        #   List invalid/stale managed entries.
+        #
+        # . Usage
+        #   ```bash
+        #   _storage_list_stale_managed_fstab_entries
+        #   ```
     _storage_list_stale_managed_fstab_entries() {
         local source="" target="" filesystem="" options="" device="" label=""
         while IFS='|' read -r source target filesystem options; do
@@ -391,11 +471,12 @@ set -uo pipefail
         # . Purpose
         #   List whole disks that do not currently contain mounted filesystems.
         #
-        # Outputs (stdout):
+        # . Outputs
+        #   (stdout):
         #   One device path per line.
         #
         # . Returns
-        #   0 after scanning available disks.
+        #   - 0 after scanning available disks.
         #
         # . Usage
         #   ```bash
@@ -416,14 +497,17 @@ set -uo pipefail
         # . Purpose
         #   Return the first partition belonging to a disk after partitioning.
         #
-        # Inputs:
-        #   $1 - Whole-disk device path.
+        # . Arguments
+        #   - `$1`: Block-device path.
+        # . Inputs
+        #   - `$1` — Whole-disk device path.
         #
-        # Outputs (stdout):
+        # . Outputs
+        #   (stdout):
         #   Partition device path.
         #
         # . Returns
-        #   0 when a partition is found, otherwise 1.
+        #   - 0 when a partition is found, otherwise 1.
         #
         # . Usage
         #   ```bash
@@ -451,11 +535,13 @@ set -uo pipefail
         # . Purpose
         #   Validate that a local or directory-backed user account can be resolved.
         #
-        # Inputs:
-        #   $1 - User name to validate.
+        # . Arguments
+        #   - `$1`: Optional: account name.
+        # . Inputs
+        #   - `$1` — User name to validate.
         #
         # . Returns
-        #   0 when the account can be resolved through getent, otherwise 1.
+        #   - 0 when the account can be resolved through getent, otherwise 1.
         #
         # . Usage
         #   ```bash
@@ -471,11 +557,13 @@ set -uo pipefail
         # . Purpose
         #   Validate that a local or directory-backed group can be resolved.
         #
-        # Inputs:
-        #   $1 - Group name to validate.
+        # . Arguments
+        #   - `$1`: Optional: group name.
+        # . Inputs
+        #   - `$1` — Group name to validate.
         #
         # . Returns
-        #   0 when the group can be resolved through getent, otherwise 1.
+        #   - 0 when the group can be resolved through getent, otherwise 1.
         #
         # . Usage
         #   ```bash
@@ -491,11 +579,13 @@ set -uo pipefail
         # . Purpose
         #   Validate a three- or four-digit octal filesystem mode.
         #
-        # Inputs:
-        #   $1 - Proposed octal mode.
+        # . Arguments
+        #   - `$1`: Octal permission mode.
+        # . Inputs
+        #   - `$1` — Proposed octal mode.
         #
         # . Returns
-        #   0 when the mode is valid, otherwise 1.
+        #   - 0 when the mode is valid, otherwise 1.
         #
         # . Usage
         #   ```bash
@@ -506,6 +596,15 @@ set -uo pipefail
     }
 
     # fn: _storage_select_access_targets - Select one, several, or all managed storage roots
+        # . Purpose
+        #   Select one, several, or all managed storage roots.
+        #
+        # . Arguments
+        #   - `$1`: Name of the shell variable receiving the result.
+        # . Usage
+        #   ```bash
+        #   _storage_select_access_targets "selected"
+        #   ```
     _storage_select_access_targets() {
         local output_var="${1:?missing output variable}"
         local choice=""
@@ -589,11 +688,11 @@ set -uo pipefail
         #   - Rejects empty names, dot entries, path separators, and embedded newlines.
         #   - Allows spaces and normal filesystem punctuation in the directory name.
         #
-        # Arguments:
-        #   $1 - Proposed direct child directory name.
+        # . Arguments
+        #   - `$1` — Proposed direct child directory name.
         #
         # . Returns
-        #   0 when the name is safe for a direct child path; otherwise 1.
+        #   - 0 when the name is safe for a direct child path; otherwise 1.
         #
         # . Usage
         #   ```bash
@@ -611,14 +710,14 @@ set -uo pipefail
         # . Purpose
         #   Return only the first-level directories below a mounted SolidGroundUX storage root.
         #
-        # Arguments:
-        #   $1 - Mounted managed storage root.
+        # . Arguments
+        #   - `$1` — Mounted managed storage root.
         #
-        # Output:
+        # . Output
         #   One directory basename per line, sorted alphabetically.
         #
         # . Returns
-        #   0 after scanning the root; non-zero when the root cannot be scanned.
+        #   - 0 after scanning the root; non-zero when the root cannot be scanned.
         #
         # . Usage
         #   ```bash
@@ -633,13 +732,13 @@ set -uo pipefail
         # . Purpose
         #   Present the first-level directories below a managed storage root and return the selected name.
         #
-        # Arguments:
-        #   $1 - Output variable name.
-        #   $2 - Mounted managed storage root.
-        #   $3 - Optional selector label.
+        # . Arguments
+        #   - `$1` — Output variable name.
+        #   - `$2` — Mounted managed storage root.
+        #   - `$3` — Optional selector label.
         #
         # . Returns
-        #   0 when a directory is selected; non-zero when none exist or selection is cancelled.
+        #   - 0 when a directory is selected; non-zero when none exist or selection is cancelled.
         #
         # . Usage
         #   ```bash
@@ -667,6 +766,13 @@ set -uo pipefail
     }
 
     # fn: _storage_action_again - Offer to repeat the completed storage action
+        # . Purpose
+        #   Offer to repeat the completed storage action.
+        #
+        # . Usage
+        #   ```bash
+        #   _storage_action_again
+        #   ```
     _storage_action_again() {
         local rc=0
 
@@ -685,7 +791,7 @@ set -uo pipefail
     }
 
 # - Public module actions --------------------------------------------------------
-    # fn$ storage_provision
+    # fn: storage_provision
         # . Purpose
         #   Provision an unused local disk as persistent SolidGroundUX storage, including its
         #   initial mount so the new filesystem is immediately usable.
@@ -701,15 +807,17 @@ set -uo pipefail
         #     retained for later administrative remounts and is not a compound child action.
         #   - Honors console dry-run mode.
         #
-        # Inputs (globals):
+        # . Inputs
+        #   (globals):
         #   FLAG_DRYRUN
         #
-        # Outputs (files):
+        # . Outputs
+        #   (files):
         #   /etc/fstab
         #
         # . Returns
-        #   0 when storage is provisioned or the action is cancelled.
-        #   Non-zero when validation, partitioning, formatting, or mounting fails.
+        #   - 0 when storage is provisioned or the action is cancelled.
+        #   - Non-zero when validation, partitioning, formatting, or mounting fails.
         #
         # . Usage
         #   ```bash
@@ -866,7 +974,7 @@ set -uo pipefail
         fi
     }
 
-    # fn$ storage_mount
+    # fn: storage_mount
         # . Purpose
         #   Mount the configured SolidGroundUX storage filesystem.
         #
@@ -876,11 +984,12 @@ set -uo pipefail
         #   - Mounts the configured filesystem unless it is already mounted.
         #   - Honors console dry-run mode.
         #
-        # Inputs (globals):
+        # . Inputs
+        #   (globals):
         #   FLAG_DRYRUN
         #
         # . Returns
-        #   0 when storage is mounted or already mounted, otherwise non-zero.
+        #   - 0 when storage is mounted or already mounted, otherwise non-zero.
         #
         # . Usage
         #   ```bash
@@ -915,7 +1024,7 @@ set -uo pipefail
         sayok "Storage mounted at $mountpoint."
     }
 
-    # fn$ storage_unmount
+    # fn: storage_unmount
         # . Purpose
         #   Unmount the configured SolidGroundUX storage filesystem.
         #
@@ -924,11 +1033,12 @@ set -uo pipefail
         #   - Reports when the storage is already unmounted.
         #   - Honors console dry-run mode.
         #
-        # Inputs (globals):
+        # . Inputs
+        #   (globals):
         #   FLAG_DRYRUN
         #
         # . Returns
-        #   0 when storage is unmounted or already unmounted, otherwise non-zero.
+        #   - 0 when storage is unmounted or already unmounted, otherwise non-zero.
         #
         # . Usage
         #   ```bash
@@ -958,7 +1068,7 @@ set -uo pipefail
         sayok "Storage unmounted from $mountpoint."
     }
 
-    # fn$ storage_expand
+    # fn: storage_expand
         # . Purpose
         #   Expand the configured storage partition and filesystem to use a larger disk.
         #
@@ -970,11 +1080,12 @@ set -uo pipefail
         #   - Mounts XFS storage first when required.
         #   - Honors console dry-run mode.
         #
-        # Inputs (globals):
+        # . Inputs
+        #   (globals):
         #   FLAG_DRYRUN
         #
         # . Returns
-        #   0 when the partition and filesystem are expanded, otherwise non-zero.
+        #   - 0 when the partition and filesystem are expanded, otherwise non-zero.
         #
         # . Usage
         #   ```bash
@@ -1068,7 +1179,7 @@ set -uo pipefail
         sayok "Storage expansion completed successfully."
     }
 
-    # fn$ storage_manage_directories
+    # fn: storage_manage_directories
         # . Purpose
         #   Manage simple first-level filesystem directories below one SolidGroundUX storage root.
         #
@@ -1082,11 +1193,12 @@ set -uo pipefail
         #   - Owns its interactive submenu and returns directly to the Storage menu when the user backs out.
         #   - Honors console dry-run mode for create, rename, and remove operations.
         #
-        # Inputs (globals):
+        # . Inputs
+        #   (globals):
         #   FLAG_DRYRUN
         #
         # . Returns
-        #   0 when the directory manager is exited normally; non-zero on an operation failure.
+        #   - 0 when the directory manager is exited normally; non-zero on an operation failure.
         #
         # . Usage
         #   ```bash
@@ -1209,7 +1321,14 @@ set -uo pipefail
         done
     }
 
-    # fn$ storage_access_status
+    # fn: storage_access_status
+        # . Purpose
+        #   Display each managed storage root with its owner, group and permission mode.
+        #
+        # . Usage
+        #   ```bash
+        #   storage_access_status
+        #   ```
     storage_access_status() {
         local path="" owner="-" group="-" mode="-"
         sgnd_print
@@ -1233,6 +1352,8 @@ set -uo pipefail
     }
 
     # fn: storage_set_access - Set access in the storage workflow.
+        # . Purpose
+        #   Select managed storage roots and apply their requested ownership or permission changes.
         #
         # . Usage
         #   ```bash
@@ -1273,6 +1394,8 @@ set -uo pipefail
     }
 
     # fn: storage_restore_access_defaults - Restore access defaults in the storage workflow.
+        # . Purpose
+        #   Restore the configured default ownership and permissions for managed storage roots.
         #
         # . Usage
         #   ```bash
@@ -1303,7 +1426,14 @@ set -uo pipefail
         (( ${FLAG_DRYRUN:-0} == 1 )) && _storage_dryrun_complete
     }
 
-    # fn$ storage_reconcile
+    # fn: storage_reconcile
+        # . Purpose
+        #   Check the current storage state and reconcile it with the recorded configuration.
+        #
+        # . Usage
+        #   ```bash
+        #   storage_reconcile
+        #   ```
     storage_reconcile() {
         local device="" uuid="" filesystem="" mountpoint="" fstab_source=""
         local detected_count=0
@@ -1337,7 +1467,7 @@ set -uo pipefail
         sayok "Storage configuration reconciled for $detected_count SGND_STORAGE volume(s)."
     }
 
-    # fn$ storage_reconcile_persistence
+    # fn: storage_reconcile_persistence
         # . Purpose
         #   Repair or clean stale SolidGroundUX-managed /etc/fstab storage entries.
         #
@@ -1354,8 +1484,8 @@ set -uo pipefail
         #   - Honors console dry-run mode.
         #
         # . Returns
-        #   0 when persistence is already valid, repaired, removed by explicit confirmation, or cancelled.
-        #   Non-zero when a requested repair/removal cannot be completed safely.
+        #   - 0 when persistence is already valid, repaired, removed by explicit confirmation, or cancelled.
+        #   - Non-zero when a requested repair/removal cannot be completed safely.
         #
         # . Usage
         #   ```bash
@@ -1579,7 +1709,14 @@ set -uo pipefail
         sayinfo "Backup retained at $backup_file."
     }
 
-    # fn$ storage_status
+    # fn: storage_status
+        # . Purpose
+        #   Display block-device, mountpoint and filesystem status for the managed storage environment.
+        #
+        # . Usage
+        #   ```bash
+        #   storage_status
+        #   ```
     storage_status() {
         local source="" mountpoint="" filesystem="" options="" device="" label="" uuid="" size="-" available="-" mounted="No" rw="No"
         sgnd_print
@@ -1613,7 +1750,14 @@ set -uo pipefail
         done < <(_storage_list_managed_fstab_entries)
     }
 
-    # fn$ storage_validate_provisioning
+    # fn: storage_validate_provisioning
+        # . Purpose
+        #   Validate that provisioned storage devices and mountpoints meet expected conditions.
+        #
+        # . Usage
+        #   ```bash
+        #   storage_validate_provisioning
+        #   ```
     storage_validate_provisioning() {
         local source="" mountpoint="" filesystem="" options="" device="" label="" result="" failures=0 count=0 stale_count=0
         sgnd_print
@@ -1653,6 +1797,15 @@ set -uo pipefail
 
 # - Action dispatch -----------------------------------------------------------------
     # fn: _run_action - Dispatch the requested management action to its implementation.
+        # . Purpose
+        #   Dispatch the requested management action to its implementation.
+        #
+        # . Arguments
+        #   - `$1`: Management action to execute.
+        # . Usage
+        #   ```bash
+        #   _run_action "status"
+        #   ```
     _run_action() {
         local action="${1:?missing action}"
 
@@ -1678,6 +1831,13 @@ set -uo pipefail
 
 # - Main ----------------------------------------------------------------------------
     # fn: main - Dispatch command-line options to the appropriate management workflow.
+        # . Purpose
+        #   Dispatch command-line options to the appropriate management workflow.
+        #
+        # . Usage
+        #   ```bash
+        #   main "$@"
+        #   ```
     main() {
         local action=""
 

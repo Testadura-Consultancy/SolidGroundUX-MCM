@@ -14,9 +14,16 @@ _CONTENT_FILE_RE = re.compile(r"^(?P<name>.+)_(?P<language>[A-Za-z]{2})\.md$")
 _INDEX_FILE_RE = re.compile(r"^.+_Index_(?P<language>[A-Za-z]{2})\.md$")
 
 
+
+# --- Public functions ------------------------------------------------------------
 # fn: section_index - Find the one descriptive index for a section/language.
 def section_index(directory: Path, language: str) -> Path | None:
-    """Find the one descriptive index for a section/language."""
+    """Find the one descriptive index for a section/language.
+    
+    Usage:
+        ```python
+        index = section_index(content_dir, "NL")
+        ```"""
     matches = sorted(path for path in directory.glob(f"*_Index_{language}.md") if _INDEX_FILE_RE.fullmatch(path.name))
     if len(matches) > 1:
         raise ValueError(f"Multiple {language} section indexes in {directory}: " + ", ".join(p.name for p in matches))
@@ -24,6 +31,8 @@ def section_index(directory: Path, language: str) -> Path | None:
 
 
 
+
+# --- Public classes ------------------------------------------------------------
 # cls: SiteConfig - Resolved website source paths and site configuration settings.
 @dataclass(slots=True)
 class SiteConfig:
@@ -81,37 +90,45 @@ class ContentItem:
     # fn: title - Return the effective title from the content item metadata.
     @property
     def title(self) -> str:
-        """Handle title for the web content workflow.
+        """Return the effective title from the content item metadata.
         
-        Returns:
-            Operation result or None, as defined by the implementation."""
+        Usage:
+            ```python
+            content_item.title
+            ```"""
         return str(self.metadata.get("title", self.base_name))
 
     # fn: summary - Return the effective summary from the content item metadata.
     @property
     def summary(self) -> str:
-        """Handle summary for the web content workflow.
+        """Return the effective summary from the content item metadata.
         
-        Returns:
-            Operation result or None, as defined by the implementation."""
+        Usage:
+            ```python
+            content_item.summary
+            ```"""
         return str(self.metadata.get("summary", ""))
 
     # fn: date - Read the effective article date from content metadata.
     @property
     def date(self) -> str:
-        """Handle date for the web content workflow.
+        """Read the effective article date from content metadata.
         
-        Returns:
-            Operation result or None, as defined by the implementation."""
+        Usage:
+            ```python
+            content_item.date
+            ```"""
         return str(self.metadata.get("published") or self.metadata.get("date") or "")
 
     # fn: tags - Return the normalized tags associated with the content item.
     @property
     def tags(self) -> list[str]:
-        """Handle tags for the web content workflow.
+        """Return the normalized tags associated with the content item.
         
-        Returns:
-            Operation result or None, as defined by the implementation."""
+        Usage:
+            ```python
+            content_item.tags
+            ```"""
         value = self.metadata.get("tags", [])
         if isinstance(value, list):
             return [str(v) for v in value]
@@ -122,19 +139,23 @@ class ContentItem:
     # fn: draft - Determine whether the content item is marked as draft.
     @property
     def draft(self) -> bool:
-        """Handle draft for the web content workflow.
+        """Determine whether the content item is marked as draft.
         
-        Returns:
-            Operation result or None, as defined by the implementation."""
+        Usage:
+            ```python
+            content_item.draft
+            ```"""
         return self.status == "draft"
 
     # fn: status - Return the effective publication status of the content item.
     @property
     def status(self) -> str:
-        """Handle status for the web content workflow.
+        """Return the effective publication status of the content item.
         
-        Returns:
-            Operation result or None, as defined by the implementation."""
+        Usage:
+            ```python
+            content_item.status
+            ```"""
         value = str(self.metadata.get("status", "")).strip().lower()
         return value if value in {"draft", "preview", "published"} else ("draft" if self.metadata.get("draft", False) else "published")
 
@@ -144,9 +165,13 @@ class ContentItem:
     @property
     def hidden(self) -> bool:
         """Whether a published page is omitted from normal discovery/navigation.
-
+        
         Hidden is not an access-control mechanism: generated pages remain public.
-        """
+        
+        Usage:
+            ```python
+            content_item.hidden
+            ```"""
         return str(self.metadata.get("hidden", False)).strip().lower() in {"true", "yes", "1"}
 
     # fn: private - Declare a URL requiring server-side access control.
@@ -155,25 +180,36 @@ class ContentItem:
     @property
     def private(self) -> bool:
         """Declare a URL requiring server-side access control.
-
+        
         Metadata alone never creates authentication; the generator checks
         protected URL placement, and the web server must enforce the guard.
-        """
+        
+        Usage:
+            ```python
+            content_item.private
+            ```"""
         return str(self.metadata.get("private", False)).strip().lower() in {"true", "yes", "1"}
 
     # fn: featured - Determine whether the content item appears in Featured content.
     @property
     def featured(self) -> bool:
-        """Handle featured for the web content workflow.
+        """Determine whether the content item appears in Featured content.
         
-        Returns:
-            Operation result or None, as defined by the implementation."""
+        Usage:
+            ```python
+            content_item.featured
+            ```"""
         return bool(self.metadata.get("featured", False))
 
     # fn: order - Return the optional sibling-order hint used for section navigation.
     @property
     def order(self) -> int:
-        """Return the optional sibling-order hint used for section navigation."""
+        """Return the optional sibling-order hint used for section navigation.
+        
+        Usage:
+            ```python
+            content_item.order
+            ```"""
         value = self.metadata.get("order", 1000)
         try:
             return int(value)
@@ -181,9 +217,16 @@ class ContentItem:
             return 1000
 
 
+
+# --- Internal functions ------------------------------------------------------------
 # fn: _parse_scalar - Parse a front-matter scalar value into its structured representation.
 def _parse_scalar(value: str) -> Any:
-    """Handle parse scalar for the web content workflow."""
+    """Parse a front-matter scalar value into its structured representation.
+    
+    Usage:
+        ```python
+        _parse_scalar(value)
+        ```"""
     value = value.strip()
     if len(value) >= 2 and value[0] == value[-1] and value[0] in {"'", '"'}:
         return value[1:-1]
@@ -204,13 +247,23 @@ def _parse_scalar(value: str) -> Any:
 
 # fn: _indent_of - Measure the indentation of a Markdown metadata line.
 def _indent_of(line: str) -> int:
-    """Handle indent of for the web content workflow."""
+    """Measure the indentation of a Markdown metadata line.
+    
+    Usage:
+        ```python
+        _indent_of(line)
+        ```"""
     return len(line) - len(line.lstrip(" "))
 
 
 # fn: _parse_mapping - Parse a nested front-matter mapping and preserve its hierarchy.
 def _parse_mapping(lines: list[str], start: int = 0, indent: int = 0) -> tuple[dict[str, Any], int]:
-    """Handle parse mapping for the web content workflow."""
+    """Parse a nested front-matter mapping and preserve its hierarchy.
+    
+    Usage:
+        ```python
+        _parse_mapping(lines, start, indent)
+        ```"""
     result: dict[str, Any] = {}
     index = start
 
@@ -293,17 +346,21 @@ def _parse_mapping(lines: list[str], start: int = 0, indent: int = 0) -> tuple[d
     return result, index
 
 
+
+# --- Public functions ------------------------------------------------------------
 # fn: parse_front_matter - Parse a Markdown document into front-matter metadata and body.
 # . Description
-#   Args: text: Input used by this operation.
+#   Args: text: Markdown text to parse or render.
 def parse_front_matter(text: str) -> tuple[dict[str, Any], str]:
     """Parse a Markdown document into front-matter metadata and body.
-    
-    Args:
-        text: Input used by this operation.
-    
-    Returns:
-        Operation result or None, as defined by the implementation."""
+        
+        Args:
+            text: Markdown text to parse or render.
+        
+        Usage:
+            ```python
+            metadata, body = parse_front_matter(markdown_text)
+            ```"""
     normalized = text.replace("\r\n", "\n").replace("\r", "\n")
     lines = normalized.split("\n")
     if not lines or lines[0].strip() != "---":
@@ -324,15 +381,17 @@ def parse_front_matter(text: str) -> tuple[dict[str, Any], str]:
 
 # fn: load_site_config - Read and resolve website configuration from a source repository.
 # . Description
-#   Args: root: Input used by this operation.
+#   Args: root: Website source root directory.
 def load_site_config(root: Path) -> SiteConfig:
     """Read and resolve website configuration from a source repository.
-    
-    Args:
-        root: Input used by this operation.
-    
-    Returns:
-        Operation result or None, as defined by the implementation."""
+        
+        Args:
+            root: Website source root directory.
+        
+        Usage:
+            ```python
+            config = load_site_config(site_root)
+            ```"""
     root = root.resolve()
     cfg_path = root / "config" / "site.cfg"
     if not cfg_path.is_file():
@@ -396,9 +455,13 @@ def load_site_config(root: Path) -> SiteConfig:
 #   The boundary is included, but ancestors outside it are never inspected.
 def is_ignored(path: Path, boundary: Path) -> bool:
     """Whether a source path is beneath a directory containing `.ignore`.
-
+    
     The boundary is included, but ancestors outside it are never inspected.
-    """
+    
+    Usage:
+        ```python
+        is_ignored(path, boundary)
+        ```"""
     boundary = boundary.resolve()
     current = path.resolve() if path.is_dir() else path.resolve().parent
     if not current.is_relative_to(boundary):
@@ -416,11 +479,15 @@ def is_ignored(path: Path, boundary: Path) -> bool:
 #   Dutch index metadata provides structural defaults; translated indexes supply translated labels. A section without an index is not navigation.
 def load_navigation(root: Path, *, include_drafts: bool = False) -> list[NavigationItem]:
     """Discover root navigation from section indexes, never navigation.cfg.
-
+    
     Dutch index metadata provides structural defaults; translated indexes
     supply translated labels. A section without an index is not navigation.
     Preview mode includes draft-only sections; public mode excludes them.
-    """
+    
+    Usage:
+        ```python
+        navigation = load_navigation(site_root, include_drafts=False)
+        ```"""
     config = load_site_config(root)
     entries: list[NavigationItem] = []
     index_dirs = [config.content_dir] + sorted(
@@ -472,12 +539,16 @@ def load_navigation(root: Path, *, include_drafts: bool = False) -> list[Navigat
 #   The configured route is language-neutral. During generation the route is resolved to the matching page in the language currently being rendered.
 def load_featured(root: Path) -> list[FeaturedItem]:
     """Load curated Featured routes from ``config/featured.cfg``.
-
+    
     The configured route is language-neutral. During generation the route is
     resolved to the matching page in the language currently being rendered.
     Optional images are presentation hints; title and summary always come from
     the target page metadata so translations stay authoritative.
-    """
+    
+    Usage:
+        ```python
+        load_featured(root)
+        ```"""
     cfg_path = root.resolve() / "config" / "featured.cfg"
     if not cfg_path.is_file():
         return []
@@ -511,9 +582,16 @@ def load_featured(root: Path) -> list[FeaturedItem]:
     return sorted(items, key=lambda item: (item.order, item.key))
 
 
+
+# --- Internal functions ------------------------------------------------------------
 # fn: _base_route - Calculate the canonical public route for the chosen content item.
 def _base_route(relative_path: Path, base_name: str) -> str:
-    """Handle base route for the web content workflow."""
+    """Calculate the canonical public route for the chosen content item.
+    
+    Usage:
+        ```python
+        _base_route(relative_path, base_name)
+        ```"""
     parent = relative_path.parent.as_posix()
     if parent == ".":
         parent = ""
@@ -526,19 +604,23 @@ def _base_route(relative_path: Path, base_name: str) -> str:
     return route
 
 
+
+# --- Public functions ------------------------------------------------------------
 # fn: language_route - Build the localized public route for a content item.
 # . Description
-#   Args: base_route: Input used by this operation.
+#   Args: base_route: Canonical route before language-specific rewriting.
 def language_route(base_route: str, language: str, default_language: str) -> str:
-    """Handle language route for the web content workflow.
-    
-    Args:
-        base_route: Input used by this operation.
-        language: Input used by this operation.
-        default_language: Input used by this operation.
-    
-    Returns:
-        Operation result or None, as defined by the implementation."""
+    """Build the localized public route for a content item.
+        
+        Args:
+            base_route: Canonical route before language-specific rewriting.
+            language: Language code of the requested content.
+            default_language: Default language configured for the site.
+        
+        Usage:
+            ```python
+            language_route(base_route, language, default_language)
+            ```"""
     if language.upper() == default_language.upper():
         return base_route
     if base_route == "/":
@@ -546,9 +628,16 @@ def language_route(base_route: str, language: str, default_language: str) -> str
     return f"/{language.lower()}{base_route}"
 
 
+
+# --- Internal functions ------------------------------------------------------------
 # fn: _owning_navigation_item - Return the most specific main-navigation section that owns a content route.
 def _owning_navigation_item(base_route: str, navigation: list[NavigationItem]) -> NavigationItem | None:
-    """Return the most specific main-navigation section that owns a content route."""
+    """Return the most specific main-navigation section that owns a content route.
+    
+    Usage:
+        ```python
+        _owning_navigation_item(base_route, navigation)
+        ```"""
     matches = [
         item
         for item in navigation
@@ -559,18 +648,22 @@ def _owning_navigation_item(base_route: str, navigation: list[NavigationItem]) -
     return max(matches, key=lambda item: (len(item.path), -item.order, item.key))
 
 
+
+# --- Public functions ------------------------------------------------------------
 # fn: discover_content - Discover content pages and resolve their routes and languages.
 # . Description
-#   Args: config: Input used by this operation.
+#   Args: config: Resolved website configuration and source directories.
 def discover_content(config: SiteConfig, navigation: list[NavigationItem]) -> list[ContentItem]:
     """Discover content pages and resolve their routes and languages.
-    
-    Args:
-        config: Input used by this operation.
-        navigation: Input used by this operation.
-    
-    Returns:
-        Operation result or None, as defined by the implementation."""
+        
+        Args:
+            config: Resolved website configuration and source directories.
+            navigation: Discovered website navigation items.
+        
+        Usage:
+            ```python
+            pages = discover_content(site_config, navigation)
+            ```"""
     if not config.content_dir.is_dir():
         raise ValueError(f"Content directory not found: {config.content_dir}")
 

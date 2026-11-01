@@ -17,13 +17,25 @@ SLUG = re.compile(r"[a-z0-9]+(?:-[a-z0-9]+)*\Z")
 LANGUAGES = ("NL", "EN")
 
 
+
+# --- Internal functions ------------------------------------------------------------
 def _root(source):
-    """Return the resolved canonical content directory for a valid repository."""
+    """Return the resolved canonical content directory for a valid repository.
+    
+    Usage:
+        ```python
+        _root(source)
+        ```"""
     return load_site_config(Path(source).expanduser().resolve()).content_dir.resolve()
 
 
 def _section(content, relative, *, allow_root=False):
-    """Validate a relative section directory without permitting path traversal."""
+    """Validate a relative section directory without permitting path traversal.
+    
+    Usage:
+        ```python
+        _section(content, relative, allow_root=allow_root)
+        ```"""
     relative = relative.strip().strip("/")
     if not relative:
         if allow_root:
@@ -38,12 +50,22 @@ def _section(content, relative, *, allow_root=False):
 
 
 def _indexed(directory):
-    """Check whether an existing directory defines at least one section index."""
+    """Check whether an existing directory defines at least one section index.
+    
+    Usage:
+        ```python
+        _indexed(directory)
+        ```"""
     return directory.is_dir() and any(section_index(directory, lang) is not None for lang in LANGUAGES)
 
 
 def _protected(source, content, directory):
-    """Prevent deletion of a section referenced in the main navigation config."""
+    """Prevent deletion of a section referenced in the main navigation config.
+    
+    Usage:
+        ```python
+        _protected(source, content, directory)
+        ```"""
     relative = directory.relative_to(content).as_posix()
     for item in load_navigation(Path(source).expanduser().resolve()):
         if item.path.strip("/") == relative:
@@ -51,8 +73,15 @@ def _protected(source, content, directory):
     return False
 
 
+
+# --- Public functions ------------------------------------------------------------
 def list_sections(source):
-    """List indexed sections suitable for parent selection or management."""
+    """List indexed sections suitable for parent selection or management.
+    
+    Usage:
+        ```python
+        sections = list_sections(site_root)
+        ```"""
     content = _root(source)
     sections = [{"path": "", "label": "Website root"}]
     for directory in sorted(content.rglob("*")):
@@ -63,10 +92,16 @@ def list_sections(source):
 
 def create_section(source, parent, slug, title_nl, title_en, languages="NL,EN"):
     """Create a new indexed section with draft NL/EN pages, without overwriting.
-
-    Parent must already be indexed (except for the website root). Metadata
-    identifies these as ordinary section pages. Language choice is explicit.
-    """
+        
+        Parent must already be indexed (except for the website root). Metadata
+        identifies these as ordinary section pages. Language choice is explicit.
+        
+        Usage:
+        ```python
+        # Creates two language-specific draft section indexes.
+        create_section(source, parent="/", slug="news",
+                       title_nl="Nieuws", title_en="News")
+        ```"""
     content = _root(source)
     base = _section(content, parent, allow_root=True)
     if base != content and not _indexed(base):
@@ -101,7 +136,12 @@ def create_section(source, parent, slug, title_nl, title_en, languages="NL,EN"):
 
 
 def inspect_section(source, section):
-    """Report subtree size and protection before a destructive operation."""
+    """Report subtree size and protection before a destructive operation.
+    
+    Usage:
+        ```python
+        inspect_section(source, section)
+        ```"""
     content = _root(source)
     directory = _section(content, section)
     if not _indexed(directory):
@@ -116,12 +156,19 @@ def inspect_section(source, section):
 
 def remove_section(source, section, mode, destination="", archive_root=""):
     """Apply an explicitly chosen section removal policy.
-
-    'move' transfers children (including subordinate section trees) to an
-    existing indexed destination, then removes the selected section indexes.
-    'archive' moves the complete section tree outside the live content tree.
-    'delete' permanently removes the complete tree. Nothing edits inbound URLs.
-    """
+        
+        'move' transfers children (including subordinate section trees) to an
+        existing indexed destination, then removes the selected section indexes.
+        'archive' moves the complete section tree outside the live content tree.
+        'delete' permanently removes the complete tree. Nothing edits inbound URLs.
+        
+        Usage:
+        ```python
+        # Archive an entire section outside the live content directory.
+        remove_section(source, "news", mode="archive", archive_root="/srv/backups/sections")
+        # Permanent deletion is a separate, destructive operation.
+        remove_section(source, "news", mode="delete")
+        ```"""
     info = inspect_section(source, section)
     content = _root(source)
     directory = _section(content, section)

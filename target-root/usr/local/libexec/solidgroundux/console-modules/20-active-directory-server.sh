@@ -8,7 +8,8 @@
 #   Checksum    : 93a65cd489767064bf18f1b69d4d1614ec3e4c40368f529b4a448153c82c2a72
 #   Source      : 20-active-directory-server.sh
 #   Type        : module
-#   Group       : Module Registration
+#   Group       : Modules
+#   Subgroup    : Active Directory Server
 #   Purpose     : Register Samba Active Directory server management actions
 #
 # Description:
@@ -19,25 +20,26 @@
 set -uo pipefail
 
 # - Library guard ------------------------------------------------------------------
-    # fn$ _sgnd_lib_guard - Enforce source-only, single-load library initialization
+    # fn: _sgnd_lib_guard - Enforce source-only, source-only library guard
         # . Purpose
-        #   Ensure the file is sourced as a library and initialized only once.
+        #   Ensure the file is sourced as a library and marked as loaded.
         #
         # . Behavior
         #   - Derives a unique guard variable name from the current filename.
         #   - Aborts execution when the file is run directly instead of sourced.
         #   - Sets the guard variable on first load.
-        #   - Returns immediately when the library was already loaded.
+        #   - Returns from the guard helper when the file is already marked loaded; it does not skip subsequent top-level statements.
         #
-        # Inputs
+        # . Inputs
         #   BASH_SOURCE[0]
-        #   $0
+        #   - $0
         #
-        # Outputs (globals)
+        # . Outputs
+        #   (globals)
         #   SGND_<MODULE>_LOADED
         #
         # . Returns
-        #   0 when already loaded or successfully initialized.
+        #   - 0 when already loaded or successfully initialized.
         #   Exits with code 2 when executed instead of sourced.
         #
         # . Usage
@@ -75,18 +77,30 @@ set -uo pipefail
     SGND_MODULE_NAME="$SGND_AD_SERVER_MODULE_NAME"
 # - Management dispatch -------------------------------------------------------------
     # fn: _adsvr_run_action - Run action in the Active Directory Server workflow.
+        # . Purpose
+        #   Dispatch the requested domain-server management action to the standalone manager.
+        #
+        # . Arguments
+        #   - `$1`: Management action to execute.
+        # . Usage
+        #   ```bash
+        #   _adsvr_run_action "status"
+        #   ```
     _adsvr_run_action() {
         local action="${1:?missing action}"
         _sgnd_run_module_script "manage-active-directory-server.sh" --action "$action"
     }
 
     # fn: _adsvr_record_provision_step - Persist one child-step result in the console tracker
+        # . Purpose
+        #   Persist one child-step result in the console tracker.
+        #
         # . Arguments
-        #   $1 ITEM_KEY
-        #   $2 RESULT_CODE
+        #   - $1 ITEM_KEY
+        #   - $2 RESULT_CODE
         #
         # . Returns
-        #   0 always; tracking is best-effort when the console tracker is unavailable.
+        #   - 0 always; tracking is best-effort when the console tracker is unavailable.
         #
         # . Usage
         #   ```bash
@@ -115,7 +129,7 @@ set -uo pipefail
         #   - Treats operator cancellation after preflight as a successful parent action.
         #
         # . Returns
-        #   0 when provisioning succeeds or is cancelled after preflight.
+        #   - 0 when provisioning succeeds or is cancelled after preflight.
         #   Otherwise the workflow failure code returned by the management executable.
         #
         # . Usage
@@ -220,6 +234,11 @@ set -uo pipefail
         # . Purpose
         #   Map the manager's first failing stage to the corresponding nested console
         #   item, without conflating domain creation with domain join.
+        #
+        # . Usage
+        #   ```bash
+        #   _adsvr_join_additional_console
+        #   ```
     _adsvr_join_additional_console() {
         local rc=0 step="" key="" status=0
         local -a steps=("adsvr-add-install" "adsvr-add-discover" "adsvr-add-join" "adsvr-add-kerberos" "adsvr-add-resolver" "adsvr-add-start" "adsvr-add-dns" "adsvr-add-repl")
@@ -251,6 +270,8 @@ set -uo pipefail
     }
 
     # fn: _adsvr_add_install - Forward the `install` action to the AD Server manager.
+        # . Purpose
+        #   Forward the `install` action to the AD Server manager.
         #
         # . Returns
         #   The status returned by the delegated action.
@@ -261,6 +282,8 @@ set -uo pipefail
         #   ```
     _adsvr_add_install() { _adsvr_run_action install; }
     # fn: _adsvr_add_discover - Forward the `join-preflight` action to the AD Server manager.
+        # . Purpose
+        #   Forward the `join-preflight` action to the AD Server manager.
         #
         # . Returns
         #   The status returned by the delegated action.
@@ -271,6 +294,8 @@ set -uo pipefail
         #   ```
     _adsvr_add_discover() { _adsvr_run_action join-preflight; }
     # fn: _adsvr_add_join - Forward the `join-domain` action to the AD Server manager.
+        # . Purpose
+        #   Forward the `join-domain` action to the AD Server manager.
         #
         # . Returns
         #   The status returned by the delegated action.
@@ -281,6 +306,8 @@ set -uo pipefail
         #   ```
     _adsvr_add_join() { _adsvr_run_action join-domain; }
     # fn: _adsvr_add_replication - Forward the `join-replication` action to the AD Server manager.
+        # . Purpose
+        #   Forward the `join-replication` action to the AD Server manager.
         #
         # . Returns
         #   The status returned by the delegated action.
@@ -292,6 +319,8 @@ set -uo pipefail
     _adsvr_add_replication() { _adsvr_run_action join-replication; }
 
     # fn: _adsvr_step_install_packages - Forward the `install` action to the AD Server manager.
+        # . Purpose
+        #   Forward the `install` action to the AD Server manager.
         #
         # . Returns
         #   The status returned by the delegated action.
@@ -302,6 +331,8 @@ set -uo pipefail
         #   ```
     _adsvr_step_install_packages() { _adsvr_run_action install; }
     # fn: _adsvr_step_preflight - Forward the `preflight` action to the AD Server manager.
+        # . Purpose
+        #   Forward the `preflight` action to the AD Server manager.
         #
         # . Returns
         #   The status returned by the delegated action.
@@ -312,6 +343,8 @@ set -uo pipefail
         #   ```
     _adsvr_step_preflight()        { _adsvr_run_action preflight; }
     # fn: _adsvr_step_identity - Forward the `identity` action to the AD Server manager.
+        # . Purpose
+        #   Forward the `identity` action to the AD Server manager.
         #
         # . Returns
         #   The status returned by the delegated action.
@@ -322,6 +355,8 @@ set -uo pipefail
         #   ```
     _adsvr_step_identity()         { _adsvr_run_action identity; }
     # fn: _adsvr_step_provision - Forward the `provision` action to the AD Server manager.
+        # . Purpose
+        #   Forward the `provision` action to the AD Server manager.
         #
         # . Returns
         #   The status returned by the delegated action.
@@ -332,6 +367,8 @@ set -uo pipefail
         #   ```
     _adsvr_step_provision()        { _adsvr_run_action provision; }
     # fn: _adsvr_step_domain_settings - Forward the `settings` action to the AD Server manager.
+        # . Purpose
+        #   Forward the `settings` action to the AD Server manager.
         #
         # . Returns
         #   The status returned by the delegated action.
@@ -342,6 +379,8 @@ set -uo pipefail
         #   ```
     _adsvr_step_domain_settings()  { _adsvr_run_action settings; }
     # fn: _adsvr_step_kerberos - Forward the `kerberos` action to the AD Server manager.
+        # . Purpose
+        #   Forward the `kerberos` action to the AD Server manager.
         #
         # . Returns
         #   The status returned by the delegated action.
@@ -352,6 +391,8 @@ set -uo pipefail
         #   ```
     _adsvr_step_kerberos()         { _adsvr_run_action kerberos; }
     # fn: _adsvr_step_resolver - Forward the `resolver` action to the AD Server manager.
+        # . Purpose
+        #   Forward the `resolver` action to the AD Server manager.
         #
         # . Returns
         #   The status returned by the delegated action.
@@ -362,6 +403,8 @@ set -uo pipefail
         #   ```
     _adsvr_step_resolver()         { _adsvr_run_action resolver; }
     # fn: _adsvr_step_start - Forward the `start` action to the AD Server manager.
+        # . Purpose
+        #   Forward the `start` action to the AD Server manager.
         #
         # . Returns
         #   The status returned by the delegated action.
@@ -372,6 +415,8 @@ set -uo pipefail
         #   ```
     _adsvr_step_start()            { _adsvr_run_action start; }
     # fn: _adsvr_step_register_dns - Forward the `dns` action to the AD Server manager.
+        # . Purpose
+        #   Forward the `dns` action to the AD Server manager.
         #
         # . Returns
         #   The status returned by the delegated action.
@@ -382,6 +427,8 @@ set -uo pipefail
         #   ```
     _adsvr_step_register_dns()     { _adsvr_run_action dns; }
     # fn: _adsvr_validate - Forward the `validate` action to the AD Server manager.
+        # . Purpose
+        #   Forward the `validate` action to the AD Server manager.
         #
         # . Returns
         #   The status returned by the delegated action.
@@ -392,6 +439,8 @@ set -uo pipefail
         #   ```
     _adsvr_validate()              { _adsvr_run_action validate; }
     # fn: _adsvr_status - Forward the `status` action to the AD Server manager.
+        # . Purpose
+        #   Forward the `status` action to the AD Server manager.
         #
         # . Returns
         #   The status returned by the delegated action.
@@ -412,6 +461,8 @@ set -uo pipefail
     # Every validator sets SGND_MODULE_VALIDATION_MESSAGE to a concise result summary.
     # Detailed diagnostic output may be written by the validator or delegated action.
     # fn: validate_module_active_directory_server - Validate the Active Directory module and record its status for the console.
+        # . Purpose
+        #   Validate the Active Directory module and record its status for the console.
         #
         # . Returns
         #   A console validation status (0=pass, 1=fail, 2=warning, 3=skipped).

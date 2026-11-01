@@ -8,7 +8,8 @@
 #   Shortname   : MANAGE_SSH_ACCESS
 #   Source      : manage-ssh-access.sh
 #   Type        : script
-#   Group       : Role Managers
+#   Group       : Modules
+#   Subgroup    : Computer Setup
 #   Purpose     : Computer Setup action implementation
 #   Checksum : f3d3c055415469e90655ab01a3e966b572a09a9bed1a688f953085d045db1b1b
 # Description:
@@ -46,7 +47,7 @@ set -uo pipefail
         #     present, falls back to the installed framework copy without changing
         #     SGND_FRAMEWORK_ROOT.
         #
-        # . Globals (write)
+        # . Globals (Write)
         #   SGND_FRAMEWORK_ROOT
         #
         # . Output
@@ -54,8 +55,8 @@ set -uo pipefail
         #   helpers are not available until sgnd-exe-common.sh has been loaded.
         #
         # . Returns
-        #   0 when the framework root was resolved and executable common library loaded.
-        #   126 when the script path cannot be resolved, no canonical root component can
+        #   - 0 when the framework root was resolved and executable common library loaded.
+        #   - 126 when the script path cannot be resolved, no canonical root component can
         #   be found, or the executable common library is unreadable.
         #
         # . Usage
@@ -142,6 +143,13 @@ SGND_STATE_SAVE=0
     # Run these actions as the intended deployment account (not with sudo).
 
     # fn: _computer_ssh_user_guard - Keep deployment keys and agent owned by the login user.
+        # . Purpose
+        #   Keep deployment keys and agent owned by the login user.
+        #
+        # . Usage
+        #   ```bash
+        #   _computer_ssh_user_guard
+        #   ```
     _computer_ssh_user_guard() {
         if (( EUID == 0 )); then
             sayfail "SSH deployment access must run as the intended non-root user, not root."
@@ -155,6 +163,15 @@ SGND_STATE_SAVE=0
     }
 
     # fn: _computer_ssh_select_key - Prompt for a private key; accept only home SSH keys.
+        # . Purpose
+        #   Prompt for a private key; accept only home SSH keys.
+        #
+        # . Arguments
+        #   - `$1`: Name of the shell variable receiving the result.
+        # . Usage
+        #   ```bash
+        #   _computer_ssh_select_key "<out_var>"
+        #   ```
     _computer_ssh_select_key() {
         local out_var="${1:?missing variable}" key="${HOME}/.ssh/id_ed25519"
         ask --label "SSH private key" --var key --default "$key" --back || return 2
@@ -166,6 +183,16 @@ SGND_STATE_SAVE=0
     }
 
     # fn: _computer_ssh_select_remote - Read and validate remote SSH login details.
+        # . Purpose
+        #   Read and validate remote SSH login details.
+        #
+        # . Arguments
+        #   - `$1`: Output variable for the user name.
+        #   - `$2`: Output variable for the remote host.
+        # . Usage
+        #   ```bash
+        #   _computer_ssh_select_remote "example-user" "<host_var>"
+        #   ```
     _computer_ssh_select_remote() {
         local user_var="${1:?missing user var}" host_var="${2:?missing host var}"
         local remote_user="${USER:-}" remote_host=""
@@ -180,6 +207,13 @@ SGND_STATE_SAVE=0
     }
 
     # fn: _computer_ssh_generate_user_key - Safely create a personal Ed25519 key pair.
+        # . Purpose
+        #   Safely create a personal Ed25519 key pair.
+        #
+        # . Usage
+        #   ```bash
+        #   _computer_ssh_generate_user_key
+        #   ```
     _computer_ssh_generate_user_key() {
         local key="" decision="NO"
         _computer_ssh_user_guard || return $?
@@ -203,6 +237,13 @@ SGND_STATE_SAVE=0
     }
 
     # fn: _computer_ssh_install_key - Copy only the public key after confirmation.
+        # . Purpose
+        #   Copy only the public key after confirmation.
+        #
+        # . Usage
+        #   ```bash
+        #   _computer_ssh_install_key
+        #   ```
     _computer_ssh_install_key() {
         local key="" remote_user="" remote_host="" decision="NO"
         _computer_ssh_user_guard || return $?
@@ -227,7 +268,15 @@ SGND_STATE_SAVE=0
     }
 
     # fn: _computer_ssh_agent_connect - Reuse or start a user-only agent at a stable socket.
-    # A fixed socket lets later processes find the agent without storing its PID or passphrase.
+        # . Purpose
+        #   Reuse or start a user-only agent at a stable socket.
+        #
+        # A fixed socket lets later processes find the agent without storing its PID or passphrase.
+        #
+        # . Usage
+        #   ```bash
+        #   _computer_ssh_agent_connect
+        #   ```
     _computer_ssh_agent_connect() {
         local socket="${HOME}/.ssh/solidgroundux-agent.sock" status=0
         command -v ssh-agent >/dev/null 2>&1 && command -v ssh-add >/dev/null 2>&1 || {
@@ -263,6 +312,13 @@ SGND_STATE_SAVE=0
     }
 
     # fn: _computer_ssh_unlock_key - Load the deployment key into the agent.
+        # . Purpose
+        #   Load the deployment key into the agent.
+        #
+        # . Usage
+        #   ```bash
+        #   _computer_ssh_unlock_key
+        #   ```
     _computer_ssh_unlock_key() {
         local key=""
         _computer_ssh_user_guard || return $?
@@ -279,6 +335,13 @@ SGND_STATE_SAVE=0
     }
 
     # fn: _computer_ssh_test_access - Verify unattended SSH with the chosen identity.
+        # . Purpose
+        #   Verify unattended SSH with the chosen identity.
+        #
+        # . Usage
+        #   ```bash
+        #   _computer_ssh_test_access
+        #   ```
     _computer_ssh_test_access() {
         local key="" remote_user="" remote_host="" result="" rc=0
         _computer_ssh_user_guard || return $?
@@ -304,6 +367,15 @@ SGND_STATE_SAVE=0
 
 # - Dispatch ------------------------------------------------------------------------
 # fn: _run_action - Dispatch the requested management action to its implementation.
+    # . Purpose
+    #   Dispatch the requested management action to its implementation.
+    #
+    # . Arguments
+    #   - `$1`: Management action to execute.
+    # . Usage
+    #   ```bash
+    #   _run_action "test-access"
+    #   ```
 _run_action() {
     local action="${1:?missing action}"
     case "$action" in
@@ -316,6 +388,13 @@ _run_action() {
 }
 
 # fn: main - Dispatch command-line options to the appropriate management workflow.
+    # . Purpose
+    #   Dispatch command-line options to the appropriate management workflow.
+    #
+    # . Usage
+    #   ```bash
+    #   main "$@"
+    #   ```
 main() {
     _framework_locator || return $?
     sgnd_exe_start -- "$@" || return $?

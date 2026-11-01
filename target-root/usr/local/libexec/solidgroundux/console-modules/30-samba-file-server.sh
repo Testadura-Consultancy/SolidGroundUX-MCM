@@ -7,7 +7,8 @@
 #   Shortname   : SAMBA
 #   Source      : 30-samba-file-server.sh
 #   Type        : module
-#   Group       : Module Registration
+#   Group       : Modules
+#   Subgroup    : Samba File Server
 #   Purpose     : Register and orchestrate Samba file-server management actions
 #
 #   Checksum : 2f0fe28a971102f8386880db33c0976709d64ca6d329506e6731435897e86d96
@@ -22,25 +23,26 @@
 set -uo pipefail
 
 # - Library guard ------------------------------------------------------------------
-    # fn$ _sgnd_lib_guard - Enforce source-only, single-load library initialization
+    # fn: _sgnd_lib_guard - Enforce source-only, source-only library guard
         # . Purpose
-        #   Ensure the file is sourced as a library and initialized only once.
+        #   Ensure the file is sourced as a library and marked as loaded.
         #
         # . Behavior
         #   - Derives a unique guard variable name from the current filename.
         #   - Aborts execution when the file is run directly instead of sourced.
         #   - Sets the guard variable on first load.
-        #   - Returns immediately when the library was already loaded.
+        #   - Returns from the guard helper when the file is already marked loaded; it does not skip subsequent top-level statements.
         #
-        # Inputs
+        # . Inputs
         #   BASH_SOURCE[0]
-        #   $0
+        #   - $0
         #
-        # Outputs (globals)
+        # . Outputs
+        #   (globals)
         #   SGND_<MODULE>_LOADED
         #
         # . Returns
-        #   0 when already loaded or successfully initialized.
+        #   - 0 when already loaded or successfully initialized.
         #   Exits with code 2 when executed instead of sourced.
         #
         # . Usage
@@ -78,13 +80,22 @@ set -uo pipefail
 
     SGND_MODULE_NAME="$SGND_SAMBA_FILE_MODULE_NAME"
 # - Project executable dispatch ----------------------------------------------------
-    # fn$ _smb_run_project_script - Run a management executable owned by this project
-    #
-    # The module repository is intentionally separate from the SolidGroundUX framework
-    # repository. Resolve project-owned executables relative to this module rather than
-    # through SGND_FRAMEWORK_ROOT. Pass the active framework root explicitly so a
-    # development project executable can still load the framework runtime used by the
-    # current console.
+    # fn: _smb_run_project_script - Run a management executable owned by this project
+        # . Purpose
+        #   Run a management executable owned by this project.
+        #
+        # The module repository is intentionally separate from the SolidGroundUX framework
+        # repository. Resolve project-owned executables relative to this module rather than
+        # through SGND_FRAMEWORK_ROOT. Pass the active framework root explicitly so a
+        # development project executable can still load the framework runtime used by the
+        # current console.
+        #
+        # . Arguments
+        #   - `$1`: Name of the selected item.
+        # . Usage
+        #   ```bash
+        #   _smb_run_project_script "example"
+        #   ```
     _smb_run_project_script() {
         local script_name="${1:?missing script name}"
         shift || true
@@ -114,6 +125,15 @@ set -uo pipefail
     }
 
     # fn: _smb_run_server_action - Forward a Samba Server action to its management executable.
+        # . Purpose
+        #   Forward a Samba Server action to its management executable.
+        #
+        # . Arguments
+        #   - `$1`: Management action to execute.
+        # . Usage
+        #   ```bash
+        #   _smb_run_server_action "status"
+        #   ```
     _smb_run_server_action() {
         local action="${1:?missing action}"
         _smb_run_project_script "manage-samba-file-server.sh" --action "$action"
@@ -121,26 +141,61 @@ set -uo pipefail
 
 # - Server management dispatchers --------------------------------------------------
     # fn: _smb_step_install_packages - Run the Samba package-installation step.
+        # . Purpose
+        #   Run the Samba package-installation step.
+        #
+        # . Usage
+        #   ```bash
+        #   _smb_step_install_packages
+        #   ```
     _smb_step_install_packages() {
         _smb_run_server_action install
     }
 
     # fn: _smb_step_configure_authentication - Run the Samba authentication configuration step.
+        # . Purpose
+        #   Run the Samba authentication configuration step.
+        #
+        # . Usage
+        #   ```bash
+        #   _smb_step_configure_authentication
+        #   ```
     _smb_step_configure_authentication() {
         _smb_run_server_action authentication
     }
 
     # fn: _smb_step_validate_storage - Run the Samba storage validation step.
+        # . Purpose
+        #   Run the Samba storage validation step.
+        #
+        # . Usage
+        #   ```bash
+        #   _smb_step_validate_storage
+        #   ```
     _smb_step_validate_storage() {
         _smb_run_server_action storage
     }
 
     # fn: _smb_step_prepare_share_root - Prepare the Samba share-root directory.
+        # . Purpose
+        #   Prepare the Samba share-root directory.
+        #
+        # . Usage
+        #   ```bash
+        #   _smb_step_prepare_share_root
+        #   ```
     _smb_step_prepare_share_root() {
         _smb_run_server_action share-root
     }
 
     # fn: _smb_step_start_service - Manage the service for smb step start in the Samba workflow.
+        # . Purpose
+        #   Dispatch the Samba service startup step to the standalone manager.
+        #
+        # . Usage
+        #   ```bash
+        #   _smb_step_start_service
+        #   ```
     _smb_step_start_service() {
         _smb_run_server_action service
     }
@@ -158,7 +213,7 @@ set -uo pipefail
         #   - Falls back to direct child execution when invoked outside management-console.
         #
         # . Returns
-        #   0 when all child actions succeed; otherwise the first failing child return code.
+        #   - 0 when all child actions succeed; otherwise the first failing child return code.
         #
         # . Usage
         #   ```bash
@@ -201,27 +256,62 @@ set -uo pipefail
     }
 
     # fn: _smb_validate - Validate smb in the Samba workflow.
+        # . Purpose
+        #   Dispatch Samba validation to the standalone manager.
+        #
+        # . Usage
+        #   ```bash
+        #   _smb_validate
+        #   ```
     _smb_validate() {
         _smb_run_server_action validate
     }
 
     # fn: _smb_status - Inspect status for smb in the Samba workflow.
+        # . Purpose
+        #   Dispatch Samba status inspection to the standalone manager.
+        #
+        # . Usage
+        #   ```bash
+        #   _smb_status
+        #   ```
     _smb_status() {
         _smb_run_server_action status
     }
 
 # - Share management dispatch ------------------------------------------------------
     # fn: _smb_manage_shares - Launch the Samba share-management interface.
+        # . Purpose
+        #   Launch the Samba share-management interface.
+        #
+        # . Usage
+        #   ```bash
+        #   _smb_manage_shares
+        #   ```
     _smb_manage_shares() {
         _smb_run_project_script "manage-samba-shares.sh"
     }
 
     # fn: _smb_manage_directories - Launch the Samba directory-management interface.
+        # . Purpose
+        #   Launch the Samba directory-management interface.
+        #
+        # . Usage
+        #   ```bash
+        #   _smb_manage_directories
+        #   ```
     _smb_manage_directories() {
         _smb_run_project_script "manage-samba-directories.sh"
     }
 
     # fn: _smb_manage_users - Launch the Samba user-management interface.
+        # . Purpose
+        #   Launch the Samba user-management interface.
+        #
+        # . Usage
+        #   ```bash
+        #   _smb_manage_users
+        #   ```
     _smb_manage_users() {
         _smb_run_project_script "manage-samba-users.sh"
     }
@@ -236,6 +326,8 @@ set -uo pipefail
     # Every validator sets SGND_MODULE_VALIDATION_MESSAGE to a concise result summary.
     # Detailed diagnostic output may be written by the validator or delegated action.
     # fn: validate_module_samba_file_server - Validate the Samba module and record its status for the console.
+        # . Purpose
+        #   Validate the Samba module and record its status for the console.
         #
         # . Returns
         #   A console validation status (0=pass, 1=fail, 2=warning, 3=skipped).

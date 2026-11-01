@@ -114,7 +114,7 @@ set -uo pipefail
     #   - Demonstrates a function without arguments.
     #
     # . Returns
-    #   0 always; the function is a documentation-only example.
+    #   - 0 always; the function is a documentation-only example.
     #
     # . Usage
     #   ```bash
@@ -135,15 +135,15 @@ sample_public_function() {
     #   - Writes both resolved values to stdout.
     #
     # . Arguments
-    #   $1  Required source value.
-    #   $2  Optional target value. Defaults to stdout.
+    #   - $1  Required source value.
+    #   - $2  Optional target value. Defaults to stdout.
     #
     # . Output
     #   Writes the resolved source and target values to stdout.
     #
     # . Returns
-    #   0  Arguments were accepted.
-    #   2  Required source value was missing.
+    #   - 0  Arguments were accepted.
+    #   - 2  Required source value was missing.
     #
     # . Usage
     #   ```bash
@@ -171,7 +171,7 @@ sample_function_with_arguments() {
     #   - The name indicates a private helper; this sample performs no work.
     #
     # . Returns
-    #   0 on success.
+    #   - 0 on success.
     #
     # . Usage
     #   ```bash
@@ -182,7 +182,7 @@ _sample_internal_function() {
 }
 
 
-# fn$ sample_template_function - Sample template function
+# fn: sample_template_function - Sample template function
     # . Purpose
     #   Describe what the function does.
     #
@@ -190,8 +190,8 @@ _sample_internal_function() {
     #   - Describe the important behavior.
     #
     # . Arguments
-    #   $1  Describe the first argument.
-    #   $2  Describe the second argument.
+    #   - $1  Describe the first argument.
+    #   - $2  Describe the second argument.
     #
     # . Inputs
     #   Describe relevant global inputs, or use None.
@@ -206,8 +206,8 @@ _sample_internal_function() {
     #   Describe filesystem, process, network, or state changes, or use None.
     #
     # . Returns
-    #   0  Success.
-    #   1  General failure.
+    #   - 0  Success.
+    #   - 1  General failure.
     #
     # . Usage
     #   ```bash

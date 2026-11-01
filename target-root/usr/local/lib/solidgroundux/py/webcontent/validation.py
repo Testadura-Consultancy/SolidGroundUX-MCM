@@ -10,6 +10,8 @@ from .content import discover_content, load_featured, load_navigation, load_site
 from .markdown import referenced_style_classes
 
 
+
+# --- Public classes ------------------------------------------------------------
 @dataclass(slots=True)
 class ValidationResult:
     """Link and output validation results."""
@@ -22,8 +24,10 @@ class ValidationResult:
     def as_dict(self) -> dict[str, object]:
         """Serialize the result to a JSON-compatible mapping.
         
-        Returns:
-            Operation result or None, as defined by the implementation."""
+        Usage:
+            ```python
+            validation_result.as_dict()
+            ```"""
         return {
             "success": self.success,
             "errors": self.errors,
@@ -33,8 +37,15 @@ class ValidationResult:
         }
 
 
+
+# --- Internal functions ------------------------------------------------------------
 def _available_style_classes(css_dir: Path, prefix: str) -> set[str]:
-    """Handle available style classes for the web content workflow."""
+    """Collect available CSS class names with the configured content prefix.
+        
+        Usage:
+            ```python
+            _available_style_classes(css_dir, prefix)
+            ```"""
     classes: set[str] = set()
     pattern = re.compile(r"\.([A-Za-z_][A-Za-z0-9_-]*)")
     if not css_dir.is_dir():
@@ -45,14 +56,18 @@ def _available_style_classes(css_dir: Path, prefix: str) -> set[str]:
     return classes
 
 
+
+# --- Public functions ------------------------------------------------------------
 def validate_site(source: str | Path) -> ValidationResult:
     """Inspect a generated website for links and other publication issues.
-    
-    Args:
-        source: Input used by this operation.
-    
-    Returns:
-        Operation result or None, as defined by the implementation."""
+        
+        Args:
+            source: Website source root directory.
+        
+        Usage:
+            ```python
+            report = validate_site(site_root)
+            ```"""
     errors: list[str] = []
     warnings: list[str] = []
 

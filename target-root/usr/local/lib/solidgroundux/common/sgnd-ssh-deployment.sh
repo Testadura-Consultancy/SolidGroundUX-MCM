@@ -39,6 +39,8 @@
 #   ```
 # =====================================================================================
 # fn: sgnd_ssh_agent_discover - Locate an existing usable SSH authentication agent and export its socket.
+    # . Purpose
+    #   Locate an existing usable SSH authentication agent and export its socket.
     #
     # . Usage
     #   ```bash
@@ -59,6 +61,8 @@ sgnd_ssh_agent_discover() {
 }
 
 # fn: sgnd_ssh_agent_start - Start or reconnect to a dedicated SSH authentication agent.
+    # . Purpose
+    #   Start or reconnect to a dedicated SSH authentication agent.
     #
     # . Usage
     #   ```bash
@@ -82,10 +86,17 @@ sgnd_ssh_agent_start() {
 # Test with BatchMode; offer recovery only at an interactive terminal.
 # Inputs: remote user, hostname, port, optional private-key path.
 # fn: sgnd_ssh_ensure_access - Verify noninteractive SSH access, offering interactive key recovery when needed.
+    # . Purpose
+    #   Verify noninteractive SSH access, offering interactive key recovery when needed.
     #
+    # . Arguments
+    #   - `$1`: User account.
+    #   - `$2`: Remote host or site name.
+    #   - `$3`: TCP port.
+    #   - `$4`: Optional: configuration or response-field key.
     # . Usage
     #   ```bash
-    #   sgnd_ssh_ensure_access
+    #   sgnd_ssh_ensure_access "deploy" "web.example.test" "22" "$HOME/.ssh/id_ed25519"
     #   ```
 sgnd_ssh_ensure_access() {
     local user="$1" host="$2" port="$3" key="${4:-}" selection="" rc=0

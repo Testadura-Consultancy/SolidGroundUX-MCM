@@ -8,7 +8,7 @@
 #   Shortname   : MANAGE_WEB_CONTENT
 #   Source      : manage-web-content.sh
 #   Type        : script
-#   Group       : Role Managers
+#   Group       : Modules
 #   Subgroup    : Web Content Management
 #   Purpose     : Ingest, delete, generate, validate, and prepare static website content
 #
@@ -64,7 +64,7 @@ set -uo pipefail
         #     present, falls back to the installed framework copy without changing
         #     SGND_FRAMEWORK_ROOT.
         #
-        # . Globals (write)
+        # . Globals (Write)
         #   SGND_FRAMEWORK_ROOT
         #
         # . Output
@@ -72,8 +72,8 @@ set -uo pipefail
         #   helpers are not available until sgnd-exe-common.sh has been loaded.
         #
         # . Returns
-        #   0 when the framework root was resolved and executable common library loaded.
-        #   126 when the script path cannot be resolved, no canonical root component can
+        #   - 0 when the framework root was resolved and executable common library loaded.
+        #   - 126 when the script path cannot be resolved, no canonical root component can
         #   be found, or the executable common library is unreadable.
         #
         # . Usage
@@ -227,6 +227,13 @@ set -uo pipefail
 
 # - Helpers -------------------------------------------------------------------------
     # fn: _web_content_python_root - Run the python root action through Web Content Management.
+        # . Purpose
+        #   Run the python root action through Web Content Management.
+        #
+        # . Usage
+        #   ```bash
+        #   _web_content_python_root
+        #   ```
     _web_content_python_root() {
         if [[ "$SGND_FRAMEWORK_ROOT" == "/" ]]; then
             printf '%s\n' "/usr/local/lib/solidgroundux/py"
@@ -236,24 +243,60 @@ set -uo pipefail
     }
 
     # fn: _web_content_validate_source - Run the validate source action through Web Content Management.
+        # . Purpose
+        #   Run the validate source action through Web Content Management.
+        #
+        # . Arguments
+        #   - `$1`: Optional: filesystem path to inspect.
+        # . Usage
+        #   ```bash
+        #   _web_content_validate_source "/srv/storage/example"
+        #   ```
     _web_content_validate_source() {
         local path="${1:-}"
         [[ -d "$path" && -r "$path/config/site.cfg" && -d "$path/content" && -d "$path/templates" && -d "$path/css" ]]
     }
 
     # fn: _web_content_validate_language - Run the validate language action through Web Content Management.
+        # . Purpose
+        #   Run the validate language action through Web Content Management.
+        #
+        # . Arguments
+        #   - `$1`: Optional: value to inspect or write.
+        # . Usage
+        #   ```bash
+        #   _web_content_validate_language "NL"
+        #   ```
     _web_content_validate_language() {
         local value="${1:-}"
         [[ "${value^^}" == "ALL" || "$value" =~ ^[A-Za-z]{2}([,][A-Za-z]{2})*$ ]]
     }
 
     # fn: _web_content_validate_platform - Run the validate platform action through Web Content Management.
+        # . Purpose
+        #   Run the validate platform action through Web Content Management.
+        #
+        # . Arguments
+        #   - `$1`: Optional: value to inspect or write.
+        # . Usage
+        #   ```bash
+        #   _web_content_validate_platform "linkedin"
+        #   ```
     _web_content_validate_platform() {
         local value="${1:-}"
         [[ "$value" =~ ^[A-Za-z0-9_-]+$ ]]
     }
 
     # fn: _web_content_ensure_output_parent - Run the ensure output parent action through Web Content Management.
+        # . Purpose
+        #   Run the ensure output parent action through Web Content Management.
+        #
+        # . Arguments
+        #   - `$1`: Filesystem path to inspect.
+        # . Usage
+        #   ```bash
+        #   _web_content_ensure_output_parent "/srv/storage/example"
+        #   ```
     _web_content_ensure_output_parent() {
         local path="${1:?missing output path}"
         local parent=""
@@ -262,6 +305,16 @@ set -uo pipefail
     }
 
     # fn: _web_content_result_value - Extract a requested field from the most recent engine result.
+        # . Purpose
+        #   Extract a requested field from the most recent engine result.
+        #
+        # . Arguments
+        #   - `$1`: Path to the operation result file.
+        #   - `$2`: Configuration or response-field key.
+        # . Usage
+        #   ```bash
+        #   _web_content_result_value "/srv/storage/example.txt" "example-key"
+        #   ```
     _web_content_result_value() {
         local result_file="${1:?missing result file}"
         local key="${2:?missing key}"
@@ -281,9 +334,19 @@ PY
     }
 
     # fn: _web_content_run_engine - Invoke the noninteractive Python engine and capture its structured result.
+        # . Purpose
+        #   Invoke the noninteractive Python engine and capture its structured result.
+        #
+        # . Arguments
+        #   - `$1`: Path to the operation result file.
         # . Behavior
         #   - Coordinates the existing workflow without modifying article content directly.
         #   - Propagates errors to the caller and uses the framework for user interaction.
+        #
+        # . Usage
+        #   ```bash
+        #   _web_content_run_engine "/srv/storage/example.txt"
+        #   ```
     _web_content_run_engine() {
         local result_file="${1:?missing result file}"
         shift
@@ -313,7 +376,12 @@ PY
         #     cannot be written.
         #
         # . Arguments
-        #   $1  COUNT - Number of canonical content files changed during this action.
+        #   - $1  COUNT - Number of canonical content files changed during this action.
+        #
+        # . Usage
+        #   ```bash
+        #   _web_content_record_activity "5"
+        #   ```
     _web_content_record_activity() {
         local count="${1:-0}"
         local marker="${SGND_WEB_CONTENT_ACTIVITY_FILE:-}"
@@ -324,6 +392,15 @@ PY
     }
 
     # fn: _web_content_report_errors - Run the report errors action through Web Content Management.
+        # . Purpose
+        #   Run the report errors action through Web Content Management.
+        #
+        # . Arguments
+        #   - `$1`: Path to the operation result file.
+        # . Usage
+        #   ```bash
+        #   _web_content_report_errors "8080"
+        #   ```
     _web_content_report_errors() {
         local result_file="${1:?missing result file}"
         local errors=""
@@ -336,6 +413,15 @@ PY
     }
 
     # fn: _web_content_report_warnings - Run the report warnings action through Web Content Management.
+        # . Purpose
+        #   Run the report warnings action through Web Content Management.
+        #
+        # . Arguments
+        #   - `$1`: Path to the operation result file.
+        # . Usage
+        #   ```bash
+        #   _web_content_report_warnings "8080"
+        #   ```
     _web_content_report_warnings() {
         local result_file="${1:?missing result file}"
         local warnings=""
@@ -348,29 +434,68 @@ PY
     }
 
     # fn: _web_content_select_source - Run the select source action through Web Content Management.
+        # . Purpose
+        #   Run the select source action through Web Content Management.
+        #
+        # . Usage
+        #   ```bash
+        #   _web_content_select_source
+        #   ```
     _web_content_select_source() {
         ask --label "Website repository" --var SGND_WEB_CONTENT_SOURCE --default "$SGND_WEB_CONTENT_SOURCE" --validate _web_content_validate_source --back
     }
 
     # fn: _web_content_select_language - Run the select language action through Web Content Management.
+        # . Purpose
+        #   Run the select language action through Web Content Management.
+        #
+        # . Usage
+        #   ```bash
+        #   _web_content_select_language
+        #   ```
     _web_content_select_language() {
         ask --label "Language (ALL or codes)" --var SGND_WEB_CONTENT_LANGUAGE --default "$SGND_WEB_CONTENT_LANGUAGE" --validate _web_content_validate_language --back
         SGND_WEB_CONTENT_LANGUAGE="${SGND_WEB_CONTENT_LANGUAGE^^}"
     }
 
     # fn: _web_content_validate_ingest_dir - Run the validate ingest dir action through Web Content Management.
+        # . Purpose
+        #   Run the validate ingest dir action through Web Content Management.
+        #
+        # . Arguments
+        #   - `$1`: Optional: filesystem path to inspect.
+        # . Usage
+        #   ```bash
+        #   _web_content_validate_ingest_dir "/srv/storage/example"
+        #   ```
     _web_content_validate_ingest_dir() {
         local path="${1:-}"
         [[ -n "$path" ]]
     }
 
     # fn: _web_content_validate_slug - Run the validate slug action through Web Content Management.
+        # . Purpose
+        #   Run the validate slug action through Web Content Management.
+        #
+        # . Arguments
+        #   - `$1`: Optional: value to inspect or write.
+        # . Usage
+        #   ```bash
+        #   _web_content_validate_slug "example-page"
+        #   ```
     _web_content_validate_slug() {
         local value="${1:-}"
         [[ "$value" =~ ^[a-z0-9][a-z0-9-]*$ ]]
     }
 
     # fn: _web_content_canonical_ingest_dir - Run the canonical ingest dir action through Web Content Management.
+        # . Purpose
+        #   Run the canonical ingest dir action through Web Content Management.
+        #
+        # . Usage
+        #   ```bash
+        #   _web_content_canonical_ingest_dir
+        #   ```
     _web_content_canonical_ingest_dir() {
         # Incoming authoring files belong to the selected website repository but
         # stay outside content/ until their metadata has been resolved and confirmed.
@@ -378,6 +503,13 @@ PY
     }
 
     # fn: _web_content_canonical_archive_dir - Run the canonical archive dir action through Web Content Management.
+        # . Purpose
+        #   Run the canonical archive dir action through Web Content Management.
+        #
+        # . Usage
+        #   ```bash
+        #   _web_content_canonical_archive_dir
+        #   ```
     _web_content_canonical_archive_dir() {
         # Successfully processed loose sources are retained outside content/ as a
         # date-grouped authoring archive; the website generator ignores this tree.
@@ -385,6 +517,13 @@ PY
     }
 
     # fn: _web_content_canonical_delete_archive_dir - Run the canonical delete archive dir action through Web Content Management.
+        # . Purpose
+        #   Run the canonical delete archive dir action through Web Content Management.
+        #
+        # . Usage
+        #   ```bash
+        #   _web_content_canonical_delete_archive_dir
+        #   ```
     _web_content_canonical_delete_archive_dir() {
         # Removed canonical pages are moved outside content/ into a date-grouped
         # recovery archive so deletion remains reversible and generator-safe.
@@ -392,6 +531,13 @@ PY
     }
 
     # fn: _web_content_select_ingest_dir - Run the select ingest dir action through Web Content Management.
+        # . Purpose
+        #   Run the select ingest dir action through Web Content Management.
+        #
+        # . Usage
+        #   ```bash
+        #   _web_content_select_ingest_dir
+        #   ```
     _web_content_select_ingest_dir() {
         local canonical=""
         local selected=""
@@ -410,6 +556,15 @@ PY
     }
 
     # fn: _web_content_extract_parent_route - Run the extract parent route action through Web Content Management.
+        # . Purpose
+        #   Run the extract parent route action through Web Content Management.
+        #
+        # . Arguments
+        #   - `$1`: Optional: Parent-route selection label.
+        # . Usage
+        #   ```bash
+        #   _web_content_extract_parent_route "<selection>"
+        #   ```
     _web_content_extract_parent_route() {
         local selection="${1:-}"
         local route="${selection##*[}"
@@ -418,6 +573,15 @@ PY
     }
 
     # fn: _web_content_kind_label - Run the kind label action through Web Content Management.
+        # . Purpose
+        #   Run the kind label action through Web Content Management.
+        #
+        # . Arguments
+        #   - `$1`: Optional: content type.
+        # . Usage
+        #   ```bash
+        #   _web_content_kind_label "<kind>"
+        #   ```
     _web_content_kind_label() {
         local kind="${1:-}"
         case "$kind" in
@@ -429,6 +593,15 @@ PY
     }
 
     # fn: _web_content_kind_value - Run the kind value action through Web Content Management.
+        # . Purpose
+        #   Run the kind value action through Web Content Management.
+        #
+        # . Arguments
+        #   - `$1`: Optional: prompt or display label.
+        # . Usage
+        #   ```bash
+        #   _web_content_kind_value "Select an option"
+        #   ```
     _web_content_kind_value() {
         local label="${1:-}"
         case "$label" in
@@ -440,6 +613,15 @@ PY
     }
 
     # fn: _web_content_choose_language - Run the choose language action through Web Content Management.
+        # . Purpose
+        #   Run the choose language action through Web Content Management.
+        #
+        # . Arguments
+        #   - `$1`: Name of the shell variable receiving the result.
+        # . Usage
+        #   ```bash
+        #   _web_content_choose_language "<out_var>"
+        #   ```
     _web_content_choose_language() {
         local out_var="${1:?missing output variable}"
         shift
@@ -473,6 +655,15 @@ PY
     }
 
     # fn: _web_content_choose_kind - Run the choose kind action through Web Content Management.
+        # . Purpose
+        #   Run the choose kind action through Web Content Management.
+        #
+        # . Arguments
+        #   - `$1`: Name of the shell variable receiving the result.
+        # . Usage
+        #   ```bash
+        #   _web_content_choose_kind "<out_var>"
+        #   ```
     _web_content_choose_kind() {
         local out_var="${1:?missing output variable}"
         local remembered="${SGND_WEB_CONTENT_INGEST_KIND:-}"
@@ -499,6 +690,15 @@ PY
     }
 
     # fn: _web_content_choose_parent - Run the choose parent action through Web Content Management.
+        # . Purpose
+        #   Run the choose parent action through Web Content Management.
+        #
+        # . Arguments
+        #   - `$1`: Name of the shell variable receiving the result.
+        # . Usage
+        #   ```bash
+        #   _web_content_choose_parent "<out_var>"
+        #   ```
     _web_content_choose_parent() {
         local out_var="${1:?missing output variable}"
         shift
@@ -536,6 +736,16 @@ PY
 
 # - Actions -------------------------------------------------------------------------
     # fn: _web_content_ingest_one - Normalize and archive one loose Markdown file
+        # . Purpose
+        #   Normalize and archive one loose Markdown file.
+        #
+        # . Arguments
+        #   - `$1`: Path to the source input file.
+        #   - `$2`: Optional batch processing flag.
+        # . Usage
+        #   ```bash
+        #   _web_content_ingest_one "/srv/storage/example.txt" "status"
+        #   ```
     _web_content_ingest_one() {
         local input_file="${1:?missing input file}"
         local batch_mode="${2:-No}"
@@ -702,6 +912,13 @@ PY
     }
 
     # fn: _web_content_valid_incoming_config - Validate saved source settings before network access
+        # . Purpose
+        #   Validate saved source settings before network access.
+        #
+        # . Usage
+        #   ```bash
+        #   _web_content_valid_incoming_config
+        #   ```
     _web_content_valid_incoming_config() {
         [[ "$SGND_WEB_INCOMING_HOST" =~ ^[A-Za-z0-9][A-Za-z0-9._-]*$ ]] &&
         [[ "$SGND_WEB_INCOMING_USER" =~ ^[a-z_][a-zA-Z0-9_.-]*$ ]] &&
@@ -711,6 +928,13 @@ PY
     }
 
     # fn: _web_content_configure_incoming - Save SSH source settings through the framework state registry
+        # . Purpose
+        #   Save SSH source settings through the framework state registry.
+        #
+        # . Usage
+        #   ```bash
+        #   _web_content_configure_incoming
+        #   ```
     _web_content_configure_incoming() {
         local host="$SGND_WEB_INCOMING_HOST" user="$SGND_WEB_INCOMING_USER" port="$SGND_WEB_INCOMING_PORT" remote="$SGND_WEB_INCOMING_REMOTE_DIR"
         ask --label "Incoming SSH server" --var host --default "$host" --back || return 0
@@ -728,6 +952,13 @@ PY
     }
 
     # fn: _web_content_retrieve_incoming - Pull selected remote incoming packages safely via SSH
+        # . Purpose
+        #   Pull selected remote incoming packages safely via SSH.
+        #
+        # . Usage
+        #   ```bash
+        #   _web_content_retrieve_incoming
+        #   ```
     _web_content_retrieve_incoming() {
         local remote="$SGND_WEB_INCOMING_REMOTE_DIR" host="$SGND_WEB_INCOMING_HOST" user="$SGND_WEB_INCOMING_USER" port="$SGND_WEB_INCOMING_PORT"
         local file="" temp="" transferred=0 skipped=0 failed=0
@@ -782,6 +1013,13 @@ PY
     }
 
     # fn: _web_content_ingest - Ingest one or more loose Markdown files into a website repository
+        # . Purpose
+        #   Ingest one or more loose Markdown files into a website repository.
+        #
+        # . Usage
+        #   ```bash
+        #   _web_content_ingest
+        #   ```
     _web_content_ingest() {
         local mode=""
         local selected=""
@@ -853,13 +1091,18 @@ PY
         #   translation and descendant safety rules.
         #
         # . Arguments
-        #   $1  SELECTION - Display value returned by inspect-delete / ask_selection.
-        #   $2  COUNT_VAR - Caller variable receiving the number of archived files.
+        #   - $1  SELECTION - Display value returned by inspect-delete / ask_selection.
+        #   - $2  COUNT_VAR - Caller variable receiving the number of archived files.
         #
         # . Returns
-        #   0 when content was archived and removed.
-        #   2 when the selected item was skipped or its deletion was cancelled.
+        #   - 0 when content was archived and removed.
+        #   - 2 when the selected item was skipped or its deletion was cancelled.
         #   Other non-zero values when inspection, preview, or deletion fails.
+        #
+        # . Usage
+        #   ```bash
+        #   _web_content_delete_one "<selection>" "5"
+        #   ```
     _web_content_delete_one() {
         local selection="${1:?missing selection}"
         local count_var="${2:?missing count variable}"
@@ -1030,6 +1273,11 @@ PY
         #     Enter returns to the menu; A or timeout starts another deletion pass.
         #   - Reports the total number of changed canonical files to the Management Console
         #     activity marker so website generation can be marked pending.
+        #
+        # . Usage
+        #   ```bash
+        #   _web_content_delete
+        #   ```
     _web_content_delete() {
         local inspect_file=""
         local options_text=""
@@ -1132,6 +1380,15 @@ PY
     }
 
     # fn: _web_content_generate - Generate a static website from a content repository
+        # . Purpose
+        #   Generate a static website from a content repository.
+        #   On success, write the optional console completion marker so publication
+        #   status can be marked pending without treating cancellation as generation.
+        #
+        # . Usage
+        #   ```bash
+        #   _web_content_generate
+        #   ```
     _web_content_generate() {
         local result_file=""
         local pages=""
@@ -1191,9 +1448,23 @@ PY
         sgnd_print_labeledvalue --label "Skipped pages" --value "$(_web_content_result_value "$result_file" skipped_pages)" --labelwidth 20
         sgnd_print_labeledvalue --label "Broken links" --value "$(_web_content_result_value "$result_file" broken_links)" --labelwidth 20
         rm -f "$result_file"
+        # A successful selector cancellation also returns zero; only a completed
+        # engine generation may mark the downstream publication step pending.
+        if [[ -n "${SGND_WEB_CONTENT_GENERATION_MARKER_FILE:-}" ]]; then
+            printf '%s\n' generated > "$SGND_WEB_CONTENT_GENERATION_MARKER_FILE" ||
+                saywarning "Could not record successful website generation for menu status updates."
+        fi
+        return 0
     }
 
     # fn: _web_content_validate - Validate a web-content repository
+        # . Purpose
+        #   Validate a web-content repository.
+        #
+        # . Usage
+        #   ```bash
+        #   _web_content_validate
+        #   ```
     _web_content_validate() {
         local result_file=""
         local files=""
@@ -1218,7 +1489,15 @@ PY
     }
 
     # fn: _web_content_prepare_social - Prepare a single article as a social-media draft.
-    # The output stays outside the repository and is never posted automatically.
+        # . Purpose
+        #   Prepare a single article as a social-media draft.
+        #
+        # The output stays outside the repository and is never posted automatically.
+        #
+        # . Usage
+        #   ```bash
+        #   _web_content_prepare_social
+        #   ```
     _web_content_prepare_social() {
         local list_file="" result_file="" social_selected_page="" file="" rc=0
         local -a options=()
@@ -1286,6 +1565,13 @@ PYCODE
     }
 
     # fn: _web_content_status - Show Web Content Management configuration and engine status
+        # . Purpose
+        #   Show Web Content Management configuration and engine status.
+        #
+        # . Usage
+        #   ```bash
+        #   _web_content_status
+        #   ```
     _web_content_status() {
         local python_root=""
         local engine="Unavailable"
@@ -1317,9 +1603,19 @@ PYCODE
 # Page management uses shared Python content discovery; changes remain uncommitted in Git.
     # Metadata editing stays on a page until Done; the wrapper offers another page afterward.
     # fn: _web_content_manage_page_once - Select one page and edit metadata or move its canonical source file.
+        # . Purpose
+        #   Select one page and edit metadata or move its canonical source file.
+        #
+        # . Arguments
+        #   - `$1`: Requested operation.
         # . Behavior
         #   - Coordinates the existing workflow without modifying article content directly.
         #   - Propagates errors to the caller and uses the framework for user interaction.
+        #
+        # . Usage
+        #   ```bash
+        #   _web_content_manage_page_once "edit-metadata"
+        #   ```
     _web_content_manage_page_once() {
         local operation="${1:?missing operation}"
         local list_file="" selected="" file="" field="" metadata_new_value="" parent="" slug="" result_file=""
@@ -1601,7 +1897,17 @@ PYCODE
 
 
     # fn: _web_content_manage_page - Repeat content editing when requested.
-    # Enter or timeout returns to the console; only A starts another selection.
+        # . Purpose
+        #   Repeat content editing when requested.
+        #
+        # Enter or timeout returns to the console; only A starts another selection.
+        #
+        # . Arguments
+        #   - `$1`: Requested operation.
+        # . Usage
+        #   ```bash
+        #   _web_content_manage_page "edit-metadata"
+        #   ```
     _web_content_manage_page() {
         local operation="${1:?missing operation}"
         local dlg_rc=0
@@ -1628,12 +1934,20 @@ PYCODE
     }
 
     # fn: _web_content_manage_config - Select an existing .cfg file and open it in nano.
+        # . Purpose
+        #   Select an existing .cfg file and open it in nano.
+        #
         # . Behavior
         #   - Uses the currently selected website repository and its config/ directory.
         #   - Lists only regular .cfg files found directly under config/.
         #   - Uses the framework selection dialogue; cancellation changes nothing.
         #   - Reports editor failures and marks website generation pending only on changes.
         #   - Does not create arbitrary files or execute paths entered by the user.
+        #
+        # . Usage
+        #   ```bash
+        #   _web_content_manage_config
+        #   ```
     _web_content_manage_config() {
         local config_dir="" selected="" target="" before="" after="" rc=0
         local -a files=()
@@ -1693,9 +2007,17 @@ PYCODE
 
 # - Website publication -------------------------------------------------------------
     # fn: _web_publish_safe_path - Require a dedicated absolute deployment directory.
-        # Returns:
-        #   0 for a safe directory, 1 otherwise.
-        # Usage:
+        # . Purpose
+        #   Require a dedicated absolute deployment directory.
+        #
+        # . Arguments
+        #   - `$1`: Optional: filesystem path to inspect.
+        # . Returns
+        #   - 0 for a safe directory, 1 otherwise.
+        # . Usage
+        #   ```bash
+        #     _web_publish_safe_path "$path"
+        #   ```
         #   _web_publish_safe_path "$path"
     _web_publish_safe_path() {
         local path="${1:-}"
@@ -1705,13 +2027,19 @@ PYCODE
     }
 
     # fn: _web_publish_restore_legacy - Import one unambiguous previously saved destination.
-        # Behavior:
+        # . Purpose
+        #   Import one unambiguous previously saved destination.
+        #
+        # . Behavior
         #   - Does not require the old Markdown repository to exist.
         #   - Ignores ambiguous destinations rather than guessing which root is correct.
         #   - Does not change or remove the legacy state.
-        # Returns:
-        #   0 whether or not an unambiguous legacy destination is found.
-        # Usage:
+        # . Returns
+        #   - 0 whether or not an unambiguous legacy destination is found.
+        # . Usage
+        #   ```bash
+        #     _web_publish_restore_legacy
+        #   ```
         #   _web_publish_restore_legacy
     _web_publish_restore_legacy() {
         [[ -z "$SGND_WEB_PUBLISH_HOST" && -z "$SGND_WEB_PUBLISH_REMOTE_DIR" ]] || return 0
@@ -1752,7 +2080,10 @@ PYCODE
     }
 
     # fn: _web_publish_discover_sites - List active remote Nginx hostnames and document roots.
-        # Behavior:
+        # . Purpose
+        #   List active remote Nginx hostnames and document roots.
+        #
+        # . Behavior
         #   - Uses the active Nginx configuration; falls back to readable enabled
         #     site files if nginx -T requires unavailable privileges.
         #   - Requires no write access; sudo -n is attempted only for reading config.
@@ -1760,13 +2091,16 @@ PYCODE
         #   - With mode `roots`, returns eligible document roots; uses named sites
         #     preferentially, falling back to the Nginx default root when needed.
         #   - A failed lookup is optional: the caller can always enter values manually.
-        # Arguments:
-        #   $1 hostname; $2 user; $3 port; $4 optional SSH identity; $5 mode.
-        # Output:
+        # . Arguments
+        #   - $1 hostname; $2 user; $3 port; $4 optional SSH identity; $5 mode.
+        # . Output
         #   Mode sites: hostname TAB absolute-root; mode roots: absolute-root.
-        # Returns:
-        #   Nonzero if SSH, Nginx dump or parsing fails.
-        # Usage:
+        # . Returns
+        #   - Nonzero if SSH, Nginx dump or parsing fails.
+        # . Usage
+        #   ```bash
+        #     _web_publish_discover_sites "td-web" "deploy" "22" "" "sites"
+        #   ```
         #   _web_publish_discover_sites "$host" "$user" "$port" "$identity"
     _web_publish_discover_sites() {
         local host="$1" user="$2" port="$3" identity="${4:-}" mode="${5:-sites}" config="" rc=0
@@ -1847,16 +2181,22 @@ PYCODE
     }
 
     # fn: _web_publish_configure - Configure website publication after selecting the server.
-        # Behavior:
+        # . Purpose
+        #   Configure website publication after selecting the server.
+        #
+        # . Behavior
         #   - Requires generated HTML and an SSH login before offering remote websites.
         #   - Selecting an existing Nginx website fills its hostname and document root.
         #   - For a new website, proposes a root beneath the existing sites' parent
         #     directory when a unique parent can be determined; otherwise asks.
         #   - A failed Nginx lookup never changes existing-site selection into creation.
         #   - Saves all five publishing settings only after configuration succeeds.
-        # Returns:
-        #   0 configured; 2 cancelled; 1 invalid configuration.
-        # Usage:
+        # . Returns
+        #   - 0 configured; 2 cancelled; 1 invalid configuration.
+        # . Usage
+        #   ```bash
+        #     _web_publish_configure
+        #   ```
         #   _web_publish_configure
     _web_publish_configure() {
         local source="${SGND_WEB_PUBLISH_SOURCE:-${SGND_WEB_CONTENT_OUTPUT%/}}"
@@ -1991,6 +2331,18 @@ PYCODE
     }
 
     # fn: _web_publish_prepare_ssh - Discover the shared agent and repair SSH access when requested.
+        # . Purpose
+        #   Discover the shared agent and repair SSH access when requested.
+        #
+        # . Arguments
+        #   - `$1`: User account.
+        #   - `$2`: Remote host or site name.
+        #   - `$3`: Optional: TCP port.
+        #   - `$4`: Optional: SSH identity file.
+        # . Usage
+        #   ```bash
+        #   _web_publish_prepare_ssh "example-user" "<host>" "8080" "<identity>"
+        #   ```
     _web_publish_prepare_ssh() {
         local user="$1" host="$2" port="${3:-22}" identity="${4:-}"
         # The framework loads shared libraries declared in SGND_USING.
@@ -2003,12 +2355,27 @@ PYCODE
     }
 
     # fn: _web_publish_remote_site - Offer optional Nginx provisioning before the first rsync deployment.
+        # . Purpose
+        #   Offer optional Nginx provisioning before the first rsync deployment.
+        #
+        # . Arguments
+        #   - `$1`: Remote host or site name.
+        #   - `$2`: User account.
+        #   - `$3`: TCP port.
+        #   - `$4`: SSH identity file.
+        #   - `$5`: Remote destination directory.
+        #   - `$6`: Website hostname.
         # . Behavior
         #   - Checks by SSH whether the named virtual host exists.
         #   - Only provisions after explicit local approval; does not modify existing hosts.
         #   - Invokes the Web Server Management ensure-site action on the remote machine.
         #   - Requires the remote module to be installed and sudo to work noninteractively.
         #   - DNS is managed by the separate optional remote DNS dialog.
+        #
+        # . Usage
+        #   ```bash
+        #   _web_publish_remote_site "td-web" "deploy" "22" "" "/srv/storage/www/sgnd" "sgnd.example.test"
+        #   ```
     _web_publish_remote_site() {
         local host="$1" user="$2" port="$3" identity="$4" target="$5" address="$6"
         local name="" decision="NO" ssh_identity="" output="" rc=0
@@ -2096,7 +2463,21 @@ PYCODE
     }
 
     # fn: _web_publish_offer_dns - Run the existing Web Server DNS dialog remotely, on request.
-    # This requires an interactive SSH terminal and samba-tool on the remote web server.
+        # . Purpose
+        #   Run the existing Web Server DNS dialog remotely, on request.
+        #
+        # This requires an interactive SSH terminal and samba-tool on the remote web server.
+        #
+        # . Arguments
+        #   - `$1`: Remote host or site name.
+        #   - `$2`: User account.
+        #   - `$3`: TCP port.
+        #   - `$4`: SSH identity file.
+        #   - `$5`: Website hostname whose DNS may need registration.
+        # . Usage
+        #   ```bash
+        #   _web_publish_offer_dns "<host>" "example-user" "8080" "<identity>" "192.0.2.10"
+        #   ```
     _web_publish_offer_dns() {
         local host="$1" user="$2" port="$3" identity="$4" address="$5"
         local decision="NO" ssh_identity="" remote_command="" rc=0
@@ -2114,7 +2495,17 @@ PYCODE
     }
 
     # fn: _web_publish_verify_http - Report DNS and HTTP availability after a successful deployment.
-    # Failure to resolve or serve is reported separately from a successful file transfer.
+        # . Purpose
+        #   Report DNS and HTTP availability after a successful deployment.
+        #
+        # Failure to resolve or serve is reported separately from a successful file transfer.
+        #
+        # . Arguments
+        #   - `$1`: Website hostname for HTTP reachability verification.
+        # . Usage
+        #   ```bash
+        #   _web_publish_verify_http "192.0.2.10"
+        #   ```
     _web_publish_verify_http() {
         local address="$1" response="" resolved=""
         [[ -n "$address" ]] || return 0
@@ -2135,14 +2526,20 @@ PYCODE
     }
 
     # fn: _web_content_publish - Review, preview and publish a generated HTML website.
-        # Behavior:
+        # . Purpose
+        #   Review, preview and publish a generated HTML website.
+        #
+        # . Behavior
         #   - Shows five saved values with Publish, Modify and Cancel actions.
         #   - Publishing does not depend on or prompt for a Markdown repository.
         #   - Reuses SSH/rsync and optional remote Nginx provisioning.
         #   - Dry-runs before deployment, and propagates failures to the action dispatcher.
-        # Returns:
-        #   0 on success/cancel, nonzero on a failed deployment or configuration.
-        # Usage:
+        # . Returns
+        #   - 0 on success/cancel, nonzero on a failed deployment or configuration.
+        # . Usage
+        #   ```bash
+        #     _web_content_publish
+        #   ```
         #   _web_content_publish
     _web_content_publish() {
         local action="" source="" host="" user="" port="" identity="" target="" website_hostname="" strategy=""
@@ -2253,10 +2650,18 @@ PYCODE
 
 # - Local import into staging -------------------------------------------------------
     # fn: _web_content_import_local - Review server-local files before copying to incoming.
+        # . Purpose
+        #   Review server-local files before copying to incoming.
+        #
         # . Behavior
         #   - Previews every destination and conflict through the Python transfer planner.
         #   - Requires an explicit decision before copying, and leaves source files intact.
         #   - Does not ingest content or mark website generation pending.
+        #
+        # . Usage
+        #   ```bash
+        #   _web_content_import_local
+        #   ```
     _web_content_import_local() {
         local input_path="" incoming="" policy="abort" decision="NO"
         local result_file="" rc=0 count="0" conflicts="" errors=""
@@ -2332,10 +2737,18 @@ PYCODE
 
 # - Safe staged package ingestion ---------------------------------------------------
     # fn: _web_content_ingest_incoming - Preview and confirm ingestion of one staged package.
-    # . Behavior
-    #   - Only accepts a path inside the selected website's incoming directory.
-    #   - Reports every destination and conflict; never overwrites existing files.
-    #   - Preserves the staged originals and requires explicit confirmation.
+        # . Purpose
+        #   Preview and confirm ingestion of one staged package.
+        #
+        # . Behavior
+        #   - Only accepts a path inside the selected website's incoming directory.
+        #   - Reports every destination and conflict; never overwrites existing files.
+        #   - Preserves the staged originals and requires explicit confirmation.
+        #
+        # . Usage
+        #   ```bash
+        #   _web_content_ingest_incoming
+        #   ```
     _web_content_ingest_incoming() {
         local incoming="" input_path="" result_file="" policy="abort" decision="NO"
         local conflicts="" errors="" files="" rc=0
@@ -2421,7 +2834,7 @@ PYCODE
         #   Choose the already-generated documentation HTML and the checked-out
         #   SolidGroundUX repository, without any Markdown or remote website profile.
         # . Returns
-        #   0 on completion; 2 when the operator cancels a prompt.
+        #   - 0 on completion; 2 when the operator cancels a prompt.
         # . Usage
         #   ```bash
         #   _web_content_github_pages_configure
@@ -2446,9 +2859,9 @@ PYCODE
         #   documentation API search script and JSON still use site-root paths.
         #   Change those paths only inside the Pages copy, not the original output.
         # . Arguments
-        #   $1: Checked-out GitHub Pages docs directory.
+        #   - `$1` — Checked-out GitHub Pages docs directory.
         # . Returns
-        #   0 on success; nonzero if a present API search resource cannot be adapted.
+        #   - 0 on success; nonzero if a present API search resource cannot be adapted.
         # . Usage
         #   ```bash
         #   _web_content_github_pages_rebase "$docs_dir"
@@ -2497,7 +2910,7 @@ PY_GITHUB_PAGES
         #   - Never stages or commits changes outside docs/.
         #   - GitHub Pages builds the result from main/docs; no GitHub API is used.
         # . Returns
-        #   0 on success; nonzero for invalid paths or failed copy/commit/push.
+        #   - 0 on success; nonzero for invalid paths or failed copy/commit/push.
         # . Usage
         #   ```bash
         #   _web_content_github_pages_push
@@ -2586,7 +2999,7 @@ PY_GITHUB_PAGES
         #   Publish only generated documentation to the existing Pages location.
         #   Retain paths in ordinary SolidGroundUX state variables.
         # . Returns
-        #   0 on successful push or operator cancellation; nonzero on failure.
+        #   - 0 on successful push or operator cancellation; nonzero on failure.
         # . Usage
         #   ```bash
         #   _web_content_publish_github_pages
@@ -2623,11 +3036,21 @@ PY_GITHUB_PAGES
 
 # - Action dispatch -----------------------------------------------------------------
     # fn: _run_action - Dispatch the requested command-line management action.
+        # . Purpose
+        #   Dispatch the requested command-line management action.
+        #
+        # . Arguments
+        #   - `$1`: Management action to execute.
         # . Behavior
         #   - Publishing shows the framework's existing auto-continue dialogue after
         #     success, cancellation, or failure, allowing the operator to inspect output.
         #   - The operator can press P/Space to pause the countdown.
         #   - Preserves the original publication exit status after the dialogue.
+        #
+        # . Usage
+        #   ```bash
+        #   _run_action "status"
+        #   ```
     _run_action() {
         local action="${1:?missing action}" rc=0 completion_message=""
         case "$action" in
@@ -2681,6 +3104,13 @@ PY_GITHUB_PAGES
 
 # - Main ----------------------------------------------------------------------------
     # fn: main - Parse command-line arguments and dispatch the requested command.
+        # . Purpose
+        #   Parse command-line arguments and dispatch the requested command.
+        #
+        # . Usage
+        #   ```bash
+        #   main "$@"
+        #   ```
     main() {
         local action=""
         _framework_locator || return $?

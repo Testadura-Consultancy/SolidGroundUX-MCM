@@ -9,7 +9,8 @@
 #   Checksum    : b578990168c5d1ae2db5af71f838e9890fc550dc2cf816f4cb9e3194cfd82acb
 #   Source      : manage-framework-state.sh
 #   Type        : script
-#   Group       : Role Managers
+#   Group       : Modules
+#   Subgroup    : SolidGroundUX Framework
 #   Purpose     : Manage framework state
 #
 # Description:
@@ -67,7 +68,7 @@ set -uo pipefail
         #     present, falls back to the installed framework copy without changing
         #     SGND_FRAMEWORK_ROOT.
         #
-        # . Globals (write)
+        # . Globals (Write)
         #   SGND_FRAMEWORK_ROOT
         #
         # . Output
@@ -75,8 +76,8 @@ set -uo pipefail
         #   helpers are not available until sgnd-exe-common.sh has been loaded.
         #
         # . Returns
-        #   0 when the framework root was resolved and executable common library loaded.
-        #   126 when the script path cannot be resolved, no canonical root component can
+        #   - 0 when the framework root was resolved and executable common library loaded.
+        #   - 126 when the script path cannot be resolved, no canonical root component can
         #   be found, or the executable common library is unreadable.
         #
         # . Usage
@@ -310,6 +311,13 @@ set -uo pipefail
         #   - Cleanup
 
     # fn: _state_validate - Validate state in the Framework workflow.
+        # . Purpose
+        #   Check whether the persisted Framework state is readable and conforms to its expected format.
+        #
+        # . Usage
+        #   ```bash
+        #   _state_validate
+        #   ```
     _state_validate() {
         [[ -n "${SGND_FRAMEWORK_STATEFILE:-}" ]] || {
             saywarning "SGND_FRAMEWORK_STATEFILE is not set"
@@ -322,6 +330,13 @@ set -uo pipefail
     }
 
     # fn: _state_show - Display state in the Framework workflow.
+        # . Purpose
+        #   Display the currently recorded Framework state values.
+        #
+        # . Usage
+        #   ```bash
+        #   _state_show
+        #   ```
     _state_show() {
         local key=""
         _state_validate || return 1
@@ -335,6 +350,13 @@ set -uo pipefail
     }
 
     # fn: _state_edit - Edit state in the Framework workflow.
+        # . Purpose
+        #   Prompt for and update an individual persisted Framework state setting.
+        #
+        # . Usage
+        #   ```bash
+        #   _state_edit
+        #   ```
     _state_edit() {
         local key=""
         local -a fields=() original=()
@@ -358,6 +380,13 @@ set -uo pipefail
     }
 
     # fn: _state_save - Save state in the Framework workflow.
+        # . Purpose
+        #   Write the selected Framework state settings to their persisted configuration file.
+        #
+        # . Usage
+        #   ```bash
+        #   _state_save
+        #   ```
     _state_save() {
         _state_validate || return 1
         if (( ${FLAG_DRYRUN:-0} == 1 )); then
@@ -369,6 +398,13 @@ set -uo pipefail
     }
 
     # fn: _state_reload - Reload saved Framework state into the configured state variables.
+        # . Purpose
+        #   Reload saved Framework state into the configured state variables.
+        #
+        # . Usage
+        #   ```bash
+        #   _state_reload
+        #   ```
     _state_reload() {
         _state_validate || return 1
         sgnd_state_load_keys --file "$SGND_FRAMEWORK_STATEFILE" --array SGND_FRAMEWORK_STATE || return $?
@@ -376,6 +412,13 @@ set -uo pipefail
     }
 
     # fn: _run_action - Dispatch the requested management action to its implementation.
+        # . Purpose
+        #   Dispatch the requested management action to its implementation.
+        #
+        # . Usage
+        #   ```bash
+        #   _run_action "show"
+        #   ```
     _run_action() {
         case "${1:?missing action}" in
             show)   _state_show ;;

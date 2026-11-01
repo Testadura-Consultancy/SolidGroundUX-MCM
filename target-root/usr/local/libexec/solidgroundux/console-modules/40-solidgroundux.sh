@@ -7,7 +7,8 @@
 #   Checksum    : dacdca68d3fa3cd2ec5a4ad57034cbe8a11c17a860c02779fa523815df4aa19f
 #   Source      : 40-solidgroundux.sh
 #   Type        : module
-#   Group       : Module Registration
+#   Group       : Modules
+#   Subgroup    : SolidGroundUX Framework
 #   Purpose     : Manage the SolidGroundUX framework and setup and product lifecycle
 #
 # Description:
@@ -23,25 +24,26 @@
 # ==================================================================================
 set -uo pipefail
 # - Library guard ------------------------------------------------------------------
-    # fn$ _sgnd_lib_guard - Enforce source-only, single-load library initialization
+    # fn: _sgnd_lib_guard - Enforce source-only, source-only library guard
         # . Purpose
-        #   Ensure the file is sourced as a library and initialized only once.
+        #   Ensure the file is sourced as a library and marked as loaded.
         #
         # . Behavior
         #   - Derives a unique guard variable name from the current filename.
         #   - Aborts execution when the file is run directly instead of sourced.
         #   - Sets the guard variable on first load.
-        #   - Returns immediately when the library was already loaded.
+        #   - Returns from the guard helper when the file is already marked loaded; it does not skip subsequent top-level statements.
         #
-        # Inputs
+        # . Inputs
         #   BASH_SOURCE[0]
-        #   $0
+        #   - $0
         #
-        # Outputs (globals)
+        # . Outputs
+        #   (globals)
         #   SGND_<MODULE>_LOADED
         #
         # . Returns
-        #   0 when already loaded or successfully initialized.
+        #   - 0 when already loaded or successfully initialized.
         #   Exits with code 2 when executed instead of sourced.
         #
         # . Usage
@@ -85,7 +87,8 @@ set -uo pipefail
         #   reinstallation, and removal operations.
         #
         # . Returns
-        #   Returns the setup tool exit status.
+        #   . Returns
+        #     the setup tool exit status.
         #
         # . Usage
         #   ```bash
@@ -118,10 +121,16 @@ set -uo pipefail
 
 # - Framework diagnostics --------------------------------------------------------
     # fn: _framework_smoketest
-        # Returns:
+        # . Purpose
+        #   Launch the Framework-owned smoke-test suite from the console.
+        #
+        # . Returns
         #   Exit status of sgnd-framework-smoketest.
         #
-        # Usage:
+        # . Usage
+        #   ```bash
+        #     _framework_smoketest
+        #   ```
         #   _framework_smoketest
         #
     _framework_smoketest() {
@@ -129,21 +138,31 @@ set -uo pipefail
     }
 
     # fn: _framework_show_environment
-        # Returns:
+        # . Purpose
+        #   Display the active Framework runtime environment and configuration.
+        #
+        # . Returns
         #   Exit status of sgnd-framework-smoketest --show env.
         #
-        # Usage:
+        # . Usage
+        #   ```bash
+        #     _framework_show_environment
+        #   ```
         #   _framework_show_environment
         #
     _framework_show_environment() {
         _sgnd_run_public_command "sgnd-smoketest" --show env
     }
 
-    # fn: _framework_show_about
-        # Output:
-        #   Displays Framework about info
-        # Usage:
-        #  _framework_show_about
+    # fn: _framework_show_about - Display framework version, license and support information.
+        # . Purpose
+        #   Print the installed Framework version/build, company, copyright, license
+        #   acceptance status, release URL and online documentation location.
+        #
+        # . Usage
+        #   ```bash
+        #   _framework_show_about
+        #   ```
     _framework_show_about()
     {
         sgnd_print
@@ -165,6 +184,16 @@ set -uo pipefail
 
 # - Framework configuration actions ----------------------------------------------
     # fn: _framework_config_view_file - Open a framework configuration file read-only
+        # . Purpose
+        #   Open a framework configuration file read-only.
+        #
+        # . Arguments
+        #   - `$1`: Title of the configuration display.
+        #   - `$2`: Configuration file path.
+        # . Usage
+        #   ```bash
+        #   _framework_config_view_file "<title>" "/srv/storage/example.txt"
+        #   ```
     _framework_config_view_file() {
         local title="$1"
         local file="$2"
@@ -186,6 +215,13 @@ set -uo pipefail
     }
 
     # fn: _framework_config_view_system - View the system framework configuration
+        # . Purpose
+        #   View the system framework configuration.
+        #
+        # . Usage
+        #   ```bash
+        #   _framework_config_view_system
+        #   ```
     _framework_config_view_system() {
         _framework_config_view_file \
             "System framework configuration" \
@@ -193,6 +229,13 @@ set -uo pipefail
     }
 
     # fn: _framework_config_view_user - View the user framework configuration
+        # . Purpose
+        #   View the user framework configuration.
+        #
+        # . Usage
+        #   ```bash
+        #   _framework_config_view_user
+        #   ```
     _framework_config_view_user() {
         _framework_config_view_file \
             "User framework configuration" \
@@ -200,43 +243,94 @@ set -uo pipefail
     }
 
     # fn: framework_configure_file - Configure validated framework settings externally
+        # . Purpose
+        #   Configure validated framework settings externally.
+        #
+        # . Usage
+        #   ```bash
+        #   framework_configure_file
+        #   ```
     framework_configure_file() {
         _sgnd_run_module_script "manage-solidgroundux.sh" --action config-system-configure
     }
 
     # fn: _framework_config_edit_system - Edit the system configuration externally
+        # . Purpose
+        #   Edit the system configuration externally.
+        #
+        # . Usage
+        #   ```bash
+        #   _framework_config_edit_system
+        #   ```
     _framework_config_edit_system() {
         _sgnd_run_module_script "manage-solidgroundux.sh" --action config-system-edit
     }
 
     # fn: _framework_config_edit_user - Edit the user configuration externally
+        # . Purpose
+        #   Edit the user configuration externally.
+        #
+        # . Usage
+        #   ```bash
+        #   _framework_config_edit_user
+        #   ```
     _framework_config_edit_user() {
         _sgnd_run_module_script "manage-solidgroundux.sh" --action config-user-edit
     }
 
 # - Framework logging actions ----------------------------------------------------
     # fn: _framework_log_view - Log view in the Framework workflow.
+        # . Purpose
+        #   Display Framework log entries through the logging role manager.
+        #
+        # . Usage
+        #   ```bash
+        #   _framework_log_view
+        #   ```
     _framework_log_view() {
         _sgnd_run_module_script "manage-framework-logging.sh" --action view
     }
 
     # fn: _framework_log_follow - Log follow in the Framework workflow.
+        # . Purpose
+        #   Follow Framework log entries through the logging role manager.
+        #
+        # . Usage
+        #   ```bash
+        #   _framework_log_follow
+        #   ```
     _framework_log_follow() {
         _sgnd_run_module_script "manage-framework-logging.sh" --action follow
     }
 
     # fn: _framework_log_show_errors - Log show errors in the Framework workflow.
+        # . Purpose
+        #   Show Framework error log entries through the logging role manager.
+        #
+        # . Usage
+        #   ```bash
+        #   _framework_log_show_errors
+        #   ```
     _framework_log_show_errors() {
         _sgnd_run_module_script "manage-framework-logging.sh" --action errors
     }
 
     # fn: _framework_log_rotate - Log rotate in the Framework workflow.
+        # . Purpose
+        #   Trigger Framework log rotation through the logging role manager.
+        #
+        # . Usage
+        #   ```bash
+        #   _framework_log_rotate
+        #   ```
     _framework_log_rotate() {
         _sgnd_run_module_script "manage-framework-logging.sh" --action rotate
     }
 
 # - Framework state actions ------------------------------------------------------
     # fn: framework_state_show - Display state in the Framework workflow.
+        # . Purpose
+        #   Display currently persisted Framework state settings.
         #
         # . Usage
         #   ```bash
@@ -247,6 +341,8 @@ set -uo pipefail
     }
 
     # fn: framework_state_edit - Edit state in the Framework workflow.
+        # . Purpose
+        #   Open the Framework state editing workflow.
         #
         # . Usage
         #   ```bash
@@ -257,6 +353,8 @@ set -uo pipefail
     }
 
     # fn: framework_state_save - Save state in the Framework workflow.
+        # . Purpose
+        #   Persist edited Framework state values.
         #
         # . Usage
         #   ```bash
@@ -267,6 +365,8 @@ set -uo pipefail
     }
 
     # fn: framework_state_reload - Invoke the Framework state manager’s reload operation.
+        # . Purpose
+        #   Invoke the Framework state manager’s reload operation.
         #
         # . Usage
         #   ```bash
@@ -286,6 +386,8 @@ set -uo pipefail
     # Every validator sets SGND_MODULE_VALIDATION_MESSAGE to a concise result summary.
     # Detailed diagnostic output may be written by the validator or delegated action.
     # fn: validate_module_solidgroundux - Validate the management module and record its status for the console.
+        # . Purpose
+        #   Validate the management module and record its status for the console.
         #
         # . Returns
         #   A console validation status (0=pass, 1=fail, 2=warning, 3=skipped).
@@ -408,6 +510,11 @@ set -uo pipefail
         #   Use the canonical framework permission engine without duplicating its rules in MCM.
         #   Always show a dry-run first; repair requires a separate affirmative decision.
         #   Resolve the permission policy from the framework-owned SGND_SHARE_DIR.
+        #
+        # . Usage
+        #   ```bash
+        #   framework_repair_permissions
+        #   ```
     framework_repair_permissions() {
         local engine=""
         local policy="${SGND_SHARE_DIR:-}"

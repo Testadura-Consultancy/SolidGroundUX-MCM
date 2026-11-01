@@ -9,7 +9,8 @@
 #   Checksum    : 91ae5814a93a2c25a88abc5e764eba5fcabe9eae7442acea3a228b211966399b
 #   Source      : manage-framework-logging.sh
 #   Type        : script
-#   Group       : Role Managers
+#   Group       : Modules
+#   Subgroup    : SolidGroundUX Framework
 #   Purpose     : Manage framework logging
 #
 # Description:
@@ -67,7 +68,7 @@ set -uo pipefail
         #     present, falls back to the installed framework copy without changing
         #     SGND_FRAMEWORK_ROOT.
         #
-        # . Globals (write)
+        # . Globals (Write)
         #   SGND_FRAMEWORK_ROOT
         #
         # . Output
@@ -75,8 +76,8 @@ set -uo pipefail
         #   helpers are not available until sgnd-exe-common.sh has been loaded.
         #
         # . Returns
-        #   0 when the framework root was resolved and executable common library loaded.
-        #   126 when the script path cannot be resolved, no canonical root component can
+        #   - 0 when the framework root was resolved and executable common library loaded.
+        #   - 126 when the script path cannot be resolved, no canonical root component can
         #   be found, or the executable common library is unreadable.
         #
         # . Usage
@@ -310,6 +311,13 @@ set -uo pipefail
         #   - Cleanup
 
     # fn: _log_select - Log select in the Framework workflow.
+        # . Purpose
+        #   Prompt the user to select a Framework log source or file.
+        #
+        # . Usage
+        #   ```bash
+        #   _log_select
+        #   ```
     _log_select() {
         local primary="${SGND_LOG_PATH:-}"
         local alternate="${SGND_ALTLOG_PATH:-}"
@@ -354,6 +362,13 @@ set -uo pipefail
     }
 
     # fn: _log_view - Log view in the Framework workflow.
+        # . Purpose
+        #   Display the selected Framework log contents.
+        #
+        # . Usage
+        #   ```bash
+        #   _log_view
+        #   ```
     _log_view() {
         local pager="${PAGER:-less}"
         local -a pager_command=()
@@ -363,6 +378,13 @@ set -uo pipefail
     }
 
     # fn: _log_follow - Log follow in the Framework workflow.
+        # . Purpose
+        #   Follow new entries written to a selected Framework log.
+        #
+        # . Usage
+        #   ```bash
+        #   _log_follow
+        #   ```
     _log_follow() {
         local key=""
         local tail_pid=""
@@ -397,6 +419,13 @@ set -uo pipefail
     }
 
     # fn: _log_errors - Log errors in the Framework workflow.
+        # . Purpose
+        #   Show error-level entries from Framework logs.
+        #
+        # . Usage
+        #   ```bash
+        #   _log_errors
+        #   ```
     _log_errors() {
         local pager="${PAGER:-less}"
         local -a pager_command=()
@@ -406,6 +435,13 @@ set -uo pipefail
     }
 
     # fn: _log_rotate - Log rotate in the Framework workflow.
+        # . Purpose
+        #   Rotate Framework log files using the configured retention policy.
+        #
+        # . Usage
+        #   ```bash
+        #   _log_rotate
+        #   ```
     _log_rotate() {
         local logfile=""
         local keep="${SGND_LOG_KEEP:-5}"
@@ -444,6 +480,13 @@ set -uo pipefail
     }
 
     # fn: _run_action - Dispatch the requested management action to its implementation.
+        # . Purpose
+        #   Dispatch the requested management action to its implementation.
+        #
+        # . Usage
+        #   ```bash
+        #   _run_action "view"
+        #   ```
     _run_action() {
         case "${1:?missing action}" in
             view)   _log_view ;;

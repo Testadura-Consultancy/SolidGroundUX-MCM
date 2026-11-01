@@ -8,7 +8,8 @@
 #   Checksum    : cda3e4e1f0214e4c2de1b380cff356008409980e95169d59f6f11d902a003892
 #   Source      : 10-computer-setup.sh
 #   Type        : module
-#   Group       : Module Registration
+#   Group       : Modules
+#   Subgroup    : Computer Setup
 #   Purpose     : Configure and validate the base computer
 #
 # Description:
@@ -18,25 +19,26 @@
 set -uo pipefail
 
 # - Library guard ------------------------------------------------------------------
-    # fn$ _sgnd_lib_guard - Enforce source-only, single-load library initialization
+    # fn: _sgnd_lib_guard - Enforce source-only, source-only library guard
         # . Purpose
-        #   Ensure the file is sourced as a library and initialized only once.
+        #   Ensure the file is sourced as a library and marked as loaded.
         #
         # . Behavior
         #   - Derives a unique guard variable name from the current filename.
         #   - Aborts execution when the file is run directly instead of sourced.
         #   - Sets the guard variable on first load.
-        #   - Returns immediately when the library was already loaded.
+        #   - Returns from the guard helper when the file is already marked loaded; it does not skip subsequent top-level statements.
         #
-        # Inputs
+        # . Inputs
         #   BASH_SOURCE[0]
-        #   $0
+        #   - $0
         #
-        # Outputs (globals)
+        # . Outputs
+        #   (globals)
         #   SGND_<MODULE>_LOADED
         #
         # . Returns
-        #   0 when already loaded or successfully initialized.
+        #   - 0 when already loaded or successfully initialized.
         #   Exits with code 2 when executed instead of sourced.
         #
         # . Usage
@@ -84,26 +86,46 @@ set -uo pipefail
         #   Exit status from manage-identity.sh.
         # . Usage
         #   ```bash
-        #   _computer_set_identity "<args...>"
+        #   _computer_set_identity
         #   ```
     _computer_set_identity() {
         _sgnd_run_module_script "manage-identity.sh" "$@"
     }
 
     # fn: _computer_manage - Dispatch a machine action to its standalone manager.
+        # . Purpose
+        #   Dispatch a machine action to its standalone manager.
+        #
+        # . Arguments
+        #   - `$1`: Management action to execute.
+        # . Usage
+        #   ```bash
+        #   _computer_manage "status"
+        #   ```
     _computer_manage() {
         local action="${1:?missing action}"
         _sgnd_run_module_script "manage-computer.sh" --action "$action"
     }
 
     # fn: _computer_ssh_manage - Dispatch a user SSH action without privilege escalation.
+        # . Purpose
+        #   Dispatch a user SSH action without privilege escalation.
+        #
+        # . Arguments
+        #   - `$1`: Management action to execute.
+        # . Usage
+        #   ```bash
+        #   _computer_ssh_manage "test-access"
+        #   ```
     _computer_ssh_manage() {
         local action="${1:?missing action}"
         _sgnd_run_module_script "manage-ssh-access.sh" --action "$action"
     }
 
-    # fn: Computer Setup menu action proxies - Keep stable handler names and IDs.
+    # - Computer Setup menu action proxies (stable handler names and IDs) ---------------
     # fn: _computer_generate_ssh_keys - Call `_computer_manage` with the `ssh-host-keys` action.
+        # . Purpose
+        #   Invoke the ssh host keys action through the module manager.
         #
         # . Returns
         #   The status returned by the delegated action.
@@ -114,6 +136,8 @@ set -uo pipefail
         #   ```
     _computer_generate_ssh_keys()    { _computer_manage ssh-host-keys; }
     # fn: _computer_configure_ssh_service - Call `_computer_manage` with the `ssh-service` action.
+        # . Purpose
+        #   Invoke the ssh service action through the module manager.
         #
         # . Returns
         #   The status returned by the delegated action.
@@ -124,6 +148,8 @@ set -uo pipefail
         #   ```
     _computer_configure_ssh_service(){ _computer_manage ssh-service; }
     # fn: _computer_configure_sudoers - Call `_computer_manage` with the `sudoers` action.
+        # . Purpose
+        #   Invoke the sudoers action through the module manager.
         #
         # . Returns
         #   The status returned by the delegated action.
@@ -134,6 +160,8 @@ set -uo pipefail
         #   ```
     _computer_configure_sudoers()     { _computer_manage sudoers; }
     # fn: _computer_status - Call `_computer_manage` with the `status` action.
+        # . Purpose
+        #   Invoke the status action through the module manager.
         #
         # . Returns
         #   The status returned by the delegated action.
@@ -144,6 +172,8 @@ set -uo pipefail
         #   ```
     _computer_status()               { _computer_manage status; }
     # fn: _computer_validate - Call `_computer_manage` with the `validate` action.
+        # . Purpose
+        #   Invoke the validate action through the module manager.
         #
         # . Returns
         #   The status returned by the delegated action.
@@ -154,6 +184,8 @@ set -uo pipefail
         #   ```
     _computer_validate()             { _computer_manage validate; }
     # fn: _computer_ssh_generate_user_key - Call `_computer_ssh_manage` with the `generate-key` action.
+        # . Purpose
+        #   Invoke the generate key action through the module manager.
         #
         # . Returns
         #   The status returned by the delegated action.
@@ -164,6 +196,8 @@ set -uo pipefail
         #   ```
     _computer_ssh_generate_user_key(){ _computer_ssh_manage generate-key; }
     # fn: _computer_ssh_install_key - Call `_computer_ssh_manage` with the `install-key` action.
+        # . Purpose
+        #   Invoke the install key action through the module manager.
         #
         # . Returns
         #   The status returned by the delegated action.
@@ -174,6 +208,8 @@ set -uo pipefail
         #   ```
     _computer_ssh_install_key()      { _computer_ssh_manage install-key; }
     # fn: _computer_ssh_unlock_key - Call `_computer_ssh_manage` with the `unlock-key` action.
+        # . Purpose
+        #   Invoke the unlock key action through the module manager.
         #
         # . Returns
         #   The status returned by the delegated action.
@@ -184,6 +220,8 @@ set -uo pipefail
         #   ```
     _computer_ssh_unlock_key()       { _computer_ssh_manage unlock-key; }
     # fn: _computer_ssh_test_access - Call `_computer_ssh_manage` with the `test-access` action.
+        # . Purpose
+        #   Invoke the test access action through the module manager.
         #
         # . Returns
         #   The status returned by the delegated action.
@@ -206,7 +244,7 @@ set -uo pipefail
         #   - Never executes personal SSH key management or validation actions.
         #
         # . Returns
-        #   0 when all steps succeed; otherwise the failing step status.
+        #   - 0 when all steps succeed; otherwise the failing step status.
         # . Usage
         #   ```bash
         #   _computer_prepare
@@ -222,13 +260,18 @@ set -uo pipefail
     }
 
 
-    # fn: _prepare-template.sh
+    # fn: _prepare_template - Run the framework's template-preparation command.
         # . Purpose
-        #   Prepare a template computer for cloning.
+        #   Invoke sgnd-prepare-template to prepare the computer for cloning.
+        #   The delegated command may remove machine-specific state and identities.
         #
         # . Returns
-        #   0 on success; non-zero on failure.
-    # fn: _prepare_template - Prepare template in the management workflow.
+        #   Exit status of sgnd-prepare-template.
+        #
+        # . Usage
+        #   ```bash
+        #   _prepare_template
+        #   ```
     _prepare_template() {
         _sgnd_run_public_command "sgnd-prepare-template"
     }
@@ -243,6 +286,8 @@ set -uo pipefail
     # Every validator sets SGND_MODULE_VALIDATION_MESSAGE to a concise result summary.
     # Detailed diagnostic output may be written by the validator or delegated action.
     # fn: validate_module_computer_setup - Validate the management module and record its status for the console.
+        # . Purpose
+        #   Validate the management module and record its status for the console.
         #
         # . Returns
         #   A console validation status (0=pass, 1=fail, 2=warning, 3=skipped).

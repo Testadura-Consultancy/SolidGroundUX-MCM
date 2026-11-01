@@ -7,7 +7,8 @@
 #   Shortname   : AD_CLIENT
 #   Source      : 25-active-directory-client.sh
 #   Type        : module
-#   Group       : Module Registration
+#   Group       : Modules
+#   Subgroup    : Active Directory Client
 #   Purpose     : Register Active Directory client management actions
 #
 #   Checksum : a2bb566211b87ffacbbbbeb10ddb7ee3d72809d7dd1149a062dcfa0b12cb5067
@@ -19,25 +20,26 @@
 set -uo pipefail
 
 # - Library guard ------------------------------------------------------------------
-    # fn$ _sgnd_lib_guard - Enforce source-only, single-load library initialization
+    # fn: _sgnd_lib_guard - Enforce source-only, source-only library guard
         # . Purpose
-        #   Ensure the file is sourced as a library and initialized only once.
+        #   Ensure the file is sourced as a library and marked as loaded.
         #
         # . Behavior
         #   - Derives a unique guard variable name from the current filename.
         #   - Aborts execution when the file is run directly instead of sourced.
         #   - Sets the guard variable on first load.
-        #   - Returns immediately when the library was already loaded.
+        #   - Returns from the guard helper when the file is already marked loaded; it does not skip subsequent top-level statements.
         #
-        # Inputs
+        # . Inputs
         #   BASH_SOURCE[0]
-        #   $0
+        #   - $0
         #
-        # Outputs (globals)
+        # . Outputs
+        #   (globals)
         #   SGND_<MODULE>_LOADED
         #
         # . Returns
-        #   0 when already loaded or successfully initialized.
+        #   - 0 when already loaded or successfully initialized.
         #   Exits with code 2 when executed instead of sourced.
         #
         # . Usage
@@ -75,15 +77,25 @@ set -uo pipefail
     SGND_MODULE_NAME="$SGND_AD_CLIENT_MODULE_NAME"
 # - Management dispatch -------------------------------------------------------------
     # fn: _adc_run_action - Dispatch an Active Directory client-management action.
+        # . Purpose
+        #   Dispatch an Active Directory client-management action.
+        #
+        # . Usage
+        #   ```bash
+        #   _adc_run_action "status" "status"
+        #   ```
     _adc_run_action() { local action="${1:?missing action}"; _sgnd_run_module_script "manage-active-directory-client.sh" --action "$action"; }
 
     # fn: _adc_record_join_step - Persist one child-step result in the console action tracker
+        # . Purpose
+        #   Persist one child-step result in the console action tracker.
+        #
         # . Arguments
-        #   $1 ITEM_KEY
-        #   $2 RESULT_CODE
+        #   - $1 ITEM_KEY
+        #   - $2 RESULT_CODE
         #
         # . Returns
-        #   0 always; tracking is best-effort when the console tracker is unavailable.
+        #   - 0 always; tracking is best-effort when the console tracker is unavailable.
         #
         # . Usage
         #   ```bash
@@ -113,8 +125,8 @@ set -uo pipefail
         #   - Treats an already joined machine as a warning, not as a failed or successful join.
         #
         # . Returns
-        #   0 when the join succeeds or is cancelled after preflight.
-        #   2 when the machine is already joined and no join is required.
+        #   - 0 when the join succeeds or is cancelled after preflight.
+        #   - 2 when the machine is already joined and no join is required.
         #   Otherwise the workflow failure code.
         #
         # . Usage
@@ -209,6 +221,8 @@ set -uo pipefail
     }
 
     # fn: _adc_step_install_packages - Call `_adc_run_action` with the `install` action.
+        # . Purpose
+        #   Invoke the install action through the module manager.
         #
         # . Returns
         #   The status returned by the delegated action.
@@ -219,6 +233,8 @@ set -uo pipefail
         #   ```
     _adc_step_install_packages()  { _adc_run_action install; }
     # fn: _adc_step_preflight - Call `_adc_run_action` with the `preflight` action.
+        # . Purpose
+        #   Invoke the preflight action through the module manager.
         #
         # . Returns
         #   The status returned by the delegated action.
@@ -229,6 +245,8 @@ set -uo pipefail
         #   ```
     _adc_step_preflight()         { _adc_run_action preflight; }
     # fn: _adc_step_dns - Call `_adc_run_action` with the `dns` action.
+        # . Purpose
+        #   Invoke the dns action through the module manager.
         #
         # . Returns
         #   The status returned by the delegated action.
@@ -239,6 +257,8 @@ set -uo pipefail
         #   ```
     _adc_step_dns()               { _adc_run_action dns; }
     # fn: _adc_step_identity - Call `_adc_run_action` with the `identity` action.
+        # . Purpose
+        #   Invoke the identity action through the module manager.
         #
         # . Returns
         #   The status returned by the delegated action.
@@ -249,6 +269,8 @@ set -uo pipefail
         #   ```
     _adc_step_identity()          { _adc_run_action identity; }
     # fn: _adc_step_discover - Call `_adc_run_action` with the `discover` action.
+        # . Purpose
+        #   Invoke the discover action through the module manager.
         #
         # . Returns
         #   The status returned by the delegated action.
@@ -259,6 +281,8 @@ set -uo pipefail
         #   ```
     _adc_step_discover()          { _adc_run_action discover; }
     # fn: _adc_step_join - Call `_adc_run_action` with the `join` action.
+        # . Purpose
+        #   Invoke the join action through the module manager.
         #
         # . Returns
         #   The status returned by the delegated action.
@@ -269,6 +293,8 @@ set -uo pipefail
         #   ```
     _adc_step_join()              { _adc_run_action join; }
     # fn: _adc_step_sssd - Call `_adc_run_action` with the `sssd` action.
+        # . Purpose
+        #   Invoke the sssd action through the module manager.
         #
         # . Returns
         #   The status returned by the delegated action.
@@ -279,6 +305,8 @@ set -uo pipefail
         #   ```
     _adc_step_sssd()              { _adc_run_action sssd; }
     # fn: _adc_step_register_dns - Call `_adc_run_action` with the `register` action.
+        # . Purpose
+        #   Invoke the register action through the module manager.
         #
         # . Returns
         #   The status returned by the delegated action.
@@ -289,6 +317,8 @@ set -uo pipefail
         #   ```
     _adc_step_register_dns()      { _adc_run_action register; }
     # fn: _adc_reconcile - Call `_adc_run_action` with the `reconcile` action.
+        # . Purpose
+        #   Invoke the reconcile action through the module manager.
         #
         # . Returns
         #   The status returned by the delegated action.
@@ -299,6 +329,8 @@ set -uo pipefail
         #   ```
     _adc_reconcile()              { _adc_run_action reconcile; }
     # fn: _adc_validate - Call `_adc_run_action` with the `validate` action.
+        # . Purpose
+        #   Invoke the validate action through the module manager.
         #
         # . Returns
         #   The status returned by the delegated action.
@@ -309,6 +341,8 @@ set -uo pipefail
         #   ```
     _adc_validate()               { _adc_run_action validate; }
     # fn: _adc_status - Call `_adc_run_action` with the `status` action.
+        # . Purpose
+        #   Invoke the status action through the module manager.
         #
         # . Returns
         #   The status returned by the delegated action.
@@ -319,6 +353,8 @@ set -uo pipefail
         #   ```
     _adc_status()                 { _adc_run_action status; }
     # fn: _adc_leave - Call `_adc_run_action` with the `leave` action.
+        # . Purpose
+        #   Invoke the leave action through the module manager.
         #
         # . Returns
         #   The status returned by the delegated action.
@@ -339,6 +375,8 @@ set -uo pipefail
     # Every validator sets SGND_MODULE_VALIDATION_MESSAGE to a concise result summary.
     # Detailed diagnostic output may be written by the validator or delegated action.
     # fn: validate_module_active_directory_client - Validate the Active Directory module and record its status for the console.
+        # . Purpose
+        #   Validate the Active Directory module and record its status for the console.
         #
         # . Returns
         #   A console validation status (0=pass, 1=fail, 2=warning, 3=skipped).
