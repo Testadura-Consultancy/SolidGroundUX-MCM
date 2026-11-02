@@ -1560,10 +1560,15 @@ def split_wcm_document(markdown: str) -> tuple[dict[str, str], str]:
 # Figure numbers are assigned after product and bundle pages are assembled.
 # A single ordered walk follows the published section hierarchy, not the
 # incidental order of filenames on disk or the sequence in which pages were made.
+# Allow a per-image percentage alongside the optional authored caption.
+# The numbered figure output keeps the percentage unchanged for WCM rendering.
 _STANDALONE_FIGURE = re.compile(
     r'^\s*!\[(?P<alt>[^\]]*)\]\((?P<src>[^)]+)\)'
-    r'(?:\{caption=(?P<caption>"(?:[^"\\]|\\.)*")\})?\s*$'
+    r'(?:\{(?P<options>(?:caption="(?:[^"\\]|\\.)*"|width=[0-9]{1,3}%)'
+    r'(?:\s+(?:caption="(?:[^"\\]|\\.)*"|width=[0-9]{1,3}%))*)\})?\s*$'
 )
+_FIGURE_CAPTION_OPTION = re.compile(r'(?:^|\s)caption=("(?:[^"\\]|\\.)*")(?=\s|$)')
+_FIGURE_WIDTH_OPTION = re.compile(r'(?:^|\s)width=([0-9]{1,3})%(?=\s|$)')
 
 
 def ordered_bundle_pages(content: Path) -> list[Path]:
@@ -1664,10 +1669,11 @@ def number_bundle_figures(content: Path) -> int:
             match = _STANDALONE_FIGURE.fullmatch(stripped)
             if match is None:
                 continue
-            quoted = match.group('caption')
-            if quoted:
+            options = match.group('options') or ''
+            authored_caption = _FIGURE_CAPTION_OPTION.search(options)
+            if authored_caption:
                 try:
-                    caption = json.loads(quoted)
+                    caption = json.loads(authored_caption.group(1))
                 except ValueError:
                     continue
             else:
@@ -1678,9 +1684,16 @@ def number_bundle_figures(content: Path) -> int:
             caption = re.sub(r'^Figure\s+\d+\s*[:.\-]\s*', '', caption, flags=re.I)
             figure = len(figures) + 1
             label = f'Figure {figure}: {caption}'
-            # Preserve the original image path and descriptive alt text.
+            # Preserve image sizing through numbering, as well as the original
+            # path and alt text. Invalid percentages do not affect rendering.
+            # A literal width=... inside the authored caption is prose, not
+            # an image option. Strip the quoted caption before reading width.
+            width_options = _FIGURE_CAPTION_OPTION.sub('', options)
+            width_option = _FIGURE_WIDTH_OPTION.search(width_options)
+            width = (f' width={int(width_option.group(1))}%' if width_option
+                     and 1 <= int(width_option.group(1)) <= 100 else '')
             image = f'![{match.group("alt")}]({match.group("src")})'
-            image += '{caption=' + json.dumps(label, ensure_ascii=False) + '}'
+            image += '{caption=' + json.dumps(label, ensure_ascii=False) + width + '}'
             lines[index] = image + ('\n' if line.endswith('\n') else '')
             figures.append((figure, caption, route + f'#figure-{figure}', page_title))
             changed = True

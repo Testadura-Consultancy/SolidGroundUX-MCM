@@ -21,8 +21,9 @@ _CLASS_NAME_RE = re.compile(r"\.?([A-Za-z_][A-Za-z0-9_-]*)")
 # A captioned standalone image becomes a semantic figure, never an inline
 # paragraph fragment. Other Markdown images retain the existing renderer path.
 _CAPTIONED_IMAGE_RE = re.compile(
-    r'^!\[([^\]]*)\]\(([^)]+)\)\{caption=("(?:[^"\\]|\\.)*")\}$'
+    r'^!\[([^\]]*)\]\(([^)]+)\)\{(?P<options>[^{}]+)\}$'
 )
+_CAPTION_OPTION_RE = re.compile(r'(?:^|\s)caption=("(?:[^"\\]|\\.)*")(?=\s|$)')
 
 
 def _captioned_figure(line: str) -> str | None:
@@ -30,8 +31,12 @@ def _captioned_figure(line: str) -> str | None:
     match = _CAPTIONED_IMAGE_RE.fullmatch(line.strip())
     if match is None:
         return None
+    options = match.group('options')
+    caption_option = _CAPTION_OPTION_RE.search(options)
+    if caption_option is None:
+        return None
     try:
-        caption = json.loads(match.group(3))
+        caption = json.loads(caption_option.group(1))
     except (ValueError, TypeError):
         return None
     if not isinstance(caption, str) or not caption.strip():
@@ -39,12 +44,14 @@ def _captioned_figure(line: str) -> str | None:
     alt = html.escape(match.group(1), quote=True)
     src = html.escape(_safe_url(match.group(2)), quote=True)
     label = html.escape(caption, quote=False)
+    # Respect the same safe percentage/pixel options as ordinary Markdown images.
+    size_attr = _image_dimensions(options)
     # The generated Figure Index links directly to these stable document anchors.
     numbered = re.match(r'^Figure\s+([1-9][0-9]*):\s+', caption)
     anchor = f' id="figure-{numbered.group(1)}"' if numbered else ''
     return (
         f'<figure class="sgnd-figure"{anchor}>'
-        f'<img src="{src}" alt="{alt}">'
+        f'<img src="{src}" alt="{alt}"{size_attr}>'
         f'<figcaption><em>{label}</em></figcaption>'
         '</figure>'
     )
@@ -83,16 +90,23 @@ def _safe_url(value: str) -> str:
 def _image_dimensions(options: str) -> str:
     """Return safe inline image sizing; omit invalid or absent dimensions.
 
-    Image size attributes use positive pixel counts. A single dimension keeps
-    the intrinsic aspect ratio; both dimensions use contain to avoid cropping.
+    Width supports 1-100% of the available container or a positive pixel count.
+    Height remains pixel-based. Aspect ratio and responsive bounds are retained.
     """
-    dimensions: dict[str, int] = {}
-    for key, raw in re.findall(r"(?<![\w-])(width|height)\s*=\s*([^\s}]+)", options):
-        if raw.isdecimal() and 0 < int(raw) <= 10000:
-            dimensions[key] = int(raw)
+    # Caption text may itself mention width=80%; quoted prose is not a size
+    # directive. Keep sizing explicit, and apply it only to the image element.
+    sizing_options = _CAPTION_OPTION_RE.sub('', options)
+    dimensions: dict[str, str] = {}
+    for key, raw in re.findall(r"(?<![\w-])(width|height)\s*=\s*([^\s}]+)", sizing_options):
+        if key == 'width' and raw.endswith('%') and raw[:-1].isdecimal():
+            percent = int(raw[:-1])
+            if 1 <= percent <= 100:
+                dimensions[key] = f'{percent}%'
+        elif raw.isdecimal() and 0 < int(raw) <= 10000:
+            dimensions[key] = f'{int(raw)}px'
     if not dimensions:
         return ""
-    rules = [f"{key}: {dimensions[key]}px" for key in ("width", "height") if key in dimensions]
+    rules = [f"{key}: {dimensions[key]}" for key in ("width", "height") if key in dimensions]
     if "width" not in dimensions:
         rules.append("width: auto")
     if "height" not in dimensions:
