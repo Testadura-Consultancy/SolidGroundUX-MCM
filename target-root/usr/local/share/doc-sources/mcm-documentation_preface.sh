@@ -36,6 +36,8 @@
 # See the [Web Content Management overview](../preface-01-web-content-management-overview/) for how this output may enter
 # the independent website-generation process.
 #
+# ![Documentation Generation and Authoring — Documentation sources, bundle configuration, and source-code metadata are processed into a structured Markdown repository with navigation, indexes, prefaces, epilogues, and assets.](/assets/mcm-wcm-doc-authoring.png)
+#
 # -- Bundle Management --------------------------------------------------------------
 #
 # The `manage-bundles.sh` menu lets you create, select, configure, validate and

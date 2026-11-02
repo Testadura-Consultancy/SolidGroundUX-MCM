@@ -21,27 +21,7 @@
 # The second **builds a static website from a selected Markdown repository**.
 # They share Markdown as a possible hand-off, not as a mandatory coupling.
 #
-# ```text
-#  Framework / SDK / MCM source
-#             |
-#             v
-#   Documentation bundle manager
-#             |
-#             v
-#    Markdown documentation repo -----------+
-#                                            |
-#    Independently authored Markdown ------+---> Select WCM source
-#                                                   |
-#                                           Validate / generate
-#                                                   |
-#                                              HTML + assets
-#                                                   |
-#                                             Review locally
-#                                                   |
-#                                           Publish via SSH/rsync
-#                                                   |
-#                                               Nginx host
-# ```
+# ![Web Content Management workflows - Two independent workflows: source documentation is converted into a Markdown repository, which can optionally serve as input for website generation and publication.](/assets/mcm-wcm-workflows.png)
 #
 # Each Markdown repository is an **alternative source**. Documentation generation
 # does not build a website; website generation does not automatically deploy it.

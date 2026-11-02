@@ -27,40 +27,7 @@
 # bundle generator. Generating HTML and deploying it are deliberately separate
 # operations; the published website does not run Python.
 #
-# ```text
-#          Author's Markdown                     Documentation bundle
-#                 |                                (optional source)
-#                 v                                       |
-#          Incoming staging                               |
-#        retrieve / upload / import                        |
-#                 |                                       |
-#          review and ingest                              |
-#                 |                                       |
-#                 v                                       v
-#         Authored website repo    OR     Documentation Markdown repo
-#                  \                           /
-#                   +----- Select WCM source --+
-#                                |
-#                  Validate source and links
-#                                |
-#                       Generate website
-#                  webcontent/cli.py + generator.py
-#                         /             \
-#                        v               v
-#                 Public HTML        Preview HTML
-#                 and assets         (private output)
-#                        |
-#                   Review locally
-#                        |
-#                    Publish (MCM)
-#                 dry-run / confirmation
-#                        |
-#                    SSH + rsync
-#                        |
-#             Website host / document root
-#                        |
-#                   Nginx -> browser
-# ```
+# ![Markdown Repository to Website - An authored website or generated documentation repository is converted into static HTML, with optional publication through SSH and rsync.](/assets/mcm-markdown-to-html.png)
 #
 # `OR` is intentional: the documentation generator does **not** inject its
 # Markdown into an existing authored website. Select whichever repository

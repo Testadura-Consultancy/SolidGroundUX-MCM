@@ -59,21 +59,20 @@
 # > Test page orchestrates those Framework suites together with MCM console-registration
 # > and module-validation checks; it does not turn those MCM checks into Framework suites.
 #
-# . Table
-# ! Module :: Executable :: Common
-#   10-computer-setup.sh :: set-identity.sh ::
-#   15-storage.sh :: manage-storage.sh ::
-#   20-active-directory-server.sh :: manage-active-directory-server.sh :: active-directory-management.sh
-#   25-active-directory-client.sh :: manage-active-directory-client.sh :: active-directory-management.sh
-#   27-active-directory-management.sh :: manage-active-directory.sh :: active-directory-management.sh
-#   30-samba-file-server.sh :: manage-samba-file-server.sh ::
-#   30-samba-file-server.sh :: manage-samba-shares.sh ::
-#   40-solidgroundux.sh :: manage-solidgroundux.sh ::
-#   45-solidground-framework-test.sh :: sgnd-smoketest ::
-#   50-web-server.sh :: manage-web-server.sh ::
-#   50-web-server.sh :: publish-web-content.sh ::
-#   60-sqlserver.sh :: manage-sqlserver.sh ::
-#   70-docker-server.sh :: manage-docker-server.sh ::
-#   70-docker-server.sh :: manage-docker-containers.sh ::
-#   90-development.sh :: ::
-# . EndTable
+# | Module | Executable | Common |
+# | --- | --- | --- |
+# | `10-computer-setup.sh` | `set-identity.sh` | — |
+# | `15-storage.sh` | `manage-storage.sh` | — |
+# | `20-active-directory-server.sh` | `manage-active-directory-server.sh` | `active-directory-management.sh` |
+# | `25-active-directory-client.sh` | `manage-active-directory-client.sh` | `active-directory-management.sh` |
+# | `27-active-directory-management.sh` | `manage-active-directory.sh` | `active-directory-management.sh` |
+# | `30-samba-file-server.sh` | `manage-samba-file-server.sh` | — |
+# | `30-samba-file-server.sh` | `manage-samba-shares.sh` | — |
+# | `40-solidgroundux.sh` | `manage-solidgroundux.sh` | — |
+# | `45-solidground-framework-test.sh` | `sgnd-smoketest` | — |
+# | `50-web-server.sh` | `manage-web-server.sh` | — |
+# | `50-web-server.sh` | `publish-web-content.sh` | — |
+# | `60-sqlserver.sh` | `manage-sqlserver.sh` | — |
+# | `70-docker-server.sh` | `manage-docker-server.sh` | — |
+# | `70-docker-server.sh` | `manage-docker-containers.sh` | — |
+# | `90-development.sh` | — | — |
