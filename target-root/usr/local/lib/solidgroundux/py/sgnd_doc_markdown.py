@@ -447,7 +447,7 @@ def prune_empty_headings(lines: list[str]) -> list[str]:
     return result
 
 
-def front(title: str, order: int = 1000, summary: str = '', *, section: bool = True, template: str = 'page', nav_title: str | None = None) -> str:
+def front(title: str, order: int = 1000, summary: str = '', *, section: bool = True, template: str = 'page', nav_title: str | None = None, nav_parent: str | None = None) -> str:
     """Build YAML front matter for a generated Markdown page.
     
     Usage:
@@ -457,12 +457,14 @@ def front(title: str, order: int = 1000, summary: str = '', *, section: bool = T
     values = {'title': title, 'nav_title': title if nav_title is None else nav_title, 'summary': summary, 'template': template,
               'content_type': 'section' if section else 'page', 'nav_order': order,
               'draft': False, 'featured': False}
+    if nav_parent is not None:
+        values['nav_parent'] = nav_parent
     return '---\n' + '\n'.join(f'{key}: {json.dumps(value, ensure_ascii=False)}' if isinstance(value, str)
                               else f'{key}: {str(value).lower() if isinstance(value, bool) else value}'
                               for key, value in values.items()) + '\n---\n\n'
 
 
-def write_index(folder: Path, title: str, body: str, order: int = 1000, summary: str = '', template: str = 'page', *, nav_title: str | None = None) -> None:
+def write_index(folder: Path, title: str, body: str, order: int = 1000, summary: str = '', template: str = 'page', *, nav_title: str | None = None, nav_parent: str | None = None) -> None:
     """Write a descriptive Markdown index and its front matter to a section directory.
     
     Usage:
@@ -470,7 +472,7 @@ def write_index(folder: Path, title: str, body: str, order: int = 1000, summary:
         write_index(folder, title, body, order, summary, template, nav_title=nav_title)
         ```"""
     folder.mkdir(parents=True, exist_ok=True)
-    (folder / f'{slug(title)}_Index_NL.md').write_text(front(title, order, summary, template=template, nav_title=nav_title) + body.strip() + '\n', encoding='utf-8')
+    (folder / f'{slug(title)}_Index_NL.md').write_text(front(title, order, summary, template=template, nav_title=nav_title, nav_parent=nav_parent) + body.strip() + '\n', encoding='utf-8')
 
 
 def _section_marker(text: str, inside_item: bool, in_fence: bool):
@@ -697,7 +699,13 @@ def markdown_documentation(lines: list[str]) -> list[str]:
                     url = '/' + name
                 else:
                     url = '/images/' + name
-                images.append(f'![{alt}]({url})')
+                # Keep the authored description as an explicit caption. The
+                # bundle-wide numbering pass assigns a figure number after all
+                # pages have been written, in their published navigation order.
+                image = f'![{alt}]({url})'
+                if caption and caption.strip():
+                    image += '{caption=' + json.dumps(caption.strip(), ensure_ascii=False) + '}'
+                images.append(image)
                 cursor += 1
             if images:
                 result.extend([''] + images + [''])
@@ -1150,7 +1158,9 @@ def collect(product, content: Path, order: int, counters: Counter, template_owne
     for group_index, group in enumerate(groups, 1):
         group_folder = product_folder if group == '/' else product_folder / slug(group)
         if group != '/':
-            write_index(group_folder, group, '', group_index, template='group')
+            # Reserve low chapter navigation orders for authored prefaces and
+            # root-level source pages, as in the previous metadata fix.
+            write_index(group_folder, group, '', 200 + group_index, template='group')
         group_records = [r for r in grouped_records if (r[1].get('group', '').strip() or 'Ungrouped') == group]
         subgroup_names = {r[1].get('subgroup', '').strip() for r in group_records if r[1].get('subgroup', '').strip()}
         # Numbered console modules define their operator-facing order. Keep the
@@ -1323,7 +1333,7 @@ def collect(product, content: Path, order: int, counters: Counter, template_owne
             # Root-level files precede grouped sections in the chapter navigation.
             # Use the real source filename, not its descriptive page title.
             write_index(source_folder, title, '\n'.join(body),
-                        order=-100 if page_preface else (0 if group == '/' else 1000),
+                        order=40 if page_preface else (50 if group == '/' else 1000),
                         summary=(metadata.get('description', '') if page_preface else metadata.get('purpose', '')),
                         template='page' if page_preface else 'source',
                         nav_title=title if page_preface else path.name)
@@ -1392,7 +1402,7 @@ def _product_reference_files(source: Path, name: str) -> list[Path]:
     return [candidate for candidate in candidates if candidate.is_file()]
 
 
-def build_appendices(products: list[dict], content: Path, root: Path) -> dict:
+def build_appendices(products: list[dict], content: Path, root: Path, nav_order: int = 9999) -> dict:
     """Build one bundle-level reference index from the actually published pages.
     
     Usage:
@@ -1435,7 +1445,7 @@ def build_appendices(products: list[dict], content: Path, root: Path) -> dict:
                                       'product': product['title'], 'source': src, 'url': route})
     entries.sort(key=lambda row: (row['name'].casefold(), row['product'].casefold(), row['source']))
     variables.sort(key=lambda row: (row['name'].casefold(), row['product'].casefold(), row['source']))
-    write_index(appendix, 'Appendices', '', 9999, template='group')
+    write_index(appendix, 'Appendices', '', nav_order, template='group')
     index = appendix / 'api-index'
     write_index(index, 'API Index & Search', f'Search {len(entries)} documented public functions across the bundle.', 1, template='api-index')
     (root / 'assets' / 'sgnd-api-index.json').write_text(json.dumps(entries, ensure_ascii=False, separators=(',', ':')), encoding='utf-8')
@@ -1475,6 +1485,12 @@ def build_appendices(products: list[dict], content: Path, root: Path) -> dict:
                     text = re.sub(r'\s+', ' ', text).strip()
                     value = '© ' + text
                 identities[(field, value.casefold())] = (field, value)
+        # Do not list the company a second time as an individual developer.
+        company_names = {value.casefold() for field, value in identities.values()
+                         if field == 'company'}
+        identities = {key: item for key, item in identities.items()
+                      if not (item[0] in ('developer', 'developers')
+                              and item[1].casefold() in company_names)}
         if identities:
             attribution_lines += ['## ' + product['title'], '']
             attribution_lines.extend(f'- **{field.title()}:** {value}'
@@ -1539,6 +1555,151 @@ def split_wcm_document(markdown: str) -> tuple[dict[str, str], str]:
         return {}, normalized
     return metadata, ''.join(lines[end + 1:])
 
+
+
+# Figure numbers are assigned after product and bundle pages are assembled.
+# A single ordered walk follows the published section hierarchy, not the
+# incidental order of filenames on disk or the sequence in which pages were made.
+_STANDALONE_FIGURE = re.compile(
+    r'^\s*!\[(?P<alt>[^\]]*)\]\((?P<src>[^)]+)\)'
+    r'(?:\{caption=(?P<caption>"(?:[^"\\]|\\.)*")\})?\s*$'
+)
+
+
+def ordered_bundle_pages(content: Path) -> list[Path]:
+    """Walk all generated documents in section/navigation order.
+
+    Usage:
+        ```python
+        for page in ordered_bundle_pages(content):
+            print(page)
+        ```
+    """
+    children: dict[Path | None, list[tuple[int, str, Path, Path | None]]] = {}
+    pages = sorted(content.rglob('*.md'))
+    for page in pages:
+        metadata, _ = split_wcm_document(page.read_text(encoding='utf-8'))
+        if not metadata:
+            continue
+        try:
+            order = int(metadata.get('nav_order', '1000').strip())
+        except ValueError as error:
+            raise ValueError(f'Invalid nav_order in {page}') from error
+        # The index file is the document representing its directory. Ordinary
+        # child pages (e.g. public functions) sit under that directory's index.
+        section_index = page.name.endswith('_Index_NL.md')
+        section = page.parent if section_index else None
+        if section_index:
+            parent = page.parent.parent if page.parent != content else None
+        else:
+            parent = page.parent
+        # Documentation home prefaces already reside directly under content.
+        # nav_parent '/' reaffirms that logical relationship in the WCM sidebar.
+        key = page.relative_to(content).as_posix()
+        children.setdefault(parent, []).append((order, key, page, section))
+    result: list[Path] = []
+    seen: set[Path] = set()
+
+    def visit(parent: Path | None) -> None:
+        for _order, _key, page, section in sorted(children.get(parent, [])):
+            if page in seen:
+                continue
+            seen.add(page)
+            result.append(page)
+            if section is not None:
+                visit(section)
+
+    visit(None)
+    if len(seen) != sum(len(v) for v in children.values()):
+        missing = sorted(str(page.relative_to(content)) for group in children.values()
+                         for _, _, page, _ in group if page not in seen)
+        raise ValueError('Unreachable generated documentation pages: ' + ', '.join(missing[:5]))
+    return result
+
+
+def number_bundle_figures(content: Path) -> int:
+    """Caption figures consecutively and publish a navigable appendix index.
+
+    Standalone Markdown images with an explicit caption use that authored
+    caption; other standalone images use their alt text as the caption.
+    Code fences and inline images are not altered. Source files stay untouched.
+
+    Usage:
+        ```python
+        count = number_bundle_figures(content)
+        ```
+    """
+    figures: list[tuple[int, str, str, str]] = []
+    for page in ordered_bundle_pages(content):
+        original = page.read_text(encoding='utf-8')
+        metadata, _body = split_wcm_document(original)
+        if not metadata or metadata.get('nav_only', '').strip().lower() == 'true':
+            continue
+        if page.parent == content / 'appendices' / 'figure-index':
+            continue
+        # Do not re-interpret YAML metadata as Markdown body.
+        lines = original.splitlines(keepends=True)
+        body_start = 0
+        if lines and lines[0].strip() == '---':
+            body_start = next((index + 1 for index in range(1, len(lines))
+                               if lines[index].strip() == '---'), 0)
+        page_title = metadata.get('title', '').strip().strip('"\'') or page.parent.name
+        relative = page.parent.relative_to(content)
+        if page.name.endswith('_Index_NL.md'):
+            route = '/' if str(relative) == '.' else '/' + relative.as_posix() + '/'
+        else:
+            stem = page.name.rsplit('_NL.md', 1)[0]
+            route = '/' + relative.as_posix().strip('.') + '/' + slug(stem) + '/'
+            route = re.sub(r'/+', '/', route)
+        in_fence = False
+        changed = False
+        for index in range(body_start, len(lines)):
+            line = lines[index]
+            stripped = line.strip()
+            if stripped.startswith(('```', '~~~')):
+                in_fence = not in_fence
+                continue
+            if in_fence:
+                continue
+            match = _STANDALONE_FIGURE.fullmatch(stripped)
+            if match is None:
+                continue
+            quoted = match.group('caption')
+            if quoted:
+                try:
+                    caption = json.loads(quoted)
+                except ValueError:
+                    continue
+            else:
+                caption = match.group('alt').strip() or Path(match.group('src')).stem.replace('-', ' ').replace('_', ' ')
+            caption = str(caption).strip()
+            if not caption:
+                continue
+            caption = re.sub(r'^Figure\s+\d+\s*[:.\-]\s*', '', caption, flags=re.I)
+            figure = len(figures) + 1
+            label = f'Figure {figure}: {caption}'
+            # Preserve the original image path and descriptive alt text.
+            image = f'![{match.group("alt")}]({match.group("src")})'
+            image += '{caption=' + json.dumps(label, ensure_ascii=False) + '}'
+            lines[index] = image + ('\n' if line.endswith('\n') else '')
+            figures.append((figure, caption, route + f'#figure-{figure}', page_title))
+            changed = True
+        if changed:
+            page.write_text(''.join(lines), encoding='utf-8')
+    sections = [
+        f'{len(figures)} figures across the documentation bundle.', '',
+        '| Figure | Caption | Page |', '| --- | --- | --- |',
+    ]
+    for number, caption, target, title in figures:
+        # Pipes would otherwise terminate Markdown table cells.
+        label = caption.replace('|', r'\|').replace('[', r'\[').replace(']', r'\]')
+        location = title.replace('|', r'\|')
+        sections.append(f'| [Figure {number}]({target}) | {label} | [{location}]({target}) |')
+    if not figures:
+        sections = ['No figures were found in this documentation bundle.']
+    write_index(content / 'appendices' / 'figure-index', 'Figure Index',
+                '\n'.join(sections), 6, template='page')
+    return len(figures)
 
 
 # Bundle-level prefaces/epilogues are independent authored documents, not a
@@ -1648,6 +1809,39 @@ def bundle_document_source(item: str | dict, products: list[dict],
     return path, title, reference
 
 
+def bundle_document_metadata(path: Path) -> dict[str, str]:
+    """Read authored Markdown navigation metadata without changing its body.
+
+    Usage:
+        ```python
+        metadata = bundle_document_metadata(path)
+        ```
+    """
+    if path.suffix.lower() not in ('.md', '.markdown'):
+        return {}
+    metadata, _ = split_wcm_document(path.read_text(encoding='utf-8'))
+    return {key.lower(): value.strip().strip('"\'') for key, value in metadata.items()}
+
+
+def bundle_nav_order(metadata: dict[str, str], fallback: int) -> int:
+    """Validate an authored document's order relative to its siblings.
+
+    Usage:
+        ```python
+        order = bundle_nav_order(metadata, 10)
+        ```
+    """
+    value = metadata.get('nav_order', '').strip()
+    if not value:
+        return fallback
+    if not re.fullmatch(r'\d+', value):
+        raise ValueError(f'Invalid bundle document nav_order: {value}')
+    order = int(value)
+    if order >= 10000:
+        raise ValueError('Bundle document nav_order must be below 10000')
+    return order
+
+
 def render_bundle_document(path: Path, title: str | None) -> tuple[str, str]:
     """Convert an authored preface/epilogue without executing source code.
 
@@ -1725,17 +1919,16 @@ def publish_bundle_documents(selections: list, label: str, products: list[dict],
     """
     used_folders: set[Path] = set()
     used_sources: list[Path] = []
-    top_level_number = 0
     for number, item in enumerate(selections, 1):
         path, title_override, reference = bundle_document_source(item, products, content)
-        title, body = render_bundle_document(path, title_override)
-        # A selection can target a product chapter explicitly. Unscoped
-        # selections remain bundle-level introductions or closing documents.
-        # Do not infer scope from the source repository: the same document
-        # might intentionally introduce the entire bundle.
-        chapter_id = ''
-        if isinstance(item, dict):
+        metadata = bundle_document_metadata(path)
+        title, body = render_bundle_document(path, metadata.get('title') or title_override)
+        # An authored document is bundle-wide unless its own metadata explicitly
+        # scopes it to a product. A legacy bundle selection can still supply scope.
+        chapter_id = (metadata.get('product') or metadata.get('chapter') or '').strip()
+        if not chapter_id and isinstance(item, dict):
             chapter_id = str(item.get('product') or item.get('chapter') or '').strip()
+        relative_order = bundle_nav_order(metadata, number * 10)
         if chapter_id:
             matches = [product for product in products
                        if chapter_id.casefold() in (str(product['id']).casefold(),
@@ -1744,18 +1937,19 @@ def publish_bundle_documents(selections: list, label: str, products: list[dict],
                 raise ValueError(f'Unknown or ambiguous bundle document product: {chapter_id}')
             chapter = content / slug(matches[0]['id'])
             folder = chapter / f'{label}-{number:02d}-{slug(title)}'
-            # Product prefaces precede all chapter content; product epilogues
-            # follow it. Their order is stable even with several selections.
-            page_order = (-1000 + number) if label == 'preface' else (9000 + number)
+            # A product's own preface/epilogue remains within that chapter.
+            page_order = relative_order if label == 'preface' else 10000 + relative_order
         else:
-            top_level_number += 1
             folder = content / f'bundle-{label}-{number:02d}-{slug(title)}'
-            page_order = start_order + top_level_number - 1
+            # The bundle home has only its explicitly designated prefaces as
+            # children. The product chapters stay as independent top-level entries.
+            page_order = relative_order if label == 'preface' else start_order + relative_order
         if folder in used_folders or folder.exists():
             raise ValueError(f'Bundle document route conflict: {folder.name}')
         used_folders.add(folder)
         write_index(folder, title, body, page_order,
-                    template='page', summary='', nav_title=title)
+                    template='page', summary='', nav_title=title,
+                    nav_parent='/' if label == 'preface' and not chapter_id else None)
         used_sources.append(path)
         # A promoted page must not also display its body at the old route.
         if path.is_relative_to(content.resolve()):
@@ -1838,12 +2032,14 @@ def generate(bundle: dict, docs_root: Path | None = None) -> dict:
                     excluded_sources.add(selected.resolve())
         # Product pages are generated before promotion of authored/generator
         # selections; navigation order is independent of creation order.
-        top_level_prefaces = sum(not (isinstance(item, dict) and
-                                      (item.get('product') or item.get('chapter')))
-                                  for item in prefaces)
-        for i, product in enumerate(products, top_level_prefaces + 1):
-            collect(product, content, i, counts, template_owners, excluded_sources)
-        counts.update(build_appendices(products, content, root))
+        # Reserve disjoint ordering bands for products, conclusions and
+        # appendices. Bundle prefaces sort as children of the home page, using
+        # their own nav_order rather than their selection/list position.
+        for i, product in enumerate(products, 1):
+            collect(product, content, i * 10000, counts, template_owners, excluded_sources)
+        epilogue_base = (len(products) + 1) * 10000
+        appendix_order = (len(products) + 2) * 10000
+        counts.update(build_appendices(products, content, root, appendix_order))
         # Images referenced by comments belong to each product source tree.
         # Keep /assets/... links valid without depending on an external website.
         for product in products:
@@ -1873,9 +2069,12 @@ def generate(bundle: dict, docs_root: Path | None = None) -> dict:
         preface_count, preface_sources = publish_bundle_documents(
             prefaces, 'preface', products, content, 1)
         epilogue_count, epilogue_sources = publish_bundle_documents(
-            epilogues, 'epilogue', products, content, 9000)
+            epilogues, 'epilogue', products, content, epilogue_base)
         counts['bundle_prefaces'] = preface_count
         counts['bundle_epilogues'] = epilogue_count
+        # Number figures only after every authored/generated page exists; the
+        # figure appendix is generated from the exact published page routes.
+        counts['figures'] = number_bundle_figures(content)
         # Bundle defaults come from the selected MCM documentation resources.
         # Product resources are scoped to their chapter; no product can overwrite
         # another chapter's templates or the bundle-wide defaults.

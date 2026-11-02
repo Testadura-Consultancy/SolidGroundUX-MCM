@@ -300,7 +300,18 @@ def _render_navigation(
             nodes[route] = {"children": set(), "page": page}
 
     top = sorted(navigation, key=lambda n: n.order)
-    roots = [n.path for n in top if n.path in nodes and n.labels.get(language)]
+    # Bundle prefaces can explicitly choose the home page as their navigation
+    # parent. This must be opt-in: the rest of the site's sections are not
+    # automatically children of the homepage.
+    home_children = set()
+    if doc_sidebar:
+        home_children = {
+            route for route in nodes["/"]["children"]
+            if nodes[route]["page"] is not None
+            and nodes[route]["page"].metadata.get("nav_parent") == "/"
+        }
+    roots = [n.path for n in top if n.path in nodes and n.labels.get(language)
+             and n.path not in home_children]
     # Root entries are discovered from section indexes, not navigation.cfg.
     top_by_path = {n.path: n for n in top}
 
@@ -334,7 +345,7 @@ def _render_navigation(
             return ""
         node = nodes[route]
         # Home is its own navigation entry, not a container for every section.
-        child_routes = () if route == "/" else node["children"]
+        child_routes = home_children if route == "/" else node["children"]
         # fn: child_order - Prefer section navigation order over ordinary page ordering.
         def child_order(child_route: str) -> int:
             """Prefer section navigation order over ordinary page ordering.

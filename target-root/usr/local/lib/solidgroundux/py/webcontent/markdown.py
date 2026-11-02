@@ -39,8 +39,11 @@ def _captioned_figure(line: str) -> str | None:
     alt = html.escape(match.group(1), quote=True)
     src = html.escape(_safe_url(match.group(2)), quote=True)
     label = html.escape(caption, quote=False)
+    # The generated Figure Index links directly to these stable document anchors.
+    numbered = re.match(r'^Figure\s+([1-9][0-9]*):\s+', caption)
+    anchor = f' id="figure-{numbered.group(1)}"' if numbered else ''
     return (
-        '<figure class="sgnd-figure">'
+        f'<figure class="sgnd-figure"{anchor}>'
         f'<img src="{src}" alt="{alt}">'
         f'<figcaption><em>{label}</em></figcaption>'
         '</figure>'
