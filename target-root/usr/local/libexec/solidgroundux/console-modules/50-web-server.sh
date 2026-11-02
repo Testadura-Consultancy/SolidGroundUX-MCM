@@ -2,8 +2,8 @@
 # SolidGroundUX Management Console Modules - Web Server
 # ----------------------------------------------------------------------------------
 # Metadata:
-#   Version     : 2.1
-#   Build       : 2630201
+#   Version     : 2.2
+#   Build       : 2630620
 #   Shortname   : WEB_SERVER
 #   Source      : 50-web-server.sh
 #   Type        : module
@@ -11,7 +11,7 @@
 #   Subgroup    : Web Server
 #   Purpose     : Install, configure, manage, validate, and inspect an Nginx web server
 #
-#   Checksum : cfa3271091a0bcaaabd13b31bd838228b39f6ddc5c2dba860f6f3492e7c67e40
+#   Checksum : ca4352ecd4ed5b1431c9797dd16a3ee7503317866d0ae614cf46ddccc116a0e2
 # Description:
 #   Registers Nginx host, site, publishing, documentation, service, validation, and
 #   status actions with the SolidGround Management Console. Persistent operations are
@@ -20,26 +20,25 @@
 set -uo pipefail
 
 # - Library guard ------------------------------------------------------------------
-    # fn: _sgnd_lib_guard - Enforce source-only, source-only library guard
+    # fn$ _sgnd_lib_guard - Enforce source-only, single-load library initialization
         # . Purpose
-        #   Ensure the file is sourced as a library and marked as loaded.
+        #   Ensure the file is sourced as a library and initialized only once.
         #
         # . Behavior
         #   - Derives a unique guard variable name from the current filename.
         #   - Aborts execution when the file is run directly instead of sourced.
         #   - Sets the guard variable on first load.
-        #   - Returns from the guard helper when the file is already marked loaded; it does not skip subsequent top-level statements.
+        #   - Returns immediately when the library was already loaded.
         #
-        # . Inputs
+        # Inputs
         #   BASH_SOURCE[0]
-        #   - $0
+        #   $0
         #
-        # . Outputs
-        #   (globals)
+        # Outputs (globals)
         #   SGND_<MODULE>_LOADED
         #
         # . Returns
-        #   - 0 when already loaded or successfully initialized.
+        #   0 when already loaded or successfully initialized.
         #   Exits with code 2 when executed instead of sourced.
         #
         # . Usage

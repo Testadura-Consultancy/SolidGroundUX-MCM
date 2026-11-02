@@ -2,10 +2,10 @@
 # SolidGroundUX Management Console Modules - Computer Setup
 # ----------------------------------------------------------------------------------
 # Metadata:
-#   Version     : 2.1
-#   Build       : 2629401
+#   Version     : 2.2
+#   Build       : 2630620
 #   Shortname   : COMPUTER_SETUP
-#   Checksum    : cda3e4e1f0214e4c2de1b380cff356008409980e95169d59f6f11d902a003892
+#   Checksum    : 354ad50018ce69773e45341b233fbe228c02589b26ecbb867f38a488b8f29e0e
 #   Source      : 10-computer-setup.sh
 #   Type        : module
 #   Group       : Modules
@@ -19,26 +19,25 @@
 set -uo pipefail
 
 # - Library guard ------------------------------------------------------------------
-    # fn: _sgnd_lib_guard - Enforce source-only, source-only library guard
+    # fn$ _sgnd_lib_guard - Enforce source-only, single-load library initialization
         # . Purpose
-        #   Ensure the file is sourced as a library and marked as loaded.
+        #   Ensure the file is sourced as a library and initialized only once.
         #
         # . Behavior
         #   - Derives a unique guard variable name from the current filename.
         #   - Aborts execution when the file is run directly instead of sourced.
         #   - Sets the guard variable on first load.
-        #   - Returns from the guard helper when the file is already marked loaded; it does not skip subsequent top-level statements.
+        #   - Returns immediately when the library was already loaded.
         #
-        # . Inputs
+        # Inputs
         #   BASH_SOURCE[0]
-        #   - $0
+        #   $0
         #
-        # . Outputs
-        #   (globals)
+        # Outputs (globals)
         #   SGND_<MODULE>_LOADED
         #
         # . Returns
-        #   - 0 when already loaded or successfully initialized.
+        #   0 when already loaded or successfully initialized.
         #   Exits with code 2 when executed instead of sourced.
         #
         # . Usage

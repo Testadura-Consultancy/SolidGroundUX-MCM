@@ -2,8 +2,8 @@
 # SolidGroundUX Management Console Modules - Storage
 # ----------------------------------------------------------------------------------
 # Metadata:
-#   Version     : 2.1
-#   Build       : 2627515
+#   Version     : 2.2
+#   Build       : 2630620
 #   Shortname   : STORAGE
 #   Source      : 15-storage.sh
 #   Type        : module
@@ -11,7 +11,7 @@
 #   Subgroup    : Storage
 #   Purpose     : Configure and inspect local storage volumes and directories
 #
-#   Checksum : bcbd429937a05d126eb06babf74e0d344728fb38e2babbc36d9a551e8aa7e007
+#   Checksum : 95cf4882fff045033c9322d6ce91669ef80ffcc3a0de7828229d1792984f6453
 # Description:
 #   Registers local-storage management actions with the SolidGround Management Console.
 #   Persistent storage operations are implemented by manage-storage.sh.
@@ -26,26 +26,25 @@
 set -uo pipefail
 
 # - Library guard ------------------------------------------------------------------
-    # fn: _sgnd_lib_guard - Enforce source-only, source-only library guard
+    # fn$ _sgnd_lib_guard - Enforce source-only, single-load library initialization
         # . Purpose
-        #   Ensure the file is sourced as a library and marked as loaded.
+        #   Ensure the file is sourced as a library and initialized only once.
         #
         # . Behavior
         #   - Derives a unique guard variable name from the current filename.
         #   - Aborts execution when the file is run directly instead of sourced.
         #   - Sets the guard variable on first load.
-        #   - Returns from the guard helper when the file is already marked loaded; it does not skip subsequent top-level statements.
+        #   - Returns immediately when the library was already loaded.
         #
-        # . Inputs
+        # Inputs
         #   BASH_SOURCE[0]
-        #   - $0
+        #   $0
         #
-        # . Outputs
-        #   (globals)
+        # Outputs (globals)
         #   SGND_<MODULE>_LOADED
         #
         # . Returns
-        #   - 0 when already loaded or successfully initialized.
+        #   0 when already loaded or successfully initialized.
         #   Exits with code 2 when executed instead of sourced.
         #
         # . Usage

@@ -3,10 +3,10 @@
 # SolidGroundUX - SolidGround Management Console
 # -------------------------------------------------------------------------------------
 # Metadata:
-#   Version     : 2.1
-#   Build       : 2630201
+#   Version     : 2.2
+#   Build       : 2630620
 #   Shortname   : MANAGEMENT_CONSOLE
-#   Checksum    : 796da68181ce7f0e65b502cbf2eb43a9c555c7f4d4bb8275c2c90dd597a960f7
+#   Checksum    : 33fd543e04314352ba49a1b3f5f9c376008f299d79ece74d6be6275152fb04b1
 #   Source      : management-console.sh
 #   Wrapper     : sgnd-console
 #   Type        : script
@@ -81,7 +81,7 @@ set -uo pipefail
         #     present, falls back to the installed framework copy without changing
         #     SGND_FRAMEWORK_ROOT.
         #
-        # . Globals (Write)
+        # . Globals (write)
         #   SGND_FRAMEWORK_ROOT
         #
         # . Output
@@ -89,8 +89,8 @@ set -uo pipefail
         #   helpers are not available until sgnd-exe-common.sh has been loaded.
         #
         # . Returns
-        #   - 0 when the framework root was resolved and executable common library loaded.
-        #   - 126 when the script path cannot be resolved, no canonical root component can
+        #   0 when the framework root was resolved and executable common library loaded.
+        #   126 when the script path cannot be resolved, no canonical root component can
         #   be found, or the executable common library is unreadable.
         #
         # . Usage

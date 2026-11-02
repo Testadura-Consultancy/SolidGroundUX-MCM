@@ -3,8 +3,8 @@
 # SolidGroundUX Management Console Modules - Manage SolidGroundUX
 # -------------------------------------------------------------------------------------
 # Metadata:
-#   Version     : 2.1
-#   Build       : 2627501
+#   Version     : 2.2
+#   Build       : 2630620
 #   Shortname   : MANAGE_SOLIDGROUNDUX
 #   Source      : manage-solidgroundux.sh
 #   Type        : script
@@ -12,7 +12,7 @@
 #   Subgroup    : SolidGroundUX Framework
 #   Purpose     : Apply persistent SolidGroundUX framework management actions
 #
-#   Checksum : 3f6a8ce90ba7fe95aa9abc24cf8e7a6e0e1a8f22dc4d407c8002fb07a86f1a3e
+#   Checksum : 78bfc4b72a02cca0e4bc1fa40f690b048e6a04b2d365d5348b076cc7b26cc0bf
 # Description:
 #   Implements persistent framework configuration and logging actions dispatched by
 #   the SolidGroundUX Management Console. All mutating actions honor --dryrun and
@@ -56,7 +56,7 @@ set -uo pipefail
         #     present, falls back to the installed framework copy without changing
         #     SGND_FRAMEWORK_ROOT.
         #
-        # . Globals (Write)
+        # . Globals (write)
         #   SGND_FRAMEWORK_ROOT
         #
         # . Output
@@ -64,8 +64,8 @@ set -uo pipefail
         #   helpers are not available until sgnd-exe-common.sh has been loaded.
         #
         # . Returns
-        #   - 0 when the framework root was resolved and executable common library loaded.
-        #   - 126 when the script path cannot be resolved, no canonical root component can
+        #   0 when the framework root was resolved and executable common library loaded.
+        #   126 when the script path cannot be resolved, no canonical root component can
         #   be found, or the executable common library is unreadable.
         #
         # . Usage

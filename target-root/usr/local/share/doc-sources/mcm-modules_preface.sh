@@ -2,9 +2,9 @@
 # SolidGroundUX Management Console Modules - Module Registration
 # ----------------------------------------------------------------------------------
 # Metadata:
-#   Version     : 2.1
-#   Build       : 2627700
-#   Checksum    : 1097c01140043aee179ddf7677fce60b7e0445fcb2aaad4cce852ca70e1966ae
+#   Version     : 2.2
+#   Build       : 2630620
+#   Checksum    : 760417477781b94973909f74e582d45e5970ffebc31bdff7acedaa8568e956bb
 #   Source      : mcm-modules_preface.sh
 #   Type        : documentation
 #   Group       : Modules

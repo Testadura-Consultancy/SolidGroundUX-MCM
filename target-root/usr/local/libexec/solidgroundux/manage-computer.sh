@@ -3,15 +3,15 @@
 # SolidGroundUX Management Console Modules - manage-computer
 # ----------------------------------------------------------------------------------
 # Metadata:
-#   Version     : 2.1
-#   Build       : 2629401
+#   Version     : 2.2
+#   Build       : 2630620
 #   Shortname   : MANAGE_COMPUTER
 #   Source      : manage-computer.sh
 #   Type        : script
 #   Group       : Modules
 #   Subgroup    : Computer Setup
 #   Purpose     : Computer Setup action implementation
-#   Checksum : ae086d397bbb4ce8d8cbc5e51ea1295f69c56e85fd802472274e493ad14dce50
+#   Checksum : 9530c9aef8fb6b20520c7948bbd688ef50907ff5a8537c3b189f6f63c7fd1e34
 # Description:
 #   Standalone management actions dispatched from 10-computer-setup.sh.
 #   UI, reporting and errors use the SolidGroundUX framework.
@@ -47,7 +47,7 @@ set -uo pipefail
         #     present, falls back to the installed framework copy without changing
         #     SGND_FRAMEWORK_ROOT.
         #
-        # . Globals (Write)
+        # . Globals (write)
         #   SGND_FRAMEWORK_ROOT
         #
         # . Output
@@ -55,8 +55,8 @@ set -uo pipefail
         #   helpers are not available until sgnd-exe-common.sh has been loaded.
         #
         # . Returns
-        #   - 0 when the framework root was resolved and executable common library loaded.
-        #   - 126 when the script path cannot be resolved, no canonical root component can
+        #   0 when the framework root was resolved and executable common library loaded.
+        #   126 when the script path cannot be resolved, no canonical root component can
         #   be found, or the executable common library is unreadable.
         #
         # . Usage

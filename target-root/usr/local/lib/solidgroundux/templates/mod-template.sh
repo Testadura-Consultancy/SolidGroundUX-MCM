@@ -2,9 +2,9 @@
 # SolidGroundUX - Console Module Template
 # ----------------------------------------------------------------------------------
 # Metadata:
-#   Version     : 2.1
-#   Build       : 2627501
-#   Checksum    : 87a61b9b319fdc25859cdf6533ac017188624387b930dece46996a5df2bcf000
+#   Version     : 2.2
+#   Build       : 2630620
+#   Checksum    : 7e196e3c6a0b1822aa27aff65e8001644ac9195bf2817930ce9df1a9c2f48029
 #   Source      : mod-template.sh
 #   Type        : module
 #   Group       : SDK
@@ -50,33 +50,31 @@
 # ==================================================================================
 set -uo pipefail
 # - Library guard ------------------------------------------------------------------
-    # fn: _sgnd_lib_guard - Enforce source-only, source-only library guard
+    # fn$ _sgnd_lib_guard - Enforce source-only, single-load library initialization
         # . Purpose
-        #   Ensure the file is sourced as a library and marked as loaded.
+        #   Ensure the file is sourced as a library and initialized only once.
         #
         # . Behavior
         #   - Derives a unique guard variable name from the current filename.
         #   - Aborts execution when the file is run directly instead of sourced.
         #   - Sets the guard variable on first load.
-        #   - Returns from the guard helper when the file is already marked loaded; it does not skip subsequent top-level statements.
+        #   - Returns immediately when the library was already loaded.
         #
-        # . Inputs
+        # Inputs
         #   BASH_SOURCE[0]
-        #   - $0
+        #   $0
         #
-        # . Outputs
-        #   (globals)
+        # Outputs (globals)
         #   SGND_<MODULE>_LOADED
         #
         # . Returns
-        #   - 0 when already loaded or successfully initialized.
+        #   0 when already loaded or successfully initialized.
         #   Exits with code 2 when executed instead of sourced.
         #
         # . Usage
         #   ```bash
-        #     _sgnd_lib_guard
-        #   ```
         #   _sgnd_lib_guard
+        #   ```
     _sgnd_lib_guard() {
         local lib_base=""
         local guard=""

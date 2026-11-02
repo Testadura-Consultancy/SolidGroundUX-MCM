@@ -2,9 +2,9 @@
 # SolidGroundUX Management Console Modules - Role Managers
 # ----------------------------------------------------------------------------------
 # Metadata:
-#   Version     : 2.1
-#   Build       : 2627700
-#   Checksum    : ef0c330ea808bf3dc2d8a22e6b003c1d4e18b353a976d8f471ae537814d7bf11
+#   Version     : 2.2
+#   Build       : 2630620
+#   Checksum    : 5ed74ea5ceacddbf68e4802137f60f5f44afa779da3372a2f735d6876571e6dc
 #   Source      : mcm-role-managers_preface.sh
 #   Type        : documentation
 #   Group       : Modules

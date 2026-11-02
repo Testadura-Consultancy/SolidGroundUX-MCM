@@ -3,8 +3,8 @@
 # SolidGroundUX Management Console Modules - Manage Web Content
 # -------------------------------------------------------------------------------------
 # Metadata:
-#   Version     : 2.1
-#   Build       : 2630201
+#   Version     : 2.2
+#   Build       : 2630620
 #   Shortname   : MANAGE_WEB_CONTENT
 #   Source      : manage-web-content.sh
 #   Type        : script
@@ -12,7 +12,7 @@
 #   Subgroup    : Web Content Management
 #   Purpose     : Ingest, delete, generate, validate, and prepare static website content
 #
-#   Checksum : 39435352e09c9760df9ad0f5244f263d0eca89e66d0a5e23161d16f2c3f2cd48
+#   Checksum : d181e0c8b0471aa0c6898a5522f6814fcf4644e3c57a14c7747d5804d50b55f3
 # Description:
 #   Provides the SolidGroundUX user-facing workflow for the reusable Python WebContent
 #   engine. All prompts, state, progress, and result reporting remain in this Bash layer;
@@ -64,7 +64,7 @@ set -uo pipefail
         #     present, falls back to the installed framework copy without changing
         #     SGND_FRAMEWORK_ROOT.
         #
-        # . Globals (Write)
+        # . Globals (write)
         #   SGND_FRAMEWORK_ROOT
         #
         # . Output
@@ -72,8 +72,8 @@ set -uo pipefail
         #   helpers are not available until sgnd-exe-common.sh has been loaded.
         #
         # . Returns
-        #   - 0 when the framework root was resolved and executable common library loaded.
-        #   - 126 when the script path cannot be resolved, no canonical root component can
+        #   0 when the framework root was resolved and executable common library loaded.
+        #   126 when the script path cannot be resolved, no canonical root component can
         #   be found, or the executable common library is unreadable.
         #
         # . Usage

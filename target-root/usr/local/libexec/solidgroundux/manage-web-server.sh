@@ -3,8 +3,8 @@
 # SolidGroundUX Management Console Modules - Manage Web Server
 # -------------------------------------------------------------------------------------
 # Metadata:
-#   Version     : 2.1
-#   Build       : 2630201
+#   Version     : 2.2
+#   Build       : 2630620
 #   Shortname   : MANAGE_WEB_SERVER
 #   Source      : manage-web-server.sh
 #   Type        : script
@@ -12,7 +12,7 @@
 #   Subgroup    : Web Server
 #   Purpose     : Configure, manage, validate, and inspect an Nginx web server
 #
-#   Checksum : 234ff54f3c9085c1c9d5a58a4a1f78efa13213131bb9261bb3914ea6cb84cc12
+#   Checksum : 80338ee3dd33e4c23b01670b4bfbf37989e3856ca23fe0a34564d773c65c8028
 # Description:
 #   Configure, manage, validate, and inspect an Nginx web server.
 #
@@ -58,7 +58,7 @@ set -uo pipefail
         #     present, falls back to the installed framework copy without changing
         #     SGND_FRAMEWORK_ROOT.
         #
-        # . Globals (Write)
+        # . Globals (write)
         #   SGND_FRAMEWORK_ROOT
         #
         # . Output
@@ -66,8 +66,8 @@ set -uo pipefail
         #   helpers are not available until sgnd-exe-common.sh has been loaded.
         #
         # . Returns
-        #   - 0 when the framework root was resolved and executable common library loaded.
-        #   - 126 when the script path cannot be resolved, no canonical root component can
+        #   0 when the framework root was resolved and executable common library loaded.
+        #   126 when the script path cannot be resolved, no canonical root component can
         #   be found, or the executable common library is unreadable.
         #
         # . Usage

@@ -2,15 +2,15 @@
 # SolidGroundUX Management Console Modules - MariaDB
 # ----------------------------------------------------------------------------------
 # Metadata:
-#   Version     : 2.1
-#   Build       : 2630201
+#   Version     : 2.2
+#   Build       : 2630620
 #   Shortname   : MARIADB
 #   Source      : 62-mariadb.sh
 #   Type        : module
 #   Group       : Modules
 #   Subgroup    : MariaDB
 #   Purpose     : Install, configure, manage, validate, and inspect MariaDB
-#   Checksum : 79d99e8d7edd64d888f645dcab8e419648e9827af9fb8f10c28a0d78d2e081b7
+#   Checksum : bf1fdc2fde492fcbdbe01c0868bd682ebbbded19776004fda8a214bf7142e4de
 # Description:
 #   Registers host-management actions. Database administration is out of scope.
 #   Installation and client connectivity have been validated on test servers;
@@ -19,26 +19,25 @@
 set -uo pipefail
 
 # - Library guard ------------------------------------------------------------------
-    # fn: _sgnd_lib_guard - Enforce source-only, source-only library guard
+    # fn$ _sgnd_lib_guard - Enforce source-only, single-load library initialization
         # . Purpose
-        #   Ensure the file is sourced as a library and marked as loaded.
+        #   Ensure the file is sourced as a library and initialized only once.
         #
         # . Behavior
         #   - Derives a unique guard variable name from the current filename.
         #   - Aborts execution when the file is run directly instead of sourced.
         #   - Sets the guard variable on first load.
-        #   - Returns from the guard helper when the file is already marked loaded; it does not skip subsequent top-level statements.
+        #   - Returns immediately when the library was already loaded.
         #
-        # . Inputs
+        # Inputs
         #   BASH_SOURCE[0]
-        #   - $0
+        #   $0
         #
-        # . Outputs
-        #   (globals)
+        # Outputs (globals)
         #   SGND_<MODULE>_LOADED
         #
         # . Returns
-        #   - 0 when already loaded or successfully initialized.
+        #   0 when already loaded or successfully initialized.
         #   Exits with code 2 when executed instead of sourced.
         #
         # . Usage

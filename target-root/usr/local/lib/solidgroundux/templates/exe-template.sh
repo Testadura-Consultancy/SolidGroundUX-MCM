@@ -3,9 +3,9 @@
 # SolidGroundUX - Executable Script Template
 # ------------------------------------------------------------------------------------
 # Metadata:
-#   Version     : 2.1
-#   Build       : 2627501
-#   Checksum    : 711f949ec5af2c2cb9a646819a95c496d21fbf85c6bf21ce1677520c0172dd92
+#   Version     : 2.2
+#   Build       : 2630620
+#   Checksum    : 197d38b4a663a5a69970887ad3adaff736713d9b5acef0c0eaf397f0a948040b
 #   Source      : exe-template.sh
 #   Type        : script
 #   Group       : SDK
@@ -61,7 +61,7 @@ set -uo pipefail
         #     present, falls back to the installed framework copy without changing
         #     SGND_FRAMEWORK_ROOT.
         #
-        # . Globals (Write)
+        # . Globals (write)
         #   SGND_FRAMEWORK_ROOT
         #
         # . Output
@@ -69,15 +69,14 @@ set -uo pipefail
         #   helpers are not available until sgnd-exe-common.sh has been loaded.
         #
         # . Returns
-        #   - 0 when the framework root was resolved and executable common library loaded.
-        #   - 126 when the script path cannot be resolved, no canonical root component can
+        #   0 when the framework root was resolved and executable common library loaded.
+        #   126 when the script path cannot be resolved, no canonical root component can
         #   be found, or the executable common library is unreadable.
         #
         # . Usage
         #   ```bash
-        #     _framework_locator || return $?
-        #   ```
         #   _framework_locator || return $?
+        #   ```
     _framework_locator() {
         local script_file=""
         local path_without_root=""

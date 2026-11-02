@@ -3,8 +3,8 @@
 # SolidGroundUX Management Console Modules - Manage Samba Users
 # -------------------------------------------------------------------------------------
 # Metadata:
-#   Version     : 2.1
-#   Build       : 2627501
+#   Version     : 2.2
+#   Build       : 2630620
 #   Shortname   : MANAGE_SAMBA_USERS
 #   Source      : manage-samba-users.sh
 #   Type        : script
@@ -12,7 +12,7 @@
 #   Subgroup    : Samba File Server
 #   Purpose     : Manage standalone Samba users, local access groups, and memberships
 #
-#   Checksum : cc27364a43c77a875f7f0206cf645a3b6729164318da61a7a969f9fd6b98e67e
+#   Checksum : 8228d1b3318931f32c8dc141d3c82c2fc0e3713150d058adf834b6a3b774bb4d
 # Description:
 #   Provides interactive management for local Samba users and the local groups used for
 #   standalone Samba share access. The overview shows Samba users together with their
@@ -53,7 +53,7 @@ set -uo pipefail
         #     present, falls back to the installed framework copy without changing
         #     SGND_FRAMEWORK_ROOT.
         #
-        # . Globals (Write)
+        # . Globals (write)
         #   SGND_FRAMEWORK_ROOT
         #
         # . Output
@@ -61,8 +61,8 @@ set -uo pipefail
         #   helpers are not available until sgnd-exe-common.sh has been loaded.
         #
         # . Returns
-        #   - 0 when the framework root was resolved and executable common library loaded.
-        #   - 126 when the script path cannot be resolved, no canonical root component can
+        #   0 when the framework root was resolved and executable common library loaded.
+        #   126 when the script path cannot be resolved, no canonical root component can
         #   be found, or the executable common library is unreadable.
         #
         # . Usage

@@ -3,8 +3,8 @@
 # SolidGroundUX Management Console Modules - Manage Samba Directories
 # -------------------------------------------------------------------------------------
 # Metadata:
-#   Version     : 2.1
-#   Build       : 2627501
+#   Version     : 2.2
+#   Build       : 2630620
 #   Shortname   : MANAGE_SAMBA_DIRECTORIES
 #   Source      : manage-samba-directories.sh
 #   Type        : script
@@ -12,7 +12,7 @@
 #   Subgroup    : Samba File Server
 #   Purpose     : Manage directories and directory-level access beneath Samba share storage
 #
-#   Checksum : 30b638a94f491c0c1a6de2a594a1754505964b7559d90de07f1fa106868ff8d0
+#   Checksum : 179581483555c137b10d3e87c7681265448179fa77adb19af39342f15bd1b664
 # Description:
 #   Provides interactive directory lifecycle and POSIX ACL management beneath the
 #   SolidGroundUX Samba share root. Samba share roots are identified from the effective
@@ -54,7 +54,7 @@ set -uo pipefail
         #     present, falls back to the installed framework copy without changing
         #     SGND_FRAMEWORK_ROOT.
         #
-        # . Globals (Write)
+        # . Globals (write)
         #   SGND_FRAMEWORK_ROOT
         #
         # . Output
@@ -62,8 +62,8 @@ set -uo pipefail
         #   helpers are not available until sgnd-exe-common.sh has been loaded.
         #
         # . Returns
-        #   - 0 when the framework root was resolved and executable common library loaded.
-        #   - 126 when the script path cannot be resolved, no canonical root component can
+        #   0 when the framework root was resolved and executable common library loaded.
+        #   126 when the script path cannot be resolved, no canonical root component can
         #   be found, or the executable common library is unreadable.
         #
         # . Usage

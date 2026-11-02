@@ -3,8 +3,8 @@
 # SolidGroundUX Management Console Modules - Manage Docker Containers
 # ----------------------------------------------------------------------------------
 # Metadata:
-#   Version     : 2.1
-#   Build       : 2627515
+#   Version     : 2.2
+#   Build       : 2630620
 #   Shortname   : MANAGE_DOCKER_CONTAINERS
 #   Source      : manage-docker-containers.sh
 #   Type        : script
@@ -12,7 +12,7 @@
 #   Subgroup    : Docker Server
 #   Purpose     : Create and manage Docker containers and images
 #
-#   Checksum : 61d4d99666b4f81ba0af9e17c3c94d3f04d2ab6130fdde58fea53778b8df4b09
+#   Checksum : b18fc098f8631e8a8c366f2a745576b579bec654c711869aa74012e47712db97
 # Description:
 #   Provides guided Docker image discovery, image pulling, container creation, and
 #   common lifecycle operations without attempting to replace Docker Compose or a
@@ -57,7 +57,7 @@ set -uo pipefail
         #     present, falls back to the installed framework copy without changing
         #     SGND_FRAMEWORK_ROOT.
         #
-        # . Globals (Write)
+        # . Globals (write)
         #   SGND_FRAMEWORK_ROOT
         #
         # . Output
@@ -65,8 +65,8 @@ set -uo pipefail
         #   helpers are not available until sgnd-exe-common.sh has been loaded.
         #
         # . Returns
-        #   - 0 when the framework root was resolved and executable common library loaded.
-        #   - 126 when the script path cannot be resolved, no canonical root component can
+        #   0 when the framework root was resolved and executable common library loaded.
+        #   126 when the script path cannot be resolved, no canonical root component can
         #   be found, or the executable common library is unreadable.
         #
         # . Usage

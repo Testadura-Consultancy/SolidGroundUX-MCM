@@ -3,8 +3,8 @@
 # SolidGroundUX Management Console Modules - Publish Web Content
 # -------------------------------------------------------------------------------------
 # Metadata:
-#   Version     : 2.1
-#   Build       : 2630201
+#   Version     : 2.2
+#   Build       : 2630620
 #   Shortname   : PUBLISH_WEB_CONTENT
 #   Source      : publish-web-content.sh
 #   Type        : script
@@ -12,7 +12,7 @@
 #   Subgroup    : Web Content Management
 #   Purpose     : Publish local, remote, Git, and SolidGroundUX documentation content
 #
-#   Checksum : 3605f17b0e185a098210332966945eb3fad2181e194ef6672bbc792f149be0ba
+#   Checksum : df584dc70d72e0c2179a79c1e774957d3a76dc294126661bdebc182fb35388ac
 # Description:
 #   Publish local, remote, Git, and SolidGroundUX documentation content to Nginx sites.
 #
@@ -54,7 +54,7 @@ set -uo pipefail
         #     present, falls back to the installed framework copy without changing
         #     SGND_FRAMEWORK_ROOT.
         #
-        # . Globals (Write)
+        # . Globals (write)
         #   SGND_FRAMEWORK_ROOT
         #
         # . Output
@@ -62,8 +62,8 @@ set -uo pipefail
         #   helpers are not available until sgnd-exe-common.sh has been loaded.
         #
         # . Returns
-        #   - 0 when the framework root was resolved and executable common library loaded.
-        #   - 126 when the script path cannot be resolved, no canonical root component can
+        #   0 when the framework root was resolved and executable common library loaded.
+        #   126 when the script path cannot be resolved, no canonical root component can
         #   be found, or the executable common library is unreadable.
         #
         # . Usage

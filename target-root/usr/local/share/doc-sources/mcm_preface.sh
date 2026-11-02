@@ -2,9 +2,9 @@
 # SolidGroundUX Management Console Modules - Console Modules Introduction
 # ----------------------------------------------------------------------------------
 # Metadata:
-#   Version     : 2.1
-#   Build       : 2627501
-#   Checksum    : 99331c23cdaa4909d1e91ce6f6d1f6f5a1ffa4d67db329bfa3446fb9a2f099cd
+#   Version     : 2.2
+#   Build       : 2630620
+#   Checksum    : 5567de91f55c0a82600a3b6076145e5b475fa3c1e4c358efe228adc96d42d58a
 #   Source      : mcm-preface.sh
 #   Type        : documentation
 #   Group       : SolidGroundUX Management Console Modules

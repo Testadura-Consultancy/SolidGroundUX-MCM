@@ -3,10 +3,10 @@
 # SolidGroundUX Management Console Modules - Manage Samba Shares
 # ------------------------------------------------------------------------------------
 # Metadata:
-#   Version     : 2.1
-#   Build       : 2627501
+#   Version     : 2.2
+#   Build       : 2630620
 #   Shortname   : MANAGE_SAMBA_SHARES
-#   Checksum    : 5c3d49bab9348d5a1315c3445cb720ce39f3a9a80b6506bbdf7f71fdf88fde1f
+#   Checksum    : 05705da594a7c95d6491c9b55c41df68b4435e641acdc2e35ce783141391ca4b
 #   Source      : manage-samba-shares.sh
 #   Type        : script
 #   Group       : Modules
@@ -68,7 +68,7 @@ set -uo pipefail
         #     present, falls back to the installed framework copy without changing
         #     SGND_FRAMEWORK_ROOT.
         #
-        # . Globals (Write)
+        # . Globals (write)
         #   SGND_FRAMEWORK_ROOT
         #
         # . Output
@@ -76,8 +76,8 @@ set -uo pipefail
         #   helpers are not available until sgnd-exe-common.sh has been loaded.
         #
         # . Returns
-        #   - 0 when the framework root was resolved and executable common library loaded.
-        #   - 126 when the script path cannot be resolved, no canonical root component can
+        #   0 when the framework root was resolved and executable common library loaded.
+        #   126 when the script path cannot be resolved, no canonical root component can
         #   be found, or the executable common library is unreadable.
         #
         # . Usage

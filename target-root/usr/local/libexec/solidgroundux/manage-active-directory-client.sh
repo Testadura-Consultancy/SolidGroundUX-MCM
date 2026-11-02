@@ -3,8 +3,8 @@
 # SolidGroundUX Management Console Modules - Manage Active Directory Client
 # -------------------------------------------------------------------------------------
 # Metadata:
-#   Version     : 2.1
-#   Build       : 2627501
+#   Version     : 2.2
+#   Build       : 2630620
 #   Shortname   : MANAGE_AD_CLIENT
 #   Source      : manage-active-directory-client.sh
 #   Type        : script
@@ -12,7 +12,7 @@
 #   Subgroup    : Active Directory Client
 #   Purpose     : Join, reconcile, validate, and inspect an Active Directory client
 #
-#   Checksum : 2c51917c4b11d48a773e27c47f75f5a25263b9edaf8cad70fa3b8471bef2f40e
+#   Checksum : 9329925be139980f4e3d917164db68da0c0671b2ae5afd5bababb6e81f45b90f
 # Description:
 #   Implements persistent Active Directory client management actions exposed by the
 #   25-active-directory-client Management Console module.
@@ -56,7 +56,7 @@ set -uo pipefail
         #     present, falls back to the installed framework copy without changing
         #     SGND_FRAMEWORK_ROOT.
         #
-        # . Globals (Write)
+        # . Globals (write)
         #   SGND_FRAMEWORK_ROOT
         #
         # . Output
@@ -64,8 +64,8 @@ set -uo pipefail
         #   helpers are not available until sgnd-exe-common.sh has been loaded.
         #
         # . Returns
-        #   - 0 when the framework root was resolved and executable common library loaded.
-        #   - 126 when the script path cannot be resolved, no canonical root component can
+        #   0 when the framework root was resolved and executable common library loaded.
+        #   126 when the script path cannot be resolved, no canonical root component can
         #   be found, or the executable common library is unreadable.
         #
         # . Usage

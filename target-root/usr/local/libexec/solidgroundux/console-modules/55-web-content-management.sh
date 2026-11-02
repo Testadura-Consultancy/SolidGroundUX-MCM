@@ -2,8 +2,8 @@
 # SolidGroundUX Management Console Modules - Web Content Management
 # ----------------------------------------------------------------------------------
 # Metadata:
-#   Version     : 2.1
-#   Build       : 2630201
+#   Version     : 2.2
+#   Build       : 2630620
 #   Shortname   : WEB_CONTENT_MANAGEMENT
 #   Source      : 55-web-content-management.sh
 #   Type        : module
@@ -11,7 +11,7 @@
 #   Subgroup    : Web Content Management
 #   Purpose     : Ingest, delete, generate, validate, and prepare content for static websites
 #
-#   Checksum : ce5878438c978675419f1e34c1ce212166e97e4ec7f6e11157cc6ed46601628e
+#   Checksum : 4571b2be25fa3918a7af3cbf72bbc988d05dda9e5e1180216401d403eba6aee5
 # Description:
 #   Registers Web Content Management actions with the SolidGround Management Console.
 #   Persistent workflow and user interaction are implemented by manage-web-content.sh;
@@ -27,26 +27,25 @@
 set -uo pipefail
 
 # - Library guard ------------------------------------------------------------------
-    # fn: _sgnd_lib_guard - Enforce source-only, source-only library guard
+    # fn$ _sgnd_lib_guard - Enforce source-only, single-load library initialization
         # . Purpose
-        #   Ensure the file is sourced as a library and marked as loaded.
+        #   Ensure the file is sourced as a library and initialized only once.
         #
         # . Behavior
         #   - Derives a unique guard variable name from the current filename.
         #   - Aborts execution when the file is run directly instead of sourced.
         #   - Sets the guard variable on first load.
-        #   - Returns from the guard helper when the file is already marked loaded; it does not skip subsequent top-level statements.
+        #   - Returns immediately when the library was already loaded.
         #
-        # . Inputs
+        # Inputs
         #   BASH_SOURCE[0]
-        #   - $0
+        #   $0
         #
-        # . Outputs
-        #   (globals)
+        # Outputs (globals)
         #   SGND_<MODULE>_LOADED
         #
         # . Returns
-        #   - 0 when already loaded or successfully initialized.
+        #   0 when already loaded or successfully initialized.
         #   Exits with code 2 when executed instead of sourced.
         #
         # . Usage

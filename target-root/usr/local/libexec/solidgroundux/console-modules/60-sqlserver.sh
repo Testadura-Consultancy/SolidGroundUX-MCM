@@ -2,8 +2,8 @@
 # SolidGroundUX Management Console Modules - SQL Server
 # ----------------------------------------------------------------------------------
 # Metadata:
-#   Version     : 2.1
-#   Build       : 2630201
+#   Version     : 2.2
+#   Build       : 2630620
 #   Shortname   : SQLSERVER
 #   Source      : 60-sqlserver.sh
 #   Type        : module
@@ -11,7 +11,7 @@
 #   Subgroup    : SQL Server
 #   Purpose     : Install, configure, manage, validate, and inspect Microsoft SQL Server
 #
-#   Checksum : eeb58f3bece3059548ec479c535927529ce476abfef0e23873ba73411b6fa16f
+#   Checksum : 04801f8335649c3e65b164b004ede65ec3fdeb33a6aa2a7021147712103fa43a
 # Description:
 #   Registers Microsoft SQL Server host-management actions with the SolidGround
 #   Management Console. Persistent operations are implemented by manage-sqlserver.sh.
@@ -20,26 +20,25 @@
 set -uo pipefail
 
 # - Library guard ------------------------------------------------------------------
-    # fn: _sgnd_lib_guard - Enforce source-only, source-only library guard
+    # fn$ _sgnd_lib_guard - Enforce source-only, single-load library initialization
         # . Purpose
-        #   Ensure the file is sourced as a library and marked as loaded.
+        #   Ensure the file is sourced as a library and initialized only once.
         #
         # . Behavior
         #   - Derives a unique guard variable name from the current filename.
         #   - Aborts execution when the file is run directly instead of sourced.
         #   - Sets the guard variable on first load.
-        #   - Returns from the guard helper when the file is already marked loaded; it does not skip subsequent top-level statements.
+        #   - Returns immediately when the library was already loaded.
         #
-        # . Inputs
+        # Inputs
         #   BASH_SOURCE[0]
-        #   - $0
+        #   $0
         #
-        # . Outputs
-        #   (globals)
+        # Outputs (globals)
         #   SGND_<MODULE>_LOADED
         #
         # . Returns
-        #   - 0 when already loaded or successfully initialized.
+        #   0 when already loaded or successfully initialized.
         #   Exits with code 2 when executed instead of sourced.
         #
         # . Usage

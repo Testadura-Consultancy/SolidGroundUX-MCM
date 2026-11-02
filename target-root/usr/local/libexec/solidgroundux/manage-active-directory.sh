@@ -3,8 +3,8 @@
 # SolidGroundUX Management Console Modules - Manage Active Directory
 # -------------------------------------------------------------------------------------
 # Metadata:
-#   Version     : 2.1
-#   Build       : 2627501
+#   Version     : 2.2
+#   Build       : 2630620
 #   Shortname   : MANAGE_AD
 #   Source      : manage-active-directory.sh
 #   Type        : script
@@ -12,7 +12,7 @@
 #   Subgroup    : Active Directory Management
 #   Purpose     : Manage Samba Active Directory users, groups, memberships, and computers
 #
-#   Checksum : 17f5acdd36f138315549b1a19979762550040ddc5e9cbeaa135153442855e6f8
+#   Checksum : c2d6159ae4fd9d7a250a73bc941d883a97e6e42e80bbcc8cab2371bcb513b815
 # Description:
 #   Implements day-to-day directory administration exposed by the
 #   27-active-directory-management Management Console module.
@@ -56,7 +56,7 @@ set -uo pipefail
         #     present, falls back to the installed framework copy without changing
         #     SGND_FRAMEWORK_ROOT.
         #
-        # . Globals (Write)
+        # . Globals (write)
         #   SGND_FRAMEWORK_ROOT
         #
         # . Output
@@ -64,8 +64,8 @@ set -uo pipefail
         #   helpers are not available until sgnd-exe-common.sh has been loaded.
         #
         # . Returns
-        #   - 0 when the framework root was resolved and executable common library loaded.
-        #   - 126 when the script path cannot be resolved, no canonical root component can
+        #   0 when the framework root was resolved and executable common library loaded.
+        #   126 when the script path cannot be resolved, no canonical root component can
         #   be found, or the executable common library is unreadable.
         #
         # . Usage

@@ -27,9 +27,9 @@
 #   used for developer comments or module-level prose.
 #
 # Metadata:
-#   Version     : 2.1
-#   Build       : 2627501
-#   Checksum    : d77cb35fd66f8ac7780a4f69e76882ff3761d2b6d8030404af5c99d7016c6c00
+#   Version     : 2.2
+#   Build       : 2630620
+#   Checksum    : e66b4c70032bf9ad93131df56b82fc7977b18cb2f10161c76939b1c4e8e2b5ac
 #   Source      : doc-sample.sh
 #   Type        : documentation
 #   Group       : SDK

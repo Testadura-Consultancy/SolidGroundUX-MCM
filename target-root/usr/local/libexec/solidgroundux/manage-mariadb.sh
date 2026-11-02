@@ -3,8 +3,8 @@
 # SolidGroundUX Management Console Modules - Manage MariaDB
 # ----------------------------------------------------------------------------------
 # Metadata:
-#   Version     : 2.1
-#   Build       : 2630201
+#   Version     : 2.2
+#   Build       : 2630620
 #   Shortname   : MANAGE_MARIADB
 #   Source      : manage-mariadb.sh
 #   Type        : script
@@ -12,7 +12,7 @@
 #   Subgroup    : MariaDB
 #   Purpose     : Install, configure, manage, validate, and inspect MariaDB
 #
-#   Checksum : de9f3fe64205a5cabde58db6983026802346552c309ae8325221b59c0ab63010
+#   Checksum : 5773245b7edb876519ba6a43e6f4021698b762e1378ac2f5a3c8b6ba2579a110
 # Description:
 #   Install, configure, manage, validate, and inspect MariaDB.
 #
@@ -54,7 +54,7 @@ set -uo pipefail
         #     present, falls back to the installed framework copy without changing
         #     SGND_FRAMEWORK_ROOT.
         #
-        # . Globals (Write)
+        # . Globals (write)
         #   SGND_FRAMEWORK_ROOT
         #
         # . Output
@@ -62,8 +62,8 @@ set -uo pipefail
         #   helpers are not available until sgnd-exe-common.sh has been loaded.
         #
         # . Returns
-        #   - 0 when the framework root was resolved and executable common library loaded.
-        #   - 126 when the script path cannot be resolved, no canonical root component can
+        #   0 when the framework root was resolved and executable common library loaded.
+        #   126 when the script path cannot be resolved, no canonical root component can
         #   be found, or the executable common library is unreadable.
         #
         # . Usage

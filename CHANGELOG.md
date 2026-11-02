@@ -6,6 +6,21 @@ The format is inspired by *Keep a Changelog* while remaining focused on practica
 
 ## Unreleased
 
+## Release 2.2.2630620
+
+### Documentation structure, illustrations and rendering (2026-11-02)
+
+- Completed the MCM documentation review across console modules, management scripts, Python API descriptions and authored bundle/section prefaces; updated explanations and usage examples to reflect the current code.
+- Added bundle-wide sequential numbering of standalone figures in published navigation order. Generated captions have stable figure anchors and link from a new **Figure Index** appendix; authored source files are not rewritten.
+- Added optional percentage-based width in Markdown image options (for example, `width=80%`) while retaining pixel sizing, responsiveness, captions and Figure Index links. Quoted caption text is not parsed as a sizing directive.
+- Adjusted Figure Index table proportions so figure and reference columns have more room while descriptive text can wrap in the middle column, without changing unrelated site tables.
+- Kept the documentation bundle’s default stylesheets under MCM control. Product images and chapter-scoped templates are retained, but legacy product CSS cannot silently replace the shared bundle stylesheet; explicit product-specific styling remains a future option.
+- Replaced obsolete transferred documentation diagrams with reviewed MCM architecture, console, module-lifecycle, Markdown-to-HTML and WCM authoring/workflow illustrations; updated prefaces to distinguish documentation generation/authoring from website generation/publication.
+
+### Website workflow status tracking (2026-11-02)
+
+- After confirmed successful documentation-bundle generation, mark downstream website-generation and publishing actions as pending; after successful website generation, mark publication as pending. Cancellations do not invalidate downstream results, and pending statuses are recorded across menu redraws where supported.
+
 ### Documentation site title bar and source breadcrumbs (2026-10-30)
 
 - Moved the contextual page title and breadcrumb from the article body into the documentation header, matching the Testadura page layout while keeping the existing sidebar and language controls.

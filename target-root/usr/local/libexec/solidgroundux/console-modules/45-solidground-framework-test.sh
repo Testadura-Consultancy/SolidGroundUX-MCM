@@ -2,15 +2,15 @@
 # SolidGroundUX Management Console Modules - SolidGround Framework Test
 # ----------------------------------------------------------------------------------
 # Metadata:
-#   Version     : 2.1
+#   Version     : 2.2
 #   Source      : 45-solidground-framework-test.sh
 #   Type        : module
 #   Group       : Modules
 #   Subgroup    : SolidGroundUX Framework
 #   Purpose     : Register SolidGroundUX framework test and validation actions
-#   Build       : 2627501
+#   Build       : 2630620
 #   Shortname   : FRAMEWORK_TEST
-#   Checksum    : 51d4e586b7076e3c4ebd1b04d9875c22a38e3482df4c504b6813b2ab5ee7acc9
+#   Checksum    : 0a56b79f0b804ade4d8d62066d606bcaa4d9e56305673bd5db6575e791b97c33
 # Description:
 #   Provides the Management Console presentation layer for framework testing.
 #   Framework smoke tests are owned by the SolidGroundUX framework. This module acts as
@@ -26,26 +26,25 @@
 set -uo pipefail
 
 # - Library guard ------------------------------------------------------------------
-    # fn: _sgnd_lib_guard - Enforce source-only, source-only library guard
+    # fn$ _sgnd_lib_guard - Enforce source-only, single-load library initialization
         # . Purpose
-        #   Ensure the file is sourced as a library and marked as loaded.
+        #   Ensure the file is sourced as a library and initialized only once.
         #
         # . Behavior
         #   - Derives a unique guard variable name from the current filename.
         #   - Aborts execution when the file is run directly instead of sourced.
         #   - Sets the guard variable on first load.
-        #   - Returns from the guard helper when the file is already marked loaded; it does not skip subsequent top-level statements.
+        #   - Returns immediately when the library was already loaded.
         #
-        # . Inputs
+        # Inputs
         #   BASH_SOURCE[0]
-        #   - $0
+        #   $0
         #
-        # . Outputs
-        #   (globals)
+        # Outputs (globals)
         #   SGND_<MODULE>_LOADED
         #
         # . Returns
-        #   - 0 when already loaded or successfully initialized.
+        #   0 when already loaded or successfully initialized.
         #   Exits with code 2 when executed instead of sourced.
         #
         # . Usage

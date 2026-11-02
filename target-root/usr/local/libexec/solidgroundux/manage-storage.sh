@@ -3,8 +3,8 @@
 # SolidGroundUX Management Console Modules - Manage Storage
 # -------------------------------------------------------------------------------------
 # Metadata:
-#   Version     : 2.1
-#   Build       : 2627515
+#   Version     : 2.2
+#   Build       : 2630620
 #   Shortname   : MANAGE_STORAGE
 #   Source      : manage-storage.sh
 #   Type        : script
@@ -12,7 +12,7 @@
 #   Subgroup    : Storage
 #   Purpose     : Configure, reconcile, validate, and manage local storage volumes and directories
 #
-#   Checksum : 074c78a6e61ff9220b3fc21c404e9291b6da2611d44c7f1dca45cf72aea40b95
+#   Checksum : c84dca03a20a98226dbe15304d7e971ed1be58ff0784095bd95bd0d1d9c8ef33
 # Description:
 #   Implements persistent local-storage management actions exposed by the
 #   15-storage Management Console module.
@@ -56,7 +56,7 @@ set -uo pipefail
         #     present, falls back to the installed framework copy without changing
         #     SGND_FRAMEWORK_ROOT.
         #
-        # . Globals (Write)
+        # . Globals (write)
         #   SGND_FRAMEWORK_ROOT
         #
         # . Output
@@ -64,8 +64,8 @@ set -uo pipefail
         #   helpers are not available until sgnd-exe-common.sh has been loaded.
         #
         # . Returns
-        #   - 0 when the framework root was resolved and executable common library loaded.
-        #   - 126 when the script path cannot be resolved, no canonical root component can
+        #   0 when the framework root was resolved and executable common library loaded.
+        #   126 when the script path cannot be resolved, no canonical root component can
         #   be found, or the executable common library is unreadable.
         #
         # . Usage

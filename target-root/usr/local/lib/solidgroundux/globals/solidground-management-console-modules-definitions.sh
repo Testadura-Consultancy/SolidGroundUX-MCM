@@ -2,9 +2,9 @@
 # SolidGroundUX Management Console Modules - Project Definitions
 # -------------------------------------------------------------------------------------
 # Metadata:
-#   Version     : 2.1
-#   Build       : 2630201
-#   Checksum    : 1b8f86c4120978bf1ef9ec3336fc29bbc77b99cb4142fc4ddb79c5068fb61ccb
+#   Version     : 2.2
+#   Build       : 2630621
+#   Checksum    : eb4c21e634e844f8bc1b70f3c4f27e1171169d84c42fb3ec61efef5eab7cb6f2
 #   Source      : solidgroundux-management-modules-definitions.sh
 #   Type        : library
 #   Group       : Globals
@@ -12,26 +12,25 @@
 # =====================================================================================
 set -uo pipefail
 # - Library guard ------------------------------------------------------------------
-    # fn: _sgnd_lib_guard - Enforce source-only, source-only library guard
+    # fn$ _sgnd_lib_guard - Enforce source-only, single-load library initialization
         # . Purpose
-        #   Ensure the file is sourced as a library and marked as loaded.
+        #   Ensure the file is sourced as a library and initialized only once.
         #
         # . Behavior
         #   - Derives a unique guard variable name from the current filename.
         #   - Aborts execution when the file is run directly instead of sourced.
         #   - Sets the guard variable on first load.
-        #   - Returns from the guard helper when the file is already marked loaded; it does not skip subsequent top-level statements.
+        #   - Returns immediately when the library was already loaded.
         #
-        # . Inputs
+        # Inputs
         #   BASH_SOURCE[0]
-        #   - $0
+        #   $0
         #
-        # . Outputs
-        #   (globals)
+        # Outputs (globals)
         #   SGND_<MODULE>_LOADED
         #
         # . Returns
-        #   - 0 when already loaded or successfully initialized.
+        #   0 when already loaded or successfully initialized.
         #   Exits with code 2 when executed instead of sourced.
         #
         # . Usage
@@ -65,8 +64,8 @@ set -uo pipefail
 # - Framework identity --------------------------------------------------------------
     # def: Framework identity
     SGND_SOLIDGROUND_MANAGEMENT_CONSOLE_MODULES_PRODUCT="SolidGroundUX Management Console Modules"
-    SGND_SOLIDGROUND_MANAGEMENT_CONSOLE_MODULES_VERSION=2.1
-    SGND_SOLIDGROUND_MANAGEMENT_CONSOLE_MODULES_BUILD=2630201
+    SGND_SOLIDGROUND_MANAGEMENT_CONSOLE_MODULES_VERSION=2.2
+    SGND_SOLIDGROUND_MANAGEMENT_CONSOLE_MODULES_BUILD=2630621
 
     SGND_SOLIDGROUND_MANAGEMENT_CONSOLE_MODULES_COMPANY="Testadura Consultancy"
     SGND_SOLIDGROUND_MANAGEMENT_CONSOLE_MODULES_COPYRIGHT="© 2025 - 2026 Testadura Consultancy"

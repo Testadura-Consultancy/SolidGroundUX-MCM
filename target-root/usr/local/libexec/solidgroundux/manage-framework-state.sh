@@ -3,10 +3,10 @@
 # SolidGroundUX Management Console Modules - Manage Framework State
 # ------------------------------------------------------------------------------------
 # Metadata:
-#   Version     : 2.1
-#   Build       : 2627501
+#   Version     : 2.2
+#   Build       : 2630620
 #   Shortname   : MANAGE_FRAMEWORK_STATE
-#   Checksum    : b578990168c5d1ae2db5af71f838e9890fc550dc2cf816f4cb9e3194cfd82acb
+#   Checksum    : b844acf8165b0c86f8a895e1a43c6937f1c3fdf5bb35e9db8d9df7eb6718cb36
 #   Source      : manage-framework-state.sh
 #   Type        : script
 #   Group       : Modules
@@ -68,7 +68,7 @@ set -uo pipefail
         #     present, falls back to the installed framework copy without changing
         #     SGND_FRAMEWORK_ROOT.
         #
-        # . Globals (Write)
+        # . Globals (write)
         #   SGND_FRAMEWORK_ROOT
         #
         # . Output
@@ -76,8 +76,8 @@ set -uo pipefail
         #   helpers are not available until sgnd-exe-common.sh has been loaded.
         #
         # . Returns
-        #   - 0 when the framework root was resolved and executable common library loaded.
-        #   - 126 when the script path cannot be resolved, no canonical root component can
+        #   0 when the framework root was resolved and executable common library loaded.
+        #   126 when the script path cannot be resolved, no canonical root component can
         #   be found, or the executable common library is unreadable.
         #
         # . Usage

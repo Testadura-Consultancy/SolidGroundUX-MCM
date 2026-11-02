@@ -3,8 +3,8 @@
 # SolidGroundUX Management Console Modules - Manage Samba File Server
 # -------------------------------------------------------------------------------------
 # Metadata:
-#   Version     : 2.1
-#   Build       : 2627501
+#   Version     : 2.2
+#   Build       : 2630620
 #   Shortname   : MANAGE_SAMBA_SERVER
 #   Source      : manage-samba-file-server.sh
 #   Type        : script
@@ -12,7 +12,7 @@
 #   Subgroup    : Samba File Server
 #   Purpose     : Prepare, validate, and inspect the Samba file-server service
 #
-#   Checksum : 4a8880accee6a7db6ad40f2ec0c23b5620953c6d27f0b411c0e40670c70445c1
+#   Checksum : 75459a6def9f50c9d430d4e66a0bcfffd1e59b3f561f68fe531b4392b0b46ffa
 # Description:
 #   Implements persistent Samba file-server management actions exposed by the
 #   30-samba-file-server Management Console module. Share lifecycle/share-level access
@@ -58,7 +58,7 @@ set -uo pipefail
         #     present, falls back to the installed framework copy without changing
         #     SGND_FRAMEWORK_ROOT.
         #
-        # . Globals (Write)
+        # . Globals (write)
         #   SGND_FRAMEWORK_ROOT
         #
         # . Output
@@ -66,8 +66,8 @@ set -uo pipefail
         #   helpers are not available until sgnd-exe-common.sh has been loaded.
         #
         # . Returns
-        #   - 0 when the framework root was resolved and executable common library loaded.
-        #   - 126 when the script path cannot be resolved, no canonical root component can
+        #   0 when the framework root was resolved and executable common library loaded.
+        #   126 when the script path cannot be resolved, no canonical root component can
         #   be found, or the executable common library is unreadable.
         #
         # . Usage

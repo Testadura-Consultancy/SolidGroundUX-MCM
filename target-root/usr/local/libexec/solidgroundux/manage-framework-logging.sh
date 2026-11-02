@@ -3,10 +3,10 @@
 # SolidGroundUX Management Console Modules - Manage Framework Logging
 # ------------------------------------------------------------------------------------
 # Metadata:
-#   Version     : 2.1
-#   Build       : 2627501
+#   Version     : 2.2
+#   Build       : 2630620
 #   Shortname   : MANAGE_FRAMEWORK_LOGGING
-#   Checksum    : 91ae5814a93a2c25a88abc5e764eba5fcabe9eae7442acea3a228b211966399b
+#   Checksum    : bde898c15021df122680da63b9bd123c9932c973fe40cff8cccf71f7fa217565
 #   Source      : manage-framework-logging.sh
 #   Type        : script
 #   Group       : Modules
@@ -68,7 +68,7 @@ set -uo pipefail
         #     present, falls back to the installed framework copy without changing
         #     SGND_FRAMEWORK_ROOT.
         #
-        # . Globals (Write)
+        # . Globals (write)
         #   SGND_FRAMEWORK_ROOT
         #
         # . Output
@@ -76,8 +76,8 @@ set -uo pipefail
         #   helpers are not available until sgnd-exe-common.sh has been loaded.
         #
         # . Returns
-        #   - 0 when the framework root was resolved and executable common library loaded.
-        #   - 126 when the script path cannot be resolved, no canonical root component can
+        #   0 when the framework root was resolved and executable common library loaded.
+        #   126 when the script path cannot be resolved, no canonical root component can
         #   be found, or the executable common library is unreadable.
         #
         # . Usage

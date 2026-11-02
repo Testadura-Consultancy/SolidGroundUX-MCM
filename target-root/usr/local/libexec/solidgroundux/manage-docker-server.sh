@@ -3,8 +3,8 @@
 # SolidGroundUX Management Console Modules - Manage Docker Server
 # ----------------------------------------------------------------------------------
 # Metadata:
-#   Version     : 2.1
-#   Build       : 2630201
+#   Version     : 2.2
+#   Build       : 2630620
 #   Shortname   : MANAGE_DOCKER
 #   Source      : manage-docker-server.sh
 #   Type        : script
@@ -12,7 +12,7 @@
 #   Subgroup    : Docker Server
 #   Purpose     : Install, configure, validate, and inspect a Docker host
 #
-#   Checksum : a6330ad578e84dcea58b2fb8db41a79fa85b29489b1b43d52341da90c61ffb01
+#   Checksum : b049a2d2b6def625b9464301bd6930af82c05a54fbece46e9a6d43482e9188d9
 # Description:
 #   Provides first-version Docker host management for SolidGroundUX. The script
 #   deliberately avoids migrating an existing Docker data root automatically.
@@ -55,7 +55,7 @@ set -uo pipefail
         #     present, falls back to the installed framework copy without changing
         #     SGND_FRAMEWORK_ROOT.
         #
-        # . Globals (Write)
+        # . Globals (write)
         #   SGND_FRAMEWORK_ROOT
         #
         # . Output
@@ -63,8 +63,8 @@ set -uo pipefail
         #   helpers are not available until sgnd-exe-common.sh has been loaded.
         #
         # . Returns
-        #   - 0 when the framework root was resolved and executable common library loaded.
-        #   - 126 when the script path cannot be resolved, no canonical root component can
+        #   0 when the framework root was resolved and executable common library loaded.
+        #   126 when the script path cannot be resolved, no canonical root component can
         #   be found, or the executable common library is unreadable.
         #
         # . Usage

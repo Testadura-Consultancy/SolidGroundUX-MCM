@@ -2,9 +2,9 @@
 # SolidGroundUX - Web Content Manager Authoring
 # ----------------------------------------------------------------------------------
 # Metadata:
-#   Version     : 2.1
-#   Build       : 2630201
-#   Checksum    : e45f0a3b2855451181c98dc0ba3a02bf92b3c5f01f0b6dc7142094906c936031
+#   Version     : 2.2
+#   Build       : 2630620
+#   Checksum    : 1fa593cc8aec378726259aa9ad0196bd731d7c46b72386f26ca0a0a28357922b
 #   Source      : web-content-manager_preface.sh
 #   Type        : documentation
 #   Title       : Markdown Repository to Website

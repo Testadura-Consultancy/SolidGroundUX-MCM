@@ -3,10 +3,10 @@
 # SolidGroundUX Management Console Modules - Manage Identity
 # ------------------------------------------------------------------------------------
 # Metadata:
-#   Version     : 2.1
-#   Build       : 2627501
+#   Version     : 2.2
+#   Build       : 2630620
 #   Shortname   : MANAGE_IDENTITY
-#   Checksum    : 75a2fd3062300859dbcf1430ba6ac1898409025c663232ff514c0e958f9f6f4f
+#   Checksum    : c9e31ed785af27596d4d3cfcdae883e334f0651ff0b98d0b6cc36215bbec69be
 #   Source      : manage-identity.sh
 #   Type        : script
 #   Group       : Modules
@@ -61,7 +61,7 @@ set -uo pipefail
         #     present, falls back to the installed framework copy without changing
         #     SGND_FRAMEWORK_ROOT.
         #
-        # . Globals (Write)
+        # . Globals (write)
         #   SGND_FRAMEWORK_ROOT
         #
         # . Output
@@ -69,8 +69,8 @@ set -uo pipefail
         #   helpers are not available until sgnd-exe-common.sh has been loaded.
         #
         # . Returns
-        #   - 0 when the framework root was resolved and executable common library loaded.
-        #   - 126 when the script path cannot be resolved, no canonical root component can
+        #   0 when the framework root was resolved and executable common library loaded.
+        #   126 when the script path cannot be resolved, no canonical root component can
         #   be found, or the executable common library is unreadable.
         #
         # . Usage

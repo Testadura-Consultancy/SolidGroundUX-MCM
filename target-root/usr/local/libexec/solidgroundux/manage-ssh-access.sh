@@ -3,15 +3,15 @@
 # SolidGroundUX Management Console Modules - manage-ssh-access
 # ----------------------------------------------------------------------------------
 # Metadata:
-#   Version     : 2.1
-#   Build       : 2630201
+#   Version     : 2.2
+#   Build       : 2630620
 #   Shortname   : MANAGE_SSH_ACCESS
 #   Source      : manage-ssh-access.sh
 #   Type        : script
 #   Group       : Modules
 #   Subgroup    : Computer Setup
 #   Purpose     : Computer Setup action implementation
-#   Checksum : f3d3c055415469e90655ab01a3e966b572a09a9bed1a688f953085d045db1b1b
+#   Checksum : 4d41458724791da65832e6b90af4b799d77bb78ae64c334b853dda0157fb8404
 # Description:
 #   Standalone management actions dispatched from 10-computer-setup.sh.
 #   UI, reporting and errors use the SolidGroundUX framework.
@@ -47,7 +47,7 @@ set -uo pipefail
         #     present, falls back to the installed framework copy without changing
         #     SGND_FRAMEWORK_ROOT.
         #
-        # . Globals (Write)
+        # . Globals (write)
         #   SGND_FRAMEWORK_ROOT
         #
         # . Output
@@ -55,8 +55,8 @@ set -uo pipefail
         #   helpers are not available until sgnd-exe-common.sh has been loaded.
         #
         # . Returns
-        #   - 0 when the framework root was resolved and executable common library loaded.
-        #   - 126 when the script path cannot be resolved, no canonical root component can
+        #   0 when the framework root was resolved and executable common library loaded.
+        #   126 when the script path cannot be resolved, no canonical root component can
         #   be found, or the executable common library is unreadable.
         #
         # . Usage

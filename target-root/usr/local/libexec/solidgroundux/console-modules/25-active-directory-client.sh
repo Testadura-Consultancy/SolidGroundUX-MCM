@@ -2,8 +2,8 @@
 # SolidGroundUX Management Console Modules - Active Directory Client
 # ----------------------------------------------------------------------------------
 # Metadata:
-#   Version     : 2.1
-#   Build       : 2627501
+#   Version     : 2.2
+#   Build       : 2630620
 #   Shortname   : AD_CLIENT
 #   Source      : 25-active-directory-client.sh
 #   Type        : module
@@ -11,7 +11,7 @@
 #   Subgroup    : Active Directory Client
 #   Purpose     : Register Active Directory client management actions
 #
-#   Checksum : a2bb566211b87ffacbbbbeb10ddb7ee3d72809d7dd1149a062dcfa0b12cb5067
+#   Checksum : 3b9d4fca46ca9f612908fb891d3e927bea3ed206557ed4395f32f4a6bcb6d7f2
 # Description:
 #   Registers Active Directory client management actions with the SolidGround Management
 #   Console. Persistent join, reconciliation, validation, and repair operations are
@@ -20,26 +20,25 @@
 set -uo pipefail
 
 # - Library guard ------------------------------------------------------------------
-    # fn: _sgnd_lib_guard - Enforce source-only, source-only library guard
+    # fn$ _sgnd_lib_guard - Enforce source-only, single-load library initialization
         # . Purpose
-        #   Ensure the file is sourced as a library and marked as loaded.
+        #   Ensure the file is sourced as a library and initialized only once.
         #
         # . Behavior
         #   - Derives a unique guard variable name from the current filename.
         #   - Aborts execution when the file is run directly instead of sourced.
         #   - Sets the guard variable on first load.
-        #   - Returns from the guard helper when the file is already marked loaded; it does not skip subsequent top-level statements.
+        #   - Returns immediately when the library was already loaded.
         #
-        # . Inputs
+        # Inputs
         #   BASH_SOURCE[0]
-        #   - $0
+        #   $0
         #
-        # . Outputs
-        #   (globals)
+        # Outputs (globals)
         #   SGND_<MODULE>_LOADED
         #
         # . Returns
-        #   - 0 when already loaded or successfully initialized.
+        #   0 when already loaded or successfully initialized.
         #   Exits with code 2 when executed instead of sourced.
         #
         # . Usage

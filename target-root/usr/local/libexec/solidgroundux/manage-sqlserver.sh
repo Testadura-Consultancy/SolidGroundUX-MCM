@@ -3,8 +3,8 @@
 # SolidGroundUX Management Console Modules - Manage SQL Server
 # ----------------------------------------------------------------------------------
 # Metadata:
-#   Version     : 2.1
-#   Build       : 2630201
+#   Version     : 2.2
+#   Build       : 2630620
 #   Shortname   : MANAGE_SQLSERVER
 #   Source      : manage-sqlserver.sh
 #   Type        : script
@@ -12,7 +12,7 @@
 #   Subgroup    : SQL Server
 #   Purpose     : Install, configure, manage, validate, and inspect Microsoft SQL Server
 #
-#   Checksum : d58d881f48fa29d46b6bbf6830a03b661d045ece7a5edc3fa63010561aa78658
+#   Checksum : 6522c7bb84df47f93cce5095a2705c0f5cf08588398f75668905fb21f85a25fd
 # Description:
 #   Install, configure, manage, validate, and inspect Microsoft SQL Server.
 #
@@ -54,7 +54,7 @@ set -uo pipefail
         #     present, falls back to the installed framework copy without changing
         #     SGND_FRAMEWORK_ROOT.
         #
-        # . Globals (Write)
+        # . Globals (write)
         #   SGND_FRAMEWORK_ROOT
         #
         # . Output
@@ -62,8 +62,8 @@ set -uo pipefail
         #   helpers are not available until sgnd-exe-common.sh has been loaded.
         #
         # . Returns
-        #   - 0 when the framework root was resolved and executable common library loaded.
-        #   - 126 when the script path cannot be resolved, no canonical root component can
+        #   0 when the framework root was resolved and executable common library loaded.
+        #   126 when the script path cannot be resolved, no canonical root component can
         #   be found, or the executable common library is unreadable.
         #
         # . Usage

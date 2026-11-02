@@ -2,10 +2,10 @@
 # SolidGroundUX Management Console Modules - Active Directory Server
 # ----------------------------------------------------------------------------------
 # Metadata:
-#   Version     : 2.1
-#   Build       : 2629401
+#   Version     : 2.2
+#   Build       : 2630620
 #   Shortname   : AD_SERVER
-#   Checksum    : 93a65cd489767064bf18f1b69d4d1614ec3e4c40368f529b4a448153c82c2a72
+#   Checksum    : cb1da3b7508f05b06eed0f5884e3d3dd81e6d799c217aa8147111b840dd50d2e
 #   Source      : 20-active-directory-server.sh
 #   Type        : module
 #   Group       : Modules
@@ -20,26 +20,25 @@
 set -uo pipefail
 
 # - Library guard ------------------------------------------------------------------
-    # fn: _sgnd_lib_guard - Enforce source-only, source-only library guard
+    # fn$ _sgnd_lib_guard - Enforce source-only, single-load library initialization
         # . Purpose
-        #   Ensure the file is sourced as a library and marked as loaded.
+        #   Ensure the file is sourced as a library and initialized only once.
         #
         # . Behavior
         #   - Derives a unique guard variable name from the current filename.
         #   - Aborts execution when the file is run directly instead of sourced.
         #   - Sets the guard variable on first load.
-        #   - Returns from the guard helper when the file is already marked loaded; it does not skip subsequent top-level statements.
+        #   - Returns immediately when the library was already loaded.
         #
-        # . Inputs
+        # Inputs
         #   BASH_SOURCE[0]
-        #   - $0
+        #   $0
         #
-        # . Outputs
-        #   (globals)
+        # Outputs (globals)
         #   SGND_<MODULE>_LOADED
         #
         # . Returns
-        #   - 0 when already loaded or successfully initialized.
+        #   0 when already loaded or successfully initialized.
         #   Exits with code 2 when executed instead of sourced.
         #
         # . Usage

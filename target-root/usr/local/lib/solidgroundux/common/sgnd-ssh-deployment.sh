@@ -3,12 +3,14 @@
 # SolidGroundUX Management Console Modules - Shared SSH Deployment Helpers
 # -------------------------------------------------------------------------------------
 # Metadata:
-#   Version     : 2.1
+#   Version     : 2.2
 #   Source      : sgnd-ssh-deployment.sh
 #   Type        : library
 #   Group       : Common Core
 #   Purpose     : Provide shared SSH authentication sessions and connection recovery
 #
+#   Build : 2630620
+#   Checksum : 889c9f1a683f6c223b631742c581d837123a22eed402f3e47cbe01ceeaebe789
 # Description:
 #   Shared, source-only helpers for SSH-based deployment and publishing workflows.
 #   The library:

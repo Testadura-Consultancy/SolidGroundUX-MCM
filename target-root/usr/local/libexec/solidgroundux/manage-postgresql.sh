@@ -3,8 +3,8 @@
 # SolidGroundUX Management Console Modules - Manage PostgreSQL
 # ----------------------------------------------------------------------------------
 # Metadata:
-#   Version     : 2.1
-#   Build       : 2630201
+#   Version     : 2.2
+#   Build       : 2630620
 #   Shortname   : MANAGE_POSTGRESQL
 #   Source      : manage-postgresql.sh
 #   Type        : script
@@ -12,7 +12,7 @@
 #   Subgroup    : PostgreSQL
 #   Purpose     : Install, configure, manage, validate, and inspect PostgreSQL
 #
-#   Checksum : 35b7ef9c1443231c83a0cd84d701a0034ceac99bdb486c1a804914e2ab166da3
+#   Checksum : 0f2c414897598aa0fb1617a079977717966895f6cc11ce9536125301dd2b7012
 # Description:
 #   Install, configure, manage, validate, and inspect PostgreSQL.
 #
@@ -54,7 +54,7 @@ set -uo pipefail
         #     present, falls back to the installed framework copy without changing
         #     SGND_FRAMEWORK_ROOT.
         #
-        # . Globals (Write)
+        # . Globals (write)
         #   SGND_FRAMEWORK_ROOT
         #
         # . Output
@@ -62,8 +62,8 @@ set -uo pipefail
         #   helpers are not available until sgnd-exe-common.sh has been loaded.
         #
         # . Returns
-        #   - 0 when the framework root was resolved and executable common library loaded.
-        #   - 126 when the script path cannot be resolved, no canonical root component can
+        #   0 when the framework root was resolved and executable common library loaded.
+        #   126 when the script path cannot be resolved, no canonical root component can
         #   be found, or the executable common library is unreadable.
         #
         # . Usage

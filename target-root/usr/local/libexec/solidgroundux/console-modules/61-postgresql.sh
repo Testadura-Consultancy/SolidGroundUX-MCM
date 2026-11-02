@@ -2,15 +2,15 @@
 # SolidGroundUX Management Console Modules - PostgreSQL
 # ----------------------------------------------------------------------------------
 # Metadata:
-#   Version     : 2.1
-#   Build       : 2630201
+#   Version     : 2.2
+#   Build       : 2630620
 #   Shortname   : POSTGRESQL
 #   Source      : 61-postgresql.sh
 #   Type        : module
 #   Group       : Modules
 #   Subgroup    : PostgreSQL
 #   Purpose     : Install, configure, manage, validate, and inspect PostgreSQL
-#   Checksum : 983cd86192c605d1ac0b52797c1536aa5bf650fa3cfbbc4d798411bd2b36d0b2
+#   Checksum : 9d3f734bc3cf5b81811187c18296505d572316b2648bfb7249eb17133068e313
 # Description:
 #   Registers host-management actions. Database administration is out of scope.
 #   Installation and client connectivity have been validated on test servers;
@@ -19,26 +19,25 @@
 set -uo pipefail
 
 # - Library guard ------------------------------------------------------------------
-    # fn: _sgnd_lib_guard - Enforce source-only, source-only library guard
+    # fn$ _sgnd_lib_guard - Enforce source-only, single-load library initialization
         # . Purpose
-        #   Ensure the file is sourced as a library and marked as loaded.
+        #   Ensure the file is sourced as a library and initialized only once.
         #
         # . Behavior
         #   - Derives a unique guard variable name from the current filename.
         #   - Aborts execution when the file is run directly instead of sourced.
         #   - Sets the guard variable on first load.
-        #   - Returns from the guard helper when the file is already marked loaded; it does not skip subsequent top-level statements.
+        #   - Returns immediately when the library was already loaded.
         #
-        # . Inputs
+        # Inputs
         #   BASH_SOURCE[0]
-        #   - $0
+        #   $0
         #
-        # . Outputs
-        #   (globals)
+        # Outputs (globals)
         #   SGND_<MODULE>_LOADED
         #
         # . Returns
-        #   - 0 when already loaded or successfully initialized.
+        #   0 when already loaded or successfully initialized.
         #   Exits with code 2 when executed instead of sourced.
         #
         # . Usage

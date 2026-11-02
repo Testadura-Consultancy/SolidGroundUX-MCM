@@ -3,14 +3,14 @@
 # SolidGroundUX - Active Directory Management Library
 # -------------------------------------------------------------------------------------
 # Metadata:
-#   Version     : 2.1
-#   Build       : 2627501
+#   Version     : 2.2
+#   Build       : 2630620
 #   Source      : active-directory-management.sh
 #   Type        : library
 #   Group       : Common Core
 #   Purpose     : Provide shared Active Directory discovery and validation primitives
 #
-#   Checksum : 089809fefa51d7ac3f169f28367e837fa4b00f29208266a2831f3df459ce990a
+#   Checksum : 4b7727f4c74afa59747aab31faf6f06cfd0b4531e035640bfa8c8f2cc63c040d
 # Description:
 #   Shared Active Directory primitives used by the server, client, and directory
 #   management executables. Role-specific provisioning and mutation remain outside
@@ -19,26 +19,25 @@
 set -uo pipefail
 
 # - Library guard ------------------------------------------------------------------
-    # fn: _sgnd_lib_guard - Enforce source-only, source-only library guard
+    # fn$ _sgnd_lib_guard - Enforce source-only, single-load library initialization
         # . Purpose
-        #   Ensure the file is sourced as a library and marked as loaded.
+        #   Ensure the file is sourced as a library and initialized only once.
         #
         # . Behavior
         #   - Derives a unique guard variable name from the current filename.
         #   - Aborts execution when the file is run directly instead of sourced.
         #   - Sets the guard variable on first load.
-        #   - Returns from the guard helper when the file is already marked loaded; it does not skip subsequent top-level statements.
+        #   - Returns immediately when the library was already loaded.
         #
-        # . Inputs
+        # Inputs
         #   BASH_SOURCE[0]
-        #   - $0
+        #   $0
         #
-        # . Outputs
-        #   (globals)
+        # Outputs (globals)
         #   SGND_<MODULE>_LOADED
         #
         # . Returns
-        #   - 0 when already loaded or successfully initialized.
+        #   0 when already loaded or successfully initialized.
         #   Exits with code 2 when executed instead of sourced.
         #
         # . Usage

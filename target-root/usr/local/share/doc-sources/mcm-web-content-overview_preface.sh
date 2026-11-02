@@ -2,12 +2,14 @@
 # SolidGroundUX - Web Content Management Overview
 # ----------------------------------------------------------------------------------
 # Metadata:
-#   Version     : 2.1
+#   Version     : 2.2
 #   Type        : documentation
 #   Group       : Modules
 #   Subgroup    : Web Content Management
 #   Purpose     : Subgroup preface
 #
+#   Build : 2630620
+#   Checksum : 6ca8ce3422c04f440e9e061186a06caa591094660be07a744758cbf6e69c3d87
 # Attribution:
 #   Developers  : Mark Fieten
 #   Company     : Testadura Consultancy

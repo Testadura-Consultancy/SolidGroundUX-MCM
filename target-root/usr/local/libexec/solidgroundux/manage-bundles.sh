@@ -3,15 +3,15 @@
 # SolidGroundUX MCM - Manage Documentation Bundles
 # -------------------------------------------------------------------------------------
 # Metadata:
-#   Version     : 2.1
+#   Version     : 2.2
 #   Source      : manage-bundles.sh
 #   Type        : script
 #   Group       : Modules
 #   Subgroup    : Web Content Management
 #   Purpose     : Manage documentation bundles through the SolidGroundUX interface.
 #
-#   Build : 2630201
-#   Checksum : 855701f92cbfafb06593247b4a4f84dedcd3aeafea389b5e70b8c5c1d47beae8
+#   Build : 2630620
+#   Checksum : 6f5c9585a7aa335bda295368137fd3f0445dd61b031bdca9afa7424e9d414deb
 #
 # Description:
 #   MCM frontend for sgnd_doc_bundles.py and sgnd_doc_markdown.py. The Python programs
@@ -56,7 +56,7 @@ set -uo pipefail
         #     present, falls back to the installed framework copy without changing
         #     SGND_FRAMEWORK_ROOT.
         #
-        # . Globals (Write)
+        # . Globals (write)
         #   SGND_FRAMEWORK_ROOT
         #
         # . Output
@@ -64,8 +64,8 @@ set -uo pipefail
         #   helpers are not available until sgnd-exe-common.sh has been loaded.
         #
         # . Returns
-        #   - 0 when the framework root was resolved and executable common library loaded.
-        #   - 126 when the script path cannot be resolved, no canonical root component can
+        #   0 when the framework root was resolved and executable common library loaded.
+        #   126 when the script path cannot be resolved, no canonical root component can
         #   be found, or the executable common library is unreadable.
         #
         # . Usage
