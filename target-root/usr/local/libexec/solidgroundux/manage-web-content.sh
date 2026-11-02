@@ -2923,8 +2923,10 @@ PY_GITHUB_PAGES
         command -v python3 >/dev/null 2>&1 || { sayfail "Python 3 is not installed."; return 127; }
         source="$(realpath -e -- "$SGND_WEB_GITHUB_SOURCE")" || { sayfail "Generated documentation directory not found."; return 1; }
         repo="$(realpath -e -- "$SGND_WEB_GITHUB_REPO")" || { sayfail "SolidGroundUX repository directory not found."; return 1; }
-        [[ -d "$source" && -f "$source/index.html" && -f "$source/introduction/index.html" ]] || {
-            sayfail "The selected source does not contain the generated documentation homepage and introduction."
+        # WCM generates a root homepage; bundle introductions and prefaces are
+        # placed in the documentation hierarchy, not introduction/index.html.
+        [[ -d "$source" && -f "$source/index.html" ]] || {
+            sayfail "The selected source does not contain a generated website homepage (index.html)."
             return 1
         }
         grep -qi 'SolidGroundUX' "$source/index.html" || {
