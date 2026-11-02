@@ -51,8 +51,8 @@
 #
 # | Guide | Purpose | Main output |
 # | --- | --- | --- |
-# | [Documentation Generation and Authoring](mcm-documentation-preface/) | Save bundles, extract source documentation, author comments, functions and examples | Navigable Markdown documentation repository |
-# | [Markdown Repository to Website](mcm-web-content-manager-preface/) | Manage Markdown content, generate public/preview HTML, and publish through MCM | Static website on the configured web server |
+# | [Documentation Generation and Authoring](../mcm-documentation-preface/) | Save bundles, extract source documentation, author comments, functions and examples | Navigable Markdown documentation repository |
+# | [Markdown Repository to Website](../mcm-web-content-manager-preface/) | Manage Markdown content, generate public/preview HTML, and publish through MCM | Static website on the configured web server |
 #
 # The console modules expose user actions; Python implements the bundle/Markdown
 # conversion and website renderer; Bash publication tools perform remote transfer.

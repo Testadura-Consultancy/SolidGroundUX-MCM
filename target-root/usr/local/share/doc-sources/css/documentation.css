@@ -80,6 +80,14 @@
 .doc-main .doc-def-table .doc-def-group{background:#f2f4f7;border-right:1px solid #cbd4e1;color:#26364b;min-width:6.5rem}
 .doc-main .doc-def-table tbody tr:last-child>td{border-bottom:1px solid #d5dce5}
 
+/* Backticked code in paragraphs, list items, and table cells is the same size as the
+   surrounding text.  Preformatted code blocks remain smaller than the body text. */
+.doc-main p code,
+.doc-main li code,
+.doc-main td code {
+    font-size: 1em;
+}
+
 /* Read-only Theme Gallery appendix. Keep the specimen visually separate from
    the documentation shell without affecting other pages or ordinary tables. */
 .sgnd-theme-gallery{min-width:0;margin:1rem 0 2rem}

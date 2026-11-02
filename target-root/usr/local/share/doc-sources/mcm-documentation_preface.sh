@@ -33,7 +33,7 @@
 #
 # This page covers the first, source-to-Markdown workflow only. Documentation
 # bundles end at an authored Markdown repository; they do not render or deploy HTML.
-# See the [Web Content Management overview](../) for how this output may enter
+# See the [Web Content Management overview](../preface-01-web-content-management-overview/) for how this output may enter
 # the independent website-generation process.
 #
 # -- Bundle Management --------------------------------------------------------------

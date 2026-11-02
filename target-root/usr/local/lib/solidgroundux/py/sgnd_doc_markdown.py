@@ -377,7 +377,13 @@ def prune_empty_headings(lines: list[str]) -> list[str]:
         prune_empty_headings(lines)
         ```"""
     markdown_heading = re.compile(r'^(#{2,6})\s+')
-    details_heading = re.compile(r'^:::\s+td-details\b[^\n]*?\bheading=([2-6])\b')
+    # The older generator emitted a heading=N component option. The current
+    # WCM renderer treats that text as part of the visible disclosure title.
+    # Recognize both styles as document boundaries while emitting only the
+    # supported human-readable titles for newly generated pages.
+    details_heading = re.compile(
+        r'^:::\s+td-details\s+(?:heading=([2-6])\s+)?(?:open\s+)?'
+        r'(?:Internal (?:functions|classes)|Script metadata)\b', re.I)
     boundaries: list[int | None] = []
     fence_marker = ''
 
@@ -400,7 +406,7 @@ def prune_empty_headings(lines: list[str]) -> list[str]:
             boundaries.append(len(match.group(1)))
             continue
         match = details_heading.match(stripped)
-        boundaries.append(int(match.group(1)) if match else None)
+        boundaries.append(int(match.group(1) or 2) if match else None)
 
     # An authored heading is meaningful when it contains actual content or
     # a meaningful, deeper subsection. Same-level disclosures are siblings.
@@ -1111,9 +1117,8 @@ def collect(product, content: Path, order: int, counters: Counter, template_owne
     for path in paths:
         metadata, entries, loc = parse_documented_source(path)
         records.append((path, metadata, entries, loc))
-    # Product-level prefaces and epilogues belong to the chapter index, not to
-    # a new group named after the product. Group/subgroup prefaces remain in their
-    # respective section indexes.
+    # Every preface and epilogue is an independent page in its own section:
+    # prefaces before ordinary children, epilogues after every ordinary child.
     grouped_records = []
     product_specials = []
     for path, metadata, entries, loc in records:
@@ -1129,7 +1134,7 @@ def collect(product, content: Path, order: int, counters: Counter, template_owne
         special = source_document_template(path.name)
         purpose = metadata.get('purpose', '').strip().casefold()
         if special in ('preface', 'epilogue') and purpose == f'product {special}':
-            product_specials.append((special, entries, loc))
+            product_specials.append((special, path, metadata))
         else:
             grouped_records.append((path, metadata, entries, loc))
     # Group: / deliberately places a source at the product root, without adding a
@@ -1139,9 +1144,9 @@ def collect(product, content: Path, order: int, counters: Counter, template_owne
     if any(metadata.get('group', '').strip() == '/' for _, metadata, _, _ in grouped_records):
         groups.insert(0, '/')
     route_names = set()
-    special_pages = {}
-    for special, entries, loc in product_specials:
-        special_pages.setdefault(product_folder, {'preface': [], 'epilogue': []})[special].append(entries)
+    special_pages: dict[Path, dict[str, list[tuple[Path, dict]]]] = {}
+    for special, path, metadata in product_specials:
+        special_pages.setdefault(product_folder, {'preface': [], 'epilogue': []})[special].append((path, metadata))
     for group_index, group in enumerate(groups, 1):
         group_folder = product_folder if group == '/' else product_folder / slug(group)
         if group != '/':
@@ -1166,16 +1171,14 @@ def collect(product, content: Path, order: int, counters: Counter, template_owne
             subgroup = metadata.get('subgroup', '').strip()
             parent = group_folder / slug(subgroup) if subgroup else group_folder
             rel = path.relative_to(source)
-            # Defer prefaces/epilogues until every source is discovered, preserving
-            # source ordering and placing introductions before closing material.
+            # Defer section prefaces/epilogues until their siblings are known.
+            # Page prefaces are already separate child pages in the source flow.
             special = source_document_template(path.name)
-            # A Page preface is a named child article. Group/subgroup prefaces
-            # continue to populate their section's landing page as before.
             page_preface = (special == 'preface' and
                             metadata.get('purpose', '').strip().casefold() == 'page preface')
             if special in ('preface', 'epilogue') and not page_preface:
                 section_folder = parent
-                special_pages.setdefault(section_folder, {'preface': [], 'epilogue': []})[special].append(entries)
+                special_pages.setdefault(section_folder, {'preface': [], 'epilogue': []})[special].append((path, metadata))
                 continue
             # Keep one source document per file, with anchored public declarations.
             basename = slug(path.stem)
@@ -1240,7 +1243,7 @@ def collect(product, content: Path, order: int, counters: Counter, template_owne
                 # WCM's native details component renders Markdown inside a
                 # closed-by-default disclosure. Keep the internal API table
                 # accessible without overwhelming the source overview.
-                body += ['::: td-details heading=2 Internal functions', '',
+                body += ['::: td-details Internal functions', '',
                          '| Function | Purpose | Arguments | Output |',
                          '| --- | --- | --- | --- |']
                 for entry in internal:
@@ -1260,7 +1263,7 @@ def collect(product, content: Path, order: int, counters: Counter, template_owne
                     body.append(f'| `{entry["name"]}` | {purpose} | {field_value("Arguments")} | {field_value("Output")} |')
                 body += ['', ':::', '']
             if internal_classes:
-                body += ['::: td-details heading=2 Internal classes', '',
+                body += ['::: td-details Internal classes', '',
                          '| Class | Purpose |', '| --- | --- |']
                 for entry in internal_classes:
                     lines = entry['lines']
@@ -1291,7 +1294,7 @@ def collect(product, content: Path, order: int, counters: Counter, template_owne
                         # default, and preserve its proper h2 document level.
                         metadata_lines = script_metadata_markdown(entry['lines'])
                         if any(line.strip() for line in metadata_lines):
-                            body += [f'::: td-details heading=2 open {entry["title"]}', '',
+                            body += [f'::: td-details open {entry["title"]}', '',
                                      '::: sgnd-script-metadata', '']
                             body += metadata_lines + ['', ':::', '', ':::', '']
                     else:
@@ -1324,22 +1327,25 @@ def collect(product, content: Path, order: int, counters: Counter, template_owne
                         summary=(metadata.get('description', '') if page_preface else metadata.get('purpose', '')),
                         template='page' if page_preface else 'source',
                         nav_title=title if page_preface else path.name)
+    # Do not merge introductions or closing material into the section index.
+    # Stable child nav_order bands guarantee first/last placement at every depth.
     for section_folder, specials in special_pages.items():
-        index_files = list(section_folder.glob('*_Index_NL.md'))
-        if len(index_files) != 1:
-            raise ValueError(f'Expected one section index in {section_folder}')
-        index_file = index_files[0]
-        existing = index_file.read_text(encoding='utf-8')
-        front_end = existing.find('\n---\n', 4)
-        if front_end < 0:
-            raise ValueError(f'Invalid index front matter: {index_file}')
-        prefix, body = existing[:front_end + len('\n---\n')], existing[front_end + len('\n---\n'):]
-        intro, closing = [], []
-        for entries in specials['preface']:
-            append_preface(intro, entries)
-        for entries in specials['epilogue']:
-            append_preface(closing, entries)
-        index_file.write_text(prefix + '\n' + '\n'.join(intro) + '\n' + body + '\n' + '\n'.join(closing), encoding='utf-8')
+        for kind in ('preface', 'epilogue'):
+            for number, (path, metadata) in enumerate(specials[kind], 1):
+                title, body = render_bundle_document(path, None)
+                if not body.strip():
+                    continue
+                # Preserve the already-published product epilogue route.
+                is_product_epilogue = (kind == 'epilogue' and section_folder == product_folder
+                                       and metadata.get('purpose', '').strip().casefold() == 'product epilogue')
+                page_name = (f'product-epilogue-{slug(title)}' if is_product_epilogue
+                             else f'{kind}-{number:02d}-{slug(title)}')
+                page_folder = section_folder / page_name
+                if page_folder.exists():
+                    raise ValueError(f'{kind.title()} route collision: {page_folder}')
+                page_order = (-10000 + number) if kind == 'preface' else (10000 + number)
+                write_index(page_folder, title, body, page_order,
+                            template='page', nav_title=title)
     # WCM uses section indexes as navigation metadata. Keep those with children,
     # but explicitly mark empty ones as navigation-only, not publishable pages.
     # Remove empty leaf sections completely.
@@ -1451,17 +1457,28 @@ def build_appendices(products: list[dict], content: Path, root: Path) -> dict:
                                       f'**Source:** `{license_files[0].relative_to(source)}`', ''])
                 license_lines.extend('> ' + line if line.strip() else '>' for line in document.splitlines())
                 license_lines.append('')
-        identities = set()
+        identities: dict[tuple[str, str], tuple[str, str]] = {}
         for path in source.rglob('*.sh'):
             if any(part in SKIP_DIRS for part in path.relative_to(source).parts):
                 continue
             for line in path.read_text(encoding='utf-8', errors='replace').splitlines()[:100]:
                 match = re.match(r'^#\s*(Developers?|Company|Copyright)\s*:\s*(.*?)\s*$', line, re.I)
-                if match and match.group(2) and match.group(2) != '-':
-                    identities.add((match.group(1).casefold(), match.group(2)))
+                if not match or not match.group(2) or match.group(2) == '-':
+                    continue
+                field, value = match.group(1).casefold(), match.group(2).strip()
+                if field == 'copyright':
+                    # Source headers use ©, (c), and sometimes no copyright
+                    # symbol for the same legal notice. Display one canonical
+                    # representation per product without altering source files.
+                    text = re.sub(r'^(?:\(c\)|©)\s*', '', value, flags=re.I)
+                    text = re.sub(r'\s*[-–—]\s*', ' – ', text)
+                    text = re.sub(r'\s+', ' ', text).strip()
+                    value = '© ' + text
+                identities[(field, value.casefold())] = (field, value)
         if identities:
             attribution_lines += ['## ' + product['title'], '']
-            attribution_lines.extend(f'- **{field.title()}:** {value}' for field, value in sorted(identities))
+            attribution_lines.extend(f'- **{field.title()}:** {value}'
+                                     for field, value in sorted(identities.values()))
             attribution_lines.append('')
     if license_lines:
         write_index(appendix / 'licenses', 'Licenses', '\n'.join(license_lines), 3, template='page')
@@ -1708,14 +1725,36 @@ def publish_bundle_documents(selections: list, label: str, products: list[dict],
     """
     used_folders: set[Path] = set()
     used_sources: list[Path] = []
+    top_level_number = 0
     for number, item in enumerate(selections, 1):
         path, title_override, reference = bundle_document_source(item, products, content)
         title, body = render_bundle_document(path, title_override)
-        folder = content / f'bundle-{label}-{number:02d}-{slug(title)}'
+        # A selection can target a product chapter explicitly. Unscoped
+        # selections remain bundle-level introductions or closing documents.
+        # Do not infer scope from the source repository: the same document
+        # might intentionally introduce the entire bundle.
+        chapter_id = ''
+        if isinstance(item, dict):
+            chapter_id = str(item.get('product') or item.get('chapter') or '').strip()
+        if chapter_id:
+            matches = [product for product in products
+                       if chapter_id.casefold() in (str(product['id']).casefold(),
+                                                   str(product['title']).casefold())]
+            if len(matches) != 1:
+                raise ValueError(f'Unknown or ambiguous bundle document product: {chapter_id}')
+            chapter = content / slug(matches[0]['id'])
+            folder = chapter / f'{label}-{number:02d}-{slug(title)}'
+            # Product prefaces precede all chapter content; product epilogues
+            # follow it. Their order is stable even with several selections.
+            page_order = (-1000 + number) if label == 'preface' else (9000 + number)
+        else:
+            top_level_number += 1
+            folder = content / f'bundle-{label}-{number:02d}-{slug(title)}'
+            page_order = start_order + top_level_number - 1
         if folder in used_folders or folder.exists():
             raise ValueError(f'Bundle document route conflict: {folder.name}')
         used_folders.add(folder)
-        write_index(folder, title, body, start_order + number - 1,
+        write_index(folder, title, body, page_order,
                     template='page', summary='', nav_title=title)
         used_sources.append(path)
         # A promoted page must not also display its body at the old route.
@@ -1799,7 +1838,10 @@ def generate(bundle: dict, docs_root: Path | None = None) -> dict:
                     excluded_sources.add(selected.resolve())
         # Product pages are generated before promotion of authored/generator
         # selections; navigation order is independent of creation order.
-        for i, product in enumerate(products, len(prefaces) + 1):
+        top_level_prefaces = sum(not (isinstance(item, dict) and
+                                      (item.get('product') or item.get('chapter')))
+                                  for item in prefaces)
+        for i, product in enumerate(products, top_level_prefaces + 1):
             collect(product, content, i, counts, template_owners, excluded_sources)
         counts.update(build_appendices(products, content, root))
         # Images referenced by comments belong to each product source tree.
@@ -1826,12 +1868,12 @@ def generate(bundle: dict, docs_root: Path | None = None) -> dict:
                 metrics += f'\n- **{key.title()}:** {counts[key]}'
         write_index(content, bundle.get('title', bundle['id']), metrics, 0, template='home')
 
-        # Bundle introduction pages are ordered before product chapters;
-        # concluding pages follow even the appendices. Keep the home page alone.
+        # Bundle introduction pages precede the products; bundle conclusions
+        # follow the products and precede the technical appendices.
         preface_count, preface_sources = publish_bundle_documents(
             prefaces, 'preface', products, content, 1)
         epilogue_count, epilogue_sources = publish_bundle_documents(
-            epilogues, 'epilogue', products, content, 10000)
+            epilogues, 'epilogue', products, content, 9000)
         counts['bundle_prefaces'] = preface_count
         counts['bundle_epilogues'] = epilogue_count
         # Bundle defaults come from the selected MCM documentation resources.
