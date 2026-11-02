@@ -1093,7 +1093,7 @@ def directory_title(path: Path):
     return path.name.replace('-', ' ').replace('_', ' ').strip().title()
 
 
-def collect(product, content: Path, order: int, counters: Counter, template_owners: dict[str, tuple[str, str]]):
+def collect(product, content: Path, order: int, counters: Counter, template_owners: dict[str, tuple[str, str]], excluded_sources: set[Path] | None = None):
     """Use source metadata Group/Subgroup, never installation directories, for navigation.
     
     Usage:
@@ -1105,7 +1105,8 @@ def collect(product, content: Path, order: int, counters: Counter, template_owne
         raise ValueError(f'Missing source directory: {source}')
     product_folder = content / slug(product['id'])
     write_index(product_folder, product['title'], '', order, template='chapter')
-    paths = source_files(source)
+    paths = [path for path in source_files(source)
+             if path.resolve() not in (excluded_sources or set())]
     records = []
     for path in paths:
         metadata, entries, loc = parse_documented_source(path)
@@ -1319,7 +1320,7 @@ def collect(product, content: Path, order: int, counters: Counter, template_owne
             # Root-level files precede grouped sections in the chapter navigation.
             # Use the real source filename, not its descriptive page title.
             write_index(source_folder, title, '\n'.join(body),
-                        order=100 if page_preface else (0 if group == '/' else 1000),
+                        order=-100 if page_preface else (0 if group == '/' else 1000),
                         summary=(metadata.get('description', '') if page_preface else metadata.get('purpose', '')),
                         template='page' if page_preface else 'source',
                         nav_title=title if page_preface else path.name)
@@ -1522,97 +1523,225 @@ def split_wcm_document(markdown: str) -> tuple[dict[str, str], str]:
     return metadata, ''.join(lines[end + 1:])
 
 
-def chapter0_body(markdown: str) -> str:
-    """Return just the body of a promoted WCM page.
-    
-    Older generated introductions may already contain a *second* WCM page
-    embedded after a logo. Consume that nested document boundary explicitly,
-    rather than deleting arbitrary text that resembles YAML fields.
-    
-    Usage:
-        ```python
-        chapter0_body(markdown)
-        ```"""
-    _, body = split_wcm_document(markdown)
-    lines = body.splitlines(keepends=True)
-    result: list[str] = []
-    cursor = 0
-    while cursor < len(lines):
-        if lines[cursor].strip() == '---':
-            # The second front matter has the same documented WCM page shape,
-            # but may be located after an image/introductory content.
-            nested_metadata, nested_body = split_wcm_document(''.join(lines[cursor:]))
-            if nested_metadata:
-                result.append(nested_body)
-                break
-        result.append(lines[cursor])
-        cursor += 1
-    return ''.join(result).strip()
+
+# Bundle-level prefaces/epilogues are independent authored documents, not a
+# generated Chapter 0 page. They are listed in the bundle, in display order.
+BUNDLE_SPECIAL = re.compile(r'^bundle(?:[-_].+)?[-_](preface|epilogue)\.(?:md|markdown|sh|py)$', re.I)
 
 
-def generated_chapter0_path(content: Path, reference: str, origin: str = '') -> Path | None:
-    """Resolve a logical generated page, migrating old absolute output references.
-    
-    External authored Markdown is deliberately not interpreted as a generated
-    route. A retained snapshot with an original generated path is migrated.
-    
+def bundle_document_selections(bundle: dict, products: list[dict]) -> tuple[list, list]:
+    """Read ordered selections, or discover conventional bundle documents.
+
     Usage:
         ```python
-        generated_chapter0_path(content, reference, origin)
-        ```"""
-    selected = reference
-    if origin and '/content/' in origin:
-        selected = origin
-    if selected.startswith('content/'):
-        relative = Path(selected[len('content/'):])
-    elif '/content/' in selected:
-        relative = Path(selected.rsplit('/content/', 1)[1])
+        prefaces, epilogues = bundle_document_selections(bundle, products)
+        ```
+    """
+    def configured(name: str) -> list:
+        plural = 'prefaces' if name == 'preface' else 'epilogues'
+        for key in ('bundle_' + plural, plural):
+            value = bundle.get(key)
+            if value is not None:
+                if not isinstance(value, list):
+                    raise ValueError(f'Bundle {key} must be an ordered list')
+                return value
+        return []
+
+    prefaces = configured('preface')
+    epilogues = configured('epilogue')
+    if prefaces or epilogues:
+        return prefaces, epilogues
+
+    # Older saved bundles used one generated Chapter 0 document. Interpret it
+    # as the sole preface without requiring the user to edit their saved JSON.
+    old = bundle.get('chapter0', '')
+    if old:
+        return [{'path': old, 'title': 'Introduction',
+                 'origin': bundle.get('chapter0_origin', '')}], []
+
+    discovered: dict[str, list] = {'preface': [], 'epilogue': []}
+    seen: set[Path] = set()
+    for product in products:
+        source = Path(product['source_dir']).expanduser().resolve()
+        directories = (source, source / 'doc-sources',
+                       source / 'usr/local/share/doc-sources',
+                       source / 'target-root/usr/local/share/doc-sources')
+        for directory in directories:
+            if not directory.is_dir():
+                continue
+            # Conventional files live at the documentation root, not somewhere
+            # in a generated cache, application source tree or vendor package.
+            for path in sorted(directory.iterdir(), key=lambda item: item.name.casefold()):
+                if not path.is_file() or path.resolve() in seen:
+                    continue
+                match = BUNDLE_SPECIAL.fullmatch(path.name)
+                if match:
+                    seen.add(path.resolve())
+                    discovered[match.group(1).lower()].append(str(path.resolve()))
+    return discovered['preface'], discovered['epilogue']
+
+
+def bundle_document_source(item: str | dict, products: list[dict],
+                           content: Path) -> tuple[Path, str | None, str]:
+    """Resolve an authored bundle document or generated Markdown selection.
+
+    Usage:
+        ```python
+        path, title, origin = bundle_document_source(item, products, content)
+        ```
+    """
+    if isinstance(item, str):
+        reference, title, origin = item, None, ''
+    elif isinstance(item, dict):
+        reference = item.get('path') or item.get('source') or item.get('file')
+        title = item.get('title') or None
+        origin = item.get('origin') or ''
     else:
-        return None
-    if relative.is_absolute() or '..' in relative.parts or relative.suffix.lower() != '.md':
-        raise ValueError(f'Invalid generated Chapter 0 route: {reference}')
-    target = (content / relative).resolve()
-    if not target.is_relative_to(content.resolve()):
-        raise ValueError(f'Invalid generated Chapter 0 route: {reference}')
-    return target
+        raise ValueError('Bundle document entries must be filenames or objects')
+    if not isinstance(reference, str) or not reference.strip():
+        raise ValueError('Bundle document entry has no filename')
+    reference = reference.strip()
+    if title is not None and not isinstance(title, str):
+        raise ValueError('Bundle document title must be text')
+    if origin and '/content/' in origin:
+        reference = origin
+    if reference.startswith('content/') or '/content/' in reference:
+        relative = reference.split('/content/', 1)[1] if '/content/' in reference else reference[8:]
+        selected = Path(relative)
+        if selected.is_absolute() or '..' in selected.parts:
+            raise ValueError(f'Invalid bundle generated page: {reference}')
+        path = (content / selected).resolve()
+        if not path.is_relative_to(content.resolve()):
+            raise ValueError(f'Invalid bundle generated page: {reference}')
+    elif Path(reference).is_absolute():
+        path = Path(reference).expanduser().resolve()
+    else:
+        selected = Path(reference)
+        if '..' in selected.parts:
+            raise ValueError(f'Unsafe bundle document path: {reference}')
+        matches = [candidate.resolve() for product in products
+                   for candidate in [Path(product['source_dir']).expanduser().resolve() / selected]
+                   if candidate.is_file()]
+        matches = list(dict.fromkeys(matches))
+        if len(matches) != 1:
+            raise ValueError(f'Bundle document path must match exactly one source: {reference}')
+        path = matches[0]
+    if not path.is_file() or path.suffix.lower() not in ('.md', '.markdown', '.sh', '.py'):
+        raise ValueError(f'Invalid or missing bundle document: {path}')
+    return path, title, reference
 
 
-def exclude_chapter0(content: Path, target: Path) -> None:
-    """Promote exactly one generated page, removing its normal navigation entry.
-    
+def render_bundle_document(path: Path, title: str | None) -> tuple[str, str]:
+    """Convert an authored preface/epilogue without executing source code.
+
     Usage:
         ```python
-        exclude_chapter0(content, target)
-        ```"""
-    target.unlink()
-    folder = target.parent
-    while folder != content and folder.is_dir() and not any(folder.iterdir()):
-        folder.rmdir()
-        folder = folder.parent
+        title, body = render_bundle_document(document, None)
+        ```
+    """
+    if path.suffix.lower() in ('.md', '.markdown'):
+        metadata, body = split_wcm_document(path.read_text(encoding='utf-8'))
+        if not title:
+            label = metadata.get('title', '').strip().strip('"')
+            heading = re.search(r'^#\s+(.+)$', body, flags=re.M)
+            title = label or (heading.group(1).strip() if heading else '')
+    else:
+        metadata, entries, _ = parse_documented_source(path)
+        lines: list[str] = []
+        for entry in entries:
+            if entry['kind'] == 'def':
+                lines.extend(definition_markdown(entry))
+            else:
+                append_preface(lines, [entry])
+        body = '\n'.join(lines)
+        if not title:
+            title = metadata.get('title', '').strip()
+        if metadata.get('purpose') and not body.strip():
+            body = metadata['purpose']
+    if not body.strip():
+        raise ValueError(f'Empty bundle document: {path}')
+    if not title:
+        title = path.stem.replace('_', ' ').replace('-', ' ').title()
+        title = re.sub(r'^Bundle\s+', '', title, flags=re.I)
+        title = re.sub(r'\s+(Preface|Epilogue)$', '', title, flags=re.I)
+    # WCM owns the document heading. Do not repeat an identical Markdown H1
+    # inside the published page body.
+    lines = body.strip().splitlines()
+    if lines and re.fullmatch(r'#\s+' + re.escape(title.strip()) + r'\s*', lines[0], re.I):
+        body = '\n'.join(lines[1:]).strip()
+    return title, body.strip()
 
 
-def rewrite_chapter0_links(content: Path, old_page: Path) -> None:
-    """Retarget absolute links to a promoted page to its Introduction route.
-    
+def rewrite_promoted_links(content: Path, old_page: Path, new_route: str) -> None:
+    """Retarget links to an earlier generated route promoted as a bundle preface.
+
     Usage:
         ```python
-        rewrite_chapter0_links(content, old_page)
-        ```"""
+        rewrite_promoted_links(content, old_page, '/bundle-preface-01-introduction/')
+        ```
+    """
     relative = old_page.relative_to(content)
-    parts = list(relative.parts)
-    filename = parts.pop()
+    filename = relative.name
     stem = filename.removesuffix('_Index_NL.md') if filename.endswith('_Index_NL.md') else filename.removesuffix('_NL.md')
-    routes = {'/' + '/'.join(parts + [stem]).strip('/') + '/'}
+    parent_route = '/' + relative.parent.as_posix().strip('.') + '/'
+    routes = {parent_route + stem + '/'}
     if filename.endswith('_Index_NL.md'):
-        routes.add('/' + '/'.join(parts).strip('/') + '/')
+        routes.add(parent_route)
     for file in content.rglob('*.md'):
         text = file.read_text(encoding='utf-8')
-        original = text
+        revised = text
         for route in routes:
-            text = text.replace('](' + route + ')', '](/introduction/)')
-            text = text.replace('](' + route + '#', '](/introduction/#')
-        if text != original:
-            file.write_text(text, encoding='utf-8')
+            revised = revised.replace('](' + route + ')', '](' + new_route + ')')
+            revised = revised.replace('](' + route + '#', '](' + new_route + '#')
+        if revised != text:
+            file.write_text(revised, encoding='utf-8')
+
+
+def publish_bundle_documents(selections: list, label: str, products: list[dict],
+                             content: Path, start_order: int) -> tuple[int, list[Path]]:
+    """Publish selected documents once, ordered before or after the chapters.
+
+    Usage:
+        ```python
+        count, sources = publish_bundle_documents(prefaces, 'preface', products, content, 1)
+        ```
+    """
+    used_folders: set[Path] = set()
+    used_sources: list[Path] = []
+    for number, item in enumerate(selections, 1):
+        path, title_override, reference = bundle_document_source(item, products, content)
+        title, body = render_bundle_document(path, title_override)
+        folder = content / f'bundle-{label}-{number:02d}-{slug(title)}'
+        if folder in used_folders or folder.exists():
+            raise ValueError(f'Bundle document route conflict: {folder.name}')
+        used_folders.add(folder)
+        write_index(folder, title, body, start_order + number - 1,
+                    template='page', summary='', nav_title=title)
+        used_sources.append(path)
+        # A promoted page must not also display its body at the old route.
+        if path.is_relative_to(content.resolve()):
+            rewrite_promoted_links(content, path, '/' + folder.name + '/')
+            children = [child for child in path.parent.rglob('*.md') if child != path]
+            if children and path.name.endswith('_Index_NL.md'):
+                # A section index may own many child pages. Keep its navigation
+                # metadata so the children are not stranded, but remove the
+                # promoted body and mark the section navigation-only.
+                existing = path.read_text(encoding='utf-8')
+                metadata, _ = split_wcm_document(existing)
+                if not metadata:
+                    raise ValueError(f'Invalid generated page metadata: {path}')
+                prefix_end = existing.find('\n---\n', 4)
+                prefix = existing[:prefix_end]
+                if 'nav_only:' not in prefix:
+                    prefix += '\nnav_only: true'
+                path.write_text(prefix + '\n---\n', encoding='utf-8')
+            else:
+                path.unlink()
+                parent = path.parent
+                while parent != content and not any(parent.iterdir()):
+                    parent.rmdir()
+                    parent = parent.parent
+    return len(selections), used_sources
 
 
 
@@ -1658,10 +1787,20 @@ def generate(bundle: dict, docs_root: Path | None = None) -> dict:
         counts = Counter()
         counts['products'] = len(products)
         template_owners = build_template_owners(products)
-        # Reserve the first top-level navigation position for an optional Chapter 0.
-        chapter0 = bundle.get('chapter0', '')
-        for i, product in enumerate(products, 2 if chapter0 else 1):
-            collect(product, content, i, counts, template_owners)
+        prefaces, epilogues = bundle_document_selections(bundle, products)
+        # Authored .sh/.py bundle documents are published as introduction or
+        # closing pages, not a second time within their source product chapter.
+        excluded_sources: set[Path] = set()
+        for selection in [*prefaces, *epilogues]:
+            reference = selection if isinstance(selection, str) else selection.get('path', selection.get('source', selection.get('file', '')))
+            if reference and not (str(reference).startswith('content/') or '/content/' in str(reference)):
+                selected, _, _ = bundle_document_source(selection, products, content)
+                if selected.suffix.lower() in ('.sh', '.py'):
+                    excluded_sources.add(selected.resolve())
+        # Product pages are generated before promotion of authored/generator
+        # selections; navigation order is independent of creation order.
+        for i, product in enumerate(products, len(prefaces) + 1):
+            collect(product, content, i, counts, template_owners, excluded_sources)
         counts.update(build_appendices(products, content, root))
         # Images referenced by comments belong to each product source tree.
         # Keep /assets/... links valid without depending on an external website.
@@ -1669,7 +1808,7 @@ def generate(bundle: dict, docs_root: Path | None = None) -> dict:
             copy_legacy_images(Path(product['source_dir']).expanduser().resolve(), root)
             asset_dir = Path(product['source_dir']).expanduser().resolve() / 'assets'
             copy_assets_checked(asset_dir, root / 'assets')
-        # The home/title page is independent of Chapter 0. It always displays
+        # The home/title page is independent of bundle prefaces. It always displays
         # the bundle metrics; the home template supplies its established branding.
         metrics = f'- **Products:** {counts["products"]}\n\n'
         metrics += '| Metric | Bash | Python | Total |\n'
@@ -1687,24 +1826,15 @@ def generate(bundle: dict, docs_root: Path | None = None) -> dict:
                 metrics += f'\n- **{key.title()}:** {counts[key]}'
         write_index(content, bundle.get('title', bundle['id']), metrics, 0, template='home')
 
-        if chapter0:
-            generated = generated_chapter0_path(content, chapter0, bundle.get('chapter0_origin', ''))
-            if generated is not None:
-                if not generated.is_file():
-                    raise ValueError(f'Generated Chapter 0 route not found in this build: {generated.relative_to(content)}')
-                intro = chapter0_body(generated.read_text(encoding='utf-8'))
-            else:
-                custom = Path(chapter0).expanduser().resolve()
-                if not custom.is_file():
-                    raise ValueError(f'External Chapter 0 Markdown missing: {custom}')
-                intro = chapter0_body(custom.read_text(encoding='utf-8'))
-            if not intro:
-                raise ValueError('Chapter 0 Markdown contains no page body')
-            if generated is not None:
-                rewrite_chapter0_links(content, generated)
-                exclude_chapter0(content, generated)
-            write_index(content / 'introduction', 'Introduction', intro, 1, template='page')
-        # Bundle defaults are supplied by the SDK documentation resources.
+        # Bundle introduction pages are ordered before product chapters;
+        # concluding pages follow even the appendices. Keep the home page alone.
+        preface_count, preface_sources = publish_bundle_documents(
+            prefaces, 'preface', products, content, 1)
+        epilogue_count, epilogue_sources = publish_bundle_documents(
+            epilogues, 'epilogue', products, content, 10000)
+        counts['bundle_prefaces'] = preface_count
+        counts['bundle_epilogues'] = epilogue_count
+        # Bundle defaults come from the selected MCM documentation resources.
         # Product resources are scoped to their chapter; no product can overwrite
         # another chapter's templates or the bundle-wide defaults.
         if docs_root:
@@ -1730,12 +1860,13 @@ def generate(bundle: dict, docs_root: Path | None = None) -> dict:
                 custom_templates = candidate / 'templates'
                 if custom_templates.is_dir():
                     shutil.copytree(custom_templates, root / 'templates' / chapter, dirs_exist_ok=True)
-                for resource in ('assets', 'css', 'images'):
+                # Bundle-wide CSS comes from docs_root. Source products retain
+                # their own images and other assets, but cannot silently replace
+                # the site's default stylesheets. Product CSS is reserved for a
+                # future explicit, chapter-scoped opt-in.
+                for resource in ('assets', 'images'):
                     if (candidate / resource).is_dir():
-                        if resource in ('assets', 'images'):
-                            copy_assets_checked(candidate / resource, root / resource)
-                        else:
-                            shutil.copytree(candidate / resource, root / resource, dirs_exist_ok=True)
+                        copy_assets_checked(candidate / resource, root / resource)
         required = ('base.html', 'home.html', 'page.html', 'article.html')
         missing = [name for name in required if not (root / 'templates' / name).is_file()]
         if missing:

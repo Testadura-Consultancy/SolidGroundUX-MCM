@@ -9,6 +9,7 @@ without dropping down to raw HTML.
 from __future__ import annotations
 
 import html
+import json
 import re
 from urllib.parse import urlparse
 
@@ -17,23 +18,44 @@ _STYLE_CLASS_RE = re.compile(r"\.([A-Za-z_][A-Za-z0-9_-]*)")
 _BLOCK_CLASS_RE = re.compile(r"^:::\s+(.+)$", re.MULTILINE)
 _CLASS_NAME_RE = re.compile(r"\.?([A-Za-z_][A-Za-z0-9_-]*)")
 
+# A captioned standalone image becomes a semantic figure, never an inline
+# paragraph fragment. Other Markdown images retain the existing renderer path.
+_CAPTIONED_IMAGE_RE = re.compile(
+    r'^!\[([^\]]*)\]\(([^)]+)\)\{caption=("(?:[^"\\]|\\.)*")\}$'
+)
 
 
-# --- Public functions ------------------------------------------------------------
-# fn: referenced_style_classes - Find td- prefixed CSS class references in authored Markdown.
-# . Description
-#   Args: markdown_text: Markdown source to analyze or render.
+def _captioned_figure(line: str) -> str | None:
+    """Render explicitly captioned standalone images without altering other markup."""
+    match = _CAPTIONED_IMAGE_RE.fullmatch(line.strip())
+    if match is None:
+        return None
+    try:
+        caption = json.loads(match.group(3))
+    except (ValueError, TypeError):
+        return None
+    if not isinstance(caption, str) or not caption.strip():
+        return None
+    alt = html.escape(match.group(1), quote=True)
+    src = html.escape(_safe_url(match.group(2)), quote=True)
+    label = html.escape(caption, quote=False)
+    return (
+        '<figure class="sgnd-figure">'
+        f'<img src="{src}" alt="{alt}">'
+        f'<figcaption><em>{label}</em></figcaption>'
+        '</figure>'
+    )
+
+
 def referenced_style_classes(markdown_text: str, prefix: str) -> set[str]:
-    """Find td- prefixed CSS class references in authored Markdown.
-        
-        Args:
-            markdown_text: Markdown source to analyze or render.
-            prefix: Configured class or style prefix.
-        
-        Usage:
-            ```python
-            referenced_style_classes(markdown_text, prefix)
-            ```"""
+    """Handle referenced style classes for the web content workflow.
+    
+    Args:
+        markdown_text: Input used by this operation.
+        prefix: Input used by this operation.
+    
+    Returns:
+        Operation result or None, as defined by the implementation."""
     classes = {name for name in _STYLE_CLASS_RE.findall(markdown_text) if name.startswith(prefix)}
     for block_spec in _BLOCK_CLASS_RE.findall(markdown_text):
         if block_spec.startswith("td-image-text "):
@@ -46,16 +68,8 @@ def referenced_style_classes(markdown_text: str, prefix: str) -> set[str]:
     return classes
 
 
-
-# --- Internal functions ------------------------------------------------------------
-# fn: _safe_url - Validate and escape a link target for generated markup.
 def _safe_url(value: str) -> str:
-    """Validate and escape a link target for generated markup.
-    
-    Usage:
-        ```python
-        _safe_url(value)
-        ```"""
+    """Handle safe url for the web content workflow."""
     value = value.strip()
     parsed = urlparse(value)
     if parsed.scheme.lower() in {"javascript", "data"}:
@@ -63,19 +77,12 @@ def _safe_url(value: str) -> str:
     return value
 
 
-# fn: _image_dimensions - Return safe inline image sizing; omit invalid or absent dimensions.
-# . Description
-#   Image size attributes use positive pixel counts. A single dimension keeps the intrinsic aspect ratio; both dimensions use contain to avoid cropping.
 def _image_dimensions(options: str) -> str:
     """Return safe inline image sizing; omit invalid or absent dimensions.
-    
+
     Image size attributes use positive pixel counts. A single dimension keeps
     the intrinsic aspect ratio; both dimensions use contain to avoid cropping.
-    
-    Usage:
-        ```python
-        _image_dimensions(options)
-        ```"""
+    """
     dimensions: dict[str, int] = {}
     for key, raw in re.findall(r"(?<![\w-])(width|height)\s*=\s*([^\s}]+)", options):
         if raw.isdecimal() and 0 < int(raw) <= 10000:
@@ -91,66 +98,45 @@ def _image_dimensions(options: str) -> str:
     return f' style="{html.escape("; ".join(rules), quote=True)}"'
 
 
-# fn: _render_inline - Render inline Markdown constructs into HTML while escaping content.
 def _render_inline(text: str) -> str:
-    """Render inline Markdown constructs into HTML while escaping content.
-    
-    Usage:
-        ```python
-        _render_inline(text)
-        ```"""
+    """Render inline Markdown constructs into HTML while escaping content."""
     escaped = html.escape(text, quote=False)
     tokens: dict[str, str] = {}
 
-    # fn: stash - Preserve an embedded fragment while Markdown text is transformed.
-    # . Description
-    #   Args: fragment: Rendered text fragment to preserve during substitution.
     def stash(fragment: str) -> str:
-        """Preserve an embedded fragment while Markdown text is transformed.
-                        
-                        Args:
-                            fragment: Rendered text fragment to preserve during substitution.
-                        
-                        Usage:
-                            ```python
-                            stash(fragment)
-                            ```"""
+        """Handle stash for the web content workflow.
+        
+        Args:
+            fragment: Input used by this operation.
+        
+        Returns:
+            Operation result or None, as defined by the implementation."""
         key = f"\x00WC{len(tokens)}\x00"
         tokens[key] = fragment
         return key
 
-    # fn: code_repl - Replace a Markdown code-span match with protected HTML output.
-    # . Description
-    #   Args: match: Regular-expression match for the current substitution.
     def code_repl(match: re.Match[str]) -> str:
-        """Replace a Markdown code-span match with protected HTML output.
-                        
-                        Args:
-                            match: Regular-expression match for the current substitution.
-                        
-                        Usage:
-                            ```python
-                            code_repl(match)
-                            ```"""
+        """Handle code repl for the web content workflow.
+        
+        Args:
+            match: Input used by this operation.
+        
+        Returns:
+            Operation result or None, as defined by the implementation."""
         return stash(f"<code>{html.escape(match.group(1), quote=False)}</code>")
 
     escaped = re.sub(r"`([^`]+)`", code_repl, escaped)
 
     image_pattern = re.compile(r"!\[([^\]]*)\]\(([^)]+)\)(?:\{([^}]+)\})?")
 
-    # fn: image_repl - Replace a Markdown image reference with rendered image markup.
-    # . Description
-    #   Args: match: Regular-expression match for the current substitution.
     def image_repl(match: re.Match[str]) -> str:
-        """Replace a Markdown image reference with rendered image markup.
-                        
-                        Args:
-                            match: Regular-expression match for the current substitution.
-                        
-                        Usage:
-                            ```python
-                            image_repl(match)
-                            ```"""
+        """Handle image repl for the web content workflow.
+        
+        Args:
+            match: Input used by this operation.
+        
+        Returns:
+            Operation result or None, as defined by the implementation."""
         alt = match.group(1)
         src = html.escape(_safe_url(html.unescape(match.group(2))), quote=True)
         classes = " ".join(_STYLE_CLASS_RE.findall(match.group(3) or ""))
@@ -163,19 +149,14 @@ def _render_inline(text: str) -> str:
     # Optional {download} suffix forces a local link to download as a file.
     link_pattern = re.compile(r"\[([^\]]+)\]\(([^)]+)\)(?:\{(download)\})?")
 
-    # fn: link_repl - Render a Markdown link after checking and escaping its target.
-    # . Description
-    #   Args: match: Regular-expression match for the current substitution.
     def link_repl(match: re.Match[str]) -> str:
-        """Render a Markdown link after checking and escaping its target.
-                        
-                        Args:
-                            match: Regular-expression match for the current substitution.
-                        
-                        Usage:
-                            ```python
-                            link_repl(match)
-                            ```"""
+        """Handle link repl for the web content workflow.
+        
+        Args:
+            match: Input used by this operation.
+        
+        Returns:
+            Operation result or None, as defined by the implementation."""
         label = match.group(1)
         href = html.escape(_safe_url(html.unescape(match.group(2))), quote=True)
         download_attr = " download" if match.group(3) and href != "#" else ""
@@ -185,19 +166,14 @@ def _render_inline(text: str) -> str:
 
     style_pattern = re.compile(r"\[([^\]]+)\]\{([^}]+)\}")
 
-    # fn: style_repl - Render supported inline style attributes on Markdown spans.
-    # . Description
-    #   Args: match: Regular-expression match for the current substitution.
     def style_repl(match: re.Match[str]) -> str:
-        """Render supported inline style attributes on Markdown spans.
-                        
-                        Args:
-                            match: Regular-expression match for the current substitution.
-                        
-                        Usage:
-                            ```python
-                            style_repl(match)
-                            ```"""
+        """Handle style repl for the web content workflow.
+        
+        Args:
+            match: Input used by this operation.
+        
+        Returns:
+            Operation result or None, as defined by the implementation."""
         label = match.group(1)
         classes = " ".join(_STYLE_CLASS_RE.findall(match.group(2)))
         if not classes:
@@ -207,14 +183,7 @@ def _render_inline(text: str) -> str:
     escaped = style_pattern.sub(style_repl, escaped)
 
     # Angle-bracket autolinks use the same URL safety policy as ordinary links.
-    # fn: autolink_repl - Convert a recognized automatic URL to a link.
     def autolink_repl(match: re.Match[str]) -> str:
-        """Convert a recognized automatic URL to a link.
-                
-                Usage:
-                    ```python
-                    autolink_repl(match)
-                    ```"""
         url = html.unescape(match.group(1))
         href = html.escape(_safe_url(url), quote=True)
         return stash(f'<a href="{href}">{html.escape(url, quote=False)}</a>')
@@ -231,14 +200,8 @@ def _render_inline(text: str) -> str:
     return escaped
 
 
-# fn: _render_paragraph - Join soft lines and preserve CommonMark space/backslash hard breaks.
 def _render_paragraph(lines: list[str]) -> str:
-    """Join soft lines and preserve CommonMark space/backslash hard breaks.
-    
-    Usage:
-        ```python
-        _render_paragraph(lines)
-        ```"""
+    """Join soft lines and preserve CommonMark space/backslash hard breaks."""
     parts: list[str] = []
     for line in lines[:-1]:
         hard_spaces = len(line) - len(line.rstrip(" ")) >= 2
@@ -253,14 +216,8 @@ def _render_paragraph(lines: list[str]) -> str:
     return _render_inline("".join(parts)).replace("\n", "<br>\n")
 
 
-# fn: _heading_id - Create a predictable Unicode-friendly anchor from a heading's plain text.
 def _heading_id(title: str) -> str:
-    """Create a predictable Unicode-friendly anchor from a heading's plain text.
-    
-    Usage:
-        ```python
-        _heading_id(title)
-        ```"""
+    """Create a predictable Unicode-friendly anchor from a heading's plain text."""
     plain = re.sub(r"[`*_~]", "", re.sub(r"\[([^]]+)\]\([^)]+\)", r"\1", title)).lower()
     plain = re.sub(r"[^\w\s-]", "", plain, flags=re.UNICODE)
     return re.sub(r"[\s_-]+", "-", plain).strip("-")
@@ -269,14 +226,8 @@ def _heading_id(title: str) -> str:
 _LIST_RE = re.compile(r"^(?P<indent>[ ]*)(?P<marker>[-*+]|[0-9]+[.)])\s+(?P<body>.*)$")
 
 
-# fn: _render_list - Render nested ordered/unordered lists using indentation and item boundaries.
 def _render_list(lines: list[str], start: int) -> tuple[str, int]:
-    """Render nested ordered/unordered lists using indentation and item boundaries.
-    
-    Usage:
-        ```python
-        _render_list(lines, start)
-        ```"""
+    """Render nested ordered/unordered lists using indentation and item boundaries."""
     initial = _LIST_RE.match(lines[start])
     assert initial is not None
     base = len(initial.group("indent"))
@@ -318,64 +269,24 @@ def _render_list(lines: list[str], start: int) -> tuple[str, int]:
     return "\n".join(result), index
 
 
-# fn: _is_table_separator - Recognize the delimiter row that separates Markdown table headers.
 def _is_table_separator(line: str) -> bool:
-    """Recognize the delimiter row that separates Markdown table headers.
-    
-    Usage:
-        ```python
-        _is_table_separator(line)
-        ```"""
+    """Handle is table separator for the web content workflow."""
     cells = [cell.strip() for cell in line.strip().strip("|").split("|")]
     return bool(cells) and all(re.fullmatch(r":?-{3,}:?", cell) for cell in cells)
 
 
-# fn: _table_cells - Split one Markdown table row into its cell values.
 def _table_cells(line: str) -> list[str]:
-    """Split one Markdown table row into its cell values.
-        
-        A Bash definition such as label|icon|symbol belongs in one cell, even
-        though the source Markdown escapes each separator as \\|.
-        
-        Usage:
-            ```python
-            _table_cells(line)
-            ```"""
-    content = line.strip()
-    if content.startswith('|'):
-        content = content[1:]
-    if content.endswith('|'):
-        content = content[:-1]
-    cells: list[str] = []
-    current: list[str] = []
-    index = 0
-    while index < len(content):
-        char = content[index]
-        if char == "\\" and index + 1 < len(content) and content[index + 1] == '|':
-            current.append('|')
-            index += 2
-            continue
-        if char == '|':
-            cells.append(''.join(current).strip())
-            current = []
-        else:
-            current.append(char)
-        index += 1
-    cells.append(''.join(current).strip())
-    return cells
+    """Handle table cells for the web content workflow."""
+    return [cell.strip() for cell in line.strip().strip("|").split("|")]
 
 
-# fn: _starts_block - Check whether a Markdown line begins a block-level construct.
 def _starts_block(lines: list[str], index: int) -> bool:
-    """Check whether a Markdown line begins a block-level construct.
-    
-    Usage:
-        ```python
-        _starts_block(lines, index)
-        ```"""
+    """Handle starts block for the web content workflow."""
     line = lines[index]
     stripped = line.strip()
     if not stripped:
+        return True
+    if _captioned_figure(stripped) is not None:
         return True
     if stripped.startswith("```") or stripped.startswith(":::"):
         return True
@@ -391,10 +302,60 @@ def _starts_block(lines: list[str], index: int) -> bool:
         return True
     return False
 
+def _render_quoted_markdown(lines: list[str]) -> str:
+    """Preserve code blocks embedded in legacy quoted documentation.
 
-# fn: _render_lines - Render a line range and optionally stop at the matching ``:::`` marker.
-# . Description
-#   Component rendering is recursive. A nested opener therefore consumes its own closing marker before control returns to the containing component, while
+    Prose retains its original inline rendering; only indented and fenced code
+    becomes a distinct block. This does not change other Markdown constructs.
+    """
+    result: list[str] = []
+    prose: list[str] = []
+    index = 0
+
+    def flush_prose() -> None:
+        if any(line.strip() for line in prose):
+            result.append("<p>" + _render_inline(" ".join(line.lstrip() for line in prose)) + "</p>")
+        prose.clear()
+
+    while index < len(lines):
+        line = lines[index]
+        stripped = line.strip()
+        if stripped.startswith("```"):
+            flush_prose()
+            language = stripped[3:].strip()
+            index += 1
+            block: list[str] = []
+            while index < len(lines) and not lines[index].strip().startswith("```"):
+                block.append(lines[index])
+                index += 1
+            if index < len(lines):
+                index += 1
+            language_attr = f' class="language-{html.escape(language, quote=True)}"' if language else ""
+            result.append(f"<pre><code{language_attr}>{html.escape(chr(10).join(block), quote=False)}</code></pre>")
+            continue
+        if line.startswith("    ") and stripped:
+            flush_prose()
+            code: list[str] = []
+            while index < len(lines):
+                current = lines[index]
+                if current.startswith("    "):
+                    code.append(current[4:])
+                    index += 1
+                elif (not current.strip() and index + 1 < len(lines)
+                      and lines[index + 1].startswith("    ")
+                      and lines[index + 1].strip()):
+                    code.append("")
+                    index += 1
+                else:
+                    break
+            result.append("<pre><code>" + html.escape("\n".join(code), quote=False) + "</code></pre>")
+            continue
+        prose.append(line)
+        index += 1
+    flush_prose()
+    return "\n".join(result)
+
+
 def _render_lines(
     lines: list[str],
     start: int = 0,
@@ -402,15 +363,11 @@ def _render_lines(
     stop_at_component_end: bool = False,
 ) -> tuple[str, int, bool]:
     """Render a line range and optionally stop at the matching ``:::`` marker.
-    
+
     Component rendering is recursive. A nested opener therefore consumes its own
     closing marker before control returns to the containing component, while
     fenced code blocks continue to treat ``:::`` as ordinary code text.
-    
-    Usage:
-        ```python
-        _render_lines(lines, start, stop_at_component_end=stop_at_component_end)
-        ```"""
+    """
     output: list[str] = []
     index = start
 
@@ -418,6 +375,12 @@ def _render_lines(
         line = lines[index]
         stripped = line.strip()
         if not stripped:
+            index += 1
+            continue
+
+        figure = _captioned_figure(stripped)
+        if figure is not None:
+            output.append(figure)
             index += 1
             continue
 
@@ -480,22 +443,9 @@ def _render_lines(
                 # Native accessible disclosure, with nested Markdown in its body.
                 options = component_spec[len("td-details"):].strip()
                 is_open = bool(re.search(r"(?:^|\s)open(?:=true)?(?:\s|$)", options, re.I))
-                options = re.sub(r"(?:^|\s)open(?:=true)?(?:\s|$)", " ", options, flags=re.I).strip()
-                # An optional heading level makes the disclosure label part of
-                # the document outline while keeping it clickable and closed
-                # by default. Existing td-details syntax is unchanged.
-                heading_match = re.match(r"^heading=([2-6])(?:\s+|$)", options, re.I)
-                heading_level = int(heading_match.group(1)) if heading_match else None
-                title = options[heading_match.end():].strip() if heading_match else options
-                title = title or "Meer informatie"
+                title = re.sub(r"(?:^|\s)open(?:=true)?(?:\s|$)", " ", options, flags=re.I).strip() or "Meer informatie"
                 open_attr = " open" if is_open else ""
-                if heading_level is None:
-                    summary = html.escape(title)
-                    css_class = "td-details"
-                else:
-                    summary = f'<h{heading_level}>{html.escape(title)}</h{heading_level}>'
-                    css_class = "td-details td-details-heading"
-                output.append(f'<details class="{css_class}"{open_attr}><summary>{summary}</summary>\n<div class="td-details-body">{inner}</div></details>')
+                output.append(f'<details class="td-details"{open_attr}><summary>{html.escape(title)}</summary>\n<div class="td-details-body">{inner}</div></details>')
             elif "td-example" in classes.split():
                 # The displayed Markdown is extracted from the actual example
                 # body, so examples cannot drift away from their source.
@@ -529,9 +479,17 @@ def _render_lines(
         if stripped.startswith(">"):
             quote_lines: list[str] = []
             while index < len(lines) and lines[index].strip().startswith(">"):
-                quote_lines.append(lines[index].strip()[1:].lstrip())
+                # Remove only the quote marker and one optional following space.
+                # Further indentation is meaningful for nested code blocks.
+                quoted = lines[index].lstrip()[1:]
+                quote_lines.append(quoted[1:] if quoted.startswith(" ") else quoted)
                 index += 1
-            output.append(f"<blockquote><p>{_render_inline(' '.join(quote_lines))}</p></blockquote>")
+            if any(line.startswith("    ") and line.strip() or line.strip().startswith("```")
+                   for line in quote_lines):
+                output.append("<blockquote>\n" + _render_quoted_markdown(quote_lines) + "\n</blockquote>")
+            else:
+                # Keep existing output for ordinary prose-only quotations.
+                output.append(f"<blockquote><p>{_render_inline(' '.join(line.lstrip() for line in quote_lines))}</p></blockquote>")
             continue
 
         if _LIST_RE.match(line):
@@ -558,43 +516,20 @@ def _render_lines(
                 rows.append(_table_cells(lines[index]))
                 index += 1
 
-            # Opt-in merged group column, used by generated # def: tables.
-            # Leave every other Markdown table unchanged, including empty cells.
-            grouped = bool(headers and headers[0].strip() == 'Group {rowspan}')
-            if grouped:
-                headers[0] = 'Group'
             head_cells: list[str] = []
             for i, cell in enumerate(headers):
                 style = f' style="text-align: {alignments[i]}"' if i < len(alignments) and alignments[i] else ""
                 head_cells.append(f"<th{style}>{_render_inline(cell)}</th>")
             body_rows: list[str] = []
-            for row_index, row in enumerate(rows):
-                # A new group starts at each nonempty group cell. Mark its row
-                # so the documentation stylesheet can draw a single subtle
-                # separator across the group without boxing every cell.
-                group_start = grouped and bool(row and row[0])
+            for row in rows:
                 rendered_cells: list[str] = []
                 for i in range(len(headers)):
                     value = row[i] if i < len(row) else ""
-                    if grouped and i == 0:
-                        # A blank first cell continues the preceding group's rowspan.
-                        if row_index > 0 and not value and rows[row_index - 1][0]:
-                            continue
-                        if row_index > 0 and not value:
-                            continue
-                        span = 1
-                        while row_index + span < len(rows) and not rows[row_index + span][0]:
-                            span += 1
-                        attrs = (f' rowspan="{span}"' if span > 1 else '') + ' class="doc-def-group" style="text-align:center;vertical-align:middle"'
-                        rendered_cells.append(f"<td{attrs}>{_render_inline(value)}</td>")
-                        continue
                     style = f' style="text-align: {alignments[i]}"' if i < len(alignments) and alignments[i] else ""
                     rendered_cells.append(f"<td{style}>{_render_inline(value)}</td>")
-                row_class = ' class="doc-def-group-start"' if group_start else ''
-                body_rows.append("<tr" + row_class + ">" + "".join(rendered_cells) + "</tr>")
-            table_class = ' class="doc-def-table"' if grouped else ''
+                body_rows.append("<tr>" + "".join(rendered_cells) + "</tr>")
             output.append(
-                '<div class="table-scroll"><table' + table_class + '><thead><tr>'
+                '<div class="table-scroll"><table><thead><tr>'
                 + "".join(head_cells)
                 + "</tr></thead><tbody>"
                 + "".join(body_rows)
@@ -612,16 +547,8 @@ def _render_lines(
     return "\n".join(output), index, False
 
 
-
-# --- Public functions ------------------------------------------------------------
-# fn: render_markdown - Render Markdown plus the nestable Testadura ``:::`` component extension.
 def render_markdown(markdown_text: str) -> str:
-    """Render Markdown plus the nestable Testadura ``:::`` component extension.
-    
-    Usage:
-        ```python
-        html = render_markdown("# Introduction\\n\\nHello world.")
-        ```"""
+    """Render Markdown plus the nestable Testadura ``:::`` component extension."""
     lines = markdown_text.replace("\r\n", "\n").replace("\r", "\n").split("\n")
     rendered, _index, _closed = _render_lines(lines)
     return rendered
