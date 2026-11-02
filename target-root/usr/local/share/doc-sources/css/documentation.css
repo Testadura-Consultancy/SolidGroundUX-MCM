@@ -72,6 +72,17 @@
    column alignments remain authoritative; ordinary table body styling stays as-is. */
 .doc-main .table-scroll thead th{background:#f1f3f6;text-align:left;padding:.5rem .65rem;border-bottom:2px solid #c8d1dd}
 
+/* Figure Index: keep figure numbers and destination pages together.
+   The caption alone wraps into the space left by those two columns.
+   The existing table-scroll wrapper handles narrow screens. */
+.doc-main .sgnd-figure-index .table-scroll table{width:100%;table-layout:auto}
+.doc-main .sgnd-figure-index .table-scroll th:first-child,
+.doc-main .sgnd-figure-index .table-scroll td:first-child{width:8.5rem;min-width:8.5rem;white-space:nowrap}
+.doc-main .sgnd-figure-index .table-scroll th:last-child,
+.doc-main .sgnd-figure-index .table-scroll td:last-child{width:1%;min-width:11rem;white-space:nowrap}
+.doc-main .sgnd-figure-index .table-scroll th:nth-child(2),
+.doc-main .sgnd-figure-index .table-scroll td:nth-child(2){width:auto;white-space:normal;overflow-wrap:break-word}
+
 /* Generated # def: group tables: a merged category cell and one separator
    per group, rather than boxing all definition rows. */
 .doc-main .doc-def-table{border-collapse:collapse;width:max-content;min-width:100%;max-width:100%}

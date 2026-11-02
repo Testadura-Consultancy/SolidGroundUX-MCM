@@ -1686,8 +1686,11 @@ def number_bundle_figures(content: Path) -> int:
             changed = True
         if changed:
             page.write_text(''.join(lines), encoding='utf-8')
+    # Scope figure-index column widths to this appendix; other Markdown tables
+    # retain their existing layout and wrapping rules.
     sections = [
         f'{len(figures)} figures across the documentation bundle.', '',
+        '::: sgnd-figure-index', '',
         '| Figure | Caption | Page |', '| --- | --- | --- |',
     ]
     for number, caption, target, title in figures:
@@ -1695,7 +1698,9 @@ def number_bundle_figures(content: Path) -> int:
         label = caption.replace('|', r'\|').replace('[', r'\[').replace(']', r'\]')
         location = title.replace('|', r'\|')
         sections.append(f'| [Figure {number}]({target}) | {label} | [{location}]({target}) |')
-    if not figures:
+    if figures:
+        sections.extend(['', ':::'])
+    else:
         sections = ['No figures were found in this documentation bundle.']
     write_index(content / 'appendices' / 'figure-index', 'Figure Index',
                 '\n'.join(sections), 6, template='page')
