@@ -4,7 +4,7 @@
 # ----------------------------------------------------------------------------------
 # Metadata:
 #   Version     : 2.2
-#   Build       : 2630620
+#   Build       : 2630700
 #   Shortname   : MANAGE_POSTGRESQL
 #   Source      : manage-postgresql.sh
 #   Type        : script

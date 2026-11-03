@@ -3,7 +3,7 @@
 # ----------------------------------------------------------------------------------
 # Metadata:
 #   Version     : 2.2
-#   Build       : 2630620
+#   Build       : 2630700
 #   Shortname   : WEB_CONTENT_MANAGEMENT
 #   Source      : 55-web-content-management.sh
 #   Type        : module

@@ -3,7 +3,7 @@
 # ----------------------------------------------------------------------------------
 # Metadata:
 #   Version     : 2.2
-#   Build       : 2630620
+#   Build       : 2630700
 #   Shortname   : SAMBA
 #   Source      : 30-samba-file-server.sh
 #   Type        : module

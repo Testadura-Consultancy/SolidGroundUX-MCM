@@ -6,7 +6,7 @@ The format is inspired by *Keep a Changelog* while remaining focused on practica
 
 ## Unreleased
 
-## Release 2.2.2630620
+## Release 2.2.2630700
 
 ### Documentation structure, illustrations and rendering (2026-11-02)
 

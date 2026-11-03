@@ -3,8 +3,8 @@
 # -------------------------------------------------------------------------------------
 # Metadata:
 #   Version     : 2.2
-#   Build       : 2630621
-#   Checksum    : eb4c21e634e844f8bc1b70f3c4f27e1171169d84c42fb3ec61efef5eab7cb6f2
+#   Build       : 2630700
+#   Checksum    : 18674294418d5984ff4da283df8fe355f6151e934b648449e351508218a19e93
 #   Source      : solidgroundux-management-modules-definitions.sh
 #   Type        : library
 #   Group       : Globals
@@ -65,7 +65,7 @@ set -uo pipefail
     # def: Framework identity
     SGND_SOLIDGROUND_MANAGEMENT_CONSOLE_MODULES_PRODUCT="SolidGroundUX Management Console Modules"
     SGND_SOLIDGROUND_MANAGEMENT_CONSOLE_MODULES_VERSION=2.2
-    SGND_SOLIDGROUND_MANAGEMENT_CONSOLE_MODULES_BUILD=2630621
+    SGND_SOLIDGROUND_MANAGEMENT_CONSOLE_MODULES_BUILD=2630700
 
     SGND_SOLIDGROUND_MANAGEMENT_CONSOLE_MODULES_COMPANY="Testadura Consultancy"
     SGND_SOLIDGROUND_MANAGEMENT_CONSOLE_MODULES_COPYRIGHT="© 2025 - 2026 Testadura Consultancy"

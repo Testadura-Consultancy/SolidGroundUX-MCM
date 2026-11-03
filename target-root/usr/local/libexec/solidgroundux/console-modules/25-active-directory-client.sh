@@ -3,7 +3,7 @@
 # ----------------------------------------------------------------------------------
 # Metadata:
 #   Version     : 2.2
-#   Build       : 2630620
+#   Build       : 2630700
 #   Shortname   : AD_CLIENT
 #   Source      : 25-active-directory-client.sh
 #   Type        : module

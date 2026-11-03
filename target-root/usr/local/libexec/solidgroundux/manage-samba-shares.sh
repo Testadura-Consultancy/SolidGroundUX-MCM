@@ -4,7 +4,7 @@
 # ------------------------------------------------------------------------------------
 # Metadata:
 #   Version     : 2.2
-#   Build       : 2630620
+#   Build       : 2630700
 #   Shortname   : MANAGE_SAMBA_SHARES
 #   Checksum    : 05705da594a7c95d6491c9b55c41df68b4435e641acdc2e35ce783141391ca4b
 #   Source      : manage-samba-shares.sh

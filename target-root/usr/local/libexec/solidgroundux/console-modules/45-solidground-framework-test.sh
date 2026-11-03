@@ -8,7 +8,7 @@
 #   Group       : Modules
 #   Subgroup    : SolidGroundUX Framework
 #   Purpose     : Register SolidGroundUX framework test and validation actions
-#   Build       : 2630620
+#   Build       : 2630700
 #   Shortname   : FRAMEWORK_TEST
 #   Checksum    : 0a56b79f0b804ade4d8d62066d606bcaa4d9e56305673bd5db6575e791b97c33
 # Description:

@@ -4,7 +4,7 @@
 # ----------------------------------------------------------------------------------
 # Metadata:
 #   Version     : 2.2
-#   Build       : 2630620
+#   Build       : 2630700
 #   Shortname   : MANAGE_DOCKER_CONTAINERS
 #   Source      : manage-docker-containers.sh
 #   Type        : script

@@ -4,7 +4,7 @@
 # -------------------------------------------------------------------------------------
 # Metadata:
 #   Version     : 2.2
-#   Build       : 2630620
+#   Build       : 2630700
 #   Shortname   : MANAGE_AD_SERVER
 #   Source      : manage-active-directory-server.sh
 #   Type        : script

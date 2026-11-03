@@ -4,7 +4,7 @@
 # -------------------------------------------------------------------------------------
 # Metadata:
 #   Version     : 2.2
-#   Build       : 2630620
+#   Build       : 2630700
 #   Shortname   : PUBLISH_WEB_CONTENT
 #   Source      : publish-web-content.sh
 #   Type        : script

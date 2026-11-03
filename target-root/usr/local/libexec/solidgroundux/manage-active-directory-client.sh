@@ -4,7 +4,7 @@
 # -------------------------------------------------------------------------------------
 # Metadata:
 #   Version     : 2.2
-#   Build       : 2630620
+#   Build       : 2630700
 #   Shortname   : MANAGE_AD_CLIENT
 #   Source      : manage-active-directory-client.sh
 #   Type        : script

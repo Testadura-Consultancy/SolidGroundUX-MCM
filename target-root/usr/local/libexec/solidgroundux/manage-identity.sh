@@ -4,7 +4,7 @@
 # ------------------------------------------------------------------------------------
 # Metadata:
 #   Version     : 2.2
-#   Build       : 2630620
+#   Build       : 2630700
 #   Shortname   : MANAGE_IDENTITY
 #   Checksum    : c9e31ed785af27596d4d3cfcdae883e334f0651ff0b98d0b6cc36215bbec69be
 #   Source      : manage-identity.sh

@@ -4,7 +4,7 @@
 # ------------------------------------------------------------------------------------
 # Metadata:
 #   Version     : 2.2
-#   Build       : 2630620
+#   Build       : 2630700
 #   Shortname   : MANAGE_FRAMEWORK_STATE
 #   Checksum    : b844acf8165b0c86f8a895e1a43c6937f1c3fdf5bb35e9db8d9df7eb6718cb36
 #   Source      : manage-framework-state.sh
