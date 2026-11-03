@@ -1,0 +1,381 @@
+# Changelog History
+
+This changelog covers Release 1.2.2626021 - Release 2.2.2630700
+
+[Back to  current Changelog](CHANGELOG.md)
+
+## Release 2.2.2630700
+
+### Documentation structure, illustrations and rendering (2026-11-02)
+
+- Completed the MCM documentation review across console modules, management scripts, Python API descriptions and authored bundle/section prefaces; updated explanations and usage examples to reflect the current code.
+- Added bundle-wide sequential numbering of standalone figures in published navigation order. Generated captions have stable figure anchors and link from a new **Figure Index** appendix; authored source files are not rewritten.
+- Added optional percentage-based width in Markdown image options (for example, `width=80%`) while retaining pixel sizing, responsiveness, captions and Figure Index links. Quoted caption text is not parsed as a sizing directive.
+- Adjusted Figure Index table proportions so figure and reference columns have more room while descriptive text can wrap in the middle column, without changing unrelated site tables.
+- Kept the documentation bundle’s default stylesheets under MCM control. Product images and chapter-scoped templates are retained, but legacy product CSS cannot silently replace the shared bundle stylesheet; explicit product-specific styling remains a future option.
+- Replaced obsolete transferred documentation diagrams with reviewed MCM architecture, console, module-lifecycle, Markdown-to-HTML and WCM authoring/workflow illustrations; updated prefaces to distinguish documentation generation/authoring from website generation/publication.
+
+### Website workflow status tracking (2026-11-02)
+
+- After confirmed successful documentation-bundle generation, mark downstream website-generation and publishing actions as pending; after successful website generation, mark publication as pending. Cancellations do not invalidate downstream results, and pending statuses are recorded across menu redraws where supported.
+
+### Documentation site title bar and source breadcrumbs (2026-10-30)
+
+- Moved the contextual page title and breadcrumb from the article body into the documentation header, matching the Testadura page layout while keeping the existing sidebar and language controls.
+- Displayed source filenames (for example, `sgnd-setup.sh`) in documentation breadcrumbs instead of the source page's descriptive title; retained ordinary site navigation labels for other pages.
+- Added original `source_file` metadata to generated script documentation so filename breadcrumbs remain accurate without changing the displayed page title. Older source-overview pages remain supported through their existing `Source` line.
+
+
+### Documentation bundle composition (2026-10-30)
+
+- Replaced the Chapter 0 selection in the bundle manager with ordered **Bundle Prefaces**, **Bundle Epilogues**, and explicitly selected authored documents. Existing saved `chapter0` selections are interpreted as legacy bundle prefaces.
+- Added automatic discovery of bundle-prefixed `.sh`, `.py`, and `.md` documentation sources, preferring exact bundle-ID filenames over generic `bundle_*` filenames. Manual lists take precedence; deliberately empty lists disable discovery.
+- Added source-file selections from other repositories, section-level preface/epilogue placement and duplicate-source/route checks.
+- Published bundle introductions before product chapters and bundle closing remarks after all product chapters, before appendices. Product and section prefaces/epilogues now receive ordered pages rather than being concatenated into section indexes.
+- Copied authored Markdown byte-for-byte. The WCM content loader reads optional generated navigation-order metadata from `config/doc-nav-orders.json` rather than rewriting Markdown front matter.
+
+
+### Web Content Management metadata editor (2026-10-29)
+
+- Added an explicit **Remove metadata field** action to the staged page editor. Removed front-matter keys fall back to computed defaults after Save; `:clear` continues to retain an empty explicit field. Mixed edits and removals are committed atomically, with the Markdown body preserved.
+
+### Documentation bundles and website publication (2026-10-29)
+
+#### Added
+
+- Relocated the legacy documentation-generation diagrams from SDK into MCM documentation assets, with MCM-prefixed filenames; artwork is unchanged and awaits a separate content-accuracy review.
+- Added persistent documentation-bundle configuration for assembling Markdown from multiple source repositories (Framework, SDK, and MCM) into one documentation website, with optional designated Chapter 0.
+- Added remote Nginx website discovery to publishing: an existing website supplies its hostname and document root; when creating a new website, the tool suggests an appropriate root based on the remote server's configured websites, with manual entry available.
+- Added public HTTPS certificate export for the selected managed website, including the export path, SHA-256 fingerprint and an SCP retrieval command. Private keys are not exported.
+- Added a dedicated unmatched-host HTTPS fallback so requests for hostnames without a matching HTTPS virtual host do not expose another hosted website; Ubuntu's ordinary HTTP default site remains supported.
+
+#### Changed
+
+- Moved the documentation bundle manager and source-to-Markdown generator from SDK to MCM as the authoritative implementation; obsolete SDK copies are not maintained.
+- Changed generated Chapter 0 handling to store a stable relative generated-content reference and resolve it **after** Markdown generation. The selected document becomes the bundle homepage exactly once, is removed from its original content position and indexes/navigation, and does not produce duplicate YAML front matter. Existing absolute references can be migrated.
+- Separated the website pipeline into independent operations: **Assemble Markdown → Generate Website → Publish Website** for documentation, and **Generate Website → Publish Website** for ordinary WWW content.
+- Simplified **Publish Website** to state-saved source HTML directory, destination `user@host`, remote directory, website hostname and Update/Mirror synchronization, followed by Publish/Modify/Cancel. Publishing no longer depends on the Markdown repository or a separately managed destination registry.
+- Simplified general post-action countdowns to Enter to continue and P/Space to pause; removed the unused Cancel choice from completed-action dialogs without changing pre-action confirmations.
+- Placed remote server selection ahead of website discovery, and postponed the completed settings summary until a remote website has been selected or created.
+- Standardized displayed Yes/No decisions and their defaults to title case (`Yes` / `No`) while preserving framework-internal uppercase decision values.
+- Kept HTTPS optional for managed sites, with existing-certificate or self-signed configuration and optional HTTP-to-HTTPS redirection.
+
+#### Fixed
+
+- Corrected duplicate/ambiguous legacy publishing-destination resolution during the transition away from repository-scoped destinations.
+- Corrected publication status reporting so failed deployment and cancellation are not described as successful publication.
+- Corrected the initial HTTPS fallback design to coexist with Ubuntu's default HTTP virtual host instead of requiring the administrator to remove it.
+- Hid the internal `00-solidgroundux-https-default` configuration from ordinary Nginx website listings and made site inspection use sudo when needed, without broadening permissions.
+
+#### Verified
+
+- End-to-end deployment on a restored Nginx host: generated SolidGroundUX documentation published over HTTP, then HTTPS enabled with redirection and a self-signed certificate; the public certificate was exported and trusted by the Windows certificate store (Edge displayed a secure connection; Chrome still indicated a resource-security warning). A second, independent Testadura WWW website was published alongside it.
+
+### Active Directory
+
+- Added a separate **Join existing domain as additional DC** workflow with DNS/LDAP/Kerberos discovery, interactive Samba DC join, generated Kerberos configuration, resolver cutover, service/DNS registration and DRS replication status checks. Existing first-DC provisioning remains unchanged.
+- Added tracked child actions to report the first failing additional-DC stage. The workflow refuses to overwrite an existing smb.conf and requires the system resolver to discover the existing domain before joining. Live join and failure recovery are not tested.
+
+### Framework diagnostics
+
+- Added **Inspect / repair permissions** to Framework Diagnostics, invoking the Framework-owned policy engine in dry-run first and requiring explicit confirmation before applying its policy.
+
+### Database-server management
+
+- Added module `61-postgresql.sh` with `manage-postgresql.sh` and `sgnd-manage-postgresql`, following the SQL Server host-management lifecycle for Ubuntu 24.04/26.04.
+- Added module `62-mariadb.sh` with `manage-mariadb.sh` and `sgnd-manage-mariadb`, using stock Ubuntu packages and a dedicated MariaDB configuration override.
+- Both modules register tracked preparation substeps, service, network, memory, firewall, storage inspection, status and validation actions. Automatic relocation of existing database directories is intentionally disabled to avoid damaging populated servers.
+- **Validation update:** Live PostgreSQL and MariaDB servers are confirmed operational. This does not imply separate validation of every storage, restart, or recovery scenario.
+
+
+### Web Content Management 2.1 — final workflow and authoring updates
+
+- Markdown image sizes: optional `width` and `height` (pixels) for inline Markdown images and `td-image-text`, including images nested in tiles and galleries; no change to featured-card sizing defaults.
+
+- Consolidated the Incoming workflow around **Retrieve Incoming**, **Import local files to Incoming**, and **Review and ingest Incoming package**, including ZIP packages with Markdown and local resources.
+- Added automatic movement of successfully ingested packages to `incoming/archive/`; failed or conflicting packages remain available for review.
+- Added `featured_order` front-matter ordering for the homepage Featured slider: numbered items first (ascending), followed by unnumbered items alphabetically; `nav_order` remains independent.
+- Documented the front-matter Featured workflow, the remaining legacy `featured.cfg` override, and the separate `featured-slider.cfg` autoplay setting.
+- Updated the Web Content Manager preface and repository authoring instructions to reflect the current Incoming and Featured workflows.
+
+### Added
+
+- Added the new **Web Content Management** module (`55-web-content-management`) with the `manage-web-content.sh` management executable and supporting Python package under `usr/local/lib/solidgroundux/py/webcontent`.
+- Added Markdown-based static-site generation from site configuration, content, templates, CSS, and assets, including multilingual routes and language-aware navigation.
+- Added content hierarchy support based on the website content tree, with section landing pages, nested subpages, breadcrumbs, and automatically generated **In deze sectie** child-page indexes.
+- Added interactive Markdown ingestion from the canonical site `incoming/` directory, with support for an operator-supplied directory or `--ingest-dir` override.
+- Added metadata-assisted ingestion that uses metadata already present in a Markdown file, derives safe defaults where possible, and interactively asks only for missing or ambiguous values.
+- Added batch ingestion with remembered defaults for repeated metadata such as language, content type, and parent section, allowing subsequent files to accept the previous choices with Enter.
+- Added archival of successfully ingested source Markdown under `ingested/YYYY-MM-DD/`, preserving the original input while writing normalized canonical content into the website content tree.
+- Added safe page deletion with multi-select support, translation-aware handling, recursive section deletion confirmation, protected section roots, and archival under `deleted/YYYY-MM-DD/` rather than immediate destruction.
+- Added Testadura Markdown component extensions, including nested `:::` component blocks, responsive `td-grid` / `td-tile` layouts, callouts, inline/image classes, and native scroll-snap image galleries.
+- Added configurable featured-content support through `featured.cfg`, allowing product pages or articles to be curated independently of the site navigation and resolved per language by the generator.
+- Added website-source validation for content metadata, duplicate generated routes, optional section-index structure, component CSS references, featured-content targets, and other generation-time consistency checks.
+- Added section management for creating, renaming/moving, and removing website sections, including configurable section index pages and explicit choices for moving, archiving, or deleting contained content.
+- Added interactive page-metadata editing and management of publication status, with draft/preview output separated from the public website.
+- Added website publication destinations stored as reusable profiles, including SSH/rsync targets and **Update** versus **Mirror** synchronization previews with explicit confirmation.
+- Added remote Nginx-site provisioning from Web Content Management: check the destination host and document root, offer to create missing sites, and refuse silently changing conflicting existing site configurations.
+- Added assisted SSH authentication recovery for remote publication, including agent detection, fallback to the fixed SolidGroundUX socket, key unlocking, public-key installation, and retry.
+- Added remote publication-directory preparation and permission checks, with confirmed remediation for the publishing account while keeping the site readable by Nginx.
+- Added optional internal DNS A-record registration and post-publication DNS/HTTP verification as part of the website-deployment workflow.
+- Added optional DNS A-record cleanup to **Web Server Management → Manage Sites → Remove site**, limited to a record matching the local web-server address and requiring explicit confirmation.
+- Added a documentation content comparison to **Documentation status**, with a confirmed **Update published documentation** operation using an rsync checksum preview.
+- Added favicon rendering/support through the Python site renderer so published sites can serve `favicon.ico` as a static asset; no separate Nginx management action is required.
+
+- Added optional per-site HTTPS configuration in **Web Server Management → Manage Sites**, supporting existing certificates or self-signed test certificates and optional HTTP-to-HTTPS redirection, with Nginx configuration validation and rollback.
+- Added per-site private URL-section management using Nginx HTTP Basic Authentication, bcrypt password hashes stored outside the document root, and optional on-demand installation of `apache2-utils` (`htpasswd`).
+- Added an HTTPS-only Markdown upload receiver behind Nginx Basic Authentication, accepting up to ten `.md` files per request, with per-file limits and storage outside the public document root.
+- Added a drag-and-drop Markdown upload page and a separate authenticated upload endpoint; the website can publish the upload page without exposing the receiver publicly.
+- Added **Retrieve Incoming** in Web Content Management, with persistently configurable SSH source host, account, port, and remote incoming directory, selection of multiple files, and post-transfer remote archiving of successfully retrieved files.
+- Added multi-file selection to **Ingest**, alongside the existing ingest-all workflow.
+- Added automatically generated, expandable sidebar navigation for nested sections and subpages, using configured main-section labels and Markdown page titles, with support for sections without index pages.
+- Added `hidden` navigation behavior and `ShowHidden`/`HideHidden` browsing controls, including preservation across internal navigation; private-page metadata is checked against configured protected URL prefixes at generation time.
+- Added content-hash versioning of local CSS and JavaScript asset references to reduce stale browser asset caching.
+
+### Changed
+
+- Changed website generation so the filesystem content tree is authoritative for page hierarchy while `navigation.cfg` remains focused on the main site navigation.
+- Changed non-listing section child pages to render as normal pages by default while article/listing sections retain article behavior.
+- Changed multilingual generation so navigation and language-switch links are emitted only for translations that actually exist in the generated output.
+- Changed Web Content Management action status handling so a successful ingest or delete operation that changes website source marks **Generate website** as warning until the site is regenerated successfully.
+- Changed page-deletion UX to use multi-selection and the standard SolidGroundUX auto-continue flow, with **Enter** returning to the menu and **A** offering another deletion pass.
+- Changed Web Content Management publishing from a configuration-file-only operation into an interactive, destination-based deployment flow while retaining preview and cancellation controls.
+- Changed remote hosting operations to execute the canonical Web Server Management executable under the existing constrained SolidGroundUX sudo policy rather than assuming general passwordless sudo.
+- Changed SSH helper loading to use `SGND_USING=(sgnd-ssh-deployment.sh)` and its Framework-owned common library, rather than a hand-maintained set of library search paths.
+- Changed Computer Setup into a thin console orchestrator with separate computer/identity and SSH-access management executables; added per-user SSH key-generation, remote installation, agent-unlock, and authentication-test actions.
+- Changed the installed-documentation source path in Web Server Management to `/usr/local/share/doc/solidgroundux-codex`, with an override through `SGND_WEB_DOC_INSTALLED_ROOT` or `web-server.cfg`.
+
+- Changed content validation to permit missing language variants and optional section index pages; an untranslated or index-less intermediate directory no longer blocks generation solely because its index is absent.
+- Changed the site navigation from flat top-level links to a recursive hierarchy; hidden section nodes suppress their descendants in ordinary navigation but can be revealed with `ShowHidden`.
+- Changed the upload-page generation to include the required JavaScript explicitly and fail if the expected upload script is unavailable; the script and other JavaScript assets now publish from `www/js/` rather than `www/images/`.
+- Changed the web-content publishing flow to distinguish successful rsync publication from subsequent HTTP verification warnings; an HTTP-to-HTTPS `301` is still reported as a pending verification rather than a publishing failure.
+
+### Fixed
+
+- Fixed language-switch generation that could previously expose links to untranslated pages when only a subset of configured languages was generated.
+- Fixed nested Testadura Markdown component parsing so nested `:::` blocks are handled correctly without being confused by fenced code blocks containing the same marker.
+- Fixed reversed SSH username/hostname parameters during remote publishing authentication checks.
+- Fixed remote Web Server executable resolution to use the canonical MCM `libexec` path rather than nonexistent `mcm` subdirectories.
+- Fixed remote provisioning's incompatible `sudo -n true` precheck and aligned privileged site setup with the configured SolidGroundUX executable sudo rule.
+- Fixed a publishing-script regression that restored obsolete manual SSH-helper sourcing and argument ordering.
+
+- Fixed managed Basic Auth password-file directory and file permissions so the Nginx worker can read credentials without exposing them publicly.
+- Fixed Markdown upload setup to recognize existing managed HTTPS and Basic Auth configuration and avoid rewriting a functioning TLS-protected site.
+- Fixed `ShowHidden` behavior across page navigation, including support for hidden subsection navigation in the generated HTML.
+- Fixed the upload page silently losing its drag-and-drop interface when the external JavaScript reference was missing from generated HTML.
+- Fixed upload-script path handling after relocating `markdown-upload.js` from `images/` to `js/`.
+
+### Known limitations
+
+- HTTP verification after publication still reports an intentional `301` redirect to HTTPS as pending; follow the redirect and validate HTTPS with an appropriate certificate trust policy in a future refinement.
+- `private: true` is publication metadata, not access control: server-side Nginx authentication must be configured and tested independently for each protected URL and upload endpoint.
+
+## Release 2.1.2627801
+
+### SolidGroundUX setup
+
+- Renamed the SolidGroundUX lifecycle entry in the Management Console from **Release manager** to **Setup** and switched it to the canonical `/var/lib/solidgroundux/sgnd-setup.sh` entry point, with the former release-manager path retained as a transition fallback.
+
+### Management Console
+
+- Added a loaded-module registry view under **SolidGroundUX -> Framework Diagnostics**, showing module Shortname, Title, Type, Version, Build, load timestamp, and source, with selectable detailed metadata including Description.
+- Expanded the loaded-module registry schema and registration flow to retain canonical header identity for modules loaded during the current console session.
+- Changed console navigation so `Esc` is the canonical return/exit key: `Esc` returns from a module page to the main index and, on the main index, asks for confirmation before exiting.
+- Removed `Q/q` as a Management Console exit shortcut and made the footer/help text context-aware (`Esc Previous menu` on module pages and `Esc Exit` on the main index).
+- Standardized end-of-action behavior across console modules so actions that immediately return/redraw do not add a redundant completion wait.
+- Made lazy module loading transactional so registrations created during a failed module load are rolled back before returning, preventing duplicate groups/items when the module is retried.
+
+### Storage module
+
+- Corrected the indentation of the **Unmount storage** and **Expand storage** menu entries.
+
+### Samba file server
+
+- Added dedicated `manage-samba-users.sh` ownership for standalone Samba user/group administration, separating identity management from share/directory management.
+- Added a single **Manage users and groups** entry beneath Samba Shares and removed standalone identity CRUD from the share manager.
+- Added a comprehensive standalone Samba identity overview including user group memberships.
+- Fixed **Add user(s) to local group** so the second selector lists Samba users rather than local groups.
+- Added the required datatable dependency to the standalone Samba user/group manager.
+- Verified fresh Active Directory mode end-to-end, including AD join, Samba preparation, share publication, access configuration, validation, and Windows client access.
+- Verified fresh standalone mode end-to-end and verified both standalone -> AD and AD -> standalone authentication-mode transitions.
+
+### Docker module
+
+- Fixed the malformed first line in `manage-docker-server.sh` so the script has a valid shebang/header boundary.
+
+### Storage module
+
+- Added recovery for restored or reattached `SGND_STORAGE` volumes whose filesystem UUID no longer matches the SolidGroundUX-managed `/etc/fstab` entry; persistence reconciliation can identify an unambiguous managed volume, confirm the repair, update persistent configuration, and remount it without reprovisioning.
+- Added completion-status propagation for composite storage configuration so completed storage subtasks are reflected by their Management Console status icons.
+
+### AD Server module
+
+- Added tracked subtask reporting for the composite domain-provisioning workflow so each underlying provisioning action is reflected in the Management Console after **Provision domain** completes.
+- Verified fresh Active Directory Domain Controller provisioning end-to-end, including DNS, Kerberos, LDAP, registration, validation, and status.
+
+### AD Management
+
+- Added multi-select user/group management for bulk Active Directory actions and completed the current 2.1 management workflow validation.
+
+### AD Client module
+
+- Added tracked subtask reporting for the composite domain-join workflow so completed, failed, warning, and unexecuted join steps are reflected correctly in Management Console status.
+- Changed an already-joined domain preflight result from failure to warning, preventing an existing membership from being presented as an error.
+- Added host Kerberos keytab validation to AD client join and validation.
+- Expanded AD client reconciliation to detect and repair a missing or invalid `/etc/krb5.keytab` before restarting SSSD, allowing an existing valid realm membership to be repaired without a leave/rejoin cycle.
+- Fixed domain leave so a single leave operation immediately clears realm membership and deactivates SSSD; verified with repeated join/leave testing against `testadura2.hq`.
+
+### Samba file server
+
+- Simplified Samba authentication preparation so the server derives its mode from host Active Directory membership: AD members are configured for ADS integration and non-members for standalone operation, leaving domain membership ownership with the AD Client module.
+- Completed Samba ADS integration and validation around Samba machine trust, Winbind domain state, NETLOGON connectivity, SSSD-backed host membership, and DNS verification.
+- Improved Samba share-root preparation and validation so managed share paths remain traversable by authorized identities.
+- Expanded **Show shares** into the consolidated share/access overview, including authentication mode, backing path and directory state, path traversal, explicit group access, and access-configuration state; removed the now-redundant **Show access** action.
+- Added multiple-selection support for Active Directory groups when granting share access, applying the selected access level to every selected group and share.
+- Improved share creation so the managed share root is displayed, the backing directory defaults to the share name but can be overridden with a relative path, and an existing suitable backing directory is reused rather than treated as an error.
+- Added optional immediate access configuration after creating a share and kept new shares secure until explicit access is assigned.
+- Added standalone Samba identity management for local Samba users and groups while keeping those actions unavailable in Active Directory mode.
+- Added access-identity reconciliation support for managed shares.
+- Fixed share-root traversal permissions that could allow Samba share discovery while filesystem traversal still denied authorized AD users.
+- Fixed multi-group access assignment where only one selected Active Directory group could receive the requested rights.
+- Fixed composite Samba preparation so completed child actions report their status to the Management Console.
+- Added dedicated Samba directory management, separating filesystem directory lifecycle and ACL management from Samba share management, with share-root protection, multi-directory selection, explicit/default ACL inspection, and independently selectable Read, Write, and Traverse permissions.
+- Added stateful default share access group and access level, with authentication-mode-aware group selection and support for clearing the saved default.
+- Improved standalone local-group selection by excluding `nogroup` and user-private primary groups while retaining deliberate Samba access groups.
+- Fixed share access reconciliation to use the authentication-aware single-group selector and correctly propagate Samba access synchronization failures.
+- Improved Samba authentication reconfiguration with visible current/target mode reporting and progress through the transition steps.
+- Fixed standalone-to-AD Samba transitions where Winbind retained stale machine-account credentials by synchronizing Samba machine-account data from the valid host AD membership before trust validation.
+- Improved directory access reporting to use the same compact principal-to-rights presentation as share management, including explicit and default ACLs for both users and groups.
+- Fixed Active Directory directory-ACL assignment and display on subdirectories by resolving AD identities reliably before applying ACLs and verifying immediate/default ACL writes.
+- Verified Samba directory management and standalone <-> Active Directory transitions end-to-end.
+
+### Webserver module
+
+- Added completion status reporting for web-server preparation steps, including separate status for Nginx installation and web-service startup.
+- Changed composite web-server preparation to persist child action results in the Management Console, matching the tracked workflow behavior used by other compound modules.
+- Standardized web-server action endings and removed redundant menu wait times for actions that handle their own continuation dialogs.
+- Improved web-content and SolidGroundUX documentation publishing to resolve and validate the actual source web root, preventing nested publication directories that could result in HTTP 403 responses.
+- Added site document-root management, allowing the document root of an existing Nginx site to be changed.
+- Verified the Web Server and publishing workflows end-to-end, including site management, content publishing, documentation publishing, validation, and status.
+
+### SQL Server module
+
+- Added persistent child-action progress reporting for **Prepare SQL Server**, covering repository configuration, engine installation, SQL Server setup, and SQL Server tools installation.
+- Reordered the SQL Server menu so **Install SQL Server tools** is grouped with the other **Prepare SQL Server** child actions, keeping menu order aligned with the compound workflow.
+
+## Release 2.1.2626712
+
+### Changed
+
+- Samba share creation now selects a storage location immediately below the configured SolidGroundUX storage root before asking for the share name; the share path is derived from that location and existing backing directories can be reused.
+- Standardized Management Console public management wrappers on the current canonical wrapper template rather than direct fixed `/usr/local/libexec` execution.
+
+### Removed
+
+- Removed remaining references to the superseded `sgnd-framework-smoketest` command and stale `framework-smoketest.sh` implementation; Framework testing uses the Framework-owned `sgnd-smoketest` command.
+
+### Fixed
+
+- Fixed Active Directory shared management code so it invokes the canonical identity-management executable directly instead of depending on the Management Console's private module-script runner.
+- Fixed Active Directory server provisioning so resolver handoff waits for IPv4 DNS port 53 to become available before starting Samba, preventing intermittent DNS-listener failures during fresh domain-controller provisioning.
+- Fixed Active Directory Management module metadata formatting that caused lazy-load metadata validation to fail and subsequent retries to produce duplicate menu registrations.
+- Fixed Samba managed-share discovery and validation so shares can reside beneath selected top-level storage locations rather than being restricted to `/srv/storage/shares`.
+
+### Verified
+
+- Verified fresh Active Directory Domain Controller provisioning end-to-end on Ubuntu 24.04, with all provisioning, DNS, Kerberos, LDAP, registration, validation and status steps completing successfully.
+- Verified Active Directory Client workflow on a fresh Ubuntu system joining an existing known-good Active Directory domain.
+
+## Release 2.1.2626523
+
+### Added
+
+- Added the canonical per-module validation contract: `validate_module_<module-id-with-hyphens-replaced-by-underscores>`, `SGND_MODULE_VALIDATION_MESSAGE`, and standard Passed/Failed/Warning/Skipped return states.
+- Added Framework Test orchestration that combines Framework-owned smoke/installation tests with Management Console-owned registration and module validation.
+- Added metadata discovery from canonical module headers so the console can show ID, Version/Build, Description, Visibility and Source without sourcing modules.
+- Added explicit development-context reporting for the console host and console application when either runs from a non-production root.
+
+### Changed
+
+- Completed ownership of the SolidGround Management Console host (`management-console.sh`) and public `sgnd-console` command in this product. The reusable runtime and `sgnd-menu` API remain Framework-owned.
+- Framework smoke-test ownership moved to the SolidGroundUX Framework; Management Console Modules invokes the public `sgnd-smoketest` command rather than shipping a duplicate smoke-test executable.
+- Module applicability is determined by each module's canonical validator; the Framework Test runner no longer hardcodes server-role knowledge.
+- The Management Console module template is owned by this product; generic executable/library/documentation/wrapper templates are no longer treated as MCM-owned.
+- Standardized corrected module/action presentation around SolidGroundUX section headers, spacing, current-state display and return-flow conventions.
+- Continued the module/executable split so console modules remain presentation/orchestration layers and persistent operations are delegated to management executables.
+- Development-root console execution now consumes the installed Framework when no local Framework is present, while application-local MCM executables and modules continue to resolve from the MCM development tree.
+
+### Removed
+
+- Removed the former Management Console-owned `framework-smoketest.sh` and `sgnd-framework-smoketest` wrapper; these are superseded by Framework-owned `sgnd-smoketest`.
+- Removed duplicated runtime Version/Description module metadata in favor of canonical comment-header metadata.
+
+### Fixed
+
+- Fixed framework/module test integration after the product split, including console registration validation, module validator dispatch, smoke-test menu behavior and public-command execution.
+- Fixed cross-module helper ownership exposed by lazy loading by moving shared helpers to their appropriate Framework or subject-specific libraries.
+- Fixed Active Directory, Storage, Samba, Web Server, SQL Server and Docker module validation/presentation issues found during the 2.1 correction pass.
+- Fixed Management Console development startup against an installed Framework after the repository split, including Framework bootstrap, UI style/palette and license resolution.
+- Fixed duplicate/development module registration issues encountered while separating the SDK tooling from the Management Console product.
+
+## Release 1.2.2626021
+
+### Changed
+
+- Moved all existing console management modules and their dependencies to a separate repository, to be released as a separate product.
+- Defined Management Console Modules as an independently versioned and distributable product, while allowing tested compatible module releases to be bundled with full SolidGroundUX framework releases.
+- Kept `90-development.sh` as a thin integration module over the existing public `sgnd-*` development commands, with no additional management executable required.
+- Refactored console modules toward a presentation-and-orchestration role, moving persistent management operations into dedicated management executables.
+- Refactored `40-solidgroundux.sh` to separate Management Console presentation and orchestration from persistent framework-management operations.
+- Preserved runtime-sensitive framework state operations within the console module, with local DRYRUN protection.
+- Propagated console DRYRUN mode to delegated management executables and release-management actions.
+- Refactored SolidGroundUX framework testing into a thin console orchestration module, preparing framework-owned smoke testing and Management Console-owned registration/module validation to be separated cleanly.
+- Refactored `30-samba-file-server.sh` to separate Samba File Server presentation and orchestration from persistent Samba management operations.
+- Refactored `15-storage.sh` to separate Storage console presentation and orchestration from persistent storage-management operations.
+- Standardized DRYRUN reporting for management actions, using `DRYRUN: Would ...` during previews and an explicit retrospective completion message.
+- Improved Samba selection-dialog presentation with caller-owned section headers, spacing, and option layout.
+- Refactored Active Directory Server, Client, and Directory Management modules into thin console presentation and orchestration modules backed by dedicated management executables.
+- Consolidated shared Active Directory discovery, validation, addressing, and domain-state helpers into `active-directory-management.sh`.
+- Refactored `50-web-server.sh` into a thin console module backed by dedicated web-server management and publishing executables.
+- Separated Nginx server/site configuration from web-content publishing, keeping web-server management responsible for how content is served and publishing responsible for how content is deployed.
+- Generalized web-content publishing so ordinary Nginx sites can be published from local directories, remote machines, or Git repositories; SolidGroundUX documentation remains a specialized publishing workflow.
+- Refactored `60-sqlserver.sh` into a thin console module backed by `manage-sqlserver.sh`, preserving the existing SQL Server host-management scope.
+- Added the initial `70-docker-server.sh` console module with separate Docker host and container-management executables.
+
+### Added
+
+- Added `manage-solidgroundux.sh` for persistent framework configuration management and logfile rotation.
+- Added consistent DRYRUN handling to SolidGroundUX management actions, including detailed previews of intended persistent changes.
+- Added the Framework Test console page and the initial validation/smoke-test orchestration used during the product split.
+- Added `manage-samba-file-server.sh` for Samba File Server installation, preparation, service management, validation, and status operations.
+- Added dedicated Samba share-management support for creating, removing, structuring, validating, and assigning access to managed shares.
+- Added `manage-storage.sh` for persistent storage provisioning, mounting, expansion, access management, validation, and status operations.
+- Added storage configuration reconciliation to detect an existing `SGND_STORAGE` volume and repair stale SolidGroundUX `storage.cfg` state without reprovisioning the volume.
+- Added storage persistence reconciliation to detect and remove stale SolidGroundUX-managed `/etc/fstab` entries while preserving the active storage volume.
+- Added reconciliation checks to storage provisioning validation, including configured-versus-detected storage state and managed `fstab` consistency.
+- Added `manage-active-directory-server.sh` for Active Directory Domain Controller provisioning, preparation, validation, and status operations.
+- Added `manage-active-directory-client.sh` for Active Directory client joining, reconciliation, validation, status, and leave operations.
+- Added `manage-active-directory.sh` for Active Directory user, group, and computer management.
+- Added Active Directory client reconciliation for repairing DNS, machine identity, SSSD state, and client DNS registration without silently rejoining the domain.
+- Expanded Active Directory validation to cover domain membership, Kerberos and LDAP discovery, SSSD, DNS configuration and registration, and directory enumeration.
+- Added `manage-web-server.sh` for Nginx installation, content-root configuration, site lifecycle, service and firewall management, documentation-site configuration, validation, and status.
+- Added `publish-web-content.sh` for generic Nginx content publishing from local directories, remote machines, and Git repositories.
+- Added reusable Git repository publishing with branch/tag and repository-subdirectory selection for ordinary web sites.
+- Preserved SolidGroundUX documentation publishing as a specialized workflow using installed documentation, local or remote sources, or a Git repository.
+- Added `manage-sqlserver.sh` for SQL Server repository setup, engine and tools installation, storage, network, memory, service, firewall, validation, and status operations.
+- Added `manage-docker-server.sh` for Docker Engine installation, host storage configuration, service management, validation, and status.
+- Added `manage-docker-containers.sh` for basic container and image lifecycle operations, including create, start, stop, restart, remove, inspect, logs, image listing, and image pulls.
+
+### Fixed
+
+- Fixed delegated executable argument parsing so framework built-in options such as `--dryrun` are parsed correctly.
+- Fixed Samba File Server management action declaration so enum action values are correctly registered with the SolidGroundUX argument parser.
+- Fixed framework smoke-test validation to load all console modules before validating registered console handlers.
+- Fixed storage recovery when an existing `SGND_STORAGE` volume is valid but `storage.cfg` points to a stale mount point.
+- Fixed validation coverage for stale SolidGroundUX-managed `/etc/fstab` storage entries.
+- Fixed Samba management dependence on stale storage configuration by consistently consuming the reconciled SolidGroundUX storage configuration.
+- Fixed Active Directory shared-library loading so application-owned AD helpers resolve correctly from the Management Modules development or production tree.
+- Fixed stale private Active Directory helper references introduced during the module/executable split and restored client context collection using the shared AD helpers.
+- Fixed web publishing DRYRUN behavior so publishing state, SSH setup, Git checkout activity, and destination content are not persistently changed during preview.
+- Fixed malformed enum argument specifications in `framework-smoketest.sh`, `manage-solidgroundux.sh`, and `set-identity.sh` so allowed values are registered correctly.
+- Fixed a stray token in `framework-smoketest.sh` that prevented the script from parsing.
