@@ -6,7 +6,7 @@
 </td>
 <td valign="middle">
   <h2>SolidGroundUX: Management Console Modules</h2>
-  <h4>Version 2.1.2630201 · © 2026 Testadura</h4>
+  <h4>Version 2.2.2630700 · © 2026 Testadura</h4>
 </td>
 </tr>
 </table>
