@@ -3,9 +3,9 @@
 # ----------------------------------------------------------------------------------
 # Metadata:
 #   Version     : 2.2
-#   Build       : 2630700
+#   Build       : 2630913
 #   Shortname   : COMPUTER_SETUP
-#   Checksum    : 354ad50018ce69773e45341b233fbe228c02589b26ecbb867f38a488b8f29e0e
+#   Checksum    : 16a0874f3fbae8a88866999cafbc67e468ced3851f0e6b6e2665bfa391a57ea3
 #   Source      : 10-computer-setup.sh
 #   Type        : module
 #   Group       : Modules
@@ -14,7 +14,9 @@
 #
 # Description:
 #   Registers post-clone computer setup and optional outbound SSH deployment
-#   access management. Prepare computer retains its existing four-step sequence.
+#   access management. Optional Cinnamon, GNOME and Plasma desktop login and RDP are managed
+#   separately. Remote desktop session inspection and cleanup are opt-in;
+#   Prepare computer retains its existing four-step sequence.
 # ==================================================================================
 set -uo pipefail
 
@@ -158,6 +160,43 @@ set -uo pipefail
         #   _computer_configure_sudoers
         #   ```
     _computer_configure_sudoers()     { _computer_manage sudoers; }
+    # fn: _computer_configure_desktop_login - Configure optional workstation domain login.
+        # . Purpose
+        #   Configure domain login and PAM home creation for LightDM, GDM3 or SDDM.
+        # . Returns
+        #   The delegated action exit status.
+        # . Usage
+        #   ```bash
+        #   _computer_configure_desktop_login
+        #   ```
+    _computer_configure_desktop_login() { _computer_manage desktop-login; }
+
+    # fn: _computer_configure_rdp - Configure desktop-native RDP access.
+        # . Purpose
+        #   Configure Cinnamon XRDP, GNOME Remote Login or KDE KRDP with optional UFW scope.
+        # . Returns
+        #   The delegated action exit status.
+        # . Usage
+        #   ```bash
+        #   _computer_configure_rdp
+        #   ```
+    _computer_configure_rdp() { _computer_manage rdp; }
+
+    # fn: _computer_manage_rdp_sessions - Inspect and terminate logind sessions.
+        # . Purpose
+        #   Provide explicit session inspection and cleanup for remote desktops.
+        # . Description
+        #   List logind sessions, terminate one selected session, or clear all
+        #   sessions and user processes after confirmation. Includes local/SSH
+        #   sessions in the display to prevent accidental termination.
+        # . Returns
+        #   The delegated action exit status.
+        # . Usage
+        #   ```bash
+        #   _computer_manage_rdp_sessions
+        #   ```
+    _computer_manage_rdp_sessions() { _computer_manage rdp-sessions; }
+
     # fn: _computer_status - Call `_computer_manage` with the `status` action.
         # . Purpose
         #   Invoke the status action through the module manager.
@@ -334,6 +373,19 @@ set -uo pipefail
     #   > Allow the administrator to run trusted SolidGroundUX tools without a password.
     #   > Handler: _computer_configure_sudoers
     #
+    # ! Configure desktop login
+    #   > Configure desktop manual domain login and PAM home creation.
+    #   > Handler: _computer_configure_desktop_login
+    #
+    # ! Configure Remote Desktop (RDP)
+    #   > Configure desktop-specific RDP with optional trusted LAN scope.
+    #   > Handler: _computer_configure_rdp
+    #
+    # ! Manage Remote Desktop Sessions
+    #   > Inspect current logind sessions, terminate one selected session or
+    #   > terminate all sessions for a selected user, with confirmation.
+    #   > Handler: _computer_manage_rdp_sessions
+    #
     # ! Show computer status
     #   > Show identity, network, SSH, host-key, and SolidGround sudo state.
     #   > Handler: _computer_status
@@ -353,8 +405,9 @@ set -uo pipefail
         "$SGND_COMPUTER_SETUP_MODULE_NAME" \
         "$(sgnd_header_get_field_value "${BASH_SOURCE[0]}" "Metadata" "Purpose")" \
         0 1 100
-    sgnd_menu_register_group "computer-ssh-key-management" "SSH Key Management" "Manage outgoing SSH authentication for the current user" 0 1 101
-    sgnd_menu_register_group "computer-validation" "Validation" "Inspect or validate computer setup and prepare for cloning" 0 1 102
+    sgnd_menu_register_group "computer-desktop" "Desktop Configuration" "Configure desktop login and RDP for Cinnamon, GNOME and Plasma" 0 1 101
+    sgnd_menu_register_group "computer-ssh-key-management" "SSH Key Management" "Manage outgoing SSH authentication for the current user" 0 1 102
+    sgnd_menu_register_group "computer-validation" "Validation" "Inspect or validate computer setup and prepare for cloning" 0 1 103
 
     # Composite action; its four tracked substeps immediately follow, indented.
     sgnd_menu_register_item "preparepc" "$SGND_COMPUTER_SETUP_MODULE_ID" "Prepare computer" "_computer_prepare" "Run steps 2-5 in order" 0 15 1 0
@@ -362,6 +415,11 @@ set -uo pipefail
     sgnd_menu_register_item "sshkeys" "$SGND_COMPUTER_SETUP_MODULE_ID" "Generate SSH host keys" "_computer_generate_ssh_keys" "Generate SSH server host keys, validate sshd, and restart SSH" 0 15 1 1
     sgnd_menu_register_item "sshcfg" "$SGND_COMPUTER_SETUP_MODULE_ID" "Configure SSH service" "_computer_configure_ssh_service" "Enable or disable the SSH service" 0 15 1 1
     sgnd_menu_register_item "sudoers" "$SGND_COMPUTER_SETUP_MODULE_ID" "Setup SolidGround sudo access" "_computer_configure_sudoers" "Allow administrator to run trusted SolidGroundUX tools without a password" 0 15 1 1
+
+    # Desktop actions are opt-in and must never run in standard Prepare computer.
+    sgnd_menu_register_item "desktoplogin" "computer-desktop" "Configure desktop login" "_computer_configure_desktop_login" "Configure manual domain login for LightDM, GDM3 or SDDM with PAM homes" 0 15 1 0
+    sgnd_menu_register_item "desktoprdp" "computer-desktop" "Configure Remote Desktop (RDP)" "_computer_configure_rdp" "Configure desktop-native RDP and scoped UFW access" 0 15 1 0
+    sgnd_menu_register_item "rdpsessions" "computer-desktop" "Manage Remote Desktop Sessions" "_computer_manage_rdp_sessions" "Inspect sessions and terminate a session or all processes for a selected user" 0 15 1 0
 
     # User credentials: never a part of unattended/standard Prepare computer.
     sgnd_menu_register_item "sshuserkey" "computer-ssh-key-management" "Generate user SSH key" "_computer_ssh_generate_user_key" "Generate a personal SSH key pair for outbound connections" 0 15 1 0

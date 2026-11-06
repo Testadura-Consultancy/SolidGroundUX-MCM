@@ -416,7 +416,7 @@ def _render_navigation(
         expanded = active or (route.endswith("/") and current_base_route.startswith(route))
         classes = ' class="active"' if active else ""
         current = ' aria-current="page"' if active else ""
-        link = (f'<a href="{html.escape(destination.route, quote=True)}"{classes}{current}>{label}</a>'
+        link = (f'<a href="{html.escape(destination.href, quote=True)}"{classes}{current}>{label}</a>'
                 if destination is not None else f'<span class="wc-nav-label">{label}</span>')
         # A hidden section index conceals this node and all descendants in
         # normal navigation; ShowHidden reveals the complete subtree. Ordinary
@@ -822,10 +822,10 @@ def _card(item: ContentItem, heading_level: int = 2, image: str = "") -> str:
     heading_level = 2 if heading_level not in {2, 3} else heading_level
     summary = f"<p>{html.escape(item.summary)}</p>" if item.summary else ""
     date = f'<time datetime="{html.escape(item.date, quote=True)}">{html.escape(item.date)}</time>' if item.date else ""
-    media = (f'<a class="index-card-media" href="{html.escape(item.route, quote=True)}">'
+    media = (f'<a class="index-card-media" href="{html.escape(item.href, quote=True)}">'
              f'<img src="{html.escape(image, quote=True)}" alt="" loading="lazy"></a>') if image else ""
     return ('<article class="article-card">' + media
-            + f'<h{heading_level}><a href="{html.escape(item.route, quote=True)}">{html.escape(item.title)}</a></h{heading_level}>'
+            + f'<h{heading_level}><a href="{html.escape(item.href, quote=True)}">{html.escape(item.title)}</a></h{heading_level}>'
             + date + summary + '</article>')
 
 
@@ -841,7 +841,7 @@ def _index_row(item: ContentItem, image: str, *, article: bool) -> str:
     date = (f'<time datetime="{html.escape(item.date, quote=True)}">{html.escape(item.date)}</time>'
             if article and item.date else "")
     summary = f'<p>{html.escape(item.summary)}</p>' if item.summary else ""
-    return (f'<a class="index-row" href="{html.escape(item.route, quote=True)}">'
+    return (f'<a class="index-row" href="{html.escape(item.href, quote=True)}">'
             + (f'<span class="index-row-image">{media}</span>' if media else '')
             + f'<span class="index-row-content">{date}<strong>{html.escape(item.title)}</strong>{summary}'
             + '</span><span class="index-row-arrow" aria-hidden="true">›</span></a>')
@@ -968,7 +968,7 @@ def _featured_card(item: ContentItem, image: str = "") -> str:
         fit = "cover"
     if image:
         image_html = (
-            f'<a class="featured-card-media featured-card-media--{fit}" href="{html.escape(item.route, quote=True)}" tabindex="-1">'
+            f'<a class="featured-card-media featured-card-media--{fit}" href="{html.escape(item.href, quote=True)}" tabindex="-1">'
             f'<img src="{html.escape(image, quote=True)}" alt="">'
             "</a>"
         )
@@ -989,9 +989,9 @@ def _featured_card(item: ContentItem, image: str = "") -> str:
         '<article class="featured-card" role="listitem">'
         + image_html
         + '<div class="featured-card-body">'
-        + f'<h3><a href="{html.escape(item.route, quote=True)}">{html.escape(item.title)}</a></h3>'
+        + f'<h3><a href="{html.escape(item.href, quote=True)}">{html.escape(item.title)}</a></h3>'
         + summary
-        + f'<a class="featured-card-more" href="{html.escape(item.route, quote=True)}">'
+        + f'<a class="featured-card-more" href="{html.escape(item.href, quote=True)}">'
         + f'{html.escape(read_more)} <span aria-hidden="true">→</span></a>'
         + "</div></article>"
     )
@@ -1230,7 +1230,8 @@ def generate_site(source: str | Path, output: str | Path, languages: str | Itera
     footer_template = load_template(config.templates_dir / "partials" / "footer.html", config.templates_dir)
 
     page_count = 0
-    render_total = sum(page.language in selected_languages and not page.metadata.get("nav_only") for page in items)
+    render_total = sum(page.language in selected_languages and not page.metadata.get("nav_only")
+                       and not page.is_link for page in items)
     render_processed = 0
     render_step = max(1, render_total // 20)
     print(f"WCM: Rendering {render_total} pages", file=sys.stderr, flush=True)
@@ -1240,7 +1241,7 @@ def generate_site(source: str | Path, output: str | Path, languages: str | Itera
     for item in items:
         if item.language not in selected_languages:
             continue
-        if item.metadata.get('nav_only'):
+        if item.metadata.get('nav_only') or item.is_link:
             continue
         render_processed += 1
         if render_processed == 1 or render_processed % render_step == 0 or render_processed == render_total:
@@ -1469,7 +1470,7 @@ def _write_sitemap(output: Path, config, items: list[ContentItem], langs: set[st
     root = ET.Element(f"{{{ns}}}urlset")
     for item in sorted(items, key=lambda value: value.route):
         if (item.language not in langs or item.status != "published" or item.hidden
-                or item.private or item.metadata.get('nav_only')):
+                or item.private or item.metadata.get('nav_only') or item.is_link):
             continue
         entry = ET.SubElement(root, f"{{{ns}}}url")
         ET.SubElement(entry, f"{{{ns}}}loc").text = config.base_url.rstrip("/") + item.route

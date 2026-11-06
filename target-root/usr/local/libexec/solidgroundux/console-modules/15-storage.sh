@@ -3,7 +3,7 @@
 # ----------------------------------------------------------------------------------
 # Metadata:
 #   Version     : 2.2
-#   Build       : 2630700
+#   Build       : 2630815
 #   Shortname   : STORAGE
 #   Source      : 15-storage.sh
 #   Type        : module
@@ -11,7 +11,7 @@
 #   Subgroup    : Storage
 #   Purpose     : Configure and inspect local storage volumes and directories
 #
-#   Checksum : 95cf4882fff045033c9322d6ce91669ef80ffcc3a0de7828229d1792984f6453
+#   Checksum : 037402403281846d6c2a081ca33872b6496e5bf18f1fe5597806df66e1a11fc5
 # Description:
 #   Registers local-storage management actions with the SolidGround Management Console.
 #   Persistent storage operations are implemented by manage-storage.sh.
@@ -295,6 +295,17 @@ set -uo pipefail
         #   ```
     storage_manage_directories()          { _storage_run_action directories; }
 
+    # fn: storage_add_virtiofs - Configure an attached VirtioFS share in the Linux guest
+        # . Purpose
+        #   Mount an existing VirtioFS directory and persist the guest mount in /etc/fstab.
+        # . Returns
+        #   The return code from the storage management action.
+        # . Usage
+        #   ```bash
+        #   storage_add_virtiofs
+        #   ```
+    storage_add_virtiofs()               { _storage_run_action virtiofs-add; }
+
     # fn: storage_access_status - Call `_storage_run_action` with the `access-status` action.
         # . Purpose
         #   Invoke the access status action through the module manager.
@@ -385,6 +396,8 @@ set -uo pipefail
     #   > Run active checks including configuration reconciliation.
     # ! Show storage status
     #   > Show local disks and configured storage status.
+    # ! Add VirtioFS directory
+    #   > Mount a Proxmox VirtioFS share and make it persistent in the Linux guest.
     # ! Manage directories
     #   > Create, rename, list, or remove directories beneath managed storage roots.
     sgnd_menu_register_group \
@@ -403,6 +416,7 @@ set -uo pipefail
     sgnd_menu_register_item "storage-reconcile" "$SGND_STORAGE_MODULE_ID" "Reconcile storage configuration" "storage_reconcile" "Update SolidGroundUX storage configuration from the existing SGND_STORAGE volume" 0 0 1 0
     sgnd_menu_register_item "storage-reconcile-persistence" "$SGND_STORAGE_MODULE_ID" "Reconcile storage persistence" "storage_reconcile_persistence" "Repair stale SGND_STORAGE UUID mappings or explicitly remove stale managed entries" 0 0 1 0
     sgnd_menu_register_item "storage-status" "$SGND_STORAGE_MODULE_ID" "Show storage status" "storage_status" "Show local disks and configured storage status" 0 0 1 0
+    sgnd_menu_register_item "storage-virtiofs-add" "$SGND_STORAGE_MODULE_ID" "Add VirtioFS directory" "storage_add_virtiofs" "Mount an attached VirtioFS share and persist it in /etc/fstab" 0 0 1 0
     sgnd_menu_register_item "storage-directories" "$SGND_STORAGE_MODULE_ID" "Manage directories" "storage_manage_directories" "Create, rename, list, or remove directories beneath managed storage roots" 0 0 1 0
 
     # . Storage Access

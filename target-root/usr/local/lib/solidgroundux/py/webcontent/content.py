@@ -216,6 +216,29 @@ class ContentItem:
         except (TypeError, ValueError):
             return 1000
 
+    # fn: is_link - Determine whether this entry points directly to a URL rather than a generated page.
+    @property
+    def is_link(self) -> bool:
+        """Identify an authored hyperlink entry.
+
+        Usage:
+            ```python
+            if content_item.is_link:
+                print(content_item.href)
+            ```"""
+        return str(self.metadata.get("content_type", "")).strip().lower() == "link"
+
+    # fn: href - Return the navigation destination for a page or hyperlink entry.
+    @property
+    def href(self) -> str:
+        """Get the target URL for navigation and index links.
+
+        Usage:
+            ```python
+            destination = content_item.href
+            ```"""
+        return str(self.metadata.get("url", "")).strip() if self.is_link else self.route
+
 
 
 # --- Internal functions ------------------------------------------------------------

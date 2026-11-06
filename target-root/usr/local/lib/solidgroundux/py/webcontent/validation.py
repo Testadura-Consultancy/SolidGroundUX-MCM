@@ -5,6 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from pathlib import Path
 import re
+from urllib.parse import urlsplit
 
 from .content import discover_content, load_featured, load_navigation, load_site_config
 from .markdown import referenced_style_classes
@@ -110,6 +111,22 @@ def validate_site(source: str | Path) -> ValidationResult:
         logical_languages.setdefault(item.logical_id, set()).add(item.language)
         if not item.metadata.get("title"):
             errors.append(f"Missing required metadata 'title': {item.source_path}")
+        # A link-type entry appears in generated indexes and navigation without
+        # producing an HTML page of its own. Validate its destination before
+        # passing it to any href, especially to exclude script/data schemes.
+        if item.is_link:
+            url = item.href
+            parsed = urlsplit(url)
+            allowed = (
+                (parsed.scheme in {"http", "https"} and bool(parsed.netloc))
+                or (parsed.scheme in {"mailto", "tel"} and bool(parsed.path))
+                or (url.startswith("/") and not url.startswith("//")
+                    and not parsed.scheme and not parsed.netloc)
+            )
+            if not url or any(char.isspace() or ord(char) < 32 for char in url) or not allowed:
+                errors.append(f"Invalid or missing link URL in {item.source_path}: {url!r}")
+            if item.route == "/":
+                errors.append(f"The website home page cannot be a link-type entry: {item.source_path}")
         # Index directives are generator constructs, not CSS component classes.
         style_body = re.sub(r"(?m)^\s*:::\s+(?:td-index|index)(?:\s+[^\n]*)?$", "", item.body)
         # td-details takes human-readable summary text, not class names.

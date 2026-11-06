@@ -4,7 +4,7 @@
 # -------------------------------------------------------------------------------------
 # Metadata:
 #   Version     : 2.2
-#   Build       : 2630700
+#   Build       : 2630814
 #   Shortname   : MANAGE_AD_CLIENT
 #   Source      : manage-active-directory-client.sh
 #   Type        : script
@@ -12,7 +12,7 @@
 #   Subgroup    : Active Directory Client
 #   Purpose     : Join, reconcile, validate, and inspect an Active Directory client
 #
-#   Checksum : 9329925be139980f4e3d917164db68da0c0671b2ae5afd5bababb6e81f45b90f
+#   Checksum : 8909e17df220c95d5e15aedb5a5578eb46797e2df7d52f3b7ff35c0663353018
 # Description:
 #   Implements persistent Active Directory client management actions exposed by the
 #   25-active-directory-client Management Console module.
@@ -525,6 +525,38 @@ set -uo pipefail
         sayok "Machine joined to $SGND_ADC_REALM with a validated host keytab."
     }
 
+    # fn: _adc_enable_home_directories
+        # . Purpose
+        #   Enable PAM's standard first-login home-directory creation for AD users.
+        # . Behavior
+        #   - Uses pam-auth-update rather than editing common-session directly.
+        #   - Idempotent and suitable for both desktop and headless AD clients.
+        # . Returns
+        #   0 when enabled, nonzero if the PAM profile could not be activated.
+        # . Usage
+        #   ```bash
+        #   _adc_enable_home_directories
+        #   ```
+    _adc_enable_home_directories() {
+        [[ -x /usr/sbin/pam-auth-update ]] || {
+            sayfail "pam-auth-update is unavailable; cannot enable AD home-directory creation."
+            return 1
+        }
+        if (( ${FLAG_DRYRUN:-0} == 1 )); then
+            sayinfo "DRYRUN: Would enable PAM mkhomedir for Active Directory accounts."
+            return 0
+        fi
+        sudo /usr/sbin/pam-auth-update --enable mkhomedir || {
+            sayfail "Could not enable PAM mkhomedir."
+            return 1
+        }
+        grep -q 'pam_mkhomedir.so' /etc/pam.d/common-session 2>/dev/null || {
+            sayfail "PAM mkhomedir did not appear in /etc/pam.d/common-session."
+            return 1
+        }
+        sayok "Automatic home-directory creation enabled for AD logins."
+    }
+
     # fn: _adc_step_sssd
         # . Purpose
         #   Normalize, enable, restart, and validate the SSSD client service.
@@ -533,6 +565,7 @@ set -uo pipefail
         #   - Removes obsolete SolidGroundUX-managed SSSD settings through the shared AD API.
         #   - Validates the resulting SSSD configuration before activation.
         #   - Enables and restarts sssd.service only after configuration validation succeeds.
+        #   - Enables PAM mkhomedir so AD accounts receive a home directory on first login.
         #
         # . Returns
         #   - 0 when the SSSD configuration is valid and the service is active; non-zero otherwise.
@@ -542,11 +575,12 @@ set -uo pipefail
         #   _adc_step_sssd
         #   ```
     _adc_step_sssd() {
-        (( ${FLAG_DRYRUN:-0} == 1 )) && { sayinfo "DRYRUN: Would normalize, validate, and restart SSSD."; return 0; }
+        (( ${FLAG_DRYRUN:-0} == 1 )) && { sayinfo "DRYRUN: Would normalize, validate, restart SSSD, and enable PAM mkhomedir."; return 0; }
         sgnd_ad_normalize_sssd_config || return $?
         sudo systemctl enable sssd.service >/dev/null 2>&1 || true
         sudo systemctl restart sssd.service || { sayfail "SSSD could not be restarted."; return 1; }
         systemctl is-active --quiet sssd.service || { sayfail "SSSD is not active."; return 1; }
+        _adc_enable_home_directories || return $?
         sayok "SSSD is active."
     }
 
@@ -679,6 +713,12 @@ set -uo pipefail
         [[ -n "$realm" ]] && sgnd_ad_discover_kerberos "$realm" "$dns_server" && sgnd_print_labeledvalue --label "Kerberos discovery" --value "Passed" || { sgnd_print_labeledvalue --label "Kerberos discovery" --value "Failed"; failures=$((failures+1)); }
         [[ -n "$realm" ]] && sgnd_ad_discover_ldap "$realm" "$dns_server" && sgnd_print_labeledvalue --label "LDAP discovery" --value "Passed" || { sgnd_print_labeledvalue --label "LDAP discovery" --value "Failed"; failures=$((failures+1)); }
         systemctl is-active --quiet sssd.service && sgnd_print_labeledvalue --label "SSSD service" --value "Passed" || { sgnd_print_labeledvalue --label "SSSD service" --value "Failed"; failures=$((failures+1)); }
+        if grep -q 'pam_mkhomedir.so' /etc/pam.d/common-session 2>/dev/null; then
+            sgnd_print_labeledvalue --label "PAM home creation" --value "Passed"
+        else
+            sgnd_print_labeledvalue --label "PAM home creation" --value "Failed"
+            failures=$((failures+1))
+        fi
         if sudo sssctl config-check >/dev/null 2>&1; then
             sgnd_print_labeledvalue --label "SSSD configuration" --value "Passed"
         else
@@ -797,6 +837,11 @@ set -uo pipefail
             else
                 _adc_step_sssd || return $?
             fi
+        fi
+
+        if ! grep -q 'pam_mkhomedir.so' /etc/pam.d/common-session 2>/dev/null; then
+            repaired=1
+            _adc_enable_home_directories || return $?
         fi
 
         if ! _adc_dns_record_matches; then

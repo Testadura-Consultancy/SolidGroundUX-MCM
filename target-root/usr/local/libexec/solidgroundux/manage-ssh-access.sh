@@ -3,15 +3,15 @@
 # SolidGroundUX Management Console Modules - manage-ssh-access
 # ----------------------------------------------------------------------------------
 # Metadata:
-#   Version     : 2.2
-#   Build       : 2630700
+#   Version     : 2.1
+#   Build       : 2630201
 #   Shortname   : MANAGE_SSH_ACCESS
 #   Source      : manage-ssh-access.sh
 #   Type        : script
 #   Group       : Modules
 #   Subgroup    : Computer Setup
 #   Purpose     : Computer Setup action implementation
-#   Checksum : 4d41458724791da65832e6b90af4b799d77bb78ae64c334b853dda0157fb8404
+#   Checksum : f3d3c055415469e90655ab01a3e966b572a09a9bed1a688f953085d045db1b1b
 # Description:
 #   Standalone management actions dispatched from 10-computer-setup.sh.
 #   UI, reporting and errors use the SolidGroundUX framework.
@@ -47,7 +47,7 @@ set -uo pipefail
         #     present, falls back to the installed framework copy without changing
         #     SGND_FRAMEWORK_ROOT.
         #
-        # . Globals (write)
+        # . Globals (Write)
         #   SGND_FRAMEWORK_ROOT
         #
         # . Output
@@ -55,8 +55,8 @@ set -uo pipefail
         #   helpers are not available until sgnd-exe-common.sh has been loaded.
         #
         # . Returns
-        #   0 when the framework root was resolved and executable common library loaded.
-        #   126 when the script path cannot be resolved, no canonical root component can
+        #   - 0 when the framework root was resolved and executable common library loaded.
+        #   - 126 when the script path cannot be resolved, no canonical root component can
         #   be found, or the executable common library is unreadable.
         #
         # . Usage
@@ -173,13 +173,13 @@ SGND_STATE_SAVE=0
         #   _computer_ssh_select_key "<out_var>"
         #   ```
     _computer_ssh_select_key() {
-        local out_var="${1:?missing variable}" key="${HOME}/.ssh/id_ed25519"
-        ask --label "SSH private key" --var key --default "$key" --back || return 2
-        [[ "$key" == "$HOME/.ssh/"* && "$key" != *$'\n'* && "$key" != *$'\r'* ]] || {
+        local out_var="${1:?missing variable}" selected_key="${HOME}/.ssh/id_ed25519"
+        ask --label "SSH private key" --var selected_key --default "$selected_key" --back || return 2
+        [[ "$selected_key" == "$HOME/.ssh/"* && "$selected_key" != *$'\n'* && "$selected_key" != *$'\r'* ]] || {
             sayfail "Select a private key below $HOME/.ssh/."
             return 1
         }
-        printf -v "$out_var" '%s' "$key"
+        printf -v "$out_var" '%s' "$selected_key"
     }
 
     # fn: _computer_ssh_select_remote - Read and validate remote SSH login details.
@@ -195,15 +195,15 @@ SGND_STATE_SAVE=0
         #   ```
     _computer_ssh_select_remote() {
         local user_var="${1:?missing user var}" host_var="${2:?missing host var}"
-        local remote_user="${USER:-}" remote_host=""
-        ask --label "Remote SSH user" --var remote_user --default "$remote_user" --back || return 2
-        ask --label "Remote SSH host" --var remote_host --back || return 2
-        [[ "$remote_user" =~ ^[A-Za-z_][A-Za-z0-9_.-]*$ && "$remote_host" =~ ^[A-Za-z0-9][A-Za-z0-9._-]*$ && "$remote_host" != -* ]] || {
+        local selected_user="${USER:-}" selected_host=""
+        ask --label "Remote SSH user" --var selected_user --default "$selected_user" --back || return 2
+        ask --label "Remote SSH host" --var selected_host --back || return 2
+        [[ "$selected_user" =~ ^[A-Za-z_][A-Za-z0-9_.-]*$ && "$selected_host" =~ ^[A-Za-z0-9][A-Za-z0-9._-]*$ && "$selected_host" != -* ]] || {
             sayfail "Invalid remote SSH user or hostname."
             return 1
         }
-        printf -v "$user_var" '%s' "$remote_user"
-        printf -v "$host_var" '%s' "$remote_host"
+        printf -v "$user_var" '%s' "$selected_user"
+        printf -v "$host_var" '%s' "$selected_host"
     }
 
     # fn: _computer_ssh_generate_user_key - Safely create a personal Ed25519 key pair.

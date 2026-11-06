@@ -4,9 +4,9 @@
 # ------------------------------------------------------------------------------------
 # Metadata:
 #   Version     : 2.2
-#   Build       : 2630700
+#   Build       : 2630913
 #   Shortname   : MANAGE_IDENTITY
-#   Checksum    : c9e31ed785af27596d4d3cfcdae883e334f0651ff0b98d0b6cc36215bbec69be
+#   Checksum    : e173e1b5cd27c52670548bdd650ab2f94011d021890adf839db9cd8f2c373d52
 #   Source      : manage-identity.sh
 #   Type        : script
 #   Group       : Modules
@@ -342,6 +342,8 @@ set -uo pipefail
     _load_current_values() {
         local detected=""
         local current_netplan=""
+        local nm_uuid=""
+        local nm_method=""
 
         [[ -n "$TARGET_HOSTNAME" ]] || TARGET_HOSTNAME="$(hostnamectl --static 2>/dev/null || hostname)"
 
@@ -358,7 +360,20 @@ set -uo pipefail
         fi
 
         if [[ -z "$USE_DHCP" ]]; then
-            if [[ -r "$NETPLAN_FILE" ]] && grep -Eq '^[[:space:]]*dhcp4:[[:space:]]*true([[:space:]]|$)' "$NETPLAN_FILE"; then
+            if [[ -n "$PRIMARY_IFACE" ]] && _interface_uses_networkmanager; then
+                nm_uuid="$(_networkmanager_connection_uuid)" || nm_uuid=""
+                if [[ -n "$nm_uuid" ]]; then
+                    nm_method="$(nmcli -g ipv4.method connection show "$nm_uuid" 2>/dev/null)" || nm_method=""
+                fi
+                case "$nm_method" in
+                    auto) USE_DHCP="Y" ;;
+                    manual) USE_DHCP="N" ;;
+                    *)
+                        saywarning "Could not determine NetworkManager IPv4 mode; verify the DHCP selection."
+                        USE_DHCP="N"
+                        ;;
+                esac
+            elif [[ -r "$NETPLAN_FILE" ]] && grep -Eq '^[[:space:]]*dhcp4:[[:space:]]*true([[:space:]]|$)' "$NETPLAN_FILE"; then
                 USE_DHCP="Y"
             else
                 USE_DHCP="N"
@@ -423,7 +438,11 @@ set -uo pipefail
         sgnd_print_sectionheader "Enter identifying information for this host" --maxwidth "$mxw"
         ask --label "Hostname" --var TARGET_HOSTNAME --default "$TARGET_HOSTNAME" --labelwidth "$lw"
         ask --label "Use DHCP (Y/N)" --var dhcp --default "$dhcp" --labelwidth "$lw"
-        ask --label "Netplan file" --var NETPLAN_FILE --default "$NETPLAN_FILE" --labelwidth "$lw"
+        if _interface_uses_networkmanager; then
+            sayinfo "NetworkManager owns $PRIMARY_IFACE; the active connection profile will be updated."
+        else
+            ask --label "Netplan file" --var NETPLAN_FILE --default "$NETPLAN_FILE" --labelwidth "$lw"
+        fi
 
         case "${dhcp^^}" in
             Y|YES) USE_DHCP="Y" ;;
@@ -492,29 +511,6 @@ set -uo pipefail
         fi
 
         sayinfo "Primary network interface: $PRIMARY_IFACE"
-    }
-
-    # fn: _remove_other_netplan_files - Remove other netplan files
-        # . Purpose
-        #   Remove other netplan files.
-        #
-        # . Returns
-        #   . Returns
-        #     the underlying command or workflow status.
-        #
-        # . Usage
-        #   ```bash
-        #   _remove_other_netplan_files
-        #   ```
-    _remove_other_netplan_files() {
-        local file
-
-        while IFS= read -r -d '' file; do
-            if [[ "$file" != "$NETPLAN_FILE" ]]; then
-                sayinfo "Removing superseded netplan config: $file"
-                rm -f -- "$file" || return $?
-            fi
-        done < <(find /etc/netplan -maxdepth 1 -type f -name '*.yaml' -print0)
     }
 
     # fn: _static_ip_conflict_check - Static ip conflict check
@@ -594,6 +590,221 @@ set -uo pipefail
         return 0
     }
 
+    # fn: _interface_uses_networkmanager - Check whether NetworkManager owns the interface.
+        # . Purpose
+        #   Ask NetworkManager itself whether the primary interface is managed. Do not
+        #   infer ownership only from the installed desktop or a Netplan filename.
+        # . Usage
+        #   ```bash
+        #   _interface_uses_networkmanager
+        #   ```
+    _interface_uses_networkmanager() {
+        local managed=""
+
+        command -v nmcli >/dev/null 2>&1 || return 1
+        managed="$(nmcli -g GENERAL.NM-MANAGED device show "$PRIMARY_IFACE" 2>/dev/null)" || return 1
+        [[ "${managed,,}" == "yes" || "${managed,,}" == "true" ]]
+    }
+
+    # fn: _networkmanager_connection_uuid - Resolve the active profile for an interface.
+        # . Purpose
+        #   Resolve the profile UUID without creating another NetworkManager connection.
+        #   An inactive/unconnected interface is not safe to configure automatically.
+        # . Usage
+        #   ```bash
+        #   _networkmanager_connection_uuid
+        #   ```
+    _networkmanager_connection_uuid() {
+        local connection=""
+        local uuid=""
+
+        connection="$(nmcli -g GENERAL.CONNECTION device show "$PRIMARY_IFACE" 2>/dev/null)" || return 1
+        [[ -n "$connection" && "$connection" != "--" ]] || return 1
+        uuid="$(nmcli -g connection.uuid connection show "$connection" 2>/dev/null)" || return 1
+        [[ -n "$uuid" && "$uuid" != "--" ]] || return 1
+        printf '%s\n' "$uuid"
+    }
+
+    # fn: _apply_networkmanager_config - Update an existing NetworkManager IPv4 profile.
+        # . Purpose
+        #   Preserve the existing NetworkManager connection and Netplan-backed 90-NM
+        #   profiles rather than replacing their YAML with a networkd configuration.
+        #   Snapshot the IPv4 fields and restore them if reactivation fails.
+        # . Arguments
+        #   - `$1`: `static`, `dhcp` or `dns-only`.
+        # . Usage
+        #   ```bash
+        #   _apply_networkmanager_config "dhcp"
+        #   ```
+    _apply_networkmanager_config() {
+        local mode="${1:-}"
+        local uuid=""
+        local field=""
+        local original=""
+        local output=""
+        local -a previous=()
+        local -a desired=()
+        local -a fields=(ipv4.method ipv4.addresses ipv4.gateway ipv4.dns ipv4.dns-search ipv4.ignore-auto-dns)
+
+        uuid="$(_networkmanager_connection_uuid)" || {
+            sayfail "No active NetworkManager connection found for $PRIMARY_IFACE; refusing to create a competing profile."
+            return 1
+        }
+
+        for field in "${fields[@]}"; do
+            original="$(nmcli -g "$field" connection show "$uuid" 2>/dev/null)" || {
+                sayfail "Cannot inspect NetworkManager field '$field' for $PRIMARY_IFACE."
+                return 1
+            }
+            [[ "$original" == "--" ]] && original=""
+            previous+=("$field" "$original")
+        done
+
+        case "$mode" in
+            static)
+                desired=(
+                    ipv4.method manual
+                    ipv4.addresses "$TARGET_IPV4"
+                    ipv4.gateway "$TARGET_GATEWAY"
+                    ipv4.dns "$TARGET_DNS"
+                    ipv4.dns-search "$TARGET_DNS_SEARCH"
+                    ipv4.ignore-auto-dns no
+                )
+                ;;
+            dhcp)
+                desired=(
+                    ipv4.method auto
+                    ipv4.addresses ""
+                    ipv4.gateway ""
+                    ipv4.dns ""
+                    ipv4.dns-search ""
+                    ipv4.ignore-auto-dns no
+                )
+                ;;
+            dns-only)
+                desired=(
+                    ipv4.dns "$TARGET_DNS"
+                    ipv4.dns-search "$TARGET_DNS_SEARCH"
+                    ipv4.ignore-auto-dns yes
+                )
+                ;;
+            *)
+                sayfail "Unknown NetworkManager configuration mode: $mode"
+                return 1
+                ;;
+        esac
+
+        if (( ${FLAG_DRYRUN:-0} == 1 )); then
+            sayinfo "DRYRUN: Would update the existing NetworkManager connection on $PRIMARY_IFACE ($mode)."
+            sayinfo "DRYRUN: Would reactivate the connection; unrelated Netplan files would remain untouched."
+            return 0
+        fi
+
+        sayinfo "Updating the existing NetworkManager connection on $PRIMARY_IFACE ($mode)."
+        if ! output="$(nmcli connection modify "$uuid" "${desired[@]}" 2>&1)"; then
+            sayfail "NetworkManager refused the connection update: $output"
+            return 1
+        fi
+
+        if ! output="$(nmcli connection up "$uuid" ifname "$PRIMARY_IFACE" 2>&1)"; then
+            sayfail "NetworkManager failed to activate the updated connection: $output"
+            if ! nmcli connection modify "$uuid" "${previous[@]}" >/dev/null 2>&1; then
+                saywarning "Failed to restore the previous NetworkManager IPv4 settings."
+            elif ! nmcli connection up "$uuid" ifname "$PRIMARY_IFACE" >/dev/null 2>&1; then
+                saywarning "Previous settings restored, but the connection could not be reactivated."
+            fi
+            return 1
+        fi
+
+        sayok "NetworkManager connection updated; unrelated profiles preserved."
+        return 0
+    }
+
+    # fn: _netplan_file_is_dedicated - Refuse to overwrite unrelated Netplan interfaces.
+        # . Purpose
+        #   The networkd writer replaces its selected file. Permit that only when
+        #   the file contains the selected interface and standard network settings.
+        #   A complex/multi-interface configuration must be edited manually.
+        # . Usage
+        #   ```bash
+        #   _netplan_file_is_dedicated
+        #   ```
+    _netplan_file_is_dedicated() {
+        [[ -f "$NETPLAN_FILE" ]] || return 0
+        awk -v iface="$PRIMARY_IFACE" '
+            /^  (wifis|bridges|bonds|vlans|tunnels|modems|vrfs|nm-devices|dummy-devices):/ { exit 1 }
+            /^  [^ #][^:]*:/ {
+                key=$0
+                sub(/^  /, "", key)
+                sub(/:.*/, "", key)
+                if (key != "version" && key != "renderer" && key != "ethernets") exit 1
+            }
+            /^    [^ #][^:]*:/ {
+                key=$0
+                sub(/^    /, "", key)
+                sub(/:.*/, "", key)
+                gsub(/["\047]/, "", key)
+                if (key != iface) exit 1
+            }
+        ' "$NETPLAN_FILE"
+    }
+
+    # fn: _netplan_other_file_defines_iface - Detect multiple definitions of the selected interface.
+        # . Purpose
+        #   Refuse ambiguous Netplan configurations rather than accidentally overriding
+        #   a later YAML definition while keeping the files themselves untouched.
+        # . Usage
+        #   ```bash
+        #   _netplan_other_file_defines_iface
+        #   ```
+    _netplan_other_file_defines_iface() {
+        local file=""
+        while IFS= read -r -d '' file; do
+            [[ "$file" == "$NETPLAN_FILE" ]] && continue
+            if awk -v iface="$PRIMARY_IFACE" '
+                /^    [^ #][^:]*:/ {
+                    key=$0
+                    sub(/^    /, "", key)
+                    sub(/:.*/, "", key)
+                    gsub(/["\047]/, "", key)
+                    if (key == iface) found=1
+                }
+                END { exit (found ? 0 : 1) }
+            ' "$file"; then
+                return 0
+            fi
+        done < <(find /etc/netplan -maxdepth 1 -type f -name '*.yaml' -print0 2>/dev/null)
+        return 1
+    }
+
+    # fn: _networkd_renderer_is_safe - Guard against switching a NetworkManager system to networkd.
+        # . Purpose
+        #   Check the effective Netplan renderer before writing a networkd-only file.
+        #   NetworkManager-owned interfaces are handled through nmcli instead.
+        # . Usage
+        #   ```bash
+        #   _networkd_renderer_is_safe
+        #   ```
+    _networkd_renderer_is_safe() {
+        local renderer=""
+
+        renderer="$(netplan get "network.ethernets.${PRIMARY_IFACE}.renderer" 2>/dev/null)" || renderer=""
+        if [[ -z "$renderer" || "$renderer" == "null" ]]; then
+            renderer="$(netplan get network.renderer 2>/dev/null)" || renderer=""
+        fi
+        case "${renderer,,}" in
+            ""|null|networkd) return 0 ;;
+            networkmanager)
+                sayfail "NetworkManager is the selected Netplan renderer, but $PRIMARY_IFACE has no active managed connection."
+                return 1
+                ;;
+            *)
+                sayfail "Unsupported Netplan renderer '$renderer' for $PRIMARY_IFACE."
+                return 1
+                ;;
+        esac
+    }
+
     # fn: _network_config - Apply the chosen DHCP or static network configuration to the primary interface.
         # . Purpose
         #   Configure the selected network interface using the chosen network settings.
@@ -605,6 +816,19 @@ set -uo pipefail
     _network_config() {
         _detect_primary_iface || return $?
 
+        if _interface_uses_networkmanager; then
+            if (( ${FLAG_DNS_ONLY:-0} == 1 )); then
+                _apply_networkmanager_config dns-only
+            else
+                case "${USE_DHCP^^}" in
+                    Y|YES|TRUE|1|ON) _apply_networkmanager_config dhcp ;;
+                    *) _apply_networkmanager_config static ;;
+                esac
+            fi
+            return $?
+        fi
+
+        _networkd_renderer_is_safe || return $?
         case "${USE_DHCP^^}" in
             Y|YES|TRUE|1|ON)
                 sayinfo "Configuring DHCP on $PRIMARY_IFACE"
@@ -644,7 +868,7 @@ set -uo pipefail
 
     # fn: _write_netplan_static - Render a static IPv4 Netplan configuration to a file.
         # . Purpose
-        #   Write a networkd Netplan YAML file using the chosen interface, address,
+        #   Write a Netplan networkd YAML file using the chosen interface, address,
         #   gateway, DNS addresses and optional DNS search domain.
         #
         # . Arguments
@@ -714,28 +938,9 @@ set -uo pipefail
         } > "$output_file"
     }
 
-    # fn: _netplan_has_other_files - Test whether additional Netplan YAML configuration files are present.
+    # fn: _backup_netplan_files - Preserve only the target Netplan file before updating it.
         # . Purpose
-        #   Test whether additional Netplan YAML configuration files are present.
-        #
-        # . Usage
-        #   ```bash
-        #   _netplan_has_other_files
-        #   ```
-    _netplan_has_other_files() {
-        local file=""
-
-        while IFS= read -r -d '' file; do
-            [[ "$file" == "$NETPLAN_FILE" ]] || return 0
-        done < <(find /etc/netplan -maxdepth 1 -type f -name '*.yaml' -print0 2>/dev/null)
-
-        return 1
-    }
-
-    # fn: _backup_netplan_files - Preserve the current Netplan YAML files before changing networking.
-        # . Purpose
-        #   Copy all existing /etc/netplan/*.yaml files into the specified backup directory.
-        #
+        #   Back up the selected file without taking ownership of unrelated YAML files.
         # . Arguments
         #   - `$1`: Required directory path for the backup.
         # . Usage
@@ -744,46 +949,42 @@ set -uo pipefail
         #   ```
     _backup_netplan_files() {
         local backup_dir="${1:-}"
-        local file=""
 
         [[ -n "$backup_dir" ]] || return 1
         mkdir -p "$backup_dir" || return $?
-
-        while IFS= read -r -d '' file; do
-            cp -a -- "$file" "$backup_dir/" || return $?
-        done < <(find /etc/netplan -maxdepth 1 -type f -name '*.yaml' -print0 2>/dev/null)
+        if [[ -f "$NETPLAN_FILE" ]]; then
+            cp -a -- "$NETPLAN_FILE" "$backup_dir/previous.yaml" || return $?
+        else
+            : > "$backup_dir/previous-missing" || return $?
+        fi
     }
 
-    # fn: _restore_netplan_files - Restore backed-up Netplan configuration files.
+    # fn: _restore_netplan_files - Roll back only the target Netplan file.
         # . Purpose
-        #   Remove current /etc/netplan/*.yaml files and restore the YAML files from
-        #   the specified backup directory.
-        #
+        #   Restore the original selected YAML without deleting other network profiles.
         # . Arguments
-        #   - `$1`: Required directory path containing the previous YAML files.
+        #   - `$1`: Required directory containing the previous file state.
         # . Usage
         #   ```bash
         #   _restore_netplan_files "/tmp/sgnd-netplan-backup"
         #   ```
     _restore_netplan_files() {
         local backup_dir="${1:-}"
-        local file=""
 
         [[ -d "$backup_dir" ]] || return 1
-
-        while IFS= read -r -d '' file; do
-            rm -f -- "$file" || return $?
-        done < <(find /etc/netplan -maxdepth 1 -type f -name '*.yaml' -print0 2>/dev/null)
-
-        while IFS= read -r -d '' file; do
-            cp -a -- "$file" /etc/netplan/ || return $?
-        done < <(find "$backup_dir" -maxdepth 1 -type f -name '*.yaml' -print0 2>/dev/null)
+        if [[ -e "$backup_dir/previous.yaml" ]]; then
+            cp -a -- "$backup_dir/previous.yaml" "$NETPLAN_FILE" || return $?
+        elif [[ -e "$backup_dir/previous-missing" ]]; then
+            rm -f -- "$NETPLAN_FILE" || return $?
+        else
+            return 1
+        fi
     }
 
     # fn: _apply_netplan_config - Apply Netplan changes with backup and rollback handling.
         # . Purpose
-        #   Render and compare a static or DHCP network configuration, back up existing
-        #   YAML files, and apply the change with the module's dry-run and failure handling.
+        #   Render and compare static or DHCP network settings, back up only the
+        #   selected YAML file, and apply with failure rollback. Unrelated YAML stays intact.
         #
         # . Arguments
         #   - `$1`: Required configuration mode, `static` or `dhcp`.
@@ -826,9 +1027,21 @@ set -uo pipefail
                 ;;
         esac
 
+        if ! _netplan_file_is_dedicated; then
+            sayfail "Netplan file '$NETPLAN_FILE' contains unrelated network settings; refusing to overwrite it."
+            rm -f -- "$candidate_file"
+            rm -rf -- "$backup_dir"
+            return 1
+        fi
+
+        if _netplan_other_file_defines_iface; then
+            sayfail "Multiple Netplan files define $PRIMARY_IFACE; refusing an ambiguous network update."
+            rm -f -- "$candidate_file"
+            rm -rf -- "$backup_dir"
+            return 1
+        fi
+
         if [[ ! -f "$NETPLAN_FILE" ]] || ! cmp -s -- "$candidate_file" "$NETPLAN_FILE"; then
-            changed=1
-        elif _netplan_has_other_files; then
             changed=1
         fi
 
@@ -860,23 +1073,6 @@ set -uo pipefail
 
         _backup_netplan_files "$backup_dir" || {
             sayfail "Failed to back up the current netplan configuration."
-            rm -f -- "$candidate_file"
-            rm -rf -- "$backup_dir"
-            return 1
-        }
-
-        if [[ -f "$NETPLAN_FILE" ]]; then
-            cp -a -- "$NETPLAN_FILE" "${NETPLAN_FILE}.bak" || {
-                sayfail "Failed to create netplan backup: ${NETPLAN_FILE}.bak"
-                rm -f -- "$candidate_file"
-                rm -rf -- "$backup_dir"
-                return 1
-            }
-        fi
-
-        _remove_other_netplan_files || {
-            sayfail "Failed to remove superseded netplan files."
-            _restore_netplan_files "$backup_dir" || true
             rm -f -- "$candidate_file"
             rm -rf -- "$backup_dir"
             return 1

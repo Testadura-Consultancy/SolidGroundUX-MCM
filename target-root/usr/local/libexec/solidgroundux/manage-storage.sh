@@ -4,7 +4,7 @@
 # -------------------------------------------------------------------------------------
 # Metadata:
 #   Version     : 2.2
-#   Build       : 2630700
+#   Build       : 2630815
 #   Shortname   : MANAGE_STORAGE
 #   Source      : manage-storage.sh
 #   Type        : script
@@ -12,7 +12,7 @@
 #   Subgroup    : Storage
 #   Purpose     : Configure, reconcile, validate, and manage local storage volumes and directories
 #
-#   Checksum : c84dca03a20a98226dbe15304d7e971ed1be58ff0784095bd95bd0d1d9c8ef33
+#   Checksum : 8bd944c7596fed498774e8ce2cb09250bd577845bdca270cf52d1d03769cae0e
 # Description:
 #   Implements persistent local-storage management actions exposed by the
 #   15-storage Management Console module.
@@ -26,7 +26,7 @@
 #   ```
 #
 #   Script-specific options:
-#   - `--action NAME`, `-a`: Management action (supported actions: `provision`, `configure`, `mount`, `unmount`, `expand`, `reconcile`, `reconcile-persistence`, `validate`, `status`, `directories`, `access-status`, `set-access`, `restore-defaults`).
+#   - `--action NAME`, `-a`: Management action (supported actions: `provision`, `configure`, `mount`, `unmount`, `expand`, `reconcile`, `reconcile-persistence`, `validate`, `status`, `directories`, `virtiofs-add`, `access-status`, `set-access`, `restore-defaults`).
 #
 # Attribution:
 #   Developers    : Mark Fieten
@@ -141,12 +141,13 @@ set -uo pipefail
 # - Framework integration -----------------------------------------------------------
     SGND_USING=()
     SGND_ARGS_SPEC=(
-        "action|a|enum|ACTION|Management action||provision,configure,mount,unmount,expand,reconcile,reconcile-persistence,validate,status,directories,access-status,set-access,restore-defaults"
+        "action|a|enum|ACTION|Management action||provision,configure,mount,unmount,expand,reconcile,reconcile-persistence,validate,status,directories,virtiofs-add,access-status,set-access,restore-defaults"
     )
     SGND_SCRIPT_EXAMPLES=(
         "  $SGND_SCRIPT_NAME --action status"
         "  $SGND_SCRIPT_NAME --action reconcile"
         "  $SGND_SCRIPT_NAME --dryrun --action reconcile"
+        "  $SGND_SCRIPT_NAME --action virtiofs-add"
     )
     SGND_SCRIPT_GLOBALS=()
     SGND_STATE_VARIABLES=()
@@ -1711,7 +1712,7 @@ set -uo pipefail
 
     # fn: storage_status
         # . Purpose
-        #   Display block-device, mountpoint and filesystem status for the managed storage environment.
+        #   Display local block devices, SolidGroundUX-managed volumes and VirtioFS guest mounts.
         #
         # . Usage
         #   ```bash
@@ -1748,6 +1749,22 @@ set -uo pipefail
             sgnd_print_labeledvalue --label "Available" --value "$available" --labelwidth 20
             sgnd_print
         done < <(_storage_list_managed_fstab_entries)
+
+        sgnd_print_sectionheader "VirtioFS guest mounts"
+        local virtiofs_count=0
+        while IFS='|' read -r source mountpoint filesystem; do
+            [[ -n "$source" && -n "$mountpoint" ]] || continue
+            virtiofs_count=$((virtiofs_count + 1))
+            mounted="No"
+            if [[ "$(findmnt -rn -o SOURCE,FSTYPE --mountpoint "$mountpoint" 2>/dev/null)" == "$source virtiofs" ]]; then
+                mounted="Yes"
+            fi
+            sgnd_print_labeledvalue --label "VirtioFS tag" --value "$source" --labelwidth 20
+            sgnd_print_labeledvalue --label "Mount point" --value "$mountpoint" --labelwidth 20
+            sgnd_print_labeledvalue --label "Mounted" --value "$mounted" --labelwidth 20
+            sgnd_print
+        done < <(awk '$0 !~ /^[[:space:]]*#/ && NF >= 3 && $3 == "virtiofs" { printf "%s|%s|%s\n", $1, $2, $3 }' /etc/fstab)
+        (( virtiofs_count > 0 )) || sgnd_print --text "No persistent VirtioFS guest mounts configured." --pad 2
     }
 
     # fn: storage_validate_provisioning
@@ -1795,6 +1812,255 @@ set -uo pipefail
         sayfail "$failures storage provisioning check(s) failed across $count volume(s)."; return 1
     }
 
+# - VirtioFS guest mounts -----------------------------------------------------------
+    # fn: _storage_virtiofs_validate_tag - Validate a Proxmox VirtioFS directory ID
+        # . Purpose
+        #   Accept only unambiguous VirtioFS mount tags safe for fstab and mount arguments.
+        # . Arguments
+        #   - `$1`: VirtioFS tag advertised by the hypervisor.
+        # . Returns
+        #   - 0 for a valid tag; otherwise non-zero.
+        # . Usage
+        #   ```bash
+        #   _storage_virtiofs_validate_tag "sgnd-releases"
+        #   ```
+    _storage_virtiofs_validate_tag() {
+        local tag="${1:-}"
+        [[ "$tag" =~ ^[[:alnum:]][[:alnum:]_.-]*$ ]] && (( ${#tag} <= 64 ))
+    }
+
+    # fn: _storage_virtiofs_list_tags - Discover VirtioFS shares attached to this guest
+        # . Purpose
+        #   List the tags exposed by the Linux virtiofs driver, without guessing host paths.
+        # . Returns
+        #   - One valid tag per line (no output when no devices are exposed).
+        # . Usage
+        #   ```bash
+        #   _storage_virtiofs_list_tags
+        #   ```
+    _storage_virtiofs_list_tags() {
+        local tag_file="" tag=""
+        for tag_file in /sys/fs/virtiofs/*/tag; do
+            [[ -r "$tag_file" ]] || continue
+            tag=""
+            IFS= read -r tag < "$tag_file" || [[ -n "$tag" ]] || continue
+            _storage_virtiofs_validate_tag "$tag" && printf '%s\n' "$tag"
+        done | sort -u
+    }
+
+    # fn: _storage_virtiofs_validate_target - Validate a guest mount directory
+        # . Purpose
+        #   Reject mountpoints that could be ambiguous, non-canonical, or unsafe in fstab.
+        # . Arguments
+        #   - `$1`: Absolute destination directory.
+        # . Returns
+        #   - 0 for a usable pathname; otherwise non-zero.
+        # . Usage
+        #   ```bash
+        #   _storage_virtiofs_validate_target "/mnt/sgnd-releases"
+        #   ```
+    _storage_virtiofs_validate_target() {
+        local target="${1:-}"
+        _storage_validate_mountpoint "$target" || return 1
+        [[ "$target" =~ ^/[[:alnum:]_./-]+$ ]] || return 1
+        [[ "$target" != */ && "$target" != *//* && "$target" != */./* ]] || return 1
+        [[ "$target" != */../* && "$target" != */.. && "$target" != */. ]] || return 1
+        [[ "$target" != /proc && "$target" != /sys && "$target" != /dev && "$target" != /etc ]] || return 1
+        [[ "$target" != /run && "$target" != /usr && "$target" != /var && "$target" != /boot ]] || return 1
+    }
+
+    # fn: _storage_virtiofs_fstab_entries - Find entries using a tag or destination
+        # . Purpose
+        #   Detect existing or conflicting configuration without touching unrelated fstab rows.
+        # . Arguments
+        #   - `$1`: VirtioFS tag.
+        #   - `$2`: Mount directory.
+        # . Returns
+        #   - Rows of source, target, type separated by vertical bars.
+        # . Usage
+        #   ```bash
+        #   _storage_virtiofs_fstab_entries "sgnd-releases" "/mnt/sgnd-releases"
+        #   ```
+    _storage_virtiofs_fstab_entries() {
+        local tag="${1:?missing VirtioFS tag}"
+        local target="${2:?missing mount point}"
+        awk -v tag="$tag" -v target="$target" '
+            $0 !~ /^[[:space:]]*#/ && NF >= 3 &&
+            (($1 == tag && $3 == "virtiofs") || $2 == target) {
+                printf "%s|%s|%s\n", $1, $2, $3
+            }
+        ' /etc/fstab 2>/dev/null
+    }
+
+    # fn: storage_add_virtiofs - Attach an existing VirtioFS share as a permanent guest mount
+        # . Purpose
+        #   Select an already attached Proxmox VirtioFS directory and persist its guest mount.
+        # . Behavior
+        #   - Finds available share tags in /sys/fs/virtiofs; older kernels can enter a tag manually.
+        #   - Prompts for a mount directory and displays a single confirmation.
+        #   - Never formats disks or changes the SolidGroundUX local-volume configuration.
+        #   - Refuses conflicting fstab entries, mounted targets, or nonempty destinations.
+        #   - Backs up /etc/fstab, validates changes, and restores the backup on failure.
+        #   - Rolls back newly added persistence if the mount cannot be activated.
+        #   - Honors dry-run mode.
+        # . Returns
+        #   - 0 when configured/mounted, or cancelled; otherwise non-zero.
+        # . Usage
+        #   ```bash
+        #   storage_add_virtiofs
+        #   ```
+    storage_add_virtiofs() {
+        local tag="" target="" decision="No" source="" existing_target="" filesystem=""
+        local fstab_backup="" fstab_temp="" current_source="" current_type=""
+        local prior_entry=0 created_directory=0 already_mounted=0
+        local -a tags=()
+
+        sgnd_print
+        sgnd_print_sectionheader "Add VirtioFS directory"
+        sayinfo "Attach the share in Proxmox VM Hardware first. The directory ID is the guest mount tag."
+        mapfile -t tags < <(_storage_virtiofs_list_tags)
+
+        if (( ${#tags[@]} == 0 )); then
+            saywarning "No VirtioFS tags were discovered. Verify the VM hardware attachment and reboot if needed."
+            # Legacy kernels may not expose /sys/fs/virtiofs tags; a manually supplied
+            # tag must still succeed at the actual mount before persistence is accepted.
+            ask --label "VirtioFS tag" --var tag --validate _storage_virtiofs_validate_tag --labelwidth 24 || return $?
+        elif (( ${#tags[@]} == 1 )); then
+            tag="${tags[0]}"
+            sgnd_print_labeledvalue --label "Available share" --value "$tag" --labelwidth 24
+        else
+            ask_selection --label "VirtioFS share" --var tag --items "${tags[@]}" || return $?
+        fi
+
+        _storage_virtiofs_validate_tag "$tag" || { sayfail "Invalid VirtioFS tag."; return 1; }
+        target="/mnt/$tag"
+        ask --label "Guest mount point" --var target --default "$target" \
+            --validate _storage_virtiofs_validate_target --labelwidth 24 || return $?
+        _storage_virtiofs_validate_target "$target" || { sayfail "Invalid mount point."; return 1; }
+        if [[ "$(realpath -m -- "$target" 2>/dev/null)" != "$target" ]]; then
+            sayfail "Mount point contains a symbolic link or a non-canonical path: $target"
+            return 1
+        fi
+
+        # Verify existing persistent config before asking permission to change anything.
+        while IFS='|' read -r source existing_target filesystem; do
+            [[ -n "$source" ]] || continue
+            if [[ "$source" == "$tag" && "$existing_target" == "$target" && "$filesystem" == "virtiofs" ]]; then
+                prior_entry=$((prior_entry + 1))
+            else
+                sayfail "Conflicting fstab entry: $source -> $existing_target ($filesystem)."
+                return 1
+            fi
+        done < <(_storage_virtiofs_fstab_entries "$tag" "$target")
+        if (( prior_entry > 1 )); then
+            sayfail "Duplicate VirtioFS fstab entries found; please reconcile them manually."
+            return 1
+        fi
+
+        if findmnt -rn --mountpoint "$target" >/dev/null 2>&1; then
+            current_source="$(findmnt -rn -o SOURCE --mountpoint "$target" 2>/dev/null || true)"
+            current_type="$(findmnt -rn -o FSTYPE --mountpoint "$target" 2>/dev/null || true)"
+            if [[ "$current_source" == "$tag" && "$current_type" == "virtiofs" ]]; then
+                already_mounted=1
+                if (( prior_entry == 1 )); then
+                    sayok "VirtioFS share '$tag' is already mounted persistently at $target."
+                    return 0
+                fi
+                sayinfo "VirtioFS is already mounted; only boot persistence is needed."
+            else
+                sayfail "Mount point is already occupied ($current_source, $current_type): $target"
+                return 1
+            fi
+        fi
+
+        if (( already_mounted == 0 )); then
+            if [[ -L "$target" ]]; then
+                sayfail "Mount point cannot be a symbolic link: $target"
+                return 1
+            fi
+            if [[ -e "$target" ]]; then
+                if [[ ! -d "$target" || ! -r "$target" || ! -x "$target" ]] || \
+                    [[ -n "$(find "$target" -mindepth 1 -maxdepth 1 -print -quit 2>/dev/null)" ]]; then
+                    sayfail "Mount point must be an accessible, empty directory: $target"
+                    return 1
+                fi
+            fi
+        fi
+
+        sgnd_print
+        sgnd_print_labeledvalue --label "VirtioFS tag" --value "$tag" --labelwidth 24
+        sgnd_print_labeledvalue --label "Guest mount point" --value "$target" --labelwidth 24
+        sgnd_print_labeledvalue --label "Persistence" --value "Mount automatically at boot (/etc/fstab, nofail)" --labelwidth 24
+        sgnd_print
+        ask_decision --label "Configure VirtioFS mount?" \
+            --choices "Yes|Y,No|N" --default "No" --var decision || return $?
+        [[ "${decision^^}" == "YES" ]] || { sayinfo "VirtioFS configuration cancelled."; return 0; }
+
+        if (( ${FLAG_DRYRUN:-0} == 1 )); then
+            if (( prior_entry == 1 )); then
+                sayinfo "DRYRUN: Would mount the existing VirtioFS fstab entry at $target."
+            elif (( already_mounted == 1 )); then
+                sayinfo "DRYRUN: Would add '$tag $target virtiofs rw,nofail 0 0' to /etc/fstab; already mounted."
+            else
+                sayinfo "DRYRUN: Would add '$tag $target virtiofs rw,nofail 0 0' to /etc/fstab, then mount it."
+            fi
+            _storage_dryrun_complete
+            return 0
+        fi
+
+        if [[ ! -d "$target" ]]; then
+            sudo install -d -m 0755 -- "$target" || { sayfail "Could not create mount point $target."; return 1; }
+            created_directory=1
+        fi
+
+        if (( prior_entry == 0 )); then
+            fstab_backup="$(sudo mktemp /etc/fstab.pre-virtiofs.XXXXXXXX)" || return 1
+            sudo cp -a /etc/fstab "$fstab_backup" || return 1
+            fstab_temp="$(mktemp /tmp/sgnd-virtiofs-fstab.XXXXXXXX)" || return 1
+            cat /etc/fstab > "$fstab_temp" || { rm -f -- "$fstab_temp"; return 1; }
+            printf '\n# SolidGroundUX VirtioFS share: %s\n%s %s virtiofs rw,nofail 0 0\n' "$tag" "$tag" "$target" >> "$fstab_temp"
+
+            if ! findmnt --verify --tab-file "$fstab_temp" >/dev/null 2>&1; then
+                sayfail "Proposed fstab did not validate; no persistence changes were applied."
+                rm -f -- "$fstab_temp"
+                (( created_directory == 0 )) || sudo rmdir -- "$target" >/dev/null 2>&1 || true
+                return 1
+            fi
+            if ! sudo install -m 0644 "$fstab_temp" /etc/fstab; then
+                sayfail "Could not update /etc/fstab. Restoring the previous file."
+                sudo cp -a "$fstab_backup" /etc/fstab || sayfail "Rollback failed; restore fstab from $fstab_backup manually."
+                rm -f -- "$fstab_temp"
+                return 1
+            fi
+            rm -f -- "$fstab_temp"
+            if ! sudo systemctl daemon-reload; then
+                sayfail "Could not reload systemd mount configuration. Rolling back /etc/fstab."
+            else
+                sayinfo "Mounting VirtioFS share '$tag' at $target."
+                if (( already_mounted == 1 )) || sudo mount "$target"; then
+                    sayok "VirtioFS share '$tag' configured to mount at boot: $target"
+                    sayinfo "Previous fstab backed up as $fstab_backup."
+                    return 0
+                fi
+                sayfail "VirtioFS mount failed. Restoring the previous /etc/fstab."
+            fi
+            sudo cp -a "$fstab_backup" /etc/fstab || sayfail "Rollback failed; restore fstab from $fstab_backup manually."
+            sudo systemctl daemon-reload >/dev/null 2>&1 || true
+            rm -f -- "$fstab_temp"
+            (( created_directory == 0 )) || sudo rmdir -- "$target" >/dev/null 2>&1 || true
+            return 1
+        fi
+
+        sayinfo "Mounting previously configured VirtioFS share '$tag' at $target."
+        if sudo mount "$target"; then
+            sayok "VirtioFS share '$tag' mounted; existing persistent configuration is unchanged."
+            return 0
+        fi
+        sayfail "Could not mount the existing VirtioFS share '$tag'."
+        (( created_directory == 0 )) || sudo rmdir -- "$target" >/dev/null 2>&1 || true
+        return 1
+    }
+
 # - Action dispatch -----------------------------------------------------------------
     # fn: _run_action - Dispatch the requested management action to its implementation.
         # . Purpose
@@ -1819,6 +2085,7 @@ set -uo pipefail
             validate)        storage_validate_provisioning ;;
             status)          storage_status ;;
             directories)     storage_manage_directories ;;
+            virtiofs-add)   storage_add_virtiofs ;;
             access-status)    storage_access_status ;;
             set-access)       storage_set_access ;;
             restore-defaults) storage_restore_access_defaults ;;
