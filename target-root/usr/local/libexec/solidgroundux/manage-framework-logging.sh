@@ -4,7 +4,7 @@
 # ------------------------------------------------------------------------------------
 # Metadata:
 #   Version     : 2.2
-#   Build       : 2630700
+#   Build       : 2631102
 #   Shortname   : MANAGE_FRAMEWORK_LOGGING
 #   Checksum    : bde898c15021df122680da63b9bd123c9932c973fe40cff8cccf71f7fa217565
 #   Source      : manage-framework-logging.sh

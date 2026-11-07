@@ -3,9 +3,9 @@
 # ----------------------------------------------------------------------------------
 # Metadata:
 #   Version     : 2.2
-#   Build       : 2630700
+#   Build       : 2631102
 #   Shortname   : AD_MANAGEMENT
-#   Checksum    : f8e087d9e9ca850fefd742d7bb0b5610c26e08258e49e6044cbcbb6d94497200
+#   Checksum    : ef931ee2a7e37d3e44e4690ac81da6a2659963e1d13a545da32926073d1ad44a
 #   Source      : 27-active-directory-management.sh
 #   Type        : module
 #   Group       : Modules
@@ -452,8 +452,8 @@ set -uo pipefail
         "Inspect the Active Directory domain" \
         0 1 270
 
-    sgnd_menu_register_item "admg-status" "admg-directory" "Show directory status" "_admg_status" "Show realm, controller state, and directory object counts" 0 15 1 0
-    sgnd_menu_register_item "admg-validate" "admg-directory" "Validate directory management" "_admg_validate" "Validate controller state and directory object enumeration" 0 20 1 0
+    sgnd_menu_register_item "admg-status" "admg-directory" "Show directory status" "_admg_status" "Show realm, controller state, and directory object counts" 0 30 1 0
+    sgnd_menu_register_item "admg-validate" "admg-directory" "Validate directory management" "_admg_validate" "Validate controller state and directory object enumeration" 0 30 1 0
 
     sgnd_menu_register_group \
         "admg-users" \
@@ -461,13 +461,13 @@ set -uo pipefail
         "Manage Active Directory user accounts and group membership" \
         0 1 271
 
-    sgnd_menu_register_item "admg-user-list" "admg-users" "List users" "_admg_list_users" "List Active Directory users" 0 15 1 0
-    sgnd_menu_register_item "admg-user-show" "admg-users" "Show user" "_admg_show_user" "Show user details and direct group memberships" 0 15 1 0
+    sgnd_menu_register_item "admg-user-list" "admg-users" "List users" "_admg_list_users" "List Active Directory users" 0 30 1 0
+    sgnd_menu_register_item "admg-user-show" "admg-users" "Show user" "_admg_show_user" "Show user details and direct group memberships" 0 30 1 0
     sgnd_menu_register_item "admg-user-create" "admg-users" "Create user" "_admg_create_user" "Create an Active Directory user" 0 0 1 0
-    sgnd_menu_register_item "admg-user-toggle" "admg-users" "Enable / disable user" "_admg_toggle_user" "Toggle the selected user account state" 0 15 1 0
-    sgnd_menu_register_item "admg-user-password" "admg-users" "Reset user password" "_admg_reset_user_password" "Reset the selected user's password" 0 15 1 0
-    sgnd_menu_register_item "admg-user-noexpiry" "admg-users" "Set password never expires" "_admg_set_user_password_noexpiry" "Disable password expiry for the selected user" 0 15 1 0
-    sgnd_menu_register_item "admg-user-addgroups" "admg-users" "Add user to groups" "_admg_user_add_groups" "Add a selected user to one or more groups" 0 15 1 0
+    sgnd_menu_register_item "admg-user-toggle" "admg-users" "Enable / disable user" "_admg_toggle_user" "Toggle the selected user account state" 0 30 1 0
+    sgnd_menu_register_item "admg-user-password" "admg-users" "Reset user password" "_admg_reset_user_password" "Reset the selected user's password" 0 30 1 0
+    sgnd_menu_register_item "admg-user-noexpiry" "admg-users" "Set password never expires" "_admg_set_user_password_noexpiry" "Disable password expiry for the selected user" 0 30 1 0
+    sgnd_menu_register_item "admg-user-addgroups" "admg-users" "Add user to groups" "_admg_user_add_groups" "Add a selected user to one or more groups" 0 30 1 0
     sgnd_menu_register_item "admg-user-removegroups" "admg-users" "Remove user from groups" "_admg_user_remove_groups" "Remove selected direct group memberships" 0 0 1 0
     sgnd_menu_register_item "admg-user-delete" "admg-users" "Delete user" "_admg_delete_user" "Delete a selected non-protected user account" 0 0 1 0
 
@@ -477,8 +477,8 @@ set -uo pipefail
         "Manage Active Directory groups and members" \
         0 1 272
 
-    sgnd_menu_register_item "admg-group-list" "admg-groups" "List groups" "_admg_list_groups" "List Active Directory groups" 0 15 1 0
-    sgnd_menu_register_item "admg-group-show" "admg-groups" "Show group" "_admg_show_group" "Show group details and direct members" 0 15 1 0
+    sgnd_menu_register_item "admg-group-list" "admg-groups" "List groups" "_admg_list_groups" "List Active Directory groups" 0 30 1 0
+    sgnd_menu_register_item "admg-group-show" "admg-groups" "Show group" "_admg_show_group" "Show group details and direct members" 0 30 1 0
     sgnd_menu_register_item "admg-group-create" "admg-groups" "Create group" "_admg_create_group" "Create an Active Directory group" 0 0 1 0
     sgnd_menu_register_item "admg-group-addusers" "admg-groups" "Add users to group" "_admg_group_add_users" "Add one or more users to a selected group" 0 0 1 0
     sgnd_menu_register_item "admg-group-removemembers" "admg-groups" "Remove group members" "_admg_group_remove_members" "Remove one or more direct members from a selected group" 0 0 1 0
@@ -490,8 +490,8 @@ set -uo pipefail
         "Inspect and remove Active Directory computer accounts" \
         0 1 273
 
-    sgnd_menu_register_item "admg-computer-list" "admg-computers" "List computers" "_admg_list_computers" "List Active Directory computer accounts" 0 15 1 0
-    sgnd_menu_register_item "admg-computer-show" "admg-computers" "Show computer" "_admg_show_computer" "Show the selected computer account" 0 15 1 0
-    sgnd_menu_register_item "admg-computer-delete" "admg-computers" "Delete computer" "_admg_delete_computer" "Delete a selected stale computer account" 0 15 1 0
+    sgnd_menu_register_item "admg-computer-list" "admg-computers" "List computers" "_admg_list_computers" "List Active Directory computer accounts" 0 30 1 0
+    sgnd_menu_register_item "admg-computer-show" "admg-computers" "Show computer" "_admg_show_computer" "Show the selected computer account" 0 30 1 0
+    sgnd_menu_register_item "admg-computer-delete" "admg-computers" "Delete computer" "_admg_delete_computer" "Delete a selected stale computer account" 0 30 1 0
 
     sayinfo "Active Directory Management module registered with the console."

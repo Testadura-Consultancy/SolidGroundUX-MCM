@@ -3,7 +3,7 @@
 # ----------------------------------------------------------------------------------
 # Metadata:
 #   Version     : 2.2
-#   Build       : 2630700
+#   Build       : 2631102
 #   Shortname   : DOCKER
 #   Source      : 70-docker-server.sh
 #   Type        : module
@@ -11,7 +11,7 @@
 #   Subgroup    : Docker Server
 #   Purpose     : Install, configure, manage, validate, and inspect a Docker host and its containers
 #
-#   Checksum : d6d583de4520e124a5d45a0331187334dfbfe26297702e69e0eca446b401d49c
+#   Checksum : a1df896b5bcc7f1247d4f786ee8aacac70e6e8e3f6d2da67945284e9058ccc64
 # Description:
 #   Registers Docker host and container-management actions with the SolidGround
 #   Management Console. Persistent host operations are implemented by
@@ -439,13 +439,13 @@ set -uo pipefail
         "Install, configure, validate, and inspect the Docker host" \
         0 1 700
 
-    sgnd_menu_register_item "docker-prepare" "$SGND_DOCKER_MODULE_ID" "Prepare Docker server" "docker_prepare" "Install Docker, configure storage, start the service, and validate the host" 0 15 1 0
-    sgnd_menu_register_item "docker-install" "$SGND_DOCKER_MODULE_ID" "Install Docker" "docker_install" "Install the Docker Engine packages" 0 15 1 1
-    sgnd_menu_register_item "docker-storage" "$SGND_DOCKER_MODULE_ID" "Configure Docker storage" "docker_storage" "Configure the Docker data root using SolidGroundUX storage" 0 15 1 1
-    sgnd_menu_register_item "docker-start" "$SGND_DOCKER_MODULE_ID" "Start Docker service" "docker_start" "Enable and start Docker, then verify that the service is active" 0 15 1 1
-    sgnd_menu_register_item "docker-validate" "$SGND_DOCKER_MODULE_ID" "Validate Docker server" "docker_validate" "Validate Docker installation, service, daemon access, and storage" 0 15 1 1
-    sgnd_menu_register_item "docker-service" "$SGND_DOCKER_MODULE_ID" "Manage Docker service" "docker_service" "Start, stop, restart, enable, or disable Docker" 0 15 1 0
-    sgnd_menu_register_item "docker-status" "$SGND_DOCKER_MODULE_ID" "Show Docker status" "docker_status" "Show Docker package, service, daemon, storage, image, and container status" 0 15 1 0
+    sgnd_menu_register_item "docker-prepare" "$SGND_DOCKER_MODULE_ID" "Prepare Docker server" "docker_prepare" "Install Docker, configure storage, start the service, and validate the host" 0 30 1 0
+    sgnd_menu_register_item "docker-install" "$SGND_DOCKER_MODULE_ID" "Install Docker" "docker_install" "Install the Docker Engine packages" 0 30 1 1
+    sgnd_menu_register_item "docker-storage" "$SGND_DOCKER_MODULE_ID" "Configure Docker storage" "docker_storage" "Configure the Docker data root using SolidGroundUX storage" 0 30 1 1
+    sgnd_menu_register_item "docker-start" "$SGND_DOCKER_MODULE_ID" "Start Docker service" "docker_start" "Enable and start Docker, then verify that the service is active" 0 30 1 1
+    sgnd_menu_register_item "docker-validate" "$SGND_DOCKER_MODULE_ID" "Validate Docker server" "docker_validate" "Validate Docker installation, service, daemon access, and storage" 0 30 1 1
+    sgnd_menu_register_item "docker-service" "$SGND_DOCKER_MODULE_ID" "Manage Docker service" "docker_service" "Start, stop, restart, enable, or disable Docker" 0 30 1 0
+    sgnd_menu_register_item "docker-status" "$SGND_DOCKER_MODULE_ID" "Show Docker status" "docker_status" "Show Docker package, service, daemon, storage, image, and container status" 0 30 1 0
 
     sgnd_menu_register_group \
         "docker-containers" \

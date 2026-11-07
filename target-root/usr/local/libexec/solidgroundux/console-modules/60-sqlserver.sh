@@ -3,7 +3,7 @@
 # ----------------------------------------------------------------------------------
 # Metadata:
 #   Version     : 2.2
-#   Build       : 2630700
+#   Build       : 2631102
 #   Shortname   : SQLSERVER
 #   Source      : 60-sqlserver.sh
 #   Type        : module
@@ -11,7 +11,7 @@
 #   Subgroup    : SQL Server
 #   Purpose     : Install, configure, manage, validate, and inspect Microsoft SQL Server
 #
-#   Checksum : 04801f8335649c3e65b164b004ede65ec3fdeb33a6aa2a7021147712103fa43a
+#   Checksum : 2791fe5aa08d7fd14021346ea1023aa317b71f52ce230cb73da8a116d03e5a28
 # Description:
 #   Registers Microsoft SQL Server host-management actions with the SolidGround
 #   Management Console. Persistent operations are implemented by manage-sqlserver.sh.
@@ -349,17 +349,17 @@ set -uo pipefail
         "$(sgnd_header_get_field_value "${BASH_SOURCE[0]}" "Metadata" "Purpose")" \
         0 1 600
 
-    sgnd_menu_register_item "sql-prepare" "$SGND_SQLSERVER_MODULE_ID" "Prepare SQL Server" "sqlserver_prepare" "Review settings, confirm installation, configure repositories, engine and tools" 0 15 1 0
-    sgnd_menu_register_item "sql-repo" "$SGND_SQLSERVER_MODULE_ID" "Configure Microsoft repositories" "sqlserver_repository" "Configure SQL Server 2025 and Microsoft package repositories" 0 15 1 1
-    sgnd_menu_register_item "sql-install" "$SGND_SQLSERVER_MODULE_ID" "Install SQL Server engine" "sqlserver_install" "Install the Microsoft SQL Server 2025 database engine" 0 15 1 1
-    sgnd_menu_register_item "sql-configure" "$SGND_SQLSERVER_MODULE_ID" "Configure SQL Server" "sqlserver_configure" "Configure SQL Server setup (non-interactive when using Prepare)" 0 15 1 1
-    sgnd_menu_register_item "sql-tools" "$SGND_SQLSERVER_MODULE_ID" "Install SQL Server tools" "sqlserver_tools" "Install sqlcmd, bcp, and unixODBC development libraries" 0 15 1 1
-    sgnd_menu_register_item "sql-storage" "$SGND_SQLSERVER_MODULE_ID" "Configure SQL storage" "sqlserver_storage" "Configure SQL Server data, log, and backup locations" 0 15 1 0
-    sgnd_menu_register_item "sql-network" "$SGND_SQLSERVER_MODULE_ID" "Configure SQL network" "sqlserver_network" "Configure the SQL Server TCP port" 0 15 1 0
-    sgnd_menu_register_item "sql-memory" "$SGND_SQLSERVER_MODULE_ID" "Configure SQL memory" "sqlserver_memory" "Configure the SQL Server memory limit" 0 15 1 0
-    sgnd_menu_register_item "sql-service" "$SGND_SQLSERVER_MODULE_ID" "Manage SQL service" "sqlserver_service" "Start, stop, restart, enable, or disable SQL Server" 0 15 1 0
-    sgnd_menu_register_item "sql-firewall" "$SGND_SQLSERVER_MODULE_ID" "Configure SQL firewall" "sqlserver_firewall" "Allow the configured SQL Server TCP port through UFW" 0 15 1 0
-    sgnd_menu_register_item "sql-validate" "$SGND_SQLSERVER_MODULE_ID" "Validate SQL Server" "sqlserver_validate" "Validate platform, engine, service, listener, storage, and tools" 0 15 1 0
-    sgnd_menu_register_item "sql-status" "$SGND_SQLSERVER_MODULE_ID" "Show SQL Server status" "sqlserver_status" "Show service, network, memory, storage, and sqlcmd status" 0 15 1 0
+    sgnd_menu_register_item "sql-prepare" "$SGND_SQLSERVER_MODULE_ID" "Prepare SQL Server" "sqlserver_prepare" "Review settings, confirm installation, configure repositories, engine and tools" 0 30 1 0
+    sgnd_menu_register_item "sql-repo" "$SGND_SQLSERVER_MODULE_ID" "Configure Microsoft repositories" "sqlserver_repository" "Configure SQL Server 2025 and Microsoft package repositories" 0 30 1 1
+    sgnd_menu_register_item "sql-install" "$SGND_SQLSERVER_MODULE_ID" "Install SQL Server engine" "sqlserver_install" "Install the Microsoft SQL Server 2025 database engine" 0 30 1 1
+    sgnd_menu_register_item "sql-configure" "$SGND_SQLSERVER_MODULE_ID" "Configure SQL Server" "sqlserver_configure" "Configure SQL Server setup (non-interactive when using Prepare)" 0 30 1 1
+    sgnd_menu_register_item "sql-tools" "$SGND_SQLSERVER_MODULE_ID" "Install SQL Server tools" "sqlserver_tools" "Install sqlcmd, bcp, and unixODBC development libraries" 0 30 1 1
+    sgnd_menu_register_item "sql-storage" "$SGND_SQLSERVER_MODULE_ID" "Configure SQL storage" "sqlserver_storage" "Configure SQL Server data, log, and backup locations" 0 30 1 0
+    sgnd_menu_register_item "sql-network" "$SGND_SQLSERVER_MODULE_ID" "Configure SQL network" "sqlserver_network" "Configure the SQL Server TCP port" 0 30 1 0
+    sgnd_menu_register_item "sql-memory" "$SGND_SQLSERVER_MODULE_ID" "Configure SQL memory" "sqlserver_memory" "Configure the SQL Server memory limit" 0 30 1 0
+    sgnd_menu_register_item "sql-service" "$SGND_SQLSERVER_MODULE_ID" "Manage SQL service" "sqlserver_service" "Start, stop, restart, enable, or disable SQL Server" 0 30 1 0
+    sgnd_menu_register_item "sql-firewall" "$SGND_SQLSERVER_MODULE_ID" "Configure SQL firewall" "sqlserver_firewall" "Allow the configured SQL Server TCP port through UFW" 0 30 1 0
+    sgnd_menu_register_item "sql-validate" "$SGND_SQLSERVER_MODULE_ID" "Validate SQL Server" "sqlserver_validate" "Validate platform, engine, service, listener, storage, and tools" 0 30 1 0
+    sgnd_menu_register_item "sql-status" "$SGND_SQLSERVER_MODULE_ID" "Show SQL Server status" "sqlserver_status" "Show service, network, memory, storage, and sqlcmd status" 0 30 1 0
 
     sayinfo "SQL Server module registered with the console."

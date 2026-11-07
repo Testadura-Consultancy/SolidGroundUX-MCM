@@ -8,9 +8,9 @@
 #   Group       : Modules
 #   Subgroup    : SolidGroundUX Framework
 #   Purpose     : Register SolidGroundUX framework test and validation actions
-#   Build       : 2630700
+#   Build       : 2631102
 #   Shortname   : FRAMEWORK_TEST
-#   Checksum    : 0a56b79f0b804ade4d8d62066d606bcaa4d9e56305673bd5db6575e791b97c33
+#   Checksum    : cb31048dd335943c9e6c189688d94e97b6a982a202989c1792f7a50bac76574c
 # Description:
 #   Provides the Management Console presentation layer for framework testing.
 #   Framework smoke tests are owned by the SolidGroundUX framework. This module acts as
@@ -512,11 +512,11 @@ set -uo pipefail
     # does not need an additional console auto-continue pause after exiting.
     sgnd_menu_register_item "framework-test-smoke" "$SGND_FRAMEWORK_TEST_MODULE_ID" "Run framework smoke tests" "_framework_test_smoketest" "Open the interactive framework UI smoke-test suite" 0 0 1 0
 
-    sgnd_menu_register_item "framework-test-install" "$SGND_FRAMEWORK_TEST_MODULE_ID" "Validate framework installation" "_framework_test_validate_installation" "Validate required framework files, module directory, and public commands" 0 15 1 0
+    sgnd_menu_register_item "framework-test-install" "$SGND_FRAMEWORK_TEST_MODULE_ID" "Validate framework installation" "_framework_test_validate_installation" "Validate required framework files, module directory, and public commands" 0 30 1 0
 
-    sgnd_menu_register_item "framework-test-console" "$SGND_FRAMEWORK_TEST_MODULE_ID" "Validate console registration" "_framework_test_validate_console" "Load all console modules and validate groups, items, references, and handlers" 0 15 1 0
+    sgnd_menu_register_item "framework-test-console" "$SGND_FRAMEWORK_TEST_MODULE_ID" "Validate console registration" "_framework_test_validate_console" "Load all console modules and validate groups, items, references, and handlers" 0 30 1 0
 
-    sgnd_menu_register_item "framework-test-modules" "$SGND_FRAMEWORK_TEST_MODULE_ID" "Run module validations" "_framework_test_validate_modules" "Run each loaded module validator through the standard module validation contract" 0 15 1 0
+    sgnd_menu_register_item "framework-test-modules" "$SGND_FRAMEWORK_TEST_MODULE_ID" "Run module validations" "_framework_test_validate_modules" "Run each loaded module validator through the standard module validation contract" 0 30 1 0
 
     sgnd_menu_register_item "framework-test-all" "$SGND_FRAMEWORK_TEST_MODULE_ID" "Run all framework tests" "_framework_test_run_all" "Run installation, console, module, and interactive smoke tests" 0 30 1 0
 

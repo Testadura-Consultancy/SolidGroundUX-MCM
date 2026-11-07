@@ -3,14 +3,14 @@
 # ----------------------------------------------------------------------------------
 # Metadata:
 #   Version     : 2.2
-#   Build       : 2630700
+#   Build       : 2631102
 #   Shortname   : MARIADB
 #   Source      : 62-mariadb.sh
 #   Type        : module
 #   Group       : Modules
 #   Subgroup    : MariaDB
 #   Purpose     : Install, configure, manage, validate, and inspect MariaDB
-#   Checksum : bf1fdc2fde492fcbdbe01c0868bd682ebbbded19776004fda8a214bf7142e4de
+#   Checksum : e8058cb4ec8eecf773d32ebd5c07f1652783daf53fb85df88091dad9fc74aea4
 # Description:
 #   Registers host-management actions. Database administration is out of scope.
 #   Installation and client connectivity have been validated on test servers;
@@ -347,13 +347,13 @@ set -uo pipefail
     sgnd_menu_register_group "maria-installation" "Installation & Configuration" "Install and configure MariaDB" 0 1 640
     sgnd_menu_register_group "maria-server" "Server Management" "Operate and inspect MariaDB" 0 1 650
     sgnd_menu_register_group "maria-administration" "Administration" "Administrator access and data protection" 0 1 660
-    sgnd_menu_register_item "maria-prepare" "maria-installation" "Prepare / Install MariaDB" "maria_prepare" "Prerequisites, configuration questions, review and installation" 0 0 1 0
-    sgnd_menu_register_item "maria-storage" "maria-installation" "Configure Data Directory" "maria_storage" "Inspect data directory and filesystem; relocation not automatic" 0 15 1 1
-    sgnd_menu_register_item "maria-network" "maria-installation" "Configure Network & Authentication" "maria_network" "Configure MariaDB TCP port and listening interface" 0 15 1 1
-    sgnd_menu_register_item "maria-memory" "maria-installation" "Configure Memory" "maria_memory" "Configure InnoDB buffer pool" 0 15 1 1
-    sgnd_menu_register_item "maria-status" "maria-server" "Show Status & Configuration" "maria_status" "Server state, storage and DBeaver connection information" 0 15 1 0
-    sgnd_menu_register_item "maria-service" "maria-server" "Start / Stop / Restart" "maria_service" "Manage MariaDB service" 0 15 1 0
-    sgnd_menu_register_item "maria-logs" "maria-server" "View Logs" "maria_logs" "Inspect MariaDB service journal" 0 15 1 0
-    sgnd_menu_register_item "maria-access" "maria-administration" "Manage Administrator Credentials" "maria_access" "Manage dedicated remote administrator and workstation access" 0 15 1 0
-    sgnd_menu_register_item "maria-backup" "maria-administration" "Backup / Restore" "maria_backup" "MariaDB backup and restore guidance, not an automated restore" 0 15 1 0
+    sgnd_menu_register_item "maria-prepare" "maria-installation" "Prepare / Install MariaDB" "maria_prepare" "Prerequisites, configuration questions, review and installation" 0 30 1 0
+    sgnd_menu_register_item "maria-storage" "maria-installation" "Configure Data Directory" "maria_storage" "Inspect data directory and filesystem; relocation not automatic" 0 30 1 1
+    sgnd_menu_register_item "maria-network" "maria-installation" "Configure Network & Authentication" "maria_network" "Configure MariaDB TCP port and listening interface" 0 30 1 1
+    sgnd_menu_register_item "maria-memory" "maria-installation" "Configure Memory" "maria_memory" "Configure InnoDB buffer pool" 0 30 1 1
+    sgnd_menu_register_item "maria-status" "maria-server" "Show Status & Configuration" "maria_status" "Server state, storage and DBeaver connection information" 0 30 1 0
+    sgnd_menu_register_item "maria-service" "maria-server" "Start / Stop / Restart" "maria_service" "Manage MariaDB service" 0 30 1 0
+    sgnd_menu_register_item "maria-logs" "maria-server" "View Logs" "maria_logs" "Inspect MariaDB service journal" 0 30 1 0
+    sgnd_menu_register_item "maria-access" "maria-administration" "Manage Administrator Credentials" "maria_access" "Manage dedicated remote administrator and workstation access" 0 30 1 0
+    sgnd_menu_register_item "maria-backup" "maria-administration" "Backup / Restore" "maria_backup" "MariaDB backup and restore guidance, not an automated restore" 0 30 1 0
     sayinfo "MariaDB module registered with the console."

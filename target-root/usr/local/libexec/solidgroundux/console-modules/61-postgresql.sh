@@ -3,14 +3,14 @@
 # ----------------------------------------------------------------------------------
 # Metadata:
 #   Version     : 2.2
-#   Build       : 2630700
+#   Build       : 2631102
 #   Shortname   : POSTGRESQL
 #   Source      : 61-postgresql.sh
 #   Type        : module
 #   Group       : Modules
 #   Subgroup    : PostgreSQL
 #   Purpose     : Install, configure, manage, validate, and inspect PostgreSQL
-#   Checksum : 9d3f734bc3cf5b81811187c18296505d572316b2648bfb7249eb17133068e313
+#   Checksum : fe48b8c6b81682de2ab4ce6fcf83f3deb256f328e0066bcf2dc68e2c037e06ab
 # Description:
 #   Registers host-management actions. Database administration is out of scope.
 #   Installation and client connectivity have been validated on test servers;
@@ -342,13 +342,13 @@ set -uo pipefail
     sgnd_menu_register_group "pg-installation" "Installation & Configuration" "Install and configure PostgreSQL" 0 1 610
     sgnd_menu_register_group "pg-server" "Server Management" "Operate and inspect PostgreSQL" 0 1 620
     sgnd_menu_register_group "pg-administration" "Administration" "Administrator access and data protection" 0 1 630
-    sgnd_menu_register_item "pg-prepare" "pg-installation" "Prepare / Install PostgreSQL" "pg_prepare" "Prerequisites, configuration wizard, installation and verification" 0 0 1 0
-    sgnd_menu_register_item "pg-storage" "pg-installation" "Configure Data Directory" "pg_storage" "Inspect PostgreSQL data directory; no implicit cluster migration" 0 15 1 1
-    sgnd_menu_register_item "pg-network" "pg-installation" "Configure Network & Authentication" "pg_network" "Configure server listening and network connectivity" 0 15 1 1
-    sgnd_menu_register_item "pg-memory" "pg-installation" "Configure Memory" "pg_memory" "Configure PostgreSQL shared buffers" 0 15 1 1
-    sgnd_menu_register_item "pg-status" "pg-server" "Show Status & Configuration" "pg_status" "Server state, data storage and DBeaver connection information" 0 15 1 0
-    sgnd_menu_register_item "pg-service" "pg-server" "Start / Stop / Restart" "pg_service" "Manage PostgreSQL service" 0 15 1 0
-    sgnd_menu_register_item "pg-logs" "pg-server" "View Logs" "pg_logs" "Inspect database service logs" 0 15 1 0
-    sgnd_menu_register_item "pg-credentials" "pg-administration" "Manage Administrator Credentials" "pg_credentials" "Set database administrator credentials and remote access" 0 15 1 0
-    sgnd_menu_register_item "pg-backup" "pg-administration" "Backup / Restore" "pg_backup" "Database backup and restore guidance" 0 15 1 0
+    sgnd_menu_register_item "pg-prepare" "pg-installation" "Prepare / Install PostgreSQL" "pg_prepare" "Prerequisites, configuration wizard, installation and verification" 0 30 1 0
+    sgnd_menu_register_item "pg-storage" "pg-installation" "Configure Data Directory" "pg_storage" "Inspect PostgreSQL data directory; no implicit cluster migration" 0 30 1 1
+    sgnd_menu_register_item "pg-network" "pg-installation" "Configure Network & Authentication" "pg_network" "Configure server listening and network connectivity" 0 30 1 1
+    sgnd_menu_register_item "pg-memory" "pg-installation" "Configure Memory" "pg_memory" "Configure PostgreSQL shared buffers" 0 30 1 1
+    sgnd_menu_register_item "pg-status" "pg-server" "Show Status & Configuration" "pg_status" "Server state, data storage and DBeaver connection information" 0 30 1 0
+    sgnd_menu_register_item "pg-service" "pg-server" "Start / Stop / Restart" "pg_service" "Manage PostgreSQL service" 0 30 1 0
+    sgnd_menu_register_item "pg-logs" "pg-server" "View Logs" "pg_logs" "Inspect database service logs" 0 30 1 0
+    sgnd_menu_register_item "pg-credentials" "pg-administration" "Manage Administrator Credentials" "pg_credentials" "Set database administrator credentials and remote access" 0 30 1 0
+    sgnd_menu_register_item "pg-backup" "pg-administration" "Backup / Restore" "pg_backup" "Database backup and restore guidance" 0 30 1 0
     sayinfo "PostgreSQL module registered with the console."

@@ -4,14 +4,14 @@
 # ----------------------------------------------------------------------------------
 # Metadata:
 #   Version     : 2.2
-#   Build       : 2630913
+#   Build       : 2631102
 #   Shortname   : MANAGE_COMPUTER
 #   Source      : manage-computer.sh
 #   Type        : script
 #   Group       : Modules
 #   Subgroup    : Computer Setup
 #   Purpose     : Computer Setup action implementation
-#   Checksum : 33a19c05148a52e0fdd84d292c1dff34c82083eea2e2071016597d672915aa31
+#   Checksum : 427a25df326c7a0bd13e927ef97b5ee765e56cfcc67aafbbeae095ca63ff6941
 # Description:
 #   Standalone management actions dispatched from 10-computer-setup.sh.
 #   UI, reporting and errors use the SolidGroundUX framework.

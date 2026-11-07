@@ -3,7 +3,7 @@
 # ----------------------------------------------------------------------------------
 # Metadata:
 #   Version     : 2.2
-#   Build       : 2630700
+#   Build       : 2631102
 #   Shortname   : WEB_SERVER
 #   Source      : 50-web-server.sh
 #   Type        : module
@@ -11,7 +11,7 @@
 #   Subgroup    : Web Server
 #   Purpose     : Install, configure, manage, validate, and inspect an Nginx web server
 #
-#   Checksum : ca4352ecd4ed5b1431c9797dd16a3ee7503317866d0ae614cf46ddccc116a0e2
+#   Checksum : bd115fa34fc36c68f2d42241583dcc6baf14f47f335fc049059539fbfb163b9d
 # Description:
 #   Registers Nginx host, site, publishing, documentation, service, validation, and
 #   status actions with the SolidGround Management Console. Persistent operations are
@@ -356,16 +356,16 @@ set -uo pipefail
     sgnd_menu_register_group "$SGND_WEB_SERVER_MODULE_ID" "General" "General Nginx host and site management" 0 1 500
     sgnd_menu_register_group "web-service" "Service" "Nginx service, firewall, validation, and status" 0 1 510
 
-    sgnd_menu_register_item "web-prepare" "$SGND_WEB_SERVER_MODULE_ID" "Prepare web server" "web_prepare" "Install, validate, enable, and start Nginx" 0 15 1 0
-    sgnd_menu_register_item "web-install" "$SGND_WEB_SERVER_MODULE_ID" "Install Nginx" "web_install" "Install Nginx and basic web-server utilities" 0 0 1 1
-    sgnd_menu_register_item "web-start" "$SGND_WEB_SERVER_MODULE_ID" "Start web service" "web_start" "Enable and start nginx.service" 0 0 1 1
-    sgnd_menu_register_item "web-root" "$SGND_WEB_SERVER_MODULE_ID" "Configure web content root" "web_configure_root" "Select or create the storage location used for web content" 0 15 1 0
-    sgnd_menu_register_item "web-default" "$SGND_WEB_SERVER_MODULE_ID" "Protect unknown hostnames" "web_configure_default" "Reject unknown HTTP hosts and HTTPS SNI without serving another site" 0 15 1 0
-    sgnd_menu_register_item "web-sites" "$SGND_WEB_SERVER_MODULE_ID" "Manage sites" "web_manage_sites" "Select and manage Nginx sites, settings, content, and DNS records" 0 15 1 0
+    sgnd_menu_register_item "web-prepare" "$SGND_WEB_SERVER_MODULE_ID" "Prepare web server" "web_prepare" "Install, validate, enable, and start Nginx" 0 30 1 0
+    sgnd_menu_register_item "web-install" "$SGND_WEB_SERVER_MODULE_ID" "Install Nginx" "web_install" "Install Nginx and basic web-server utilities" 0 30 1 1
+    sgnd_menu_register_item "web-start" "$SGND_WEB_SERVER_MODULE_ID" "Start web service" "web_start" "Enable and start nginx.service" 0 30 1 1
+    sgnd_menu_register_item "web-root" "$SGND_WEB_SERVER_MODULE_ID" "Configure web content root" "web_configure_root" "Select or create the storage location used for web content" 0 30 1 0
+    sgnd_menu_register_item "web-default" "$SGND_WEB_SERVER_MODULE_ID" "Protect unknown hostnames" "web_configure_default" "Reject unknown HTTP hosts and HTTPS SNI without serving another site" 0 30 1 0
+    sgnd_menu_register_item "web-sites" "$SGND_WEB_SERVER_MODULE_ID" "Manage sites" "web_manage_sites" "Select and manage Nginx sites, settings, content, and DNS records" 0 30 1 0
 
-    sgnd_menu_register_item "web-service-manage" "web-service" "Manage web service" "web_service_manage" "Start, stop, restart, enable, or disable nginx.service" 0 15 1 0
-    sgnd_menu_register_item "web-firewall" "web-service" "Configure web firewall" "web_firewall" "Allow HTTP and HTTPS through UFW" 0 15 1 0
-    sgnd_menu_register_item "web-validate" "web-service" "Validate web server" "web_validate" "Validate package, configuration, service, listeners, and web root" 0 15 1 0
-    sgnd_menu_register_item "web-status" "web-service" "Show web-server status" "web_status" "Show package, service, storage, listener, and site status" 0 15 1 0
+    sgnd_menu_register_item "web-service-manage" "web-service" "Manage web service" "web_service_manage" "Start, stop, restart, enable, or disable nginx.service" 0 30 1 0
+    sgnd_menu_register_item "web-firewall" "web-service" "Configure web firewall" "web_firewall" "Allow HTTP and HTTPS through UFW" 0 30 1 0
+    sgnd_menu_register_item "web-validate" "web-service" "Validate web server" "web_validate" "Validate package, configuration, service, listeners, and web root" 0 30 1 0
+    sgnd_menu_register_item "web-status" "web-service" "Show web-server status" "web_status" "Show package, service, storage, listener, and site status" 0 30 1 0
 
     sayinfo "Web Server module registered with the console."

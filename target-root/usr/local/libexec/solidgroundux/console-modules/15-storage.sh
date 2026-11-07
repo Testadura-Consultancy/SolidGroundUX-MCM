@@ -3,7 +3,7 @@
 # ----------------------------------------------------------------------------------
 # Metadata:
 #   Version     : 2.2
-#   Build       : 2630815
+#   Build       : 2631102
 #   Shortname   : STORAGE
 #   Source      : 15-storage.sh
 #   Type        : module
@@ -11,7 +11,7 @@
 #   Subgroup    : Storage
 #   Purpose     : Configure and inspect local storage volumes and directories
 #
-#   Checksum : 037402403281846d6c2a081ca33872b6496e5bf18f1fe5597806df66e1a11fc5
+#   Checksum : cdb857e3587be172421f82f89cdc47c60e890bdefe728192aadb316a83dc09ce
 # Description:
 #   Registers local-storage management actions with the SolidGround Management Console.
 #   Persistent storage operations are implemented by manage-storage.sh.
@@ -417,7 +417,7 @@ set -uo pipefail
     sgnd_menu_register_item "storage-reconcile-persistence" "$SGND_STORAGE_MODULE_ID" "Reconcile storage persistence" "storage_reconcile_persistence" "Repair stale SGND_STORAGE UUID mappings or explicitly remove stale managed entries" 0 0 1 0
     sgnd_menu_register_item "storage-status" "$SGND_STORAGE_MODULE_ID" "Show storage status" "storage_status" "Show local disks and configured storage status" 0 0 1 0
     sgnd_menu_register_item "storage-virtiofs-add" "$SGND_STORAGE_MODULE_ID" "Add VirtioFS directory" "storage_add_virtiofs" "Mount an attached VirtioFS share and persist it in /etc/fstab" 0 0 1 0
-    sgnd_menu_register_item "storage-directories" "$SGND_STORAGE_MODULE_ID" "Manage directories" "storage_manage_directories" "Create, rename, list, or remove directories beneath managed storage roots" 0 0 1 0
+    sgnd_menu_register_item "storage-directories" "$SGND_STORAGE_MODULE_ID" "Manage directories" "storage_manage_directories" "Create, rename, list, or remove directories beneath managed storage roots" 0 30 1 0
 
     # . Storage Access
     sgnd_menu_register_group \
@@ -426,7 +426,7 @@ set -uo pipefail
         "Manage ownership and Unix permissions for managed storage roots" \
         0 1 245
 
-    sgnd_menu_register_item "storage-access-status" "storage-access" "Show storage access" "storage_access_status" "Show ownership and permissions for managed storage roots" 0 15 1 0
+    sgnd_menu_register_item "storage-access-status" "storage-access" "Show storage access" "storage_access_status" "Show ownership and permissions for managed storage roots" 0 30 1 0
     sgnd_menu_register_item "storage-access-set" "storage-access" "Set storage access" "storage_set_access" "Set owner, group, and Unix permissions for one or more managed storage roots" 0 0 1 0
     sgnd_menu_register_item "storage-access-reset" "storage-access" "Restore default access" "storage_restore_access_defaults" "Restore canonical ownership and permissions for managed storage roots" 0 0 1 0
 

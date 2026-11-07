@@ -3,7 +3,7 @@
 # ----------------------------------------------------------------------------------
 # Metadata:
 #   Version     : 2.2
-#   Build       : 2630700
+#   Build       : 2631102
 #   Shortname   : SAMBA
 #   Source      : 30-samba-file-server.sh
 #   Type        : module
@@ -11,7 +11,7 @@
 #   Subgroup    : Samba File Server
 #   Purpose     : Register and orchestrate Samba file-server management actions
 #
-#   Checksum : 971f184b5fa8052175e4b32f31f21c4c787d12e6fb97876bbe61a38dc04cb512
+#   Checksum : c6df794f94ffaa47024164cdcee28acec7acf764208665e5e210873b0ffe19c7
 # Description:
 #   Registers Samba file-server, share-management, user/group-management, and directory-
 #   management actions with the Management Console. Persistent server-management
@@ -411,12 +411,12 @@ set -uo pipefail
         "$(sgnd_header_get_field_value "${BASH_SOURCE[0]}" "Metadata" "Purpose")" \
         0 1 300
 
-    sgnd_menu_register_item "smb-prepare" "$SGND_SAMBA_FILE_MODULE_ID" "Prepare Samba file server" "_smb_prepare_file_server" "Run the complete Samba file-server preparation sequence" 0 15 1 0
-    sgnd_menu_register_item "smb-install" "$SGND_SAMBA_FILE_MODULE_ID" "Install Samba prerequisites" "_smb_step_install_packages" "Install Samba file-server packages and command-line utilities" 0 15 1 1
-    sgnd_menu_register_item "smb-authentication" "$SGND_SAMBA_FILE_MODULE_ID" "Configure Samba authentication" "_smb_step_configure_authentication" "Detect host AD membership and configure Samba authentication accordingly" 0 15 1 1
-    sgnd_menu_register_item "smb-storage" "$SGND_SAMBA_FILE_MODULE_ID" "Validate storage" "_smb_step_validate_storage" "Require the configured SolidGroundUX storage mount" 0 15 1 1
-    sgnd_menu_register_item "smb-share-root" "$SGND_SAMBA_FILE_MODULE_ID" "Prepare share root" "_smb_step_prepare_share_root" "Create and validate the configured Samba share root" 0 20 1 1
-    sgnd_menu_register_item "smb-service" "$SGND_SAMBA_FILE_MODULE_ID" "Start Samba service" "_smb_step_start_service" "Validate the configuration and start smbd.service" 0 25 1 1
+    sgnd_menu_register_item "smb-prepare" "$SGND_SAMBA_FILE_MODULE_ID" "Prepare Samba file server" "_smb_prepare_file_server" "Run the complete Samba file-server preparation sequence" 0 30 1 0
+    sgnd_menu_register_item "smb-install" "$SGND_SAMBA_FILE_MODULE_ID" "Install Samba prerequisites" "_smb_step_install_packages" "Install Samba file-server packages and command-line utilities" 0 30 1 1
+    sgnd_menu_register_item "smb-authentication" "$SGND_SAMBA_FILE_MODULE_ID" "Configure Samba authentication" "_smb_step_configure_authentication" "Detect host AD membership and configure Samba authentication accordingly" 0 30 1 1
+    sgnd_menu_register_item "smb-storage" "$SGND_SAMBA_FILE_MODULE_ID" "Validate storage" "_smb_step_validate_storage" "Require the configured SolidGroundUX storage mount" 0 30 1 1
+    sgnd_menu_register_item "smb-share-root" "$SGND_SAMBA_FILE_MODULE_ID" "Prepare share root" "_smb_step_prepare_share_root" "Create and validate the configured Samba share root" 0 30 1 1
+    sgnd_menu_register_item "smb-service" "$SGND_SAMBA_FILE_MODULE_ID" "Start Samba service" "_smb_step_start_service" "Validate the configuration and start smbd.service" 0 30 1 1
 
     sgnd_menu_register_item "smb-validate" "$SGND_SAMBA_FILE_MODULE_ID" "Validate Samba file server" "_smb_validate" "Validate tools, configuration, service, storage, and managed shares" 0 30 1 0
     sgnd_menu_register_item "smb-status" "$SGND_SAMBA_FILE_MODULE_ID" "Show Samba file-server status" "_smb_status" "Show service, configuration, storage, and share-root status" 0 35 1 0

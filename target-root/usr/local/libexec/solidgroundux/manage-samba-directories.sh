@@ -4,7 +4,7 @@
 # -------------------------------------------------------------------------------------
 # Metadata:
 #   Version     : 2.2
-#   Build       : 2630700
+#   Build       : 2631102
 #   Shortname   : MANAGE_SAMBA_DIRECTORIES
 #   Source      : manage-samba-directories.sh
 #   Type        : script

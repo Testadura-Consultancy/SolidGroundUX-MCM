@@ -3,9 +3,9 @@
 # ----------------------------------------------------------------------------------
 # Metadata:
 #   Version     : 2.2
-#   Build       : 2630700
+#   Build       : 2631102
 #   Shortname   : AD_SERVER
-#   Checksum    : cb1da3b7508f05b06eed0f5884e3d3dd81e6d799c217aa8147111b840dd50d2e
+#   Checksum    : ee04f780e12aea11842188e32250b47d3b2cf87899c68835d31cd9aeefa60bcc
 #   Source      : 20-active-directory-server.sh
 #   Type        : module
 #   Group       : Modules
@@ -542,26 +542,26 @@ set -uo pipefail
     #   > Show the configured Samba role, realm, and service state.
     #   > Handler: _adsvr_status
     sgnd_menu_register_group "$SGND_AD_SERVER_MODULE_ID" "$SGND_AD_SERVER_MODULE_NAME" "$(sgnd_header_get_field_value "${BASH_SOURCE[0]}" "Metadata" "Purpose")" 0 1 200
-    sgnd_menu_register_item "adsvr-provision" "$SGND_AD_SERVER_MODULE_ID" "Provision domain" "_adsvr_provision_domain" "Run the complete Active Directory server provisioning sequence" 0 15 1 0
-    sgnd_menu_register_item "adsvr-additional" "$SGND_AD_SERVER_MODULE_ID" "Join existing domain as additional DC" "_adsvr_join_additional_console" "Join as a writable controller; retain the existing domain" 0 15 1 0
-    sgnd_menu_register_item "adsvr-add-install" "$SGND_AD_SERVER_MODULE_ID" "Install prerequisites (additional DC)" "_adsvr_add_install" "Install Samba AD/DC prerequisites" 0 15 1 1
-    sgnd_menu_register_item "adsvr-add-discover" "$SGND_AD_SERVER_MODULE_ID" "Discover existing domain" "_adsvr_add_discover" "Validate remote DC, DNS and system resolver" 0 15 1 1
-    sgnd_menu_register_item "adsvr-add-join" "$SGND_AD_SERVER_MODULE_ID" "Join existing domain" "_adsvr_add_join" "Interactive writable DC join; requires prior discovery" 0 15 1 1
-    sgnd_menu_register_item "adsvr-add-kerberos" "$SGND_AD_SERVER_MODULE_ID" "Install joined DC Kerberos" "_adsvr_step_kerberos" "Install joined Samba Kerberos settings" 0 15 1 1
-    sgnd_menu_register_item "adsvr-add-resolver" "$SGND_AD_SERVER_MODULE_ID" "Configure joined DC DNS resolver" "_adsvr_step_resolver" "Switch from existing DC DNS to own DNS" 0 15 1 1
-    sgnd_menu_register_item "adsvr-add-start" "$SGND_AD_SERVER_MODULE_ID" "Start additional DC" "_adsvr_step_start" "Start and validate Samba AD/DC" 0 15 1 1
-    sgnd_menu_register_item "adsvr-add-dns" "$SGND_AD_SERVER_MODULE_ID" "Register additional DC DNS" "_adsvr_step_register_dns" "Register AD records on joined controller" 0 15 1 1
-    sgnd_menu_register_item "adsvr-add-repl" "$SGND_AD_SERVER_MODULE_ID" "Inspect AD replication" "_adsvr_add_replication" "Check DRS replication with existing controllers" 0 15 1 1
-    sgnd_menu_register_item "adsvr-install" "$SGND_AD_SERVER_MODULE_ID" "Install AD server prerequisites" "_adsvr_step_install_packages" "Install Samba AD/DC, Kerberos, and DNS utilities" 0 15 1 1
-    sgnd_menu_register_item "adsvr-preflight" "$SGND_AD_SERVER_MODULE_ID" "Validate provisioning inputs" "_adsvr_step_preflight" "Collect realm settings and validate the machine before changes" 0 15 1 1
-    sgnd_menu_register_item "adsvr-identity" "$SGND_AD_SERVER_MODULE_ID" "Prepare domain controller identity" "_adsvr_step_identity" "Prepare and validate the domain controller FQDN" 0 15 1 1
-    sgnd_menu_register_item "adsvr-domain" "$SGND_AD_SERVER_MODULE_ID" "Provision Samba domain" "_adsvr_step_provision" "Create the Samba directory database and AD configuration" 0 15 1 1
-    sgnd_menu_register_item "adsvr-settings" "$SGND_AD_SERVER_MODULE_ID" "Apply initial domain settings" "_adsvr_step_domain_settings" "Set Administrator policy and the upstream DNS forwarder" 0 15 1 1
-    sgnd_menu_register_item "adsvr-krb" "$SGND_AD_SERVER_MODULE_ID" "Install Kerberos configuration" "_adsvr_step_kerberos" "Install and validate Samba's generated krb5.conf" 0 15 1 1
-    sgnd_menu_register_item "adsvr-resolver" "$SGND_AD_SERVER_MODULE_ID" "Configure AD resolver" "_adsvr_step_resolver" "Point the DC at Samba DNS and free IPv4 port 53" 0 15 1 1
-    sgnd_menu_register_item "adsvr-start" "$SGND_AD_SERVER_MODULE_ID" "Start AD/DC service" "_adsvr_step_start" "Start Samba AD/DC and validate Samba-owned IPv4 DNS" 0 15 1 1
-    sgnd_menu_register_item "adsvr-dns" "$SGND_AD_SERVER_MODULE_ID" "Register domain controller DNS" "_adsvr_step_register_dns" "Register and validate the DC A, SOA, Kerberos, and LDAP records" 0 15 1 1
-    sgnd_menu_register_item "adsvr-validate" "$SGND_AD_SERVER_MODULE_ID" "Validate AD server" "_adsvr_validate" "Validate service, DNS, directory, and Kerberos discovery" 0 15 1 0
-    sgnd_menu_register_item "adsvr-status" "$SGND_AD_SERVER_MODULE_ID" "Show AD server status" "_adsvr_status" "Show the configured Samba role, realm, and service state" 0 15 1 0
+    sgnd_menu_register_item "adsvr-provision" "$SGND_AD_SERVER_MODULE_ID" "Provision domain" "_adsvr_provision_domain" "Run the complete Active Directory server provisioning sequence" 0 30 1 0
+    sgnd_menu_register_item "adsvr-additional" "$SGND_AD_SERVER_MODULE_ID" "Join existing domain as additional DC" "_adsvr_join_additional_console" "Join as a writable controller; retain the existing domain" 0 30 1 0
+    sgnd_menu_register_item "adsvr-add-install" "$SGND_AD_SERVER_MODULE_ID" "Install prerequisites (additional DC)" "_adsvr_add_install" "Install Samba AD/DC prerequisites" 0 30 1 1
+    sgnd_menu_register_item "adsvr-add-discover" "$SGND_AD_SERVER_MODULE_ID" "Discover existing domain" "_adsvr_add_discover" "Validate remote DC, DNS and system resolver" 0 30 1 1
+    sgnd_menu_register_item "adsvr-add-join" "$SGND_AD_SERVER_MODULE_ID" "Join existing domain" "_adsvr_add_join" "Interactive writable DC join; requires prior discovery" 0 30 1 1
+    sgnd_menu_register_item "adsvr-add-kerberos" "$SGND_AD_SERVER_MODULE_ID" "Install joined DC Kerberos" "_adsvr_step_kerberos" "Install joined Samba Kerberos settings" 0 30 1 1
+    sgnd_menu_register_item "adsvr-add-resolver" "$SGND_AD_SERVER_MODULE_ID" "Configure joined DC DNS resolver" "_adsvr_step_resolver" "Switch from existing DC DNS to own DNS" 0 30 1 1
+    sgnd_menu_register_item "adsvr-add-start" "$SGND_AD_SERVER_MODULE_ID" "Start additional DC" "_adsvr_step_start" "Start and validate Samba AD/DC" 0 30 1 1
+    sgnd_menu_register_item "adsvr-add-dns" "$SGND_AD_SERVER_MODULE_ID" "Register additional DC DNS" "_adsvr_step_register_dns" "Register AD records on joined controller" 0 30 1 1
+    sgnd_menu_register_item "adsvr-add-repl" "$SGND_AD_SERVER_MODULE_ID" "Inspect AD replication" "_adsvr_add_replication" "Check DRS replication with existing controllers" 0 30 1 1
+    sgnd_menu_register_item "adsvr-install" "$SGND_AD_SERVER_MODULE_ID" "Install AD server prerequisites" "_adsvr_step_install_packages" "Install Samba AD/DC, Kerberos, and DNS utilities" 0 30 1 1
+    sgnd_menu_register_item "adsvr-preflight" "$SGND_AD_SERVER_MODULE_ID" "Validate provisioning inputs" "_adsvr_step_preflight" "Collect realm settings and validate the machine before changes" 0 30 1 1
+    sgnd_menu_register_item "adsvr-identity" "$SGND_AD_SERVER_MODULE_ID" "Prepare domain controller identity" "_adsvr_step_identity" "Prepare and validate the domain controller FQDN" 0 30 1 1
+    sgnd_menu_register_item "adsvr-domain" "$SGND_AD_SERVER_MODULE_ID" "Provision Samba domain" "_adsvr_step_provision" "Create the Samba directory database and AD configuration" 0 30 1 1
+    sgnd_menu_register_item "adsvr-settings" "$SGND_AD_SERVER_MODULE_ID" "Apply initial domain settings" "_adsvr_step_domain_settings" "Set Administrator policy and the upstream DNS forwarder" 0 30 1 1
+    sgnd_menu_register_item "adsvr-krb" "$SGND_AD_SERVER_MODULE_ID" "Install Kerberos configuration" "_adsvr_step_kerberos" "Install and validate Samba's generated krb5.conf" 0 30 1 1
+    sgnd_menu_register_item "adsvr-resolver" "$SGND_AD_SERVER_MODULE_ID" "Configure AD resolver" "_adsvr_step_resolver" "Point the DC at Samba DNS and free IPv4 port 53" 0 30 1 1
+    sgnd_menu_register_item "adsvr-start" "$SGND_AD_SERVER_MODULE_ID" "Start AD/DC service" "_adsvr_step_start" "Start Samba AD/DC and validate Samba-owned IPv4 DNS" 0 30 1 1
+    sgnd_menu_register_item "adsvr-dns" "$SGND_AD_SERVER_MODULE_ID" "Register domain controller DNS" "_adsvr_step_register_dns" "Register and validate the DC A, SOA, Kerberos, and LDAP records" 0 30 1 1
+    sgnd_menu_register_item "adsvr-validate" "$SGND_AD_SERVER_MODULE_ID" "Validate AD server" "_adsvr_validate" "Validate service, DNS, directory, and Kerberos discovery" 0 30 1 0
+    sgnd_menu_register_item "adsvr-status" "$SGND_AD_SERVER_MODULE_ID" "Show AD server status" "_adsvr_status" "Show the configured Samba role, realm, and service state" 0 30 1 0
 
     sayinfo "Active Directory Server module registered with the console."

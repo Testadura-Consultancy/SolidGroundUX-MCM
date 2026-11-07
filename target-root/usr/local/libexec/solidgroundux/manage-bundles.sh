@@ -10,8 +10,8 @@
 #   Subgroup    : Web Content Management
 #   Purpose     : Manage documentation bundles through the SolidGroundUX interface.
 #
-#   Build : 2630700
-#   Checksum : 6f5c9585a7aa335bda295368137fd3f0445dd61b031bdca9afa7424e9d414deb
+#   Build : 2631102
+#   Checksum : 8b26c08d7af3080e60d235f70e702387c278374240bf6e59912328cad6a865a8
 #
 # Description:
 #   MCM frontend for sgnd_doc_bundles.py and sgnd_doc_markdown.py. The Python programs
@@ -23,10 +23,12 @@
 #   ```bash
 #   sgnd-manage-bundles
 #   sgnd-manage-bundles --generate
+#   sgnd-manage-bundles --installed
 #   ```
 #
 #   - With no mode: open the interactive documentation-bundle manager.
 #   - With `--generate`: choose a saved bundle and generate its Markdown documentation.
+#   - With `--installed`: generate documentation from installed product release manifests.
 #   - Select Q at the bundle selector to return without generating anything.
 #
 # Attribution:
@@ -148,7 +150,7 @@ set -uo pipefail
         sgnd-menu.sh
     )
     SGND_ARGS_SPEC=()
-    SGND_SCRIPT_EXAMPLES=("  $SGND_SCRIPT_NAME" "  $SGND_SCRIPT_NAME --generate")
+    SGND_SCRIPT_EXAMPLES=("  $SGND_SCRIPT_NAME" "  $SGND_SCRIPT_NAME --generate" "  $SGND_SCRIPT_NAME --installed")
     SGND_SCRIPT_GLOBALS=()
     SGND_STATE_VARIABLES=("SGND_DOC_ACTIVE_BUNDLE|Active documentation bundle||")
     SGND_ON_EXIT_HANDLERS=()
@@ -795,6 +797,126 @@ for key, title in (("output", "Output directory"), ("products", "Products"),
         _bundle_generate
     }
 
+    # fn: _bundle_generate_installed - Prepare Markdown and optional HTML for installed products
+        # . Purpose
+        #   Generate documentation from the actual installed product files, not a
+        #   development checkout or merged shared directories.
+        # . Behavior
+        #   - The Python helper identifies installed versions and matches manifests.
+        #   - Product sources are isolated using their release manifests.
+        #   - Users select products, an output directory and optional HTML rendering.
+        #   - Existing saved bundles, published sites and installed files stay intact.
+        # . Returns
+        #   0 after success or cancellation; nonzero when generation fails.
+        # . Usage
+        #   ```bash
+        #   _bundle_generate_installed
+        #   ```
+    _bundle_generate_installed() {
+        local helper="${SGND_FRAMEWORK_ROOT%/}/usr/local/lib/solidgroundux/py/sgnd_doc_installed.py"
+        local raw="" lines="" line="" number="" key="" title="" version="" available="" reason=""
+        local choice="" output="/var/lib/solidgroundux/documentation/installed" decision="Yes"
+        local selected="" status="" result="" owner="" group="" rc=0
+        local -a installed_keys=() selected_keys=() args=()
+        [[ "$SGND_FRAMEWORK_ROOT" == / ]] && helper=/usr/local/lib/solidgroundux/py/sgnd_doc_installed.py
+        [[ -r "$helper" ]] || { sayfail "Installed documentation helper not found: $helper"; return 1; }
+        command -v python3 >/dev/null 2>&1 || { sayfail 'Python 3 is required.'; return 127; }
+        raw="$(python3 "$helper" --list 2>&1)" || { sayfail "$raw"; return 1; }
+        lines="$(python3 -c '
+import json,sys
+for n, p in enumerate(json.load(sys.stdin), 1):
+    label = (p["version"] + "." + p["build"]) if p["installed"] else "Not installed"
+    status = "Available" if p["available"] else (p["reason"] or "Unavailable")
+    print("\x1f".join((str(n),p["key"],p["title"],label,status,p["available"] and "1" or "0")))
+' <<< "$raw")" || { sayfail 'Cannot parse installed products.'; return 1; }
+        sgnd_print
+        sgnd_print_sectionheader 'Generate documentation from installed products' --padend 0
+        while IFS=$'\x1f' read -r number key title version status available; do
+            [[ -n "$key" ]] || continue
+            sgnd_print "  ${number}) ${title} (${version}) - ${status}"
+            if [[ "$available" == 1 ]]; then
+                installed_keys[$number]="$key"
+            fi
+        done <<< "$lines"
+        (( ${#installed_keys[@]} > 0 )) || {
+            saywarning 'No installed products with matching release manifests were found.'
+            return 0
+        }
+        sgnd_print
+        ask --label 'Products (numbers comma-separated, A=all)' --var choice --back || return 0
+        choice="${choice//[[:space:]]/}"
+        if [[ "${choice^^}" == A ]]; then
+            for number in "${!installed_keys[@]}"; do selected_keys+=("${installed_keys[$number]}"); done
+        elif [[ "$choice" =~ ^[1-3](,[1-3])*$ ]]; then
+            local -a numbers=()
+            IFS=',' read -r -a numbers <<< "$choice"
+            for number in "${numbers[@]}"; do
+                [[ -n "${installed_keys[$number]:-}" ]] || {
+                    sayfail "Product $number is not available for documentation generation."
+                    return 1
+                }
+                [[ ",${selected}," == *",${installed_keys[$number]},"* ]] && continue
+                selected_keys+=("${installed_keys[$number]}")
+                selected="${selected:+${selected},}${installed_keys[$number]}"
+            done
+        else
+            sayfail 'Choose A or comma-separated product numbers.'
+            return 1
+        fi
+        (( ${#selected_keys[@]} > 0 )) || return 0
+        selected="$(IFS=,; printf '%s' "${selected_keys[*]}")"
+        ask --label 'Output directory' --var output --default "$output" --back || return 0
+        [[ "$output" == /* ]] || { sayfail 'Output directory must be absolute.'; return 1; }
+        ask_decision --label 'Generate HTML website as well' --choices 'Yes|Y,No|N' --default 'Yes' --var decision || return 0
+        sgnd_print_labeledvalue --label 'Products' --value "$selected" --labelwidth 20
+        sgnd_print_labeledvalue --label 'Output' --value "$output" --labelwidth 20
+        sgnd_print_labeledvalue --label 'HTML' --value "$decision" --labelwidth 20
+        local confirm='No'
+        ask_decision --label 'Generate documentation' --choices 'Yes|Y,No|N' --default 'No' --var confirm || return 0
+        [[ "$confirm" == YES ]] || { saycancel 'Documentation generation cancelled'; return 0; }
+
+        # Only the canonical generated-output folder receives privileged setup.
+        # Other destinations remain under the caller's own permission policy.
+        if [[ "$output" == /var/lib/solidgroundux/documentation/installed ]]; then
+            owner="${SUDO_USER:-$(id -un)}"
+            group="$(id -gn "$owner")" || return 1
+            # Do not change the ownership of any parent Setup state directory.
+            sudo mkdir -p -- "$output" || return 1
+            sudo chown -R -- "$owner:$group" "$output" || return 1
+            sudo chmod 0755 -- "$output" || return 1
+        fi
+        args=(--output "$output" --products "$selected")
+        [[ "$decision" == YES ]] && args+=(--html)
+        if [[ "$output" == /var/lib/solidgroundux/documentation/installed && "$(id -u)" == 0 && "$owner" != root ]]; then
+            # Keep generated documentation owned by the actual console user.
+            result="$(sudo -u "$owner" python3 "$helper" "${args[@]}" 2>&1)" || rc=$?
+        else
+            result="$(python3 "$helper" "${args[@]}" 2>&1)" || rc=$?
+        fi
+        if (( rc != 0 )); then
+            sayfail "Documentation generation failed: $result"
+            return "$rc"
+        fi
+        sgnd_print
+        sgnd_print_sectionheader 'Installed documentation prepared' --padend 0
+        sgnd_print "$(printf '%s' "$result" | python3 -c '
+import json,sys
+r=json.load(sys.stdin)
+for key,label in (("markdown","Markdown"),("html","HTML"),("files","Source files"),("functions","Functions"),("pages","HTML pages"),("missing_images","Missing images"),("broken_links","Broken links")):
+    if key in r: print(label+": "+str(r[key]))
+')"
+        if [[ "$decision" == YES ]]; then
+            sayinfo 'Use Web Content Management > Publish website to publish the generated HTML.'
+        else
+            sayinfo 'Markdown is ready. Generate HTML through Web Content Management when needed.'
+        fi
+        if [[ -n "${SGND_DOC_BUNDLE_GENERATION_MARKER_FILE:-}" ]]; then
+            printf '%s\n' generated > "$SGND_DOC_BUNDLE_GENERATION_MARKER_FILE" ||
+                saywarning 'Could not update the documentation generation menu status.'
+        fi
+        return 0
+    }
+
 # - Source management -----------------------------------------------------------------
     # fn: _bundle_sources_table - Display the ordered product/source datatable
         # . Purpose
@@ -1104,6 +1226,7 @@ for product in bundle.get("products", []):
         for argument in "$@"; do
             case "$argument" in
                 --generate) mode="generate" ;;
+                --installed) mode="installed" ;;
                 *) startup_args+=("$argument") ;;
             esac
         done
@@ -1111,6 +1234,10 @@ for product in bundle.get("products", []):
         sgnd_exe_start --autostate -- "${startup_args[@]}" || return $?
         if [[ "$mode" == "generate" ]]; then
             _bundle_generate_selected
+            return $?
+        fi
+        if [[ "$mode" == "installed" ]]; then
+            _bundle_generate_installed
             return $?
         fi
         while true; do

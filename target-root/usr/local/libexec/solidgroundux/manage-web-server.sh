@@ -4,7 +4,7 @@
 # -------------------------------------------------------------------------------------
 # Metadata:
 #   Version     : 2.2
-#   Build       : 2630700
+#   Build       : 2631102
 #   Shortname   : MANAGE_WEB_SERVER
 #   Source      : manage-web-server.sh
 #   Type        : script
@@ -12,7 +12,7 @@
 #   Subgroup    : Web Server
 #   Purpose     : Configure, manage, validate, and inspect an Nginx web server
 #
-#   Checksum : 80338ee3dd33e4c23b01670b4bfbf37989e3856ca23fe0a34564d773c65c8028
+#   Checksum : 2666636f7d5e7bd8ca78f13c3a538e222bbab1f188f68232a4c684ca26e1ca3d
 # Description:
 #   Configure, manage, validate, and inspect an Nginx web server.
 #
@@ -186,8 +186,8 @@ set -uo pipefail
     : "${SGND_WEB_DOC_SOURCE_USER:=${SUDO_USER:-${USER:-sysadmin}}}"
     : "${SGND_WEB_DOC_SOURCE_DIR:=}"
     : "${SGND_WEB_DOC_REPOSITORY:=}"
-    : "${SGND_WEB_DOC_REF:=master}"
-    : "${SGND_WEB_DOC_REPO_PATH:=target-root/usr/local/share/doc/solidgroundux-codex}"
+    : "${SGND_WEB_DOC_REF:=main}"
+    : "${SGND_WEB_DOC_REPO_PATH:=docs}"
 
     # Render a local numbered selector using the Web Server action layout.
     # The framework ask_selection API is intentionally left unchanged.
@@ -365,11 +365,10 @@ set -uo pipefail
     # fn: _web_server_installed_docs_root - Resolve installed documentation from configuration
         # . Purpose
         #   Use SGND_WEB_DOC_INSTALLED_ROOT from the environment or web-server.cfg;
-        #   otherwise use the supported installed documentation location. This replaces
-        #   the legacy /usr/local/share/testadura/solidgroundux/doc default.
+        #   otherwise use the generated website under canonical SolidGroundUX state.
         #
         # . Output
-        #   Prints an absolute path beneath the active framework root when staged.
+        #   Prints a configured absolute path, remapping /usr paths for staged roots.
         #
         # . Usage
         #   ```bash
@@ -381,7 +380,7 @@ set -uo pipefail
         if [[ -z "$configured" && -r "$SGND_WEB_SERVER_CONFIG_FILE" ]]; then
             configured="$(awk -F= '$1 == "SGND_WEB_DOC_INSTALLED_ROOT" {sub(/^[^=]*=/, ""); print; exit}' "$SGND_WEB_SERVER_CONFIG_FILE")"
         fi
-        [[ -n "$configured" ]] || configured="/usr/local/share/doc/solidgroundux-codex"
+        [[ -n "$configured" ]] || configured="/var/lib/solidgroundux/documentation/installed/www"
         [[ "$configured" == /* ]] || { sayfail "Documentation source must be an absolute path." >&2; return 2; }
         if [[ "$framework_root" != "/" && "$configured" == /usr/* ]]; then
             configured="${framework_root%/}${configured}"

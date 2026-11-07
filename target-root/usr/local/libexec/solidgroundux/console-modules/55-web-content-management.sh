@@ -3,7 +3,7 @@
 # ----------------------------------------------------------------------------------
 # Metadata:
 #   Version     : 2.2
-#   Build       : 2630700
+#   Build       : 2631102
 #   Shortname   : WEB_CONTENT_MANAGEMENT
 #   Source      : 55-web-content-management.sh
 #   Type        : module
@@ -11,7 +11,7 @@
 #   Subgroup    : Web Content Management
 #   Purpose     : Ingest, delete, generate, validate, and prepare content for static websites
 #
-#   Checksum : 4571b2be25fa3918a7af3cbf72bbc988d05dda9e5e1180216401d403eba6aee5
+#   Checksum : 51fc5361feb33fdbe13ff7cf8973c5dbbdb6730b5ecf73294153af2e47095320
 # Description:
 #   Registers Web Content Management actions with the SolidGround Management Console.
 #   Persistent workflow and user interaction are implemented by manage-web-content.sh;
@@ -195,6 +195,7 @@ set -uo pipefail
         # . Usage
         #   ```bash
         #   _web_content_run_generation_tracked documentation
+        #   _web_content_run_generation_tracked installed
         #   _web_content_run_generation_tracked website
         #   ```
     _web_content_run_generation_tracked() {
@@ -205,6 +206,7 @@ set -uo pipefail
             saywarning "Could not track generation completion; dependent menu statuses will not be updated."
             case "$generation_kind" in
                 documentation) _sgnd_run_module_script "manage-bundles.sh" --generate ;;
+                installed) _sgnd_run_module_script "manage-bundles.sh" --installed ;;
                 website) _web_content_run_manage generate ;;
                 *) return 2 ;;
             esac
@@ -215,6 +217,10 @@ set -uo pipefail
             documentation)
                 SGND_DOC_BUNDLE_GENERATION_MARKER_FILE="$marker_file" \
                     _sgnd_run_module_script "manage-bundles.sh" --generate || rc=$?
+                ;;
+            installed)
+                SGND_DOC_BUNDLE_GENERATION_MARKER_FILE="$marker_file" \
+                    _sgnd_run_module_script "manage-bundles.sh" --installed || rc=$?
                 ;;
             website)
                 SGND_WEB_CONTENT_GENERATION_MARKER_FILE="$marker_file" \
@@ -227,7 +233,7 @@ set -uo pipefail
         esac
 
         if (( rc == 0 )) && grep -qx 'generated' "$marker_file"; then
-            if [[ "$generation_kind" == documentation ]]; then
+            if [[ "$generation_kind" == documentation || "$generation_kind" == installed ]]; then
                 _web_content_mark_generation_dependencies \
                     "web-content-documentation-github" \
                     "web-content-generate" \
@@ -414,6 +420,16 @@ set -uo pipefail
         #   ```
     web_content_assemble_bundle() { _sgnd_run_module_script "manage-bundles.sh"; }
 
+    # fn: web_content_generate_installed - Document installed products through the existing generator
+        # . Purpose
+        #   Generate documentation from installed release manifests, then mark
+        #   downstream publication as pending only after successful generation.
+        # . Usage
+        #   ```bash
+        #   web_content_generate_installed
+        #   ```
+    web_content_generate_installed() { _web_content_run_generation_tracked installed; }
+
     # fn: web_content_generate_bundle - Select and generate a saved documentation bundle
         # . Purpose
         #   Open a numbered bundle selector and prepare its Markdown; after successful
@@ -483,28 +499,29 @@ set -uo pipefail
     sgnd_menu_register_group "web-content-publish" "Publish" "Website generation and publication" 0 1 554
 
     # Ingestion: staging does not modify canonical content until review confirms it.
-    sgnd_menu_register_item "web-content-retrieve" "web-content-ingestion" "Retrieve Incoming" "web_content_retrieve_incoming" "Retrieve staged files from the configured SSH source server" 0 15 1
-    sgnd_menu_register_item "web-content-import-local" "web-content-ingestion" "Import local files to Incoming" "web_content_import_local" "Copy local files, directories or ZIP archives to Incoming without changing content" 0 0 1
-    sgnd_menu_register_item "web-content-ingest-incoming" "web-content-ingestion" "Review and ingest Incoming package" "web_content_ingest_incoming" "Preview and explicitly accept staged files, directories or ZIP contents" 0 0 1
+    sgnd_menu_register_item "web-content-retrieve" "web-content-ingestion" "Retrieve Incoming" "web_content_retrieve_incoming" "Retrieve staged files from the configured SSH source server" 0 30 1
+    sgnd_menu_register_item "web-content-import-local" "web-content-ingestion" "Import local files to Incoming" "web_content_import_local" "Copy local files, directories or ZIP archives to Incoming without changing content" 0 30 1
+    sgnd_menu_register_item "web-content-ingest-incoming" "web-content-ingestion" "Review and ingest Incoming package" "web_content_ingest_incoming" "Preview and explicitly accept staged files, directories or ZIP contents" 0 30 1
 
     # Manage: page metadata and structure; sections are derived from content folders.
     sgnd_menu_register_item "web-content-metadata" "web-content-manage" "Edit page metadata" "web_content_edit_metadata" "Browse pages and update front matter without changing Markdown body" 0 0 1
     sgnd_menu_register_item "web-content-move" "web-content-manage" "Move / rename" "web_content_move_page" "Move a page to another existing section or change its URL slug" 0 0 1
     sgnd_menu_register_item "web-content-delete" "web-content-manage" "Delete page" "web_content_delete" "Remove pages or sections from active content and archive them for recovery" 0 0 1
-    sgnd_menu_register_item "web-content-source-config" "web-content-manage" "Configure source server" "web_content_configure_source" "Persist SSH host, user, port and remote incoming directory" 0 0 1
-    sgnd_menu_register_item "web-content-config" "web-content-manage" "Manage Config" "web_content_manage_config" "Select and edit an existing website configuration file" 0 0 1
+    sgnd_menu_register_item "web-content-source-config" "web-content-manage" "Configure source server" "web_content_configure_source" "Persist SSH host, user, port and remote incoming directory" 0 30 1
+    sgnd_menu_register_item "web-content-config" "web-content-manage" "Manage Config" "web_content_manage_config" "Select and edit an existing website configuration file" 0 30 1
 
     # Validate before generating and publishing the website.
-    sgnd_menu_register_item "web-content-validate" "web-content-validation" "Validate website source" "web_content_validate" "Validate configuration, content metadata, templates, and CSS styles" 0 15 1
-    sgnd_menu_register_item "web-content-status" "web-content-validation" "Show web-content status" "web_content_status" "Show engine availability and remembered source/output settings" 0 15 1
+    sgnd_menu_register_item "web-content-validate" "web-content-validation" "Validate website source" "web_content_validate" "Validate configuration, content metadata, templates, and CSS styles" 0 30 1
+    sgnd_menu_register_item "web-content-status" "web-content-validation" "Show web-content status" "web_content_status" "Show engine availability and remembered source/output settings" 0 30 1
 
     # Manage saved bundles separately from the explicit generation workflow.
     sgnd_menu_register_item "web-content-documentation-bundle" "web-content-documentation" "Manage documentation bundles" "web_content_assemble_bundle" "Create, configure and validate saved documentation bundles" 0 0 1
-    sgnd_menu_register_item "web-content-documentation-generate" "web-content-documentation" "Generate documentation bundle" "web_content_generate_bundle" "Select a saved bundle and generate its Markdown documentation" 0 0 1
-    sgnd_menu_register_item "web-content-documentation-github" "web-content-documentation" "Push to GitHub Pages" "web_content_publish_github_pages" "Publish generated documentation from the SolidGroundUX repository main/docs directory" 0 0 1
+    sgnd_menu_register_item "web-content-documentation-generate" "web-content-documentation" "Generate documentation bundle" "web_content_generate_bundle" "Select a saved bundle and generate its Markdown documentation" 0 30 1
+    sgnd_menu_register_item "web-content-documentation-installed" "web-content-documentation" "Generate documentation from installed products" "web_content_generate_installed" "Generate Markdown and optional HTML from installed product manifests" 0 30 1
+    sgnd_menu_register_item "web-content-documentation-github" "web-content-documentation" "Push to GitHub Pages" "web_content_publish_github_pages" "Publish generated documentation from the SolidGroundUX repository main/docs directory" 0 30 1
 
     # Publication is explicit: ingestion never automatically publishes content.
-    sgnd_menu_register_item "web-content-generate" "web-content-publish" "Generate website" "web_content_generate" "Generate a static website from Markdown, templates, CSS, and assets" 0 15 1
+    sgnd_menu_register_item "web-content-generate" "web-content-publish" "Generate website" "web_content_generate" "Generate a static website from Markdown, templates, CSS, and assets" 0 30 1
     sgnd_menu_register_item "web-content-publish-site" "web-content-publish" "Publish website" "web_content_publish" "Deploy generated HTML to a selected Nginx website over SSH" 0 0 1
 
     sayinfo "Web Content Management module registered with the console."

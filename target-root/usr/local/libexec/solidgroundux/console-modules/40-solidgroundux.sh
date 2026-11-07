@@ -3,8 +3,8 @@
 # ----------------------------------------------------------------------------------
 # Metadata:
 #   Version     : 2.2
-#   Build       : 2630700
-#   Checksum    : 8da25ad89e61109edc3fdc04544a4d93f45611358188da8d9c36cb52e71199cb
+#   Build       : 2631102
+#   Checksum    : fac0ecb357d92ec2af24d2dbe4c2fa965af36101834a0efc2548efbd0b30c6b8
 #   Source      : 40-solidgroundux.sh
 #   Type        : module
 #   Group       : Modules
@@ -481,8 +481,8 @@ set -uo pipefail
     #   > Handler: _framework_smoketest
     #   > Command: sgnd-framework-smoketest
     sgnd_menu_register_group "sgndinst" "SolidGroundUX" "SolidGroundUX framework information and product setup" 0 1 810
-    sgnd_menu_register_item "about" "sgndinst" "About SolidGroundUX" "_framework_show_about" "Show SolidGroundUX information" 0 15 1
-    sgnd_menu_register_item "setup" "sgndinst" "Setup" "_setup" "Open standalone product setup for install, update, rollback, removal, and local/GitHub package management" 0 15 1
+    sgnd_menu_register_item "about" "sgndinst" "About SolidGroundUX" "_framework_show_about" "Show SolidGroundUX information" 0 30 1
+    sgnd_menu_register_item "setup" "sgndinst" "Setup" "_setup" "Open standalone product setup for install, update, rollback, removal, and local/GitHub package management" 0 30 1
 
     sgnd_menu_register_group "framework-config" "Framework Configuration" "View and edit framework configuration files and effective settings" 0 1 820
     sgnd_menu_register_item "config-env" "framework-config" "Show effective configuration" "_framework_show_environment" "Show the resolved SolidGroundUX framework environment and effective settings" 0 30 1

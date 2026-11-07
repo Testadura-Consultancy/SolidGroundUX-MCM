@@ -4,7 +4,7 @@
 # -------------------------------------------------------------------------------------
 # Metadata:
 #   Version     : 2.2
-#   Build       : 2630700
+#   Build       : 2631102
 #   Shortname   : PUBLISH_WEB_CONTENT
 #   Source      : publish-web-content.sh
 #   Type        : script
@@ -12,7 +12,7 @@
 #   Subgroup    : Web Content Management
 #   Purpose     : Publish local, remote, Git, and SolidGroundUX documentation content
 #
-#   Checksum : df584dc70d72e0c2179a79c1e774957d3a76dc294126661bdebc182fb35388ac
+#   Checksum : 73f6f31993e1cc844140e64df9e734178196e80b69efe6cd6e5e80eabe0043df
 # Description:
 #   Publish local, remote, Git, and SolidGroundUX documentation content to Nginx sites.
 #
@@ -178,8 +178,8 @@ set -uo pipefail
     : "${SGND_WEB_DOC_SOURCE_USER:=${SUDO_USER:-${USER:-sysadmin}}}"
     : "${SGND_WEB_DOC_SOURCE_DIR:=}"
     : "${SGND_WEB_DOC_REPOSITORY:=}"
-    : "${SGND_WEB_DOC_REF:=master}"
-    : "${SGND_WEB_DOC_REPO_PATH:=target-root/usr/local/share/doc/solidgroundux-codex}"
+    : "${SGND_WEB_DOC_REF:=main}"
+    : "${SGND_WEB_DOC_REPO_PATH:=docs}"
 
     # Render a local numbered selector using the Web Server action layout.
     # The framework ask_selection API is intentionally left unchanged.
@@ -322,7 +322,7 @@ set -uo pipefail
         # . Purpose
         #   Read SGND_WEB_DOC_INSTALLED_ROOT from the environment or web-server.cfg;
         #   use the canonical installed documentation directory if unset.
-        #   Support staged framework roots during development.
+        #   A configured /usr path can also be resolved under a staged framework root.
         #
         # . Output
         #   Prints the configured absolute documentation path.
@@ -338,7 +338,7 @@ set -uo pipefail
         if [[ -z "$configured" && -r "$SGND_WEB_SERVER_CONFIG_FILE" ]]; then
             configured="$(awk -F= '$1 == "SGND_WEB_DOC_INSTALLED_ROOT" {sub(/^[^=]*=/, ""); print; exit}' "$SGND_WEB_SERVER_CONFIG_FILE")"
         fi
-        [[ -n "$configured" ]] || configured="/usr/local/share/doc/solidgroundux-codex"
+        [[ -n "$configured" ]] || configured="/var/lib/solidgroundux/documentation/installed/www"
         [[ "$configured" == /* ]] || { sayfail "Documentation source must be an absolute path." >&2; return 2; }
         if [[ "$framework_root" != "/" && "$configured" == /usr/* ]]; then
             configured="${framework_root%/}${configured}"
@@ -717,8 +717,8 @@ set -uo pipefail
         local source_user="${SGND_WEB_DOC_SOURCE_USER:-${SUDO_USER:-${USER:-sysadmin}}}"
         local source_dir="${SGND_WEB_DOC_SOURCE_DIR:-}"
         local repository="${SGND_WEB_DOC_REPOSITORY:-}"
-        local repo_ref="${SGND_WEB_DOC_REF:-master}"
-        local repo_path="${SGND_WEB_DOC_REPO_PATH:-target-root/usr/local/share/doc/solidgroundux-codex}"
+        local repo_ref="${SGND_WEB_DOC_REF:-main}"
+        local repo_path="${SGND_WEB_DOC_REPO_PATH:-docs}"
         local installed_docs=""
         local document_root=""
         local source_spec=""

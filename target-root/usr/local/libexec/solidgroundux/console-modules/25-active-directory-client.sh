@@ -3,7 +3,7 @@
 # ----------------------------------------------------------------------------------
 # Metadata:
 #   Version     : 2.2
-#   Build       : 2630700
+#   Build       : 2631102
 #   Shortname   : AD_CLIENT
 #   Source      : 25-active-directory-client.sh
 #   Type        : module
@@ -11,7 +11,7 @@
 #   Subgroup    : Active Directory Client
 #   Purpose     : Register Active Directory client management actions
 #
-#   Checksum : 3b9d4fca46ca9f612908fb891d3e927bea3ed206557ed4395f32f4a6bcb6d7f2
+#   Checksum : 3fa73935548c0a3dadba5b55ce477ec2f34fb40e52e9ad485ac839305b845879
 # Description:
 #   Registers Active Directory client management actions with the SolidGround Management
 #   Console. Persistent join, reconciliation, validation, and repair operations are
@@ -455,16 +455,16 @@ set -uo pipefail
     #   > Leave the currently joined Active Directory realm.
     #   > Handler: _adc_leave
     sgnd_menu_register_group "$SGND_AD_CLIENT_MODULE_ID" "$SGND_AD_CLIENT_MODULE_NAME" "$(sgnd_header_get_field_value "${BASH_SOURCE[0]}" "Metadata" "Purpose")" 0 1 250
-    sgnd_menu_register_item "adc-join" "$SGND_AD_CLIENT_MODULE_ID" "Join domain" "_adc_join_domain" "Run the complete Active Directory client join sequence" 0 15 1 0
-    sgnd_menu_register_item "adc-install" "$SGND_AD_CLIENT_MODULE_ID" "Install AD client prerequisites" "_adc_step_install_packages" "Install realmd, SSSD, Kerberos, and AD client utilities" 0 15 1 1
-    sgnd_menu_register_item "adc-preflight" "$SGND_AD_CLIENT_MODULE_ID" "Validate join inputs" "_adc_step_preflight" "Collect realm, DNS, account, and machine identity settings" 0 15 1 1
-    sgnd_menu_register_item "adc-dns" "$SGND_AD_CLIENT_MODULE_ID" "Configure Active Directory DNS" "_adc_step_dns" "Point the client at the authoritative Active Directory DNS server" 0 15 1 1
-    sgnd_menu_register_item "adc-identity" "$SGND_AD_CLIENT_MODULE_ID" "Prepare client identity" "_adc_step_identity" "Set and validate the machine FQDN before joining" 0 15 1 1
-    sgnd_menu_register_item "adc-discover" "$SGND_AD_CLIENT_MODULE_ID" "Discover Active Directory services" "_adc_step_discover" "Validate realm, Kerberos, and LDAP service discovery" 0 15 1 1
-    sgnd_menu_register_item "adc-join-step" "$SGND_AD_CLIENT_MODULE_ID" "Join Active Directory realm" "_adc_step_join" "Join the machine to the selected realm" 0 15 1 1
-    sgnd_menu_register_item "adc-sssd" "$SGND_AD_CLIENT_MODULE_ID" "Start SSSD" "_adc_step_sssd" "Start and validate the SSSD client service" 0 15 1 1
-    sgnd_menu_register_item "adc-register" "$SGND_AD_CLIENT_MODULE_ID" "Register client DNS" "_adc_step_register_dns" "Register and verify the client IPv4 host record" 0 15 1 1
-    sgnd_menu_register_item "adc-reconcile" "$SGND_AD_CLIENT_MODULE_ID" "Reconcile AD client" "_adc_reconcile" "Repair safe local AD client drift without rejoining the realm" 0 20 1 0
-    sgnd_menu_register_item "adc-validate" "$SGND_AD_CLIENT_MODULE_ID" "Validate AD client" "_adc_validate" "Validate membership, service discovery, and SSSD" 0 15 1 0
-    sgnd_menu_register_item "adc-status" "$SGND_AD_CLIENT_MODULE_ID" "Show AD client status" "_adc_status" "Show machine identity and current realm membership" 0 15 1 0
-    sgnd_menu_register_item "adc-leave" "$SGND_AD_CLIENT_MODULE_ID" "Leave domain" "_adc_leave" "Leave the currently joined Active Directory realm" 0 15 1 0
+    sgnd_menu_register_item "adc-join" "$SGND_AD_CLIENT_MODULE_ID" "Join domain" "_adc_join_domain" "Run the complete Active Directory client join sequence" 0 30 1 0
+    sgnd_menu_register_item "adc-install" "$SGND_AD_CLIENT_MODULE_ID" "Install AD client prerequisites" "_adc_step_install_packages" "Install realmd, SSSD, Kerberos, and AD client utilities" 0 30 1 1
+    sgnd_menu_register_item "adc-preflight" "$SGND_AD_CLIENT_MODULE_ID" "Validate join inputs" "_adc_step_preflight" "Collect realm, DNS, account, and machine identity settings" 0 30 1 1
+    sgnd_menu_register_item "adc-dns" "$SGND_AD_CLIENT_MODULE_ID" "Configure Active Directory DNS" "_adc_step_dns" "Point the client at the authoritative Active Directory DNS server" 0 30 1 1
+    sgnd_menu_register_item "adc-identity" "$SGND_AD_CLIENT_MODULE_ID" "Prepare client identity" "_adc_step_identity" "Set and validate the machine FQDN before joining" 0 30 1 1
+    sgnd_menu_register_item "adc-discover" "$SGND_AD_CLIENT_MODULE_ID" "Discover Active Directory services" "_adc_step_discover" "Validate realm, Kerberos, and LDAP service discovery" 0 30 1 1
+    sgnd_menu_register_item "adc-join-step" "$SGND_AD_CLIENT_MODULE_ID" "Join Active Directory realm" "_adc_step_join" "Join the machine to the selected realm" 0 30 1 1
+    sgnd_menu_register_item "adc-sssd" "$SGND_AD_CLIENT_MODULE_ID" "Start SSSD" "_adc_step_sssd" "Start and validate the SSSD client service" 0 30 1 1
+    sgnd_menu_register_item "adc-register" "$SGND_AD_CLIENT_MODULE_ID" "Register client DNS" "_adc_step_register_dns" "Register and verify the client IPv4 host record" 0 30 1 1
+    sgnd_menu_register_item "adc-reconcile" "$SGND_AD_CLIENT_MODULE_ID" "Reconcile AD client" "_adc_reconcile" "Repair safe local AD client drift without rejoining the realm" 0 30 1 0
+    sgnd_menu_register_item "adc-validate" "$SGND_AD_CLIENT_MODULE_ID" "Validate AD client" "_adc_validate" "Validate membership, service discovery, and SSSD" 0 30 1 0
+    sgnd_menu_register_item "adc-status" "$SGND_AD_CLIENT_MODULE_ID" "Show AD client status" "_adc_status" "Show machine identity and current realm membership" 0 30 1 0
+    sgnd_menu_register_item "adc-leave" "$SGND_AD_CLIENT_MODULE_ID" "Leave domain" "_adc_leave" "Leave the currently joined Active Directory realm" 0 30 1 0

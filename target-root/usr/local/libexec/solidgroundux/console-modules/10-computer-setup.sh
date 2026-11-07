@@ -3,9 +3,9 @@
 # ----------------------------------------------------------------------------------
 # Metadata:
 #   Version     : 2.2
-#   Build       : 2630913
+#   Build       : 2631102
 #   Shortname   : COMPUTER_SETUP
-#   Checksum    : 16a0874f3fbae8a88866999cafbc67e468ced3851f0e6b6e2665bfa391a57ea3
+#   Checksum    : a81f9bf9ddfe9bf8780b0d3570a31184b24a82858e97ab304c1a50b6cdc4cdc4
 #   Source      : 10-computer-setup.sh
 #   Type        : module
 #   Group       : Modules
@@ -15,8 +15,7 @@
 # Description:
 #   Registers post-clone computer setup and optional outbound SSH deployment
 #   access management. Optional Cinnamon, GNOME and Plasma desktop login and RDP are managed
-#   separately. Remote desktop session inspection and cleanup are opt-in;
-#   Prepare computer retains its existing four-step sequence.
+#   separately; Prepare computer retains its existing four-step sequence.
 # ==================================================================================
 set -uo pipefail
 
@@ -181,21 +180,6 @@ set -uo pipefail
         #   _computer_configure_rdp
         #   ```
     _computer_configure_rdp() { _computer_manage rdp; }
-
-    # fn: _computer_manage_rdp_sessions - Inspect and terminate logind sessions.
-        # . Purpose
-        #   Provide explicit session inspection and cleanup for remote desktops.
-        # . Description
-        #   List logind sessions, terminate one selected session, or clear all
-        #   sessions and user processes after confirmation. Includes local/SSH
-        #   sessions in the display to prevent accidental termination.
-        # . Returns
-        #   The delegated action exit status.
-        # . Usage
-        #   ```bash
-        #   _computer_manage_rdp_sessions
-        #   ```
-    _computer_manage_rdp_sessions() { _computer_manage rdp-sessions; }
 
     # fn: _computer_status - Call `_computer_manage` with the `status` action.
         # . Purpose
@@ -381,11 +365,6 @@ set -uo pipefail
     #   > Configure desktop-specific RDP with optional trusted LAN scope.
     #   > Handler: _computer_configure_rdp
     #
-    # ! Manage Remote Desktop Sessions
-    #   > Inspect current logind sessions, terminate one selected session or
-    #   > terminate all sessions for a selected user, with confirmation.
-    #   > Handler: _computer_manage_rdp_sessions
-    #
     # ! Show computer status
     #   > Show identity, network, SSH, host-key, and SolidGround sudo state.
     #   > Handler: _computer_status
@@ -410,25 +389,24 @@ set -uo pipefail
     sgnd_menu_register_group "computer-validation" "Validation" "Inspect or validate computer setup and prepare for cloning" 0 1 103
 
     # Composite action; its four tracked substeps immediately follow, indented.
-    sgnd_menu_register_item "preparepc" "$SGND_COMPUTER_SETUP_MODULE_ID" "Prepare computer" "_computer_prepare" "Run steps 2-5 in order" 0 15 1 0
-    sgnd_menu_register_item "setnetid" "$SGND_COMPUTER_SETUP_MODULE_ID" "Set computer identity" "_computer_set_identity" "Configure hostname, network identity, DNS, and search domain" 0 15 1 1
-    sgnd_menu_register_item "sshkeys" "$SGND_COMPUTER_SETUP_MODULE_ID" "Generate SSH host keys" "_computer_generate_ssh_keys" "Generate SSH server host keys, validate sshd, and restart SSH" 0 15 1 1
-    sgnd_menu_register_item "sshcfg" "$SGND_COMPUTER_SETUP_MODULE_ID" "Configure SSH service" "_computer_configure_ssh_service" "Enable or disable the SSH service" 0 15 1 1
-    sgnd_menu_register_item "sudoers" "$SGND_COMPUTER_SETUP_MODULE_ID" "Setup SolidGround sudo access" "_computer_configure_sudoers" "Allow administrator to run trusted SolidGroundUX tools without a password" 0 15 1 1
+    sgnd_menu_register_item "preparepc" "$SGND_COMPUTER_SETUP_MODULE_ID" "Prepare computer" "_computer_prepare" "Run steps 2-5 in order" 0 30 1 0
+    sgnd_menu_register_item "setnetid" "$SGND_COMPUTER_SETUP_MODULE_ID" "Set computer identity" "_computer_set_identity" "Configure hostname, network identity, DNS, and search domain" 0 30 1 1
+    sgnd_menu_register_item "sshkeys" "$SGND_COMPUTER_SETUP_MODULE_ID" "Generate SSH host keys" "_computer_generate_ssh_keys" "Generate SSH server host keys, validate sshd, and restart SSH" 0 30 1 1
+    sgnd_menu_register_item "sshcfg" "$SGND_COMPUTER_SETUP_MODULE_ID" "Configure SSH service" "_computer_configure_ssh_service" "Enable or disable the SSH service" 0 30 1 1
+    sgnd_menu_register_item "sudoers" "$SGND_COMPUTER_SETUP_MODULE_ID" "Setup SolidGround sudo access" "_computer_configure_sudoers" "Allow administrator to run trusted SolidGroundUX tools without a password" 0 30 1 1
 
     # Desktop actions are opt-in and must never run in standard Prepare computer.
-    sgnd_menu_register_item "desktoplogin" "computer-desktop" "Configure desktop login" "_computer_configure_desktop_login" "Configure manual domain login for LightDM, GDM3 or SDDM with PAM homes" 0 15 1 0
-    sgnd_menu_register_item "desktoprdp" "computer-desktop" "Configure Remote Desktop (RDP)" "_computer_configure_rdp" "Configure desktop-native RDP and scoped UFW access" 0 15 1 0
-    sgnd_menu_register_item "rdpsessions" "computer-desktop" "Manage Remote Desktop Sessions" "_computer_manage_rdp_sessions" "Inspect sessions and terminate a session or all processes for a selected user" 0 15 1 0
+    sgnd_menu_register_item "desktoplogin" "computer-desktop" "Configure desktop login" "_computer_configure_desktop_login" "Configure manual domain login for LightDM, GDM3 or SDDM with PAM homes" 0 30 1 0
+    sgnd_menu_register_item "desktoprdp" "computer-desktop" "Configure Remote Desktop (RDP)" "_computer_configure_rdp" "Configure desktop-native RDP and scoped UFW access" 0 30 1 0
 
     # User credentials: never a part of unattended/standard Prepare computer.
-    sgnd_menu_register_item "sshuserkey" "computer-ssh-key-management" "Generate user SSH key" "_computer_ssh_generate_user_key" "Generate a personal SSH key pair for outbound connections" 0 15 1 0
-    sgnd_menu_register_item "sshcopykey" "computer-ssh-key-management" "Install public key on remote host" "_computer_ssh_install_key" "Authorize the user's public key on a remote SSH host" 0 15 1 0
-    sgnd_menu_register_item "sshagent" "computer-ssh-key-management" "Unlock SSH key in agent" "_computer_ssh_unlock_key" "Start or reuse an SSH agent and unlock a personal key" 0 15 1 0
-    sgnd_menu_register_item "sshtest" "computer-ssh-key-management" "Test SSH authentication" "_computer_ssh_test_access" "Verify non-interactive SSH authentication to a remote host" 0 15 1 0
+    sgnd_menu_register_item "sshuserkey" "computer-ssh-key-management" "Generate user SSH key" "_computer_ssh_generate_user_key" "Generate a personal SSH key pair for outbound connections" 0 30 1 0
+    sgnd_menu_register_item "sshcopykey" "computer-ssh-key-management" "Install public key on remote host" "_computer_ssh_install_key" "Authorize the user's public key on a remote SSH host" 0 30 1 0
+    sgnd_menu_register_item "sshagent" "computer-ssh-key-management" "Unlock SSH key in agent" "_computer_ssh_unlock_key" "Start or reuse an SSH agent and unlock a personal key" 0 30 1 0
+    sgnd_menu_register_item "sshtest" "computer-ssh-key-management" "Test SSH authentication" "_computer_ssh_test_access" "Verify non-interactive SSH authentication to a remote host" 0 30 1 0
 
     sgnd_menu_register_item "pcstatus" "computer-validation" "Show computer status" "_computer_status" "Show identity, network, SSH host-key, and sudo status" 0 30 1 0
-    sgnd_menu_register_item "pcvalidate" "computer-validation" "Validate computer setup" "_computer_validate" "Validate identity, SSH host keys and service, and sudo access" 0 15 1 0
-    sgnd_menu_register_item "preptemplate" "computer-validation" "Prepare for cloning" "_prepare_template" "Prepare a template computer for cloning" 0 15 1 0
+    sgnd_menu_register_item "pcvalidate" "computer-validation" "Validate computer setup" "_computer_validate" "Validate identity, SSH host keys and service, and sudo access" 0 30 1 0
+    sgnd_menu_register_item "preptemplate" "computer-validation" "Prepare for cloning" "_prepare_template" "Prepare a template computer for cloning" 0 30 1 0
 
     sayinfo "Computer Setup module registered with the console."

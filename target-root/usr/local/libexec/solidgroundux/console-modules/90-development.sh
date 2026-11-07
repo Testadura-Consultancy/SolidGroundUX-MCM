@@ -3,9 +3,9 @@
 # ----------------------------------------------------------------------------------
 # Metadata:
 #   Version     : 2.2
-#   Build       : 2630700
+#   Build       : 2631102
 #   Shortname   : DEVELOPMENT
-#   Checksum    : c16359be10fd527ecf733d580014a0fb339c8b06c57965f7f6f01f2695375c0c
+#   Checksum    : ce42c1eb9e1ac959d51092f585dd11226a13d762f56b2954b51e1174af2bb941
 #   Source      : 90-development.sh
 #   Type        : module
 #   Group       : Modules
@@ -201,9 +201,9 @@ set -uo pipefail
         "$(sgnd_header_get_field_value "${BASH_SOURCE[0]}" "Metadata" "Purpose")" \
         0 1 900
 
-    sgnd_menu_register_item "dev-createws" "$SGND_DEVELOPMENT_MODULE_ID" "Create workspace" "_dev_create_workspace" "Create a template workspace with target-root structure" 0 15 1 0
+    sgnd_menu_register_item "dev-createws" "$SGND_DEVELOPMENT_MODULE_ID" "Create workspace" "_dev_create_workspace" "Create a template workspace with target-root structure" 0 30 1 0
     sgnd_menu_register_item "dev-deployws" "$SGND_DEVELOPMENT_MODULE_ID" "Deploy workspace" "_dev_deploy_workspace" "Select and deploy workspace files locally or remotely" 0 0 1 0
-    sgnd_menu_register_item "dev-preprel" "$SGND_DEVELOPMENT_MODULE_ID" "Prepare release" "_dev_prepare_release" "Create a release archive with checksums and manifests" 0 15 1 0
-    sgnd_menu_register_item "dev-wrappers" "$SGND_DEVELOPMENT_MODULE_ID" "Create wrappers" "_dev_create_wrappers" "Create root-aware bin or sbin wrappers for selected scripts" 0 20 1 0
+    sgnd_menu_register_item "dev-preprel" "$SGND_DEVELOPMENT_MODULE_ID" "Prepare release" "_dev_prepare_release" "Create a release archive with checksums and manifests" 0 30 1 0
+    sgnd_menu_register_item "dev-wrappers" "$SGND_DEVELOPMENT_MODULE_ID" "Create wrappers" "_dev_create_wrappers" "Create root-aware bin or sbin wrappers for selected scripts" 0 30 1 0
    
     sayinfo "Development module registered with the console."
