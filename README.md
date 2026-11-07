@@ -2,7 +2,7 @@
 <tr>
 <td width="290" align="center" valign="middle">
   <img width="256" alt="SolidGroundUX Management Console Modules logo"
-       src="target-root/usr/local/share/doc-sources/assets/mcm_readmelogo.png" />
+       src="target-root/usr/local/share/doc-sources/assets/mcm-readmelogo.png" />
 </td>
 <td valign="middle">
   <h2>SolidGroundUX: Management Console Modules</h2>
