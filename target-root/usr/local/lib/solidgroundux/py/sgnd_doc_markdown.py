@@ -1510,14 +1510,31 @@ def build_appendices(products: list[dict], content: Path, root: Path, nav_order:
     for order, product in enumerate(products, 1):
         source = Path(product['source_dir']).expanduser().resolve()
         files = _product_reference_files(source, 'CHANGELOG.md')
+        history_files = _product_reference_files(source, 'CHANGELOG-History.md')
         document = files[0].read_text(encoding='utf-8', errors='replace').strip() if files else ''
         if document:
+            # The repository history is published as a separate child page;
+            # retarget only the authored relative link, not unrelated Markdown links.
+            if history_files:
+                document = re.sub(r'(?<=\]\()(?:\./)?CHANGELOG-History\.md(?=[#?)])',
+                                  'history/', document, flags=re.I)
             body = f'**Source:** `{files[0].relative_to(source)}`\n\n{document}'
             available_change_logs += 1
         else:
             body = 'No `CHANGELOG.md` was found in this product\'s configured source tree.'
-        write_index(change_logs / slug(product['id']), product['title'], body,
-                    order, template='page')
+        product_change_logs = change_logs / slug(product['id'])
+        write_index(product_change_logs, product['title'], body, order, template='page')
+        if history_files:
+            history = history_files[0]
+            history_document = history.read_text(encoding='utf-8', errors='replace').strip()
+            if files:
+                # History lives one level below the current changelog in WCM.
+                # Retarget only the original relative Markdown link back to it.
+                history_document = re.sub(r'(?<=\]\()(?:\./)?CHANGELOG\.md(?=[#?)])',
+                                          '../', history_document, flags=re.I)
+            history_body = f'**Source:** `{history.relative_to(source)}`\n\n{history_document}'
+            write_index(product_change_logs / 'history', 'History', history_body,
+                        1, template='page')
 
     if attribution_lines:
         write_index(appendix / 'attribution', 'Attribution', '\n'.join(attribution_lines), 5, template='page')

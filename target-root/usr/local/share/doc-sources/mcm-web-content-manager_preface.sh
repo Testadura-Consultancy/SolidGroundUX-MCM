@@ -57,25 +57,74 @@
 # Both outputs can be inspected locally **without publishing**. Generation never
 # copies files to a remote web server and never commits source changes to Git.
 #
-# -- Publishing and serving -----------------------------------------------------------
+# -- Publishing profiles and serving -----------------------------------------------
 #
-# **Publish Website** takes an already generated public HTML directory—not the
-# Markdown source—as input. The Bash publishing workflow lets the operator review
-# the source directory, destination host, remote directory, website hostname
-# and synchronization strategy. It checks the generated output, can provision
-# the destination site through the remote web-server module, then previews
-# transfer changes with `rsync --dry-run` before requesting confirmation.
+# **Publish website** deploys an already generated *public HTML directory*. The
+# Markdown source is never copied to hosting. **Manage publishing profiles**
+# allows multiple websites, each with multiple named destinations. The chosen
+# destination is independent from the current generation configuration.
+# The **Manage publishing profiles** menu shows the selected profile and website
+# as yellow Framework labeled values between the title bar and View group,
+# restored from saved selection on entry and refreshed after each action.
+# **List profiles** provides a read-only summary of all websites and destinations,
+# including each destination's last successful publication date. **View profile**
+# displays the individual settings without changing the selected destination.
+# The profile manager uses the standard Framework menu renderer, with consecutive
+# selections: **View** (1-3: list, view, test), **Manage** (4-7: select, create,
+# modify, delete), and **Preview** (8-9: start/stop local server). Its screen
+# is cleared and redrawn after each action. Each completed menu action returns
+# after one interruptible auto-continue dialog; no extra Enter prompt or
+# numeric Exit item is shown (Q = Back).
+# **Test connection** and **Delete** operate on the selected profile; deletion
+# still requires explicit confirmation. Viewing another profile does not select it.
+# **Test connection** checks local source/target access, SSH authentication plus
+# rsync and remote directory permissions, or FTP/FTPS/SFTP directory listing.
+# This is a read-only connection check: it does not upload files, create remote
+# directories, start a local server or provision Nginx/DNS. SSH tests require a
+# previously trusted host key and batch-mode authentication; FTP/SFTP testing
+# requires the hosting account to permit directory listing.
 #
-# **Update** copies additions and changes; **Mirror** can also remove remote
-# files absent from the generated output. Mirror therefore requires extra
-# attention to the deletion preview. The transfer uses SSH and rsync to place
-# the static files in the web server's document root. Nginx serves the result;
-# neither the Markdown parser nor the Python renderer runs per HTTP request.
+# Available publication methods:
 #
-# `publish-web-content.sh` also exposes separate server-site and documentation
-# publishing operations. Those publishing actions should not be confused with
-# Markdown bundle generation or the Python website renderer. A successful
-# generation is not evidence that the deployment has been performed.
+# | Method | Destination | Web server management |
+# | --- | --- | --- |
+# | Local preview | Local directory synchronized with rsync | No; optional Python HTTP server |
+# | SSH / rsync | Remote directory, optionally an existing Nginx document root | Optional Nginx/DNS management |
+# | FTP / FTPS | External hosting account with credentials in `~/.netrc` | None |
+# | SFTP | External hosting via SSH credentials | None |
+#
+# **Update** transfers additions and changes; **Mirror** also removes files
+# absent from the generated output and requires interactive confirmation.
+# External FTP/FTPS/SFTP publishing uses Update only. A publishing dry-run
+# reviews the planned rsync changes without transferring files. Only successful
+# real publication updates that destination's last-publication timestamp.
+#
+# After local publication, WCM optionally offers **Start local webserver**. The
+# preview server binds to `127.0.0.1`, tries port 8080 by default and continues
+# with 8081, 8082, etc. until a free port is found. WCM displays the resulting
+# `http://localhost:<port>/` address. A WCM-owned server can be reused or
+# stopped from profile management without terminating unrelated processes.
+# **Start local preview** can also launch the HTTP server separately for an
+# already published local-preview destination, without copying any website files.
+#
+# Non-interactive publication uses a selected profile, or an explicit one:
+#
+# ```bash
+# manage-web-content.sh --action manage-publishing-profiles
+# manage-web-content.sh --action publish --profile Testadura-HQ
+# manage-web-content.sh --action publish --profile Development --auto
+# manage-web-content.sh --action publish --profile Development --dryrun
+# ```
+#
+# Framework stores structured, versioned WCM profile data in the user's
+# `~/.config/solidgroundux/deployment-profiles/wcm.json`. Existing ordinary
+# release 2.2.2631102 publishing settings are imported once; obsolete Base64
+# publishing profiles are not imported. Passwords are not stored in profiles.
+#
+# `publish-web-content.sh` also provides server-site publishing operations.
+# Generating static HTML, transferring that HTML, and provisioning a web server
+# remain distinct actions. Nginx serves the final result on managed hosts;
+# the Python renderer never runs per normal website HTTP request.
 #
 # -- Responsibilities by component ---------------------------------------------------
 #
@@ -88,7 +137,7 @@
 # | `webcontent/templates.py` | Apply the site page templates | Complete HTML pages |
 # | `webcontent/generator.py` | Coordinate HTML/site-asset generation | Public or preview output directory |
 # | `manage-web-content.sh` | Provide the MCM operator workflow | Validation and generation actions |
-# | `publish-web-content.sh` | Review destination and synchronize built site over SSH/rsync | Files in the web server document root |
+# | `manage-web-content.sh` | Select a publishing profile and deploy built HTML | Local or hosted static website |
 # | Nginx | Serve generated HTML and assets | Browser response |
 #
 # -- Markdown authoring components ---------------------------------------------------

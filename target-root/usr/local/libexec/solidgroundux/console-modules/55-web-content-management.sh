@@ -361,6 +361,14 @@ set -uo pipefail
         #   web_content_publish
         #   ```
     web_content_publish()         { _web_content_run_manage publish; }
+    # fn: web_content_manage_publishing_profiles - Manage named publication destinations.
+        # . Purpose
+        #   Open the Website Publishing Profiles interface.
+        # . Usage
+        #   ```bash
+        #   web_content_manage_publishing_profiles
+        #   ```
+    web_content_manage_publishing_profiles() { _web_content_run_manage manage-publishing-profiles; }
     # fn: web_content_publish_github_pages - Push generated documentation to GitHub Pages.
         # . Purpose
         #   Push generated documentation to GitHub Pages.
@@ -475,11 +483,9 @@ set -uo pipefail
             SGND_MODULE_VALIDATION_MESSAGE="Python 3 is not available on this host."
             return 1
         fi
-        if [[ "${SGND_FRAMEWORK_ROOT:-/}" == "/" ]]; then
-            python_root="/usr/local/lib/solidgroundux/py/webcontent"
-        else
-            python_root="${SGND_FRAMEWORK_ROOT%/}/usr/local/lib/solidgroundux/py/webcontent"
-        fi
+        local module_root="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../../.." && pwd -P)"
+        python_root="${module_root%/}/lib/solidgroundux/py/webcontent"
+        [[ -r "$python_root/__init__.py" ]] || python_root="/usr/local/lib/solidgroundux/py/webcontent"
         if [[ ! -r "$python_root/__init__.py" ]]; then
             SGND_MODULE_VALIDATION_MESSAGE="WebContent Python engine is not installed."
             return 1
@@ -522,6 +528,7 @@ set -uo pipefail
 
     # Publication is explicit: ingestion never automatically publishes content.
     sgnd_menu_register_item "web-content-generate" "web-content-publish" "Generate website" "web_content_generate" "Generate a static website from Markdown, templates, CSS, and assets" 0 30 1
-    sgnd_menu_register_item "web-content-publish-site" "web-content-publish" "Publish website" "web_content_publish" "Deploy generated HTML to a selected Nginx website over SSH" 0 0 1
+    sgnd_menu_register_item "web-content-publish-site" "web-content-publish" "Publish website" "web_content_publish" "Deploy generated HTML using a selected publishing profile" 0 0 1
+    sgnd_menu_register_item "web-content-manage-publishing-profiles" "web-content-publish" "Manage publishing profiles" "web_content_manage_publishing_profiles" "Create and select website publication destinations" 0 0 1
 
     sayinfo "Web Content Management module registered with the console."

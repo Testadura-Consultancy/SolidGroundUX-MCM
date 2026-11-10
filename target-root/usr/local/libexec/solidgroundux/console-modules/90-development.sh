@@ -106,6 +106,17 @@ set -uo pipefail
         _sgnd_run_public_command "sgnd-deploy-workspace"
     }
 
+    # fn: _dev_manage_deployment_profiles - Manage reusable SDK deployment profiles.
+        # . Purpose
+        #   Open the SDK profile manager through its supported CLI entry point.
+        # . Usage
+        #   ```bash
+        #   _dev_manage_deployment_profiles
+        #   ```
+    _dev_manage_deployment_profiles() {
+        _sgnd_run_public_command "sgnd-deploy-workspace" --manage-profiles
+    }
+
     # fn: _dev_prepare_release
         # . Purpose
         #   Launch the canonical SolidGroundUX release-preparation tool.
@@ -203,6 +214,7 @@ set -uo pipefail
 
     sgnd_menu_register_item "dev-createws" "$SGND_DEVELOPMENT_MODULE_ID" "Create workspace" "_dev_create_workspace" "Create a template workspace with target-root structure" 0 30 1 0
     sgnd_menu_register_item "dev-deployws" "$SGND_DEVELOPMENT_MODULE_ID" "Deploy workspace" "_dev_deploy_workspace" "Select and deploy workspace files locally or remotely" 0 0 1 0
+    sgnd_menu_register_item "dev-deployprofiles" "$SGND_DEVELOPMENT_MODULE_ID" "Manage deployment profiles" "_dev_manage_deployment_profiles" "Create and select reusable SDK deployment destinations" 0 30 1 0
     sgnd_menu_register_item "dev-preprel" "$SGND_DEVELOPMENT_MODULE_ID" "Prepare release" "_dev_prepare_release" "Create a release archive with checksums and manifests" 0 30 1 0
     sgnd_menu_register_item "dev-wrappers" "$SGND_DEVELOPMENT_MODULE_ID" "Create wrappers" "_dev_create_wrappers" "Create root-aware bin or sbin wrappers for selected scripts" 0 30 1 0
    

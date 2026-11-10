@@ -33,7 +33,7 @@
 #   ```
 #
 #   Script-specific options:
-#   - `--action NAME`, `-a`: Management action (supported actions: `ingest`, `delete`, `edit-metadata`, `move-page`, `manage-config`, `configure-source`, `retrieve-incoming`, `import-local`, `ingest-incoming`, `generate`, `publish`, `publish-github-pages`, `validate`, `prepare-social`, `status`).
+#   - `--action NAME`, `-a`: Management action (supported actions: `ingest`, `delete`, `edit-metadata`, `move-page`, `manage-config`, `configure-source`, `retrieve-incoming`, `import-local`, `ingest-incoming`, `generate`, `publish`, `manage-publishing-profiles`, `publish-github-pages`, `validate`, `prepare-social`, `status`).
 #   - `--ingest-dir VALUE`, `-i`: Override Markdown ingestion directory.
 #
 # Attribution:
@@ -81,63 +81,74 @@ set -uo pipefail
         #   _framework_locator || return $?
         #   ```
     _framework_locator() {
-        local script_file=""
-        local path_without_root=""
-        local component=""
-        local framework_root=""
-        local exe_common=""
-        local index=0
-        local root_index=-1
-        local -a path_parts=()
+        local script_file="" suffix="" component="" script_root="" candidate=""
+        local exe_common="" discovered="" parent="" tree="" common_suffix="usr/local/lib/solidgroundux/common/sgnd-exe-common.sh"
+        local index=0 root_index=-1
+        local -a path_parts=() matches=()
 
         script_file="$(readlink -f "${BASH_SOURCE[0]}")" || {
             printf 'FATAL: Cannot resolve executable path: %s\n' "${BASH_SOURCE[0]}" >&2
             return 126
         }
-
-        path_without_root="${script_file#/}"
-        IFS='/' read -r -a path_parts <<< "$path_without_root"
-
+        suffix="${script_file#/}"
+        IFS='/' read -r -a path_parts <<< "$suffix"
         for index in "${!path_parts[@]}"; do
             component="${path_parts[$index]}"
-            case "$component" in
-                usr|etc|var)
-                    root_index=$index
-                    ;;
-            esac
+            case "$component" in usr|etc|var) root_index=$index ;; esac
         done
-
-        if (( root_index < 0 )); then
-            printf 'FATAL: Cannot determine SolidGroundUX framework root from: %s\n' "$script_file" >&2
+        (( root_index >= 0 )) || {
+            printf 'FATAL: Cannot determine product root from %s\n' "$script_file" >&2
             return 126
-        fi
-
-        if (( root_index == 0 )); then
-            framework_root="/"
-        else
-            framework_root=""
+        }
+        script_root="/"
+        if (( root_index > 0 )); then
+            script_root=""
             for (( index=0; index<root_index; index++ )); do
-                framework_root+="/${path_parts[$index]}"
+                script_root+="/${path_parts[$index]}"
             done
         fi
 
-        SGND_FRAMEWORK_ROOT="$framework_root"
-
-        if [[ "$SGND_FRAMEWORK_ROOT" == "/" ]]; then
-            exe_common="/usr/local/lib/solidgroundux/common/sgnd-exe-common.sh"
+        # A caller may explicitly select a separate Framework development tree.
+        # A wrong explicit root is an error rather than a silent fallback.
+        if [[ -n "${SGND_FRAMEWORK_ROOT:-}" ]]; then
+            candidate="${SGND_FRAMEWORK_ROOT%/}"
+            [[ -n "$candidate" ]] || candidate="/"
+            [[ -r "${candidate%/}/$common_suffix" ]] || {
+                printf 'FATAL: SGND_FRAMEWORK_ROOT is not a Framework tree: %s\n' "$candidate" >&2
+                return 126
+            }
+            discovered="$candidate"
+        elif [[ -r "${script_root%/}/$common_suffix" ]]; then
+            discovered="$script_root"
+        elif [[ "$script_root" != / ]]; then
+            # Separate development trees: search only immediate sibling product
+            # directories, optionally under their target-root. Never pick one of
+            # several Framework trees arbitrarily.
+            for parent in "$(dirname -- "$script_root")" "$(dirname -- "$(dirname -- "$script_root")")"; do
+                for tree in "$parent"/* "$parent"/*/target-root; do
+                    [[ -r "${tree%/}/$common_suffix" ]] || continue
+                    candidate="$(cd -- "$tree" && pwd -P)" || continue
+                    for component in "${matches[@]}"; do
+                        [[ "$component" == "$candidate" ]] && break
+                    done
+                    [[ "$component" == "$candidate" ]] || matches+=("$candidate")
+                done
+            done
+            case "${#matches[@]}" in
+                0) discovered="/" ;;
+                1) discovered="${matches[0]}" ;;
+                *) printf 'FATAL: Multiple Framework trees found; set SGND_FRAMEWORK_ROOT explicitly.\n' >&2; return 126 ;;
+            esac
         else
-            exe_common="${SGND_FRAMEWORK_ROOT%/}/usr/local/lib/solidgroundux/common/sgnd-exe-common.sh"
-
-            if [[ ! -r "$exe_common" ]]; then
-                exe_common="/usr/local/lib/solidgroundux/common/sgnd-exe-common.sh"
-            fi
+            discovered="/"
         fi
 
+        exe_common="${discovered%/}/$common_suffix"
         [[ -r "$exe_common" ]] || {
-            printf 'FATAL: Cannot read executable common library: %s\n' "$exe_common" >&2
+            printf 'FATAL: Cannot read Framework executable library: %s\n' "$exe_common" >&2
             return 126
         }
-
+        SGND_FRAMEWORK_ROOT="$discovered"
         # shellcheck source=/dev/null
         source "$exe_common"
     }
@@ -149,10 +160,14 @@ set -uo pipefail
     SGND_SCRIPT_NAME="${SGND_SCRIPT_BASE%.sh}"
 
 # - Framework integration -----------------------------------------------------------
-    SGND_USING=(sgnd-ssh-deployment.sh)
+    # DataTable renders the profile list; SSH helper is MCM-owned and sourced
+    # on demand, not resolved from Framework.
+    SGND_USING=(sgnd-datatable.sh sgnd-menu.sh)
     SGND_ARGS_SPEC=(
-        "action|a|enum|ACTION|Management action||ingest,delete,edit-metadata,move-page,manage-config,configure-source,retrieve-incoming,import-local,ingest-incoming,generate,publish,publish-github-pages,validate,prepare-social,status"
+        "auto||flag|FLAG_AUTO|Publish the selected website profile unattended|0|"
+        "action|a|enum|ACTION|Management action||ingest,delete,edit-metadata,move-page,manage-config,configure-source,retrieve-incoming,import-local,ingest-incoming,generate,publish,manage-publishing-profiles,publish-github-pages,validate,prepare-social,status"
         "ingest-dir|i|value|INGEST_DIR|Override Markdown ingestion directory||"
+        "profile||value|WEB_PROFILE_ARG|Use a named website publication profile||"
     )
     SGND_SCRIPT_EXAMPLES=(
         "  $SGND_SCRIPT_NAME --action ingest"
@@ -161,6 +176,8 @@ set -uo pipefail
         "  $SGND_SCRIPT_NAME --action delete"
         "  $SGND_SCRIPT_NAME --action generate"
         "  $SGND_SCRIPT_NAME --action publish"
+        "  $SGND_SCRIPT_NAME --action publish --profile Development"
+        "  $SGND_SCRIPT_NAME --action manage-publishing-profiles"
         "  $SGND_SCRIPT_NAME --action publish-github-pages"
         "  $SGND_SCRIPT_NAME --action manage-config"
         "  $SGND_SCRIPT_NAME --action validate"
@@ -178,8 +195,6 @@ set -uo pipefail
         SGND_WEB_CONTENT_INGEST_LANGUAGE
         SGND_WEB_CONTENT_INGEST_KIND
         SGND_WEB_CONTENT_INGEST_PARENT
-        SGND_WEB_PUBLISH_PROFILES_B64
-        SGND_WEB_PUBLISH_LAST
         SGND_WEB_PUBLISH_SOURCE
         SGND_WEB_PUBLISH_HOST
         SGND_WEB_PUBLISH_REMOTE_DIR
@@ -208,8 +223,6 @@ set -uo pipefail
     : "${SGND_WEB_CONTENT_INGEST_LANGUAGE:=}"
     : "${SGND_WEB_CONTENT_INGEST_KIND:=}"
     : "${SGND_WEB_CONTENT_INGEST_PARENT:=}"
-    : "${SGND_WEB_PUBLISH_PROFILES_B64:=}"
-    : "${SGND_WEB_PUBLISH_LAST:=}"
     : "${SGND_WEB_PUBLISH_SOURCE:=}"
     : "${SGND_WEB_PUBLISH_HOST:=}"
     : "${SGND_WEB_PUBLISH_REMOTE_DIR:=}"
@@ -218,6 +231,11 @@ set -uo pipefail
     : "${SGND_WEB_PUBLISH_IDENTITY:=}"
     : "${SGND_WEB_PUBLISH_STRATEGY:=Update}"
     : "${SGND_WEB_PUBLISH_HOSTNAME:=}"
+    : "${SGND_WEB_PUBLISH_METHOD:=rsync}"
+    : "${SGND_WEB_PUBLISH_MANAGE_SITE:=Yes}"
+    : "${SGND_WEB_PUBLISH_PREVIEW_PORT:=8080}"
+    WEB_ACTIVE_PROFILE=""
+    WEB_PROFILE_ARG="${WEB_PROFILE_ARG:-}"
     : "${SGND_WEB_GITHUB_SOURCE:=}"
     : "${SGND_WEB_GITHUB_REPO:=}"
     : "${SGND_WEB_INCOMING_HOST:=td-web}"
@@ -235,10 +253,12 @@ set -uo pipefail
         #   _web_content_python_root
         #   ```
     _web_content_python_root() {
-        if [[ "$SGND_FRAMEWORK_ROOT" == "/" ]]; then
-            printf '%s\n' "/usr/local/lib/solidgroundux/py"
+        # The WebContent engine belongs to MCM, not to the separately located Framework.
+        local mcm_root="${SGND_SCRIPT_DIR%/libexec/solidgroundux}"
+        if [[ -d "$mcm_root/lib/solidgroundux/py/webcontent" ]]; then
+            printf '%s\n' "$mcm_root/lib/solidgroundux/py"
         else
-            printf '%s\n' "${SGND_FRAMEWORK_ROOT%/}/usr/local/lib/solidgroundux/py"
+            printf '%s\n' '/usr/local/lib/solidgroundux/py'
         fi
     }
 
@@ -968,7 +988,7 @@ PY
         _web_content_select_source || return 0
         _web_content_select_ingest_dir || return 0
         sgnd_print_labeledvalue --label "Incoming source" --value "${user}@${host}:${remote}" --labelwidth 20
-        sgnd_ssh_ensure_access "$user" "$host" "$port" "" || return 1
+        _web_publish_prepare_ssh "$user" "$host" "$port" "" || return 1
         # Only a constrained filename character set is accepted. The remote path
         # was validated earlier; untrusted SSH output never becomes shell syntax.
         local listing=""
@@ -2026,57 +2046,19 @@ PYCODE
         [[ "${path#/}" == */* && "$path" != *[[:space:]]* ]]
     }
 
-    # fn: _web_publish_restore_legacy - Import one unambiguous previously saved destination.
+    # fn: _web_publish_safe_external_path - Validate an FTP/SFTP account-root path.
         # . Purpose
-        #   Import one unambiguous previously saved destination.
-        #
-        # . Behavior
-        #   - Does not require the old Markdown repository to exist.
-        #   - Ignores ambiguous destinations rather than guessing which root is correct.
-        #   - Does not change or remove the legacy state.
-        # . Returns
-        #   - 0 whether or not an unambiguous legacy destination is found.
+        #   Accept a safe absolute directory, including hosting roots like /public_html.
+        # . Arguments
+        #   $1 Host-relative absolute directory.
         # . Usage
         #   ```bash
-        #     _web_publish_restore_legacy
+        #   _web_publish_safe_external_path /public_html
         #   ```
-        #   _web_publish_restore_legacy
-    _web_publish_restore_legacy() {
-        [[ -z "$SGND_WEB_PUBLISH_HOST" && -z "$SGND_WEB_PUBLISH_REMOTE_DIR" ]] || return 0
-        [[ -n "${SGND_WEB_PUBLISH_PROFILES_B64:-}" ]] || return 0
-        local buffer="" name="" method="" target="" host="" user="" port="" identity=""
-        local -a fields=()
-        buffer="$(mktemp)" || return 0
-        if WEB_PUBLISH_STATE="$SGND_WEB_PUBLISH_PROFILES_B64" python3 - "$SGND_WEB_PUBLISH_LAST" > "$buffer" <<'PYCODE'
-import base64, json, os, sys
-try:
-    records = json.loads(base64.b64decode(os.environ['WEB_PUBLISH_STATE'], validate=True))
-    if not isinstance(records, list):
-        sys.exit(1)
-    name = sys.argv[1]
-    matches = [r for r in records if isinstance(r, dict) and r.get('method') == 'rsync' and (not name or r.get('name') == name)]
-    values = {(str(r.get('path','')), str(r.get('host','')), str(r.get('user','')),
-               str(r.get('port','22')), str(r.get('identity',''))) for r in matches}
-    if len(values) != 1:
-        sys.exit(1)
-    for value in next(iter(values)):
-        sys.stdout.buffer.write(value.encode() + b'\0')
-except (ValueError, KeyError, TypeError, UnicodeError):
-    sys.exit(1)
-PYCODE
-        then
-            mapfile -d '' -t fields < "$buffer"
-            if (( ${#fields[@]} == 5 )) && _web_publish_safe_path "${fields[0]}"; then
-                SGND_WEB_PUBLISH_REMOTE_DIR="${fields[0]}"
-                SGND_WEB_PUBLISH_HOST="${fields[1]}"
-                SGND_WEB_PUBLISH_USER="${fields[2]}"
-                SGND_WEB_PUBLISH_PORT="${fields[3]:-22}"
-                SGND_WEB_PUBLISH_IDENTITY="${fields[4]}"
-                sayinfo "Recovered your previous publishing settings."
-            fi
-        fi
-        rm -f -- "$buffer"
-        return 0
+    _web_publish_safe_external_path() {
+        local path="${1:-}"
+        [[ "$path" == /* && "$path" != / && "$path" != *'..'* && "$path" != *$'\n'* && "$path" != *$'\r'* ]] || return 1
+        [[ "$path" != *'"'* && "$path" != *"'"* && "$path" != *'*'* && "$path" != *';'* && "$path" != *'$'* && "$path" != *'`'* && "$path" != *'!'* && "$path" != *'\'* && "$path" != *[[:space:]]* ]]
     }
 
     # fn: _web_publish_discover_sites - List active remote Nginx hostnames and document roots.
@@ -2180,177 +2162,45 @@ PYCODE
         return "$rc"
     }
 
-    # fn: _web_publish_configure - Configure website publication after selecting the server.
+    # fn: _web_publish_load_ssh_helper - Load the MCM-owned SSH helper from its own tree.
         # . Purpose
-        #   Configure website publication after selecting the server.
-        #
-        # . Behavior
-        #   - Requires generated HTML and an SSH login before offering remote websites.
-        #   - Selecting an existing Nginx website fills its hostname and document root.
-        #   - For a new website, proposes a root beneath the existing sites' parent
-        #     directory when a unique parent can be determined; otherwise asks.
-        #   - A failed Nginx lookup never changes existing-site selection into creation.
-        #   - Saves all five publishing settings only after configuration succeeds.
+        #   Load the shared SSH helper independently of the Framework development tree.
         # . Returns
-        #   - 0 configured; 2 cancelled; 1 invalid configuration.
+        #   0 when the helper is available; 127 if it cannot be loaded.
         # . Usage
         #   ```bash
-        #     _web_publish_configure
+        #   _web_publish_load_ssh_helper
         #   ```
-        #   _web_publish_configure
-    _web_publish_configure() {
-        local source="${SGND_WEB_PUBLISH_SOURCE:-${SGND_WEB_CONTENT_OUTPUT%/}}"
-        local host="${SGND_WEB_PUBLISH_HOST:-${SGND_WEB_INCOMING_HOST:-}}"
-        local user="${SGND_WEB_PUBLISH_USER:-${SGND_WEB_INCOMING_USER:-${USER:-}}}"
-        local port="${SGND_WEB_PUBLISH_PORT:-22}" identity="${SGND_WEB_PUBLISH_IDENTITY:-}"
-        local target="${SGND_WEB_PUBLISH_REMOTE_DIR:-}" hostname="${SGND_WEB_PUBLISH_HOSTNAME:-}"
-        local strategy="${SGND_WEB_PUBLISH_STRATEGY:-Update}" login="" site_action="" sites_file="" site_choice="" item="" row=""
-        local base="" suggested_base="" site_slug="" found=0
-        local -a available=() choices=() bases=()
-        ask --label "Source directory (generated HTML)" --var source --default "$source" --back || return 2
-        [[ -d "$source" && -f "${source%/}/index.html" ]] || { sayfail "Missing generated website: $source (index.html required)."; return 1; }
-        source="$(realpath -e -- "$source")" || return 1
-        [[ "$source" != / && "$source" != *-preview && "$source" != */preview && "$source" != */preview/* ]] || { sayfail "Unsafe or preview website directory."; return 1; }
-        [[ -z "$(find "$source" -type l -print -quit)" ]] || { sayfail "Site output contains symlinks; refusing publication."; return 1; }
-
-        login="${user}@${host}"
-        ask --label "Destination host (user@host)" --var login --default "$login" --back || return 2
-        if [[ "$login" == *@* ]]; then
-            user="${login%@*}"
-            host="${login#*@}"
-        else
-            host="$login"
+    _web_publish_load_ssh_helper() {
+        if declare -F sgnd_ssh_ensure_access >/dev/null && declare -F sgnd_ssh_agent_discover >/dev/null; then
+            return 0
         fi
-        [[ "$host" =~ ^[A-Za-z0-9._-]+$ && "$user" =~ ^[A-Za-z_][A-Za-z0-9_.-]*$ ]] || { sayfail "Invalid SSH user or host."; return 1; }
-        [[ "$port" =~ ^[0-9]+$ ]] && (( 10#$port > 0 && 10#$port < 65536 )) || { sayfail "Invalid SSH port."; return 1; }
-
-        while :; do
-            # ask_selection already provides Q. Back; do not add a second Back entry.
-            ask_selection --label "Remote website on ${user}@${host}" --var site_action --items \
-                "Select existing website" "Create new website" || return 2
-            case "$site_action" in
-                "Select existing website")
-                    if ! _web_publish_prepare_ssh "$user" "$host" "$port" "${identity/#\~\//$HOME/}"; then
-                        saywarning "SSH unavailable for ${user}@${host}; select a website again or create a new one."
-                        continue
-                    fi
-                    sites_file="$(mktemp)" || return 1
-                    available=()
-                    if _web_publish_discover_sites "$host" "$user" "$port" "$identity" > "$sites_file"; then
-                        mapfile -t available < "$sites_file"
-                    else
-                        rm -f -- "$sites_file"
-                        saywarning "Could not retrieve active Nginx websites from ${user}@${host}."
-                        continue
-                    fi
-                    rm -f -- "$sites_file"
-                    if (( ${#available[@]} == 0 )); then
-                        saywarning "No named Nginx websites found on ${user}@${host}."
-                        continue
-                    fi
-                    choices=()
-                    for row in "${available[@]}"; do
-                        choices+=("${row%%$'\t'*}  ->  ${row#*$'\t'}")
-                    done
-                    ask_selection --label "Existing website" --var site_choice --items "${choices[@]}" || return 2
-                    found=0
-                    for row in "${available[@]}"; do
-                        item="${row%%$'\t'*}  ->  ${row#*$'\t'}"
-                        if [[ "$item" == "$site_choice" ]]; then
-                            hostname="${row%%$'\t'*}"
-                            target="${row#*$'\t'}"
-                            found=1
-                            break
-                        fi
-                    done
-                    (( found )) || { sayfail "The selected website could not be resolved."; return 1; }
-                    break
-                    ;;
-                "Create new website")
-                    # A new website must never accidentally inherit the selected old
-                    # website's root. Determine a suitable base from live Nginx roots.
-                    target=""
-                    ask --label "New website hostname" --var hostname --default "" --back || return 2
-                    [[ "$hostname" =~ ^[A-Za-z0-9][A-Za-z0-9.-]*$ && "$hostname" == *.* ]] || { sayfail "Invalid website hostname."; return 1; }
-                    site_slug="${hostname%%.*}"
-                    bases=()
-                    available=()
-                    if _web_publish_prepare_ssh "$user" "$host" "$port" "${identity/#\~\//$HOME/}"; then
-                        sites_file="$(mktemp)" || return 1
-                        if _web_publish_discover_sites "$host" "$user" "$port" "$identity" roots > "$sites_file"; then
-                            mapfile -t available < "$sites_file"
-                        else
-                            saywarning "Nginx document roots unavailable; enter the new directory manually."
-                        fi
-                        rm -f -- "$sites_file"
-                    else
-                        saywarning "SSH unavailable; enter the new document root manually."
-                    fi
-                    for row in "${available[@]}"; do
-                        base="$(dirname -- "$row")"
-                        _web_publish_safe_path "$base/new-site" || continue
-                        found=0
-                        for item in "${bases[@]}"; do
-                            [[ "$item" != "$base" ]] || { found=1; break; }
-                        done
-                        (( found )) || bases+=("$base")
-                    done
-                    if (( ${#bases[@]} == 1 )); then
-                        suggested_base="${bases[0]}"
-                    elif (( ${#bases[@]} > 1 )); then
-                        # Multiple directory trees: ask rather than assume ownership.
-                        ask_selection --label "Existing website root directories" --var suggested_base --items \
-                            "${bases[@]}" "Enter manually" || return 2
-                        [[ "$suggested_base" != "Enter manually" ]] || suggested_base=""
-                    else
-                        suggested_base=""
-                    fi
-                    if [[ -n "$suggested_base" ]]; then
-                        target="${suggested_base%/}/${site_slug}"
-                        sayinfo "Suggested document root from Nginx sites: $target"
-                    fi
-                    ask --label "Remote directory" --var target --default "$target" --back || return 2
-                    break
-                    ;;
-                *) sayfail "Invalid website selection."; return 1 ;;
-            esac
-        done
-        _web_publish_safe_path "$target" || { sayfail "Destination must be a safe absolute directory."; return 1; }
-        [[ "$hostname" =~ ^[A-Za-z0-9][A-Za-z0-9.-]*$ && "$hostname" == *.* ]] || { sayfail "Invalid website hostname."; return 1; }
-        ask_selection --label "Synchronization" --var strategy --items "Update" "Mirror" || return 2
-        [[ "$strategy" == Update || "$strategy" == Mirror ]] || return 1
-        SGND_WEB_PUBLISH_SOURCE="$source"
-        SGND_WEB_PUBLISH_HOST="$host"
-        SGND_WEB_PUBLISH_USER="$user"
-        SGND_WEB_PUBLISH_PORT="$port"
-        SGND_WEB_PUBLISH_IDENTITY="$identity"
-        SGND_WEB_PUBLISH_REMOTE_DIR="$target"
-        SGND_WEB_PUBLISH_HOSTNAME="$hostname"
-        SGND_WEB_PUBLISH_STRATEGY="$strategy"
-        return 0
+        local mcm_root="${SGND_SCRIPT_DIR%/libexec/solidgroundux}"
+        local helper="$mcm_root/lib/solidgroundux/common/sgnd-ssh-deployment.sh"
+        [[ -r "$helper" ]] || helper='/usr/local/lib/solidgroundux/common/sgnd-ssh-deployment.sh'
+        [[ -r "$helper" ]] || { sayfail "SSH deployment library is missing: $helper"; return 127; }
+        # shellcheck source=/dev/null
+        source "$helper" || return $?
+        declare -F sgnd_ssh_ensure_access >/dev/null && declare -F sgnd_ssh_agent_discover >/dev/null || {
+            sayfail 'SSH deployment library is incomplete.'
+            return 127
+        }
     }
 
     # fn: _web_publish_prepare_ssh - Discover the shared agent and repair SSH access when requested.
         # . Purpose
-        #   Discover the shared agent and repair SSH access when requested.
-        #
+        #   Prepare SSH access for the normal publishing workflow, including recovery.
         # . Arguments
-        #   - `$1`: User account.
-        #   - `$2`: Remote host or site name.
-        #   - `$3`: Optional: TCP port.
-        #   - `$4`: Optional: SSH identity file.
+        #   $1 User; $2 host; $3 port; $4 optional SSH private key.
+        # . Returns
+        #   The result of the shared SSH access helper.
         # . Usage
         #   ```bash
-        #   _web_publish_prepare_ssh "example-user" "<host>" "8080" "<identity>"
+        #   _web_publish_prepare_ssh "deploy" "host.example.test" "22" ""
         #   ```
     _web_publish_prepare_ssh() {
         local user="$1" host="$2" port="${3:-22}" identity="${4:-}"
-        # The framework loads shared libraries declared in SGND_USING.
-        # Do not search or source library files from MCM libexec.
-        if ! declare -F sgnd_ssh_ensure_access >/dev/null; then
-            sayfail "SSH deployment functionality is unavailable; check SGND_USING and the installed common library."
-            return 127
-        fi
+        _web_publish_load_ssh_helper || return $?
         sgnd_ssh_ensure_access "$user" "$host" "$port" "$identity"
     }
 
@@ -2523,129 +2373,6 @@ PYCODE
         else
             sayinfo "HTTP verification unavailable (curl not installed)."
         fi
-    }
-
-    # fn: _web_content_publish - Review, preview and publish a generated HTML website.
-        # . Purpose
-        #   Review, preview and publish a generated HTML website.
-        #
-        # . Behavior
-        #   - Shows five saved values with Publish, Modify and Cancel actions.
-        #   - Publishing does not depend on or prompt for a Markdown repository.
-        #   - Reuses SSH/rsync and optional remote Nginx provisioning.
-        #   - Dry-runs before deployment, and propagates failures to the action dispatcher.
-        # . Returns
-        #   - 0 on success/cancel, nonzero on a failed deployment or configuration.
-        # . Usage
-        #   ```bash
-        #     _web_content_publish
-        #   ```
-        #   _web_content_publish
-    _web_content_publish() {
-        local action="" source="" host="" user="" port="" identity="" target="" website_hostname="" strategy=""
-        local rc=0 preview="" deployment_log="" destination="" ssh_transport="" ssh_identity="" decision="No"
-        local additions=0 updates=0 removals=0
-        local -a command_args=() transport=()
-        WEB_PUBLISH_RESULT="cancelled"
-        _web_publish_restore_legacy
-        # On the first run, configure the server and website before displaying
-        # a review of publishing settings that do not yet exist.
-        if [[ -z "$SGND_WEB_PUBLISH_HOST" || -z "$SGND_WEB_PUBLISH_REMOTE_DIR" || -z "$SGND_WEB_PUBLISH_HOSTNAME" ]]; then
-            _web_publish_configure || { rc=$?; (( rc == 2 )) && return 0; return "$rc"; }
-        fi
-        while :; do
-            sgnd_print
-            sgnd_print_sectionheader --text "Publish Website"
-            sgnd_print_labeledvalue --label "Source directory" --value "${SGND_WEB_PUBLISH_SOURCE:-${SGND_WEB_CONTENT_OUTPUT%/}}" --labelwidth 20
-            sgnd_print_labeledvalue --label "Destination host" --value "${SGND_WEB_PUBLISH_USER:-${SGND_WEB_INCOMING_USER:-${USER:-}}}@${SGND_WEB_PUBLISH_HOST:-${SGND_WEB_INCOMING_HOST:-}}" --labelwidth 20
-            sgnd_print_labeledvalue --label "Remote directory" --value "${SGND_WEB_PUBLISH_REMOTE_DIR:--}" --labelwidth 20
-            sgnd_print_labeledvalue --label "Website hostname" --value "${SGND_WEB_PUBLISH_HOSTNAME:--}" --labelwidth 20
-            sgnd_print_labeledvalue --label "Synchronization" --value "${SGND_WEB_PUBLISH_STRATEGY:-Update}" --labelwidth 20
-            if [[ -z "$SGND_WEB_PUBLISH_HOST" || -z "$SGND_WEB_PUBLISH_REMOTE_DIR" || -z "$SGND_WEB_PUBLISH_HOSTNAME" ]]; then
-                action="Modify"
-            else
-                ask_selection --label "Publication" --var action --items "Publish" "Modify" "Cancel" || return 0
-            fi
-            case "$action" in
-                Modify) _web_publish_configure || { rc=$?; (( rc == 2 )) && return 0; return "$rc"; }; continue ;;
-                Cancel) saycancel "Publication cancelled."; return 0 ;;
-                Publish) break ;;
-                *) sayfail "Invalid publishing action."; return 1 ;;
-            esac
-        done
-        source="${SGND_WEB_PUBLISH_SOURCE:-${SGND_WEB_CONTENT_OUTPUT%/}}"
-        host="$SGND_WEB_PUBLISH_HOST"
-        user="${SGND_WEB_PUBLISH_USER:-${SGND_WEB_INCOMING_USER:-${USER:-}}}"
-        port="${SGND_WEB_PUBLISH_PORT:-22}"
-        identity="$SGND_WEB_PUBLISH_IDENTITY"
-        target="$SGND_WEB_PUBLISH_REMOTE_DIR"
-        website_hostname="$SGND_WEB_PUBLISH_HOSTNAME"
-        strategy="$SGND_WEB_PUBLISH_STRATEGY"
-        [[ -d "$source" && -f "${source%/}/index.html" ]] || { sayfail "Missing generated website: $source (index.html required)."; return 1; }
-        source="$(realpath -e -- "$source")" || return 1
-        [[ "$source" != / && "$source" != *-preview && "$source" != */preview && "$source" != */preview/* ]] || { sayfail "Unsafe or preview website directory."; return 1; }
-        [[ -z "$(find "$source" -type l -print -quit)" ]] || { sayfail "Site output contains symlinks; refusing publication."; return 1; }
-        _web_publish_safe_path "$target" || { sayfail "Unsafe destination directory: $target"; return 1; }
-        [[ "$strategy" == Update || "$strategy" == Mirror ]] || { sayfail "Invalid synchronization strategy."; return 1; }
-        [[ "$host" =~ ^[A-Za-z0-9._-]+$ && "$user" =~ ^[A-Za-z_][A-Za-z0-9_.-]*$ ]] || { sayfail "Invalid SSH host or username."; return 1; }
-        [[ "$port" =~ ^[0-9]+$ ]] && (( 10#$port > 0 && 10#$port < 65536 )) || { sayfail "Invalid SSH port."; return 1; }
-        command -v rsync >/dev/null 2>&1 || { sayfail "Install rsync before publishing."; return 127; }
-        ssh_identity="${identity/#\~\//$HOME/}"
-        [[ -z "$identity" || ( -r "$ssh_identity" && "$ssh_identity" != *' '* ) ]] || { sayfail "Invalid SSH identity file."; return 1; }
-        _web_publish_prepare_ssh "$user" "$host" "$port" "$ssh_identity" || return $?
-        _web_publish_remote_site "$host" "$user" "$port" "$identity" "$target" "$website_hostname" || return $?
-        ssh_transport="ssh -o BatchMode=yes -p $port"
-        [[ -z "$identity" ]] || ssh_transport+=" -i $ssh_identity"
-        destination="${user}@${host}:${target}/"
-        transport=(rsync -rltvi -e "$ssh_transport")
-        [[ "$strategy" == Mirror ]] && transport+=(--delete)
-        command_args=("${transport[@]}" --dry-run -- "$source/" "$destination")
-        preview="$(mktemp)" || return 1
-        sayinfo "Checking planned publication changes (dry-run)..."
-        "${command_args[@]}" > "$preview" 2>&1 || rc=$?
-        if (( rc != 0 )); then
-            sayfail "Publication preview failed (exit $rc); nothing uploaded."
-            while IFS= read -r line; do [[ -n "$line" ]] && sgnd_print --text "$line"; done < "$preview"
-            rm -f -- "$preview"
-            return "$rc"
-        fi
-        sgnd_print_sectionheader --text "Publication preview"
-        sgnd_print_labeledvalue --label "Source" --value "$source" --labelwidth 20
-        sgnd_print_labeledvalue --label "Destination" --value "$destination" --labelwidth 20
-        sgnd_print_labeledvalue --label "Strategy" --value "$strategy" --labelwidth 20
-        additions="$(grep -Ec '^>f\+|^cd\+' "$preview" || true)"
-        updates="$(grep -Ec '^>f[^+]|^\.f' "$preview" || true)"
-        removals="$(grep -c '^\*deleting' "$preview" || true)"
-        sgnd_print_labeledvalue --label "New items" --value "$additions" --labelwidth 20
-        sgnd_print_labeledvalue --label "Changed files" --value "$updates" --labelwidth 20
-        sgnd_print_labeledvalue --label "Delete candidates" --value "$removals" --labelwidth 20
-        if [[ "$strategy" == Mirror ]]; then
-            saywarning "Mirror will delete remote files missing from the generated website."
-            while IFS= read -r line; do [[ "$line" == *deleting* ]] && sgnd_print --text "$line"; done < "$preview"
-        fi
-        rm -f -- "$preview"
-        if [[ "$strategy" == Mirror ]]; then
-            ask_decision --label "Confirm mirror (including removals)" --choices "Yes|Y,No|N" --default "No" --var decision || return 0
-        else
-            ask_decision --label "Publish generated website" --choices "Yes|Y,No|N" --default "No" --var decision || return 0
-        fi
-        [[ "$decision" == YES ]] || { saycancel "Publication cancelled; no changes made."; return 0; }
-        deployment_log="$(mktemp)" || return 1
-        rc=0
-        sayinfo "Publishing generated website to $host..."
-        "${transport[@]}" -- "$source/" "$destination" > "$deployment_log" 2>&1 || rc=$?
-        if (( rc != 0 )); then
-            sayfail "Publication failed (exit $rc)."
-            while IFS= read -r line; do [[ -n "$line" ]] && sgnd_print --text "$line"; done < "$deployment_log"
-            rm -f -- "$deployment_log"
-            return "$rc"
-        fi
-        rm -f -- "$deployment_log"
-        sayok "Website published to $host ($strategy)."
-        WEB_PUBLISH_RESULT="success"
-        _web_publish_offer_dns "$host" "$user" "$port" "$identity" "$website_hostname"
-        _web_publish_verify_http "$website_hostname"
-        return 0
     }
 
 # - Local import into staging -------------------------------------------------------
@@ -3036,6 +2763,999 @@ PY_GITHUB_PAGES
         done
     }
 
+# - Named website publishing profiles -----------------------------------------------
+    # fn: _web_profiles_tool - Run the non-interactive Framework profile store.
+        # . Purpose
+        #   Access WCM profile data in the resolved Framework tree.
+        # . Returns
+        #   Exit status of the profile store, or 127 if it is absent.
+        # . Usage
+        #   ```bash
+        #   _web_profiles_tool list
+        #   ```
+    _web_profiles_tool() {
+        local helper="${SGND_FRAMEWORK_ROOT%/}/usr/local/lib/solidgroundux/py/sgnd_deployment_profiles.py"
+        [[ -r "$helper" ]] || { sayfail "Framework profile store missing: $helper"; return 127; }
+        # Preserve the framework's effective user home under elevated launchers.
+        if [[ -z "${XDG_CONFIG_HOME:-}" && -n "${SGND_USER_HOME:-}" ]]; then
+            SGND_PROFILE_HOME="$SGND_USER_HOME" python3 "$helper" wcm "$@"
+        else
+            python3 "$helper" wcm "$@"
+        fi
+    }
+
+    # fn: _web_profiles_migrate - Preserve ordinary 2631102 publishing state once.
+        # . Purpose
+        #   Import the last configured SSH website without reading obsolete Base64 data.
+        # . Usage
+        #   ```bash
+        #   _web_profiles_migrate
+        #   ```
+    _web_profiles_migrate() {
+        _web_profiles_tool migrate --migration-id 'wcm-state-2631102' \
+            --field "source=${SGND_WEB_PUBLISH_SOURCE:-}" \
+            --field "host=${SGND_WEB_PUBLISH_HOST:-}" \
+            --field "user=${SGND_WEB_PUBLISH_USER:-}" \
+            --field "port=${SGND_WEB_PUBLISH_PORT:-22}" \
+            --field "identity=${SGND_WEB_PUBLISH_IDENTITY:-}" \
+            --field "path=${SGND_WEB_PUBLISH_REMOTE_DIR:-}" \
+            --field "hostname=${SGND_WEB_PUBLISH_HOSTNAME:-}" \
+            --field "website=${SGND_WEB_PUBLISH_HOSTNAME:-Website}" \
+            --field "strategy=${SGND_WEB_PUBLISH_STRATEGY:-Update}" >/dev/null
+    }
+
+    # fn: _web_profiles_read_record - Read a saved profile without selecting it.
+        # . Purpose
+        #   Populate an associative array from the validated NUL-delimited profile store.
+        # . Arguments
+        #   $1 Profile name; $2 destination associative array variable.
+        # . Returns
+        #   0 on success; nonzero when the record cannot be read.
+        # . Usage
+        #   ```bash
+        #   local -A record=()
+        #   _web_profiles_read_record Development record
+        #   ```
+    _web_profiles_read_record() {
+        local name="$1" destination="$2" buffer="" i=0
+        local -a fields=()
+        local -n record_ref="$destination"
+        record_ref=()
+        buffer="$(mktemp)" || return 1
+        if ! _web_profiles_tool get --name "$name" > "$buffer"; then
+            rm -f -- "$buffer"
+            return 1
+        fi
+        mapfile -d '' -t fields < "$buffer"
+        rm -f -- "$buffer"
+        (( ${#fields[@]} % 2 == 0 )) || return 1
+        for (( i=0; i<${#fields[@]}; i+=2 )); do
+            record_ref["${fields[$i]}"]="${fields[$((i+1))]}"
+        done
+    }
+
+    # fn: _web_profiles_restore_selection - Display the persisted profile at menu entry.
+        # . Purpose
+        #   Restore the selected destination without altering the profile store.
+        #   Optional 'persisted' ignores the one-time CLI --profile override.
+        # . Usage
+        #   ```bash
+        #   _web_profiles_restore_selection
+        #   _web_profiles_restore_selection persisted
+        #   ```
+    _web_profiles_restore_selection() {
+        local name=""
+        if [[ -n "${WEB_PROFILE_ARG:-}" && "${1:-}" != persisted ]]; then
+            name="$WEB_PROFILE_ARG"
+        else
+            name="$(_web_profiles_tool selected)" || return $?
+        fi
+        WEB_ACTIVE_PROFILE=''
+        WEB_PROFILE_WEBSITE=''
+        [[ -z "$name" ]] || _web_profiles_load "$name"
+    }
+
+    # fn: _web_profiles_load - Load a named destination without executing profile code.
+        # . Purpose
+        #   Populate publishing settings from a validated NUL-delimited record.
+        # . Arguments
+        #   $1 Profile name.
+        # . Usage
+        #   ```bash
+        #   _web_profiles_load 'HQ'
+        #   ```
+    _web_profiles_load() {
+        local name="$1" buffer="" i=0 key="" value=""
+        local -a fields=()
+        buffer="$(mktemp)" || return 1
+        if ! _web_profiles_tool get --name "$name" > "$buffer"; then rm -f -- "$buffer"; return 1; fi
+        mapfile -d '' -t fields < "$buffer"
+        rm -f -- "$buffer"
+        (( ${#fields[@]} % 2 == 0 )) || return 1
+        for (( i=0; i<${#fields[@]}; i+=2 )); do
+            key="${fields[$i]}"; value="${fields[$((i+1))]}"
+            case "$key" in
+                website) WEB_PROFILE_WEBSITE="$value" ;;
+                method) SGND_WEB_PUBLISH_METHOD="${value:-rsync}" ;;
+                source) SGND_WEB_PUBLISH_SOURCE="$value" ;;
+                host) SGND_WEB_PUBLISH_HOST="$value" ;;
+                user) SGND_WEB_PUBLISH_USER="$value" ;;
+                port) SGND_WEB_PUBLISH_PORT="${value:-22}" ;;
+                identity) SGND_WEB_PUBLISH_IDENTITY="$value" ;;
+                path) SGND_WEB_PUBLISH_REMOTE_DIR="$value" ;;
+                hostname) SGND_WEB_PUBLISH_HOSTNAME="$value" ;;
+                strategy) SGND_WEB_PUBLISH_STRATEGY="${value:-Update}" ;;
+                manage_site) SGND_WEB_PUBLISH_MANAGE_SITE="${value:-No}" ;;
+                preview_port) SGND_WEB_PUBLISH_PREVIEW_PORT="${value:-8080}" ;;
+                url) WEB_PROFILE_URL="$value" ;;
+                last_success) WEB_PROFILE_LAST_SUCCESS="$value" ;;
+            esac
+        done
+        WEB_ACTIVE_PROFILE="$name"
+        return 0
+    }
+
+    # fn: _web_profiles_save - Save a website/destination pair atomically.
+        # . Purpose
+        #   Save validated settings for one publication destination in the Framework store.
+        # . Usage
+        #   ```bash
+        #   _web_profiles_save 'Development'
+        #   ```
+    _web_profiles_save() {
+        local name="$1"
+        _web_profiles_tool save --name "$name" \
+            --field "website=${WEB_PROFILE_WEBSITE:-Website}" \
+            --field "method=${SGND_WEB_PUBLISH_METHOD:-rsync}" \
+            --field "source=${SGND_WEB_PUBLISH_SOURCE:-}" \
+            --field "host=${SGND_WEB_PUBLISH_HOST:-}" \
+            --field "user=${SGND_WEB_PUBLISH_USER:-}" \
+            --field "port=${SGND_WEB_PUBLISH_PORT:-22}" \
+            --field "identity=${SGND_WEB_PUBLISH_IDENTITY:-}" \
+            --field "path=${SGND_WEB_PUBLISH_REMOTE_DIR:-}" \
+            --field "hostname=${SGND_WEB_PUBLISH_HOSTNAME:-}" \
+            --field "strategy=${SGND_WEB_PUBLISH_STRATEGY:-Update}" \
+            --field "manage_site=${SGND_WEB_PUBLISH_MANAGE_SITE:-No}" \
+            --field "preview_port=${SGND_WEB_PUBLISH_PREVIEW_PORT:-8080}" \
+            --field "url=${WEB_PROFILE_URL:-}" || return $?
+        _web_profiles_tool select --name "$name" || return $?
+        WEB_ACTIVE_PROFILE="$name"
+    }
+
+    # fn: _web_profiles_choose - Choose an existing website publishing destination.
+        # . Purpose
+        #   Offer names grouped by their website, without preselecting a destination.
+        # . Usage
+        #   ```bash
+        #   _web_profiles_choose
+        #   ```
+    _web_profiles_choose() {
+        _web_profiles_prompt_name || return $?
+        _web_profiles_load "$WEB_CHOSEN_PROFILE" || return $?
+        _web_profiles_tool select --name "$WEB_CHOSEN_PROFILE"
+    }
+
+    # fn: _web_profiles_prompt_name - Choose a profile without activating it.
+        # . Purpose
+        #   Offer website-grouped choices for read-only viewing and connection checks.
+        # . Returns
+        #   0 when WEB_CHOSEN_PROFILE contains a saved name; 2 on cancellation.
+        # . Usage
+        #   ```bash
+        #   _web_profiles_prompt_name
+        #   ```
+    _web_profiles_prompt_name() {
+        local buffer="" choice="" row="" index=0
+        local -a names=() labels=()
+        WEB_CHOSEN_PROFILE=''
+        buffer="$(mktemp)" || return 1
+        if ! _web_profiles_tool list --display > "$buffer"; then rm -f -- "$buffer"; return 1; fi
+        mapfile -t names < "$buffer"
+        rm -f -- "$buffer"
+        (( ${#names[@]} )) || { saywarning 'No publishing profiles have been created.'; return 2; }
+        for row in "${names[@]}"; do labels+=("${row%%$'\t'*} / ${row#*$'\t'}"); done
+        ask_selection --label 'Website publishing profile' --var choice --items "${labels[@]}" || return 2
+        for index in "${!labels[@]}"; do
+            if [[ "${labels[$index]}" == "$choice" ]]; then
+                WEB_CHOSEN_PROFILE="${names[$index]#*$'\t'}"
+                return 0
+            fi
+        done
+        return 1
+    }
+
+    # fn: _web_profiles_list - Show all saved website publishing destinations.
+        # . Purpose
+        #   Display grouped website, profile, method, destination and last publication;
+        #   mark the active profile without modifying any profile or selection.
+        # . Usage
+        #   ```bash
+        #   _web_profiles_list
+        #   ```
+    _web_profiles_list() {
+        local buffer="" name="" active="" method="" destination="" last="" value="" website=""
+        local -a names=() profile_rows=()
+        local -A record=()
+        buffer="$(mktemp)" || return 1
+        if ! _web_profiles_tool list > "$buffer"; then rm -f -- "$buffer"; return 1; fi
+        mapfile -t names < "$buffer"
+        rm -f -- "$buffer"
+        sgnd_print_sectionheader --text 'Publishing Profiles'
+        if (( ${#names[@]} == 0 )); then
+            sayinfo 'No publishing profiles have been created.'
+            return 0
+        fi
+        active="$(_web_profiles_tool selected)" || return $?
+        for name in "${names[@]}"; do
+            _web_profiles_read_record "$name" record || return $?
+            method="${record[method]:-rsync}"
+            case "$method" in
+                preview) method='Local preview'; destination="${record[path]:-}" ;;
+                rsync) method='SSH / rsync'; destination="${record[user]:-}@${record[host]:-}:${record[path]:-}" ;;
+                ftp|ftps|sftp) method="${method^^}"; destination="${record[host]:-}:${record[path]:-}" ;;
+            esac
+            last="${record[last_success]:--}"
+            last="${last/T/ }"
+            value="$name"
+            [[ "$name" != "$active" ]] || value="* $name"
+            # DataTable uses | as the column delimiter; literal profile data cannot split rows.
+            website="${record[website]:-Website}"
+            profile_rows+=("${website//|/¦}|${value//|/¦}|${method//|/¦}|${destination//|/¦}|${last//|/¦}")
+        done
+        sgnd_dt_print_table 'Website|Profile|Method|Destination|Last published' profile_rows 1 || return $?
+        sgnd_print_labeledvalue --label 'Selected profile' --value "${active:-None}"
+    }
+
+    # fn: _web_profiles_view - Show one saved destination without selecting it.
+        # . Purpose
+        #   Display the complete non-secret profile configuration and publication date.
+        # . Arguments
+        #   $1 Name of saved profile.
+        # . Usage
+        #   ```bash
+        #   _web_profiles_view Hostnet
+        #   ```
+    _web_profiles_view() {
+        local name="$1" method="" selected=""
+        local -A record=()
+        _web_profiles_read_record "$name" record || return $?
+        selected="$(_web_profiles_tool selected)" || return $?
+        method="${record[method]:-rsync}"
+        sgnd_print_sectionheader --text 'View Publishing Profile'
+        sgnd_print_labeledvalue --label 'Website' --value "${record[website]:-Website}"
+        sgnd_print_labeledvalue --label 'Profile' --value "$name"
+        sgnd_print_labeledvalue --label 'Selected' --value "$( [[ "$name" == "$selected" ]] && printf Yes || printf No )"
+        sgnd_print_labeledvalue --label 'Method' --value "$method"
+        sgnd_print_labeledvalue --label 'Generated HTML' --value "${record[source]:-Not configured}"
+        sgnd_print_labeledvalue --label 'Target directory' --value "${record[path]:-Not configured}"
+        if [[ "$method" == preview ]]; then
+            sgnd_print_labeledvalue --label 'Preferred HTTP port' --value "${record[preview_port]:-8080}"
+            sgnd_print_labeledvalue --label 'Preview URL' --value "${record[url]:-Assigned when local server starts}"
+        else
+            sgnd_print_labeledvalue --label 'Destination host' --value "${record[host]:-Not configured}"
+            sgnd_print_labeledvalue --label 'Destination user' --value "${record[user]:-Not configured}"
+            sgnd_print_labeledvalue --label 'Transport port' --value "${record[port]:-22}"
+            if [[ "$method" == rsync || "$method" == sftp ]]; then
+                sgnd_print_labeledvalue --label 'SSH identity' --value "${record[identity]:-Default SSH identity}"
+            fi
+            sgnd_print_labeledvalue --label 'Public hostname' --value "${record[hostname]:-Not configured}"
+            sgnd_print_labeledvalue --label 'Nginx/DNS management' --value "${record[manage_site]:-No}"
+        fi
+        sgnd_print_labeledvalue --label 'Synchronization' --value "${record[strategy]:-Update}"
+        sgnd_print_labeledvalue --label 'Last published' --value "${record[last_success]:-Never}"
+    }
+
+    # fn: _web_profiles_test_connection - Verify destination access without publishing.
+        # . Purpose
+        #   Check local preview paths, SSH authentication/rsync/target permissions, or
+        #   FTP/FTPS/SFTP directory access using the configured transport.
+        #   Never creates files, starts servers, or changes Nginx/DNS settings.
+        # . Arguments
+        #   $1 Name of the profile to verify, selected or otherwise.
+        # . Returns
+        #   0 for a successful check; nonzero if access or prerequisites failed.
+        # . Usage
+        #   ```bash
+        #   _web_profiles_test_connection Hostnet
+        #   ```
+    _web_profiles_test_connection() {
+        local name="$1" method="" source="" target="" host="" user="" port="" identity=""
+        local ancestor="" escaped="" remote_command="" endpoint="" result=0
+        local ssh_diagnostic="" ssh_line="" shown=0
+        local -a ssh_args=() curl_args=()
+        local -A record=()
+        _web_profiles_read_record "$name" record || return $?
+        method="${record[method]:-rsync}"
+        source="${record[source]:-}"
+        target="${record[path]:-}"
+        host="${record[host]:-}"
+        user="${record[user]:-}"
+        port="${record[port]:-22}"
+        identity="${record[identity]:-}"
+        sgnd_print_sectionheader --text 'Test Publishing Connection'
+        sgnd_print_labeledvalue --label 'Website' --value "${record[website]:-Website}"
+        sgnd_print_labeledvalue --label 'Profile' --value "$name"
+        sgnd_print_labeledvalue --label 'Method' --value "$method"
+        if [[ "$method" == preview ]]; then
+            [[ -d "$source" && -r "${source%/}/index.html" ]] || {
+                sayfail 'Generated website directory or readable index.html is missing.'
+                return 1
+            }
+            _web_publish_safe_path "$target" || { sayfail 'Invalid local target directory.'; return 1; }
+            [[ ! -L "$target" ]] || { sayfail 'Local target is a symbolic link.'; return 1; }
+            ancestor="$target"
+            while [[ ! -e "$ancestor" && "$ancestor" != / ]]; do
+                ancestor="$(dirname -- "$ancestor")"
+            done
+            [[ -d "$ancestor" && -w "$ancestor" && -x "$ancestor" ]] || {
+                sayfail "Local target or its parent is not writable: $ancestor"
+                return 1
+            }
+            command -v rsync >/dev/null 2>&1 || { sayfail 'rsync is missing.'; return 127; }
+            sayok 'Local preview source and destination are accessible (server not started).'
+            return 0
+        fi
+        [[ "$host" =~ ^[A-Za-z0-9][A-Za-z0-9._-]*$ ]] || { sayfail 'Invalid destination host.'; return 1; }
+        [[ "$port" =~ ^[0-9]+$ ]] && (( 10#$port > 0 && 10#$port <= 65535 )) || {
+            sayfail 'Invalid transport port.'
+            return 1
+        }
+        if [[ "$method" == rsync ]]; then
+            [[ "$user" =~ ^[A-Za-z_][A-Za-z0-9_.-]*$ ]] || { sayfail 'Invalid SSH user.'; return 1; }
+            _web_publish_safe_path "$target" || { sayfail 'Invalid SSH target directory.'; return 1; }
+            command -v ssh >/dev/null 2>&1 || { sayfail 'SSH client is missing.'; return 127; }
+            # Use the same dedicated agent discovery and SSH policy as publishing.
+            # A connection check never starts an agent or offers key installation.
+            _web_publish_load_ssh_helper || return $?
+            sgnd_ssh_agent_discover || true
+            ssh_args=(ssh -o BatchMode=yes -o ConnectTimeout=8 -o ConnectionAttempts=1 -p "$port")
+            if [[ -n "$identity" ]]; then
+                identity="${identity/#\~\//$HOME/}"
+                [[ -r "$identity" ]] || { sayfail 'SSH identity is not readable.'; return 1; }
+                ssh_args+=(-i "$identity")
+            fi
+            printf -v escaped '%q' "$target"
+            remote_command="command -v rsync >/dev/null 2>&1 || exit 20; test -d $escaped || exit 21; test -w $escaped || exit 22"
+            ssh_diagnostic="$("${ssh_args[@]}" -- "${user}@${host}" "$remote_command" 2>&1)" || result=$?
+            case "$result" in
+                0) sayok 'SSH authentication, remote rsync, and writable destination verified.'; return 0 ;;
+                20) sayfail 'Connected over SSH, but rsync is not installed on the server.' ;;
+                21) sayfail 'Connected over SSH, but the remote directory does not exist.' ;;
+                22) sayfail 'Connected over SSH, but the remote directory is not writable.' ;;
+                *) sayfail "SSH connection or authentication failed (exit $result)." ;;
+            esac
+            # Preserve actionable SSH diagnostics instead of hiding them. Limit
+            # output and remove control characters before passing it to the UI.
+            while IFS= read -r ssh_line && (( shown < 4 )); do
+                ssh_line="${ssh_line//[$'\001'-$'\010'$'\013'$'\014'$'\016'-$'\037'$'\177']/}"
+                [[ -z "$ssh_line" ]] || { saywarning "SSH: ${ssh_line:0:240}"; shown=$((shown+1)); }
+            done <<< "$ssh_diagnostic"
+            return 1
+        fi
+        if [[ "$method" == ftp || "$method" == ftps || "$method" == sftp ]]; then
+            _web_publish_safe_external_path "$target" || { sayfail 'Invalid hosting directory.'; return 1; }
+            [[ "$user" =~ ^[A-Za-z0-9_][A-Za-z0-9_.@+-]*$ ]] || { sayfail 'Invalid hosting user.'; return 1; }
+            command -v curl >/dev/null 2>&1 || { sayfail 'curl is missing.'; return 127; }
+            endpoint="${method}://${host}:${port}${target%/}/"
+            curl_args=(curl --fail --silent --show-error --list-only --connect-timeout 8 --max-time 25)
+            if [[ "$method" == ftp || "$method" == ftps ]]; then
+                [[ -f "${HOME}/.netrc" ]] || { sayfail 'FTP credentials in ~/.netrc are missing.'; return 1; }
+                curl_args+=(--netrc-file "$HOME/.netrc")
+                [[ "$method" != ftps ]] || curl_args+=(--ssl-reqd)
+            else
+                curl_args+=(--user "${user}:")
+                if [[ -n "$identity" ]]; then
+                    identity="${identity/#\~\//$HOME/}"
+                    [[ -r "$identity" ]] || { sayfail 'SSH identity is not readable.'; return 1; }
+                    curl_args+=(--key "$identity")
+                fi
+            fi
+            if "${curl_args[@]}" "$endpoint" >/dev/null; then
+                sayok 'Hosting authentication and directory listing verified (no upload performed).'
+                return 0
+            fi
+            sayfail 'Hosting connection or directory listing failed; verify credentials and permissions.'
+            return 1
+        fi
+        sayfail "Unsupported publication method: $method"
+        return 1
+    }
+
+    # fn: _web_profiles_select_nginx_site - Select an existing remote Nginx root.
+        # . Purpose
+        #   Optionally reuse an active Nginx hostname and document root on the SSH host.
+        # . Arguments
+        #   $1 host; $2 user; $3 port; $4 identity.
+        # . Usage
+        #   ```bash
+        #   _web_profiles_select_nginx_site td-web sysadmin 22 ''
+        #   ```
+    _web_profiles_select_nginx_site() {
+        local host="$1" user="$2" port="$3" identity="$4" file="" chosen="" row=""
+        local -a sites=() labels=()
+        _web_publish_prepare_ssh "$user" "$host" "$port" "${identity/#\~\//$HOME/}" || return $?
+        file="$(mktemp)" || return 1
+        if ! _web_publish_discover_sites "$host" "$user" "$port" "$identity" > "$file"; then
+            rm -f -- "$file"
+            saywarning 'Unable to list active Nginx websites; enter the target manually.'
+            return 1
+        fi
+        mapfile -t sites < "$file"
+        rm -f -- "$file"
+        (( ${#sites[@]} )) || { saywarning 'No named Nginx websites found.'; return 1; }
+        for row in "${sites[@]}"; do labels+=("${row%%$'\t'*} : ${row#*$'\t'}"); done
+        ask_selection --label 'Existing website' --var chosen --items "${labels[@]}" || return 2
+        local index=0
+        for index in "${!labels[@]}"; do
+            if [[ "${labels[$index]}" == "$chosen" ]]; then
+                WEB_DISCOVERED_HOSTNAME="${sites[$index]%%$'\t'*}"
+                WEB_DISCOVERED_TARGET="${sites[$index]#*$'\t'}"
+                return 0
+            fi
+        done
+        return 1
+    }
+
+    # fn: _web_profiles_configure - Configure a named local or remote destination.
+        # . Purpose
+        #   Collect one website, destination, protocol, and optional server management.
+        # . Returns
+        #   0 saved, 2 cancelled, nonzero on invalid configuration.
+        # . Usage
+        #   ```bash
+        #   _web_profiles_configure 'Development'
+        #   ```
+    _web_profiles_configure() {
+        local name="$1" method="" source="${SGND_WEB_PUBLISH_SOURCE:-${SGND_WEB_CONTENT_OUTPUT%/}}"
+        local website="${WEB_PROFILE_WEBSITE:-}" host="${SGND_WEB_PUBLISH_HOST:-}" user="${SGND_WEB_PUBLISH_USER:-${USER:-}}"
+        local port="${SGND_WEB_PUBLISH_PORT:-22}" target="${SGND_WEB_PUBLISH_REMOTE_DIR:-}" hostname="${SGND_WEB_PUBLISH_HOSTNAME:-}"
+        local strategy="${SGND_WEB_PUBLISH_STRATEGY:-Update}" manage="${SGND_WEB_PUBLISH_MANAGE_SITE:-No}"
+        local preview_port="${SGND_WEB_PUBLISH_PREVIEW_PORT:-8080}" url="${WEB_PROFILE_URL:-}" identity="${SGND_WEB_PUBLISH_IDENTITY:-}"
+        if [[ "${2:-}" == create ]]; then
+            # A new website must not inherit a selected destination's server/root.
+            website=''; host=''; user="${USER:-}"; port=22; target=''; hostname=''
+            identity=''; strategy=Update; manage=No; preview_port=8080; url=''
+        fi
+        ask --label 'Website name' --var website --default "$website" --back || return 2
+        [[ -n "$website" ]] || { sayfail 'Website name is required.'; return 1; }
+        method="${SGND_WEB_PUBLISH_METHOD:-rsync}"
+        case "$method" in
+            preview) method='Local preview' ;;
+            rsync) method='SSH / rsync' ;;
+            ftp) method='FTP' ;;
+            ftps) method='FTPS' ;;
+            sftp) method='SFTP' ;;
+        esac
+        ask_selection --label 'Publication method' --var method --items 'Local preview' 'SSH / rsync' 'FTP' 'FTPS' 'SFTP' || return 2
+        case "$method" in
+            'Local preview') method=preview ;;
+            'SSH / rsync') method=rsync ;;
+            FTP) method=ftp ;;
+            FTPS) method=ftps ;;
+            SFTP) method=sftp ;;
+        esac
+        ask --label 'Generated HTML directory' --var source --default "$source" --back || return 2
+        [[ -d "$source" && -f "${source%/}/index.html" ]] || { sayfail "Missing generated website at $source"; return 1; }
+        if [[ "$method" == preview ]]; then
+            target="${target:-${source%/}-local}"
+            ask --label 'Local website directory' --var target --default "$target" --back || return 2
+            ask --label 'Preferred HTTP port' --var preview_port --default "$preview_port" --back || return 2
+            [[ "$preview_port" =~ ^[0-9]+$ ]] && (( 10#$preview_port > 0 && 10#$preview_port <= 65535 )) || { sayfail 'Invalid HTTP port.'; return 1; }
+            host='' ; user='' ; hostname='' ; identity='' ; manage=No ; port=22
+        else
+            ask --label 'Destination hostname' --var host --default "$host" --back || return 2
+            [[ "$host" =~ ^[A-Za-z0-9][A-Za-z0-9._-]*$ ]] || { sayfail 'Invalid destination host.'; return 1; }
+            ask --label 'Destination user' --var user --default "$user" --back || return 2
+            if [[ "$method" == ftp || "$method" == ftps || "$method" == sftp ]]; then
+                [[ "$user" =~ ^[A-Za-z0-9_][A-Za-z0-9_.@+-]*$ ]] || { sayfail 'Invalid hosting username.'; return 1; }
+            else
+                [[ "$user" =~ ^[A-Za-z_][A-Za-z0-9_.-]*$ ]] || { sayfail 'Invalid SSH user.'; return 1; }
+            fi
+            [[ "$port" =~ ^[0-9]+$ ]] || port=22
+            if [[ "$method" == ftp || "$method" == ftps ]]; then
+                [[ "$port" != 22 ]] || port=21
+            fi
+            ask --label 'Transport port' --var port --default "$port" --back || return 2
+            [[ "$port" =~ ^[0-9]+$ ]] && (( 10#$port > 0 && 10#$port <= 65535 )) || { sayfail 'Invalid destination port.'; return 1; }
+            if [[ "$method" == rsync ]]; then
+                ask --label 'SSH identity file (optional)' --var identity --default "$identity" --back || return 2
+                ask_selection --label 'Nginx/DNS management' --var manage --items Yes No || return 2
+                if [[ "$manage" == Yes ]]; then
+                    local target_action=''
+                    ask_selection --label 'Website target' --var target_action --items 'Select existing Nginx website' 'Enter manually' || return 2
+                    if [[ "$target_action" == 'Select existing Nginx website' ]]; then
+                        if _web_profiles_select_nginx_site "$host" "$user" "$port" "$identity"; then
+                            target="$WEB_DISCOVERED_TARGET"; hostname="$WEB_DISCOVERED_HOSTNAME"
+                        else
+                            saywarning 'Website selection unavailable; enter the target manually.'
+                        fi
+                    fi
+                fi
+            else
+                identity='' ; manage=No
+                sayinfo 'External hosting uses existing FTP credentials (~/.netrc) or SSH authentication. Nginx and DNS are not managed.'
+            fi
+            ask --label 'Remote website directory' --var target --default "$target" --back || return 2
+            if [[ "$method" == ftp || "$method" == ftps || "$method" == sftp ]]; then
+                _web_publish_safe_external_path "$target" || { sayfail 'External hosting directory must be an absolute safe path.'; return 1; }
+            else
+                _web_publish_safe_path "$target" || { sayfail 'Remote directory must be an absolute safe path.'; return 1; }
+            fi
+            ask --label 'Public website hostname (optional)' --var hostname --default "$hostname" --back || return 2
+            [[ -z "$hostname" || "$hostname" =~ ^[A-Za-z0-9][A-Za-z0-9.-]*$ ]] || { sayfail 'Invalid website hostname.'; return 1; }
+        fi
+        if [[ "$method" == preview || "$method" == rsync ]]; then
+            ask_selection --label 'Synchronization' --var strategy --items Update Mirror || return 2
+        else
+            strategy=Update
+        fi
+        if [[ "$manage" == Yes && -z "$hostname" ]]; then
+            sayfail 'Nginx management requires a public website hostname.'
+            return 1
+        fi
+        WEB_PROFILE_WEBSITE="$website"; WEB_PROFILE_URL="$url"
+        SGND_WEB_PUBLISH_METHOD="$method"; SGND_WEB_PUBLISH_SOURCE="$source"
+        SGND_WEB_PUBLISH_HOST="$host"; SGND_WEB_PUBLISH_USER="$user"; SGND_WEB_PUBLISH_PORT="$port"
+        SGND_WEB_PUBLISH_IDENTITY="$identity"; SGND_WEB_PUBLISH_REMOTE_DIR="$target"
+        SGND_WEB_PUBLISH_HOSTNAME="$hostname"; SGND_WEB_PUBLISH_STRATEGY="$strategy"
+        SGND_WEB_PUBLISH_MANAGE_SITE="$manage"; SGND_WEB_PUBLISH_PREVIEW_PORT="$preview_port"
+        _web_profiles_save "$name"
+    }
+
+    # fn$ _web_profiles_menu_action - Execute a selected Framework menu item.
+        # . Purpose
+        #   Run one publishing-profile action without altering the main menu model.
+        # . Arguments
+        #   $1 Action identifier registered in the Framework menu.
+        # . Returns
+        #   0 on success or voluntary cancellation; nonzero on an action error.
+        # . Usage
+        #   ```bash
+        #   _web_profiles_menu_action test
+        #   ```
+    _web_profiles_menu_action() {
+        local action="${1:?missing menu action}" name="" decision="No" preview_url="" rc=0
+        case "$action" in
+            list) _web_profiles_list || rc=$? ;;
+            view)
+                if _web_profiles_prompt_name; then
+                    _web_profiles_view "$WEB_CHOSEN_PROFILE" || rc=$?
+                fi
+                ;;
+            test)
+                if [[ -z "$WEB_ACTIVE_PROFILE" ]]; then
+                    saywarning 'Select a publishing profile first.'
+                else
+                    _web_profiles_test_connection "$WEB_ACTIVE_PROFILE" || rc=$?
+                fi
+                ;;
+            select) _web_profiles_choose || rc=$? ;;
+            create)
+                if ask --label 'New profile name' --var name --default '' --back; then
+                    if _web_profiles_tool get --name "$name" >/dev/null 2>&1; then
+                        saywarning 'That profile name already exists; use Modify.'
+                    else
+                        _web_profiles_configure "$name" create || rc=$?
+                        (( rc == 0 || rc == 2 )) || saywarning 'Profile was not saved.'
+                    fi
+                fi
+                ;;
+            modify)
+                if [[ -z "$WEB_ACTIVE_PROFILE" ]]; then
+                    saywarning 'Select a publishing profile first.'
+                else
+                    _web_profiles_configure "$WEB_ACTIVE_PROFILE" || rc=$?
+                fi
+                ;;
+            delete)
+                if [[ -z "$WEB_ACTIVE_PROFILE" ]]; then
+                    saywarning 'Select a publishing profile first.'
+                else
+                    if ask_decision --label "Delete profile $WEB_ACTIVE_PROFILE" --choices 'Yes|Y,No|N' --default No --var decision; then
+                        if [[ "$decision" == YES ]]; then
+                            if _web_profiles_tool delete --name "$WEB_ACTIVE_PROFILE"; then
+                                sayok "Publishing profile deleted: $WEB_ACTIVE_PROFILE"
+                                WEB_ACTIVE_PROFILE=''
+                                WEB_PROFILE_WEBSITE=''
+                                WEB_PROFILE_ARG=''
+                            else
+                                rc=$?
+                                sayfail 'Could not delete the selected publishing profile.'
+                            fi
+                        else
+                            sayinfo 'Profile deletion cancelled.'
+                        fi
+                    fi
+                fi
+                ;;
+            start|stop)
+                if [[ -z "$WEB_ACTIVE_PROFILE" ]]; then
+                    saywarning 'Select a publishing profile first.'
+                elif [[ "${SGND_WEB_PUBLISH_METHOD:-}" != preview ]]; then
+                    saywarning 'Only local preview profiles have an HTTP server.'
+                elif [[ "$action" == start ]]; then
+                    if preview_url="$(_web_profiles_preview_server start "$SGND_WEB_PUBLISH_REMOTE_DIR" "${SGND_WEB_PUBLISH_PREVIEW_PORT:-8080}")"; then
+                        sgnd_print_labeledvalue --label 'Preview URL' --value "$preview_url"
+                        sayok 'Local preview server is running.'
+                    else
+                        rc=$?
+                        sayfail 'Could not start the local preview server.'
+                    fi
+                else
+                    if _web_profiles_preview_server stop "$SGND_WEB_PUBLISH_REMOTE_DIR" "${SGND_WEB_PUBLISH_PREVIEW_PORT:-8080}"; then
+                        sayok 'Local preview server stopped.'
+                    else
+                        rc=$?
+                        sayfail 'Could not stop the local preview server.'
+                    fi
+                fi
+                ;;
+            *) sayfail "Unknown publishing profile action: $action"; return 2 ;;
+        esac
+        return "$rc"
+    }
+
+    # fn$ _web_profiles_menu_list - Show all saved profiles.
+        # . Usage
+        #   ```bash
+        #   _web_profiles_menu_list
+        #   ```
+    _web_profiles_menu_list() { _web_profiles_menu_action list; }
+
+    # fn$ _web_profiles_menu_view - Inspect a saved profile without selecting it.
+        # . Usage
+        #   ```bash
+        #   _web_profiles_menu_view
+        #   ```
+    _web_profiles_menu_view() { _web_profiles_menu_action view; }
+
+    # fn$ _web_profiles_menu_test - Test the selected destination.
+        # . Usage
+        #   ```bash
+        #   _web_profiles_menu_test
+        #   ```
+    _web_profiles_menu_test() { _web_profiles_menu_action test; }
+
+    # fn$ _web_profiles_menu_select - Select an existing publishing profile.
+        # . Usage
+        #   ```bash
+        #   _web_profiles_menu_select
+        #   ```
+    _web_profiles_menu_select() { _web_profiles_menu_action select; }
+
+    # fn$ _web_profiles_menu_create - Create a publishing profile.
+        # . Usage
+        #   ```bash
+        #   _web_profiles_menu_create
+        #   ```
+    _web_profiles_menu_create() { _web_profiles_menu_action create; }
+
+    # fn$ _web_profiles_menu_modify - Modify the selected publishing profile.
+        # . Usage
+        #   ```bash
+        #   _web_profiles_menu_modify
+        #   ```
+    _web_profiles_menu_modify() { _web_profiles_menu_action modify; }
+
+    # fn$ _web_profiles_menu_delete - Delete the selected profile with confirmation.
+        # . Usage
+        #   ```bash
+        #   _web_profiles_menu_delete
+        #   ```
+    _web_profiles_menu_delete() { _web_profiles_menu_action delete; }
+
+    # fn$ _web_profiles_menu_start - Start HTTP preview for the selected local profile.
+        # . Usage
+        #   ```bash
+        #   _web_profiles_menu_start
+        #   ```
+    _web_profiles_menu_start() { _web_profiles_menu_action start; }
+
+    # fn$ _web_profiles_menu_stop - Stop HTTP preview for the selected local profile.
+        # . Usage
+        #   ```bash
+        #   _web_profiles_menu_stop
+        #   ```
+    _web_profiles_menu_stop() { _web_profiles_menu_action stop; }
+
+    # fn$ _web_profiles_menu_summary - Draw the current selection above menu groups.
+        # . Purpose
+        #   Print the selected destination and website as Framework labeled values
+        #   beneath the menu title, with yellow values and no duplicate subtitle.
+        # . Returns
+        #   0 after rendering.
+        # . Usage
+        #   ```bash
+        #   _web_profiles_menu_summary
+        #   ```
+    _web_profiles_menu_summary() {
+        local selected="${WEB_ACTIVE_PROFILE:-None}"
+        local website="${WEB_PROFILE_WEBSITE:-None}"
+        local selected_color="${YELLOW:-${SGND_UI_VALUE:-}}"
+        sgnd_print_labeledvalue --label 'Selected profile' --value "$selected" --labelwidth 20 --pad 4 --valueclr "$selected_color"
+        sgnd_print_labeledvalue --label 'Website' --value "$website" --labelwidth 20 --pad 4 --valueclr "$selected_color"
+        sgnd_print
+    }
+
+    # fn$ _web_profiles_menu_build - Register groups and actions through sgnd-menu.
+        # . Purpose
+        #   Recreate the standard Framework menu with contiguous item numbering.
+        #   A standard Framework preamble shows the selected website/profile
+        #   between the title bar and first menu group.
+        # . Returns
+        #   0 when the menu has been built; nonzero on registration failure.
+        # . Usage
+        #   ```bash
+        #   _web_profiles_menu_build
+        #   ```
+    _web_profiles_menu_build() {
+        sgnd_menu_create 'Manage Publishing Profiles' ' ' '_web_profiles_menu_summary' || return $?
+        SGND_MENU_SHOW_TOGGLEBAR=0
+        SGND_CURRENT_MODULE_SOURCE='manage-web-content-profiles'
+        SGND_MENU_ACTIVE_SOURCE="$SGND_CURRENT_MODULE_SOURCE"
+        sgnd_menu_register_group 'profiles-view' 'View' '' 0 1 10 || return $?
+        sgnd_menu_register_item 'profiles-list' 'profiles-view' 'List profiles' '_web_profiles_menu_list' '' 0 0 1 0 || return $?
+        sgnd_menu_register_item 'profiles-view-one' 'profiles-view' 'View profile' '_web_profiles_menu_view' '' 0 0 1 0 || return $?
+        sgnd_menu_register_item 'profiles-test' 'profiles-view' 'Test connection' '_web_profiles_menu_test' '' 0 0 1 0 || return $?
+        sgnd_menu_register_group 'profiles-manage' 'Manage' '' 0 1 20 || return $?
+        sgnd_menu_register_item 'profiles-select' 'profiles-manage' 'Select' '_web_profiles_menu_select' '' 0 0 1 0 || return $?
+        sgnd_menu_register_item 'profiles-create' 'profiles-manage' 'Create' '_web_profiles_menu_create' '' 0 0 1 0 || return $?
+        sgnd_menu_register_item 'profiles-modify' 'profiles-manage' 'Modify' '_web_profiles_menu_modify' '' 0 0 1 0 || return $?
+        sgnd_menu_register_item 'profiles-delete' 'profiles-manage' 'Delete' '_web_profiles_menu_delete' '' 0 0 1 0 || return $?
+        sgnd_menu_register_group 'profiles-preview' 'Preview' '' 0 1 30 || return $?
+        sgnd_menu_register_item 'profiles-preview-start' 'profiles-preview' 'Start local preview' '_web_profiles_menu_start' '' 0 0 1 0 || return $?
+        sgnd_menu_register_item 'profiles-preview-stop' 'profiles-preview' 'Stop local preview' '_web_profiles_menu_stop' '' 0 0 1 0 || return $?
+    }
+
+    # fn: _web_profiles_manage - Manage the selected website publishing profile.
+        # . Purpose
+        #   Show a freshly rendered Framework menu after each action, never append
+        #   a second menu beneath output from a previous action.
+        # . Behavior
+        #   - sgnd-menu clears the terminal and renders title, groups and 1-9 choices.
+        #   - Q/ESC returns to the caller, with no numeric Exit option.
+        #   - Connection testing and deletion operate on the selected profile.
+        #   - Each dispatched action ends with one interruptible autoclose dialog.
+        # . Returns
+        #   0 on Back; nonzero when a menu cannot be initialized.
+        # . Usage
+        #   ```bash
+        #   _web_profiles_manage
+        #   ```
+    _web_profiles_manage() {
+        local choice="" rc=0
+        _web_profiles_restore_selection || return $?
+        while :; do
+            _web_profiles_menu_build || return $?
+            sgnd_menu_show_menu || return $?
+            # Framework renderer adds a blank line after Preview; add another
+            # before Selection to keep Back distinct from the input prompt.
+            sgnd_print --text 'Q. Back' --pad 3
+            sgnd_print
+            printf 'Selection : ' >/dev/tty
+            sgnd_menu_read_choice choice || return $?
+            case "$choice" in
+                EXIT|ESC) return 0 ;;
+                RESET|REDRAW|'<'|'>'|L|l) continue ;;
+            esac
+            rc=0
+            sgnd_menu_dispatch "$choice" || rc=$?
+            if [[ -t 0 && "${FLAG_AUTO:-0}" != 1 ]]; then
+                sgnd_print
+                ask_dlg_autocontinue \
+                    --seconds 15 \
+                    --message 'Returning to Manage Publishing Profiles' \
+                    --pause \
+                    --legend 'Enter=return to menu; P/Space=pause; timeout=menu' \
+                    || true
+            fi
+            # Refresh only after an action: the first menu honors CLI --profile.
+            _web_profiles_restore_selection persisted || return $?
+            # The next sgnd_menu_show_menu clears the previous action output.
+        done
+    }
+
+    # fn: _web_profiles_preview_server - Start or stop the owned local HTTP server.
+        # . Purpose
+        #   Start or stop the localhost-bound server, preferring 8080 and higher ports.
+        # . Usage
+        #   ```bash
+        #   _web_profiles_preview_server start /tmp/website 8080
+        #   ```
+    _web_profiles_preview_server() {
+        local python_root=""
+        python_root="$(_web_content_python_root)"
+        PYTHONPATH="$python_root${PYTHONPATH:+:$PYTHONPATH}" python3 -m webcontent.preview_server "$1" --directory "$2" --port "${3:-8080}"
+    }
+
+    # fn: _web_profiles_transfer - Publish selected profile without coupling to Nginx.
+        # . Purpose
+        #   Dry-run, confirm and publish generated HTML through the configured transport.
+        # . Returns
+        #   0 if transfer succeeded or user cancelled, nonzero for failed publication.
+        # . Usage
+        #   ```bash
+        #   _web_profiles_transfer
+        #   ```
+    _web_profiles_transfer() {
+        local source="${SGND_WEB_PUBLISH_SOURCE:-${SGND_WEB_CONTENT_OUTPUT%/}}" target="$SGND_WEB_PUBLISH_REMOTE_DIR"
+        local method="${SGND_WEB_PUBLISH_METHOD:-rsync}" strategy="${SGND_WEB_PUBLISH_STRATEGY:-Update}"
+        local host="${SGND_WEB_PUBLISH_HOST:-}" user="${SGND_WEB_PUBLISH_USER:-}" port="${SGND_WEB_PUBLISH_PORT:-22}"
+        local identity="${SGND_WEB_PUBLISH_IDENTITY:-}" hostname="${SGND_WEB_PUBLISH_HOSTNAME:-}"
+        local rc=0 preview="" decision=No destination="" transport_command="" file="" rel="" url="" root=""
+        local -a args=() curl_args=()
+        [[ -d "$source" && -f "${source%/}/index.html" ]] || { sayfail "Generated website missing: $source"; return 1; }
+        source="$(realpath -e -- "$source")" || return 1
+        [[ "$source" != / && "$source" != *-preview && "$source" != */preview && "$source" != */preview/* ]] || { sayfail 'Unsafe source directory.'; return 1; }
+        [[ -z "$(find "$source" -type l -print -quit)" ]] || { sayfail 'Symbolic links in the website are not supported.'; return 1; }
+        [[ "$strategy" == Update || "$strategy" == Mirror ]] || { sayfail 'Invalid synchronization strategy.'; return 1; }
+        if [[ "$method" == preview ]]; then
+            _web_publish_safe_path "$target" || { sayfail 'Unsafe local website directory.'; return 1; }
+            target="$(realpath -m -- "$target")" || return 1
+            [[ "$target" != "$source" && "$target" != "$source"/* && "$source" != "$target"/* ]] || { sayfail 'Source and target directories cannot contain each other.'; return 1; }
+            [[ ! -L "$target" ]] || { sayfail 'Local destination must not be a symbolic link.'; return 1; }
+            command -v rsync >/dev/null 2>&1 || { sayfail 'rsync is required.'; return 127; }
+            mkdir -p -- "$target" || return 1
+            [[ -z "$(find "$target" -type l -print -quit)" ]] || { sayfail 'Destination contains symbolic links.'; return 1; }
+            args=(rsync -rltvi)
+            [[ "$strategy" != Mirror ]] || args+=(--delete)
+            destination="$target/"
+        elif [[ "$method" == rsync ]]; then
+            _web_publish_safe_path "$target" || { sayfail 'Unsafe remote website directory.'; return 1; }
+            [[ "$host" =~ ^[A-Za-z0-9][A-Za-z0-9._-]*$ && "$user" =~ ^[A-Za-z_][A-Za-z0-9_.-]*$ ]] || { sayfail 'Invalid SSH destination.'; return 1; }
+            [[ "$port" =~ ^[0-9]+$ ]] && (( 10#$port > 0 && 10#$port <= 65535 )) || { sayfail 'Invalid SSH port.'; return 1; }
+            command -v rsync >/dev/null 2>&1 || { sayfail 'rsync is required.'; return 127; }
+            [[ -z "$identity" || ( -r "${identity/#\~\//$HOME/}" && "$identity" != *[[:space:]]* ) ]] || { sayfail 'SSH identity is unreadable or contains whitespace.'; return 1; }
+            _web_publish_prepare_ssh "$user" "$host" "$port" "${identity/#\~\//$HOME/}" || return $?
+            # Never provision or modify a remote Nginx site during a dry-run
+            # or before the operator has approved publication.
+            transport_command="ssh -o BatchMode=yes -p $port"
+            [[ -z "$identity" ]] || transport_command+=" -i ${identity/#\~\//$HOME/}"
+            args=(rsync -rltvi -e "$transport_command")
+            [[ "$strategy" != Mirror ]] || args+=(--delete)
+            destination="${user}@${host}:${target}/"
+        elif [[ "$method" == ftp || "$method" == ftps || "$method" == sftp ]]; then
+            [[ "$strategy" == Update ]] || { sayfail 'Mirror is not supported for external FTP/SFTP hosting.'; return 1; }
+            _web_publish_safe_external_path "$target" || { sayfail 'Unsafe external website directory.'; return 1; }
+            [[ "$host" =~ ^[A-Za-z0-9][A-Za-z0-9._-]*$ && "$user" =~ ^[A-Za-z0-9_][A-Za-z0-9_.@+-]*$ ]] || { sayfail 'Invalid external hosting address.'; return 1; }
+            command -v curl >/dev/null 2>&1 || { sayfail 'curl is required for FTP/SFTP.'; return 127; }
+            if [[ "$method" == ftp || "$method" == ftps ]]; then
+                [[ -f "${HOME}/.netrc" ]] || { sayfail 'FTP credentials must be configured in ~/.netrc.'; return 1; }
+            fi
+            destination="${method}://${host}:${port}${target}/"
+        else
+            sayfail "Unsupported publishing method: $method"
+            return 1
+        fi
+        sgnd_print_sectionheader --text 'Publication preview'
+        sgnd_print_labeledvalue --label 'Website' --value "${WEB_PROFILE_WEBSITE:-Website}"
+        sgnd_print_labeledvalue --label 'Profile' --value "$WEB_ACTIVE_PROFILE"
+        sgnd_print_labeledvalue --label 'Source' --value "$source"
+        sgnd_print_labeledvalue --label 'Destination' --value "$destination"
+        sgnd_print_labeledvalue --label 'Synchronization' --value "$strategy"
+        if [[ "$method" == preview || "$method" == rsync ]]; then
+            preview="$(mktemp)" || return 1
+            "${args[@]}" --dry-run -- "$source/" "$destination" > "$preview" 2>&1 || rc=$?
+            if (( rc != 0 )); then
+                sayfail "Publication dry-run failed ($rc)."
+                while IFS= read -r file; do [[ -z "$file" ]] || sgnd_print --text "$file"; done < "$preview"
+                rm -f -- "$preview"
+                return "$rc"
+            fi
+            sgnd_print_labeledvalue --label 'New files' --value "$(grep -Ec '^>f\+|^cd\+' "$preview" || true)"
+            sgnd_print_labeledvalue --label 'Changed files' --value "$(grep -Ec '^>f[^+]|^\.f' "$preview" || true)"
+            sgnd_print_labeledvalue --label 'Delete candidates' --value "$(grep -c '^\*deleting' "$preview" || true)"
+            rm -f -- "$preview"
+        else
+            sgnd_print_labeledvalue --label 'Transport' --value 'curl (credentials are not stored)'
+        fi
+        [[ "$strategy" != Mirror ]] || saywarning 'Mirror deletes destination-only files.'
+        if [[ "${FLAG_DRYRUN:-0}" == 1 ]]; then
+            sayinfo 'Dry-run complete; no website files were transferred.'
+            return 0
+        fi
+        if [[ "${FLAG_AUTO:-0}" == 1 ]]; then
+            [[ "$strategy" != Mirror ]] || { sayfail 'Mirror requires interactive confirmation.'; return 1; }
+            decision=YES
+        else
+            ask_decision --label 'Publish website' --choices 'Yes|Y,No|N' --default No --var decision || return 0
+        fi
+        [[ "$decision" == YES ]] || { saycancel 'Publication cancelled.'; return 0; }
+        if [[ "$method" == rsync && "${SGND_WEB_PUBLISH_MANAGE_SITE:-No}" == Yes ]]; then
+            _web_publish_remote_site "$host" "$user" "$port" "$identity" "$target" "$hostname" || return $?
+        fi
+        if [[ "$method" == preview || "$method" == rsync ]]; then
+            "${args[@]}" -- "$source/" "$destination" || return $?
+        else
+            # The server path and filenames are URL-encoded independently; credentials
+            # are delegated to curl's existing netrc/SSH setup, never stored here.
+            while IFS= read -r -d '' file; do
+                rel="${file#"$source"/}"
+                url="$(python3 - "$destination" "$rel" <<'PYURL'
+import sys
+from urllib.parse import quote, urlsplit, urlunsplit
+base, name = sys.argv[1:]
+parts = urlsplit(base)
+print(urlunsplit((parts.scheme, parts.netloc, quote(parts.path, safe='/') + quote(name, safe='/'), '', '')))
+PYURL
+)" || return 1
+                curl_args=(curl --fail --show-error --silent --ftp-create-dirs --upload-file "$file")
+                if [[ "$method" == ftps ]]; then curl_args+=(--ssl-reqd --netrc-file "$HOME/.netrc"); fi
+                if [[ "$method" == ftp ]]; then curl_args+=(--netrc-file "$HOME/.netrc"); fi
+                if [[ "$method" == sftp ]]; then
+                    curl_args+=(--user "${user}:")
+                    [[ -z "$identity" ]] || curl_args+=(--key "${identity/#\~\//$HOME/}")
+                fi
+                "${curl_args[@]}" "$url" || { sayfail "Upload failed: $rel"; return 1; }
+            done < <(find "$source" -type f -print0)
+        fi
+        sayok "Website published to $destination."
+        WEB_PUBLISH_RESULT=success
+        _web_profiles_tool success --name "$WEB_ACTIVE_PROFILE" || saywarning 'Could not update successful publication timestamp.'
+        if [[ "$method" == preview ]]; then
+            if [[ "${FLAG_AUTO:-0}" != 1 ]]; then
+                ask_decision --label 'Start local webserver' --choices 'Yes|Y,No|N' --default No --var decision || return 0
+                if [[ "$decision" == YES ]]; then
+                    if url="$(_web_profiles_preview_server start "$target" "${SGND_WEB_PUBLISH_PREVIEW_PORT:-8080}")"; then
+                        sgnd_print_labeledvalue --label 'Preview URL' --value "$url"
+                    else
+                        saywarning 'Website is published, but starting the local HTTP server failed.'
+                    fi
+                fi
+            fi
+        elif [[ "$method" == rsync && "${SGND_WEB_PUBLISH_MANAGE_SITE:-No}" == Yes ]]; then
+            _web_publish_offer_dns "$host" "$user" "$port" "$identity" "$hostname"
+            _web_publish_verify_http "$hostname"
+        fi
+        return 0
+    }
+
+    # fn: _web_content_publish - Select and publish a named website profile.
+        # . Purpose
+        #   Preserve normal publishing entry action while enabling multiple destinations.
+        # . Usage
+        #   ```bash
+        #   _web_content_publish
+        #   ```
+    _web_content_publish() {
+        local action="" name="" rc=0
+        WEB_PUBLISH_RESULT=cancelled
+        _web_profiles_migrate || return $?
+        if [[ -n "${WEB_PROFILE_ARG:-}" ]]; then
+            _web_profiles_load "$WEB_PROFILE_ARG" || return $?
+        else
+            name="$(_web_profiles_tool selected)" || return $?
+            [[ -z "$name" ]] || _web_profiles_load "$name" || return $?
+        fi
+        if [[ -z "$WEB_ACTIVE_PROFILE" ]]; then
+            if [[ "${FLAG_AUTO:-0}" == 1 ]]; then
+                sayfail 'No publication profile selected for unattended publishing.'
+                return 1
+            fi
+            _web_profiles_manage || return $?
+            [[ -n "$WEB_ACTIVE_PROFILE" ]] || return 0
+        fi
+        while :; do
+            sgnd_print_sectionheader --text 'Publish Website'
+            sgnd_print_labeledvalue --label 'Website' --value "${WEB_PROFILE_WEBSITE:-Website}"
+            sgnd_print_labeledvalue --label 'Profile' --value "$WEB_ACTIVE_PROFILE"
+            sgnd_print_labeledvalue --label 'Method' --value "${SGND_WEB_PUBLISH_METHOD:-rsync}"
+            sgnd_print_labeledvalue --label 'Source' --value "${SGND_WEB_PUBLISH_SOURCE:-${SGND_WEB_CONTENT_OUTPUT%/}}"
+            sgnd_print_labeledvalue --label 'Destination' --value "${SGND_WEB_PUBLISH_HOST:-local}:${SGND_WEB_PUBLISH_REMOTE_DIR:-}"
+            sgnd_print_labeledvalue --label 'Last published' --value "${WEB_PROFILE_LAST_SUCCESS:-Not available}"
+            if [[ "${FLAG_AUTO:-0}" == 1 ]]; then action=Publish
+            else ask_selection --label 'Publication' --var action --items Publish Modify 'Select profile' 'Manage profiles' Cancel || return 0; fi
+            case "$action" in
+                Publish) break ;;
+                Modify) _web_profiles_configure "$WEB_ACTIVE_PROFILE" || return $? ;;
+                'Select profile') _web_profiles_choose || true ;;
+                'Manage profiles') _web_profiles_manage || return $? ;;
+                Cancel) return 0 ;;
+            esac
+        done
+        _web_profiles_transfer
+    }
+
 # - Action dispatch -----------------------------------------------------------------
     # fn: _run_action - Dispatch the requested command-line management action.
         # . Purpose
@@ -3071,6 +3791,7 @@ PY_GITHUB_PAGES
                 ;;
             generate) _web_content_generate ;;
             publish-github-pages) _web_content_publish_github_pages ;;
+            manage-publishing-profiles) _web_profiles_migrate && _web_profiles_manage ;;
             publish)
                 _web_content_publish || rc=$?
                 if (( rc != 0 )); then
